@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- Music note (top-left, green) -->
+    <!-- Note head -->
+    <path
+        android:fillColor="#FF00E676"
+        android:pathData="M6,18 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 Z" />
+    <!-- Note stem -->
+    <path
+        android:fillColor="#FF00E676"
+        android:pathData="M12,18 L12,8 L18,6.5 L18,9.5 L15,10.5 L15,18 Z" />
+
+    <!-- Lambda λ (right side, green, Half-Life style) -->
+    <!-- Left stroke of λ: top-center going down-left -->
+    <path
+        android:fillColor="#FF00E676"
+        android:pathData="M18,44 L22.5,44 L34,18 L29.5,18 Z" />
+    <!-- Right stroke of λ: from center going down-right with bottom foot -->
+    <path
+        android:fillColor="#FF00E676"
+        android:pathData="M34,18 L38.5,18 L45,36 L40.5,37.5 Z" />
+
+</vector>
