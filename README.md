@@ -1,4 +1,4 @@
-# 🎵 Lamba Player - Minimalist & Customizable Local Music Player
+# 🎵 Lamba Player - A Local Music Player
 
 Lamba Player is a modern, lightweight audio player built 100% with Kotlin. It is designed to play your local MP3 files with a fully customizable user interface, advanced queue management, and high-quality audio mixing—completely free and offline.
 
