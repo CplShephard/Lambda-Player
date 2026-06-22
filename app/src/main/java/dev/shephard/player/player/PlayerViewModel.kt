@@ -347,6 +347,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     // Liked songs
     fun isLiked(trackId: Long): Boolean = trackId in _uiState.value.likedIds
 
+    fun setCrossfadeEnabled(enabled: Boolean) {
+        viewModelScope.launch { prefs.setCrossfadeEnabled(enabled) }
+    }
+
+    fun setGaplessEnabled(enabled: Boolean) {
+        viewModelScope.launch { prefs.setGaplessEnabled(enabled) }
+    }
+
+    fun setPlayWithOthers(enabled: Boolean) {
+        viewModelScope.launch { prefs.setPlayWithOthers(enabled) }
+    }
+
     fun toggleLike(track: AudioTrack) {
         viewModelScope.launch {
             val currentJson = prefs.likedSongIdsJson.first()
