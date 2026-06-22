@@ -12,8 +12,8 @@ android {
         applicationId = "dev.shephard.player"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "2.0"
+        versionCode = 2
+        versionName = "2.1"
     }
 
     signingConfigs {
@@ -97,6 +97,9 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.palette:palette-ktx:1.0.0")
+
+    // Tag editor - MP3 ID3
+    implementation("com.mpatric:mp3agic:0.9.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

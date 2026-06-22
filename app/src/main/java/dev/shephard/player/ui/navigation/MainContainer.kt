@@ -142,8 +142,8 @@ fun MainContainer(
                     NavGraph(
                         navController = navController,
                         modifier = Modifier.fillMaxSize(),
-                        onTrackClick = { tracks, index ->
-                            playerViewModel.setQueueAndPlay(tracks, index)
+                        onTrackClick = { tracks, index, playlistName ->
+                            playerViewModel.setQueueAndPlay(tracks, index, playlistName)
                             showNowPlaying = true
                         }
                     )

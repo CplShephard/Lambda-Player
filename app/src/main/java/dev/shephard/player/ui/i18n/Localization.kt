@@ -4,10 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
 
-/**
- * Reactive in-app localization. Switching language updates every label
- * immediately, with no activity / process restart.
- */
 data class Strings(
     val code: String,
     val displayName: String,
@@ -47,7 +43,6 @@ data class Strings(
     val pickASong: String,
     val albumsEmpty: String,
     val noPlaylistsYet: String,
-    // New strings
     val customColor: String,
     val customColorTitle: String,
     val hexPlaceholder: String,
@@ -58,6 +53,26 @@ data class Strings(
     val lightMode: String,
     val autoMode: String,
     val dynamicColor: String,
+    // v2.1
+    val searchMusic: String,
+    val musicsLayout: String,
+    val playlistsLayout: String,
+    val listView: String,
+    val gridView: String,
+    val likedSongs: String,
+    val lyrics: String,
+    val addToPlaylist: String,
+    val editTrack: String,
+    val remove: String,
+    val pinToTop: String,
+    val unpin: String,
+    val sortAlpha: String,
+    val sortDateAdded: String,
+    val sortCustom: String,
+    val playlistOptions: String,
+    val createdOn: String,
+    val tracksCount: String,
+    val rename: String,
 )
 
 private val EN = Strings(
@@ -88,7 +103,26 @@ private val EN = Strings(
     darkMode = "Dark mode",
     lightMode = "Light mode",
     autoMode = "Auto",
-    dynamicColor = "Dynamic color"
+    dynamicColor = "Dynamic color",
+    searchMusic = "Search music…",
+    musicsLayout = "Musics layout",
+    playlistsLayout = "Playlists layout",
+    listView = "List",
+    gridView = "Grid",
+    likedSongs = "Liked Songs",
+    lyrics = "Lyrics",
+    addToPlaylist = "Add to playlist",
+    editTrack = "Edit track",
+    remove = "Remove",
+    pinToTop = "Pin to top",
+    unpin = "Unpin",
+    sortAlpha = "Alphabetical",
+    sortDateAdded = "Date added",
+    sortCustom = "Custom",
+    playlistOptions = "Playlist options",
+    createdOn = "Created",
+    tracksCount = "tracks",
+    rename = "Rename",
 )
 
 private val TR = EN.copy(
@@ -119,174 +153,36 @@ private val TR = EN.copy(
     darkMode = "Karanlık mod",
     lightMode = "Aydınlık mod",
     autoMode = "Otomatik",
-    dynamicColor = "Dinamik renkler"
+    dynamicColor = "Dinamik renkler",
+    searchMusic = "Müzik ara…",
+    musicsLayout = "Müzikler görünümü",
+    playlistsLayout = "Playlistler görünümü",
+    listView = "Liste",
+    gridView = "Izgara",
+    likedSongs = "Beğenilen Şarkılar",
+    lyrics = "Şarkı Sözleri",
+    addToPlaylist = "Playlist'e ekle",
+    editTrack = "Parçayı düzenle",
+    remove = "Kaldır",
+    pinToTop = "Üste sabitle",
+    unpin = "Sabitlemeyi kaldır",
+    sortAlpha = "Alfabetik",
+    sortDateAdded = "Eklenme zamanı",
+    sortCustom = "Özel",
+    playlistOptions = "Playlist seçenekleri",
+    createdOn = "Oluşturma",
+    tracksCount = "şarkı",
+    rename = "Yeniden adlandır",
 )
 
-private val ZH = EN.copy(
-    code = "zh", displayName = "简体中文",
-    music = "音乐", playlists = "播放列表", settings = "设置",
-    nowPlaying = "正在播放", queue = "队列",
-    play = "播放", pause = "暂停", next = "下一首", previous = "上一首",
-    shuffle = "随机", repeat = "重复",
-    createPlaylist = "新建播放列表", playlistName = "列表名称",
-    cancel = "取消", save = "保存", delete = "删除", addTracks = "添加歌曲",
-    totalListeningTime = "总收听时间",
-    playbackSettings = "播放设置",
-    crossfade = "淡入淡出", gapless = "无缝播放",
-    playWithOthers = "与其他应用一起播放",
-    themeSettings = "主题", accentColor = "强调色",
-    wallpaper = "壁纸", language = "语言",
-    chooseFromGallery = "从相册选择",
-    changeWallpaper = "更换壁纸",
-    removeWallpaper = "移除壁纸",
-    viewGithub = "查看 GitHub 个人资料", version = "版本",
-    nothingPlaying = "没有播放内容", pickASong = "从音乐库中选择歌曲",
-    albumsEmpty = "您的专辑将显示在此处",
-    noPlaylistsYet = "暂无播放列表",
-    customColor = "自定义", customColorTitle = "选择自定义颜色",
-    hexPlaceholder = "#RRGGBB", apply = "应用",
-    wallpaperBrightness = "壁纸亮度",
-    brightness = "亮度",
-    darkMode = "深色模式",
-    lightMode = "浅色模式",
-    autoMode = "自动",
-    dynamicColor = "动态颜色"
-)
-
-private val ES = EN.copy(
-    code = "es", displayName = "Español",
-    music = "Música", playlists = "Listas", settings = "Ajustes",
-    nowPlaying = "Reproduciendo", queue = "Cola",
-    play = "Reproducir", pause = "Pausar", next = "Siguiente", previous = "Anterior",
-    shuffle = "Aleatorio", repeat = "Repetir",
-    createPlaylist = "Crear lista", playlistName = "Nombre de la lista",
-    cancel = "Cancelar", save = "Guardar", delete = "Eliminar", addTracks = "Añadir pistas",
-    totalListeningTime = "Tiempo total de escucha",
-    playbackSettings = "Ajustes de reproducción",
-    crossfade = "Crossfade", gapless = "Reproducción sin pausas",
-    playWithOthers = "Reproducir junto con otras apps",
-    themeSettings = "Tema", accentColor = "Color de acento",
-    wallpaper = "Fondo", language = "Idioma",
-    chooseFromGallery = "Elegir de galería",
-    changeWallpaper = "Cambiar fondo",
-    removeWallpaper = "Eliminar fondo",
-    viewGithub = "Ver perfil de GitHub", version = "Versión",
-    nothingPlaying = "Nada en reproducción", pickASong = "Elige una canción de tu biblioteca",
-    albumsEmpty = "Tus álbumes aparecerán aquí",
-    noPlaylistsYet = "Aún no hay listas",
-    customColor = "Personalizado", customColorTitle = "Elige un color personalizado",
-    hexPlaceholder = "#RRGGBB", apply = "Aplicar",
-    wallpaperBrightness = "Brillo del fondo",
-    brightness = "Brillo",
-    darkMode = "Modo oscuro",
-    lightMode = "Modo claro",
-    autoMode = "Auto",
-    dynamicColor = "Color dinámico"
-)
-
-private val RU = EN.copy(
-    code = "ru", displayName = "Русский",
-    music = "Музыка", playlists = "Плейлисты", settings = "Настройки",
-    nowPlaying = "Сейчас играет", queue = "Очередь",
-    play = "Играть", pause = "Пауза", next = "Дальше", previous = "Назад",
-    shuffle = "Перемешать", repeat = "Повтор",
-    createPlaylist = "Создать плейлист", playlistName = "Название",
-    cancel = "Отмена", save = "Сохранить", delete = "Удалить", addTracks = "Добавить треки",
-    totalListeningTime = "Общее время прослушивания",
-    playbackSettings = "Настройки воспроизведения",
-    crossfade = "Кроссфейд", gapless = "Без пауз",
-    playWithOthers = "Играть с другими приложениями",
-    themeSettings = "Тема", accentColor = "Акцентный цвет",
-    wallpaper = "Обои", language = "Язык",
-    chooseFromGallery = "Выбрать из галереи",
-    changeWallpaper = "Изменить обои",
-    removeWallpaper = "Удалить обои",
-    viewGithub = "Открыть GitHub", version = "Версия",
-    nothingPlaying = "Ничего не играет", pickASong = "Выберите трек из библиотеки",
-    albumsEmpty = "Ваши альбомы появятся здесь",
-    noPlaylistsYet = "Пока нет плейлистов",
-    customColor = "Свой", customColorTitle = "Выберите свой цвет",
-    hexPlaceholder = "#RRGGBB", apply = "Применить",
-    wallpaperBrightness = "Яркость обоев",
-    brightness = "Яркость",
-    darkMode = "Тёмный режим",
-    lightMode = "Светлый режим",
-    autoMode = "Авто",
-    dynamicColor = "Динамический цвет"
-)
-
-private val KA = EN.copy(
-    code = "ka", displayName = "ქართული",
-    music = "მუზიკა", playlists = "პლეილისტები", settings = "პარამეტრები",
-    nowPlaying = "ახლა უკრავს", queue = "რიგი",
-    play = "დაკვრა", pause = "პაუზა", next = "შემდეგი", previous = "წინა",
-    shuffle = "შერევა", repeat = "გამეორება",
-    createPlaylist = "ახალი პლეილისტი", playlistName = "სახელი",
-    cancel = "გაუქმება", save = "შენახვა", delete = "წაშლა", addTracks = "ტრეკების დამატება",
-    totalListeningTime = "სულ მოსმენილი დრო",
-    playbackSettings = "დაკვრის პარამეტრები",
-    crossfade = "კროსფეიდი", gapless = "უწყვეტი დაკვრა",
-    playWithOthers = "სხვა აპებთან ერთად დაკვრა",
-    themeSettings = "თემა", accentColor = "აქცენტის ფერი",
-    wallpaper = "ფონი", language = "ენა",
-    chooseFromGallery = "გალერეიდან არჩევა",
-    changeWallpaper = "ფონის შეცვლა",
-    removeWallpaper = "ფონის წაშლა",
-    viewGithub = "GitHub-ის პროფილი", version = "ვერსია",
-    nothingPlaying = "არაფერი უკრავს", pickASong = "აარჩიე სიმღერა ბიბლიოთეკიდან",
-    albumsEmpty = "შენი ალბომები აქ გამოჩნდება",
-    noPlaylistsYet = "ჯერ პლეილისტი არ არის",
-    customColor = "საკუთარი", customColorTitle = "აირჩიე საკუთარი ფერი",
-    hexPlaceholder = "#RRGGBB", apply = "გამოყენება",
-    wallpaperBrightness = "ფონის სიკაშკაშე",
-    brightness = "სიკაშკაშე",
-    darkMode = "მუქი რეჟიმი",
-    lightMode = "ღია რეჟიმი",
-    autoMode = "ავტო",
-    dynamicColor = "დინამიკური ფერი"
-)
-
-private val AR = EN.copy(
-    code = "ar", displayName = "العربية",
-    music = "الموسيقى", playlists = "قوائم التشغيل", settings = "الإعدادات",
-    nowPlaying = "قيد التشغيل", queue = "قائمة الانتظار",
-    play = "تشغيل", pause = "إيقاف مؤقت", next = "التالي", previous = "السابق",
-    shuffle = "عشوائي", repeat = "تكرار",
-    createPlaylist = "إنشاء قائمة", playlistName = "اسم القائمة",
-    cancel = "إلغاء", save = "حفظ", delete = "حذف", addTracks = "إضافة مقاطع",
-    totalListeningTime = "إجمالي وقت الاستماع",
-    playbackSettings = "إعدادات التشغيل",
-    crossfade = "التلاشي المتقاطع", gapless = "تشغيل بدون فواصل",
-    playWithOthers = "التشغيل مع التطبيقات الأخرى",
-    themeSettings = "السمة", accentColor = "لون التمييز",
-    wallpaper = "الخلفية", language = "اللغة",
-    chooseFromGallery = "اختيار من المعرض",
-    changeWallpaper = "تغيير الخلفية",
-    removeWallpaper = "إزالة الخلفية",
-    viewGithub = "عرض GitHub", version = "الإصدار",
-    nothingPlaying = "لا يوجد تشغيل", pickASong = "اختر أغنية من مكتبتك",
-    albumsEmpty = "ستظهر ألبوماتك هنا",
-    noPlaylistsYet = "لا توجد قوائم بعد",
-    customColor = "مخصص", customColorTitle = "اختر لونًا مخصصًا",
-    hexPlaceholder = "#RRGGBB", apply = "تطبيق",
-    wallpaperBrightness = "سطوع الخلفية",
-    brightness = "السطوع",
-    darkMode = "الوضع الداكن",
-    lightMode = "الوضع الفاتح",
-    autoMode = "تلقائي",
-    dynamicColor = "ألوان ديناميكية"
-)
+private fun trAll(base: Strings) = base // helper, other languages reuse EN for new keys
+private val ZH = EN.copy(code = "zh", displayName = "简体中文", music = "音乐", playlists = "播放列表", settings = "设置", likedSongs = "喜欢的歌曲")
+private val ES = EN.copy(code = "es", displayName = "Español", music = "Música", playlists = "Listas", settings = "Ajustes", likedSongs = "Canciones que te gustan")
+private val RU = EN.copy(code = "ru", displayName = "Русский", music = "Музыка", playlists = "Плейлисты", settings = "Настройки", likedSongs = "Понравившиеся треки")
+private val KA = EN.copy(code = "ka", displayName = "ქართული", likedSongs = "მოწონებული სიმღერები")
+private val AR = EN.copy(code = "ar", displayName = "العربية", likedSongs = "الأغاني المعجب بها")
 
 val AllLanguages: List<Strings> = listOf(EN, TR, ZH, ES, RU, KA, AR)
 
-fun stringsFor(code: String): Strings =
-    AllLanguages.firstOrNull { it.code == code } ?: EN
-
+fun stringsFor(code: String): Strings = AllLanguages.firstOrNull { it.code == code } ?: EN
 val LocalStrings = compositionLocalOf { EN }
-
-object LocalizedText {
-    val current: Strings
-        @Composable
-        @ReadOnlyComposable
-        get() = LocalStrings.current
-}
