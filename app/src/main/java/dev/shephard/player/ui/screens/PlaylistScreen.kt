@@ -220,7 +220,8 @@ fun PlaylistScreen(
                     val next = playlists.toMutableList().also { it.removeAt(delIdx) }
                     scope.launch { prefs.setPlaylistsJson(encodePlaylists(next)) }
                 },
-                onCreate = { showCreate = true; newName = "" }
+                onCreate = { showCreate = true; newName = "" },
+                miniPlayerVisible = miniPlayerVisible
             )
         } else {
             // ----- DETAY GÖRÜNÜMÜ (AYRI SEKME) -----
@@ -369,7 +370,8 @@ private fun PlaylistListView(
     onOpen: (Int) -> Unit,
     onPlay: (LocalPlaylist) -> Unit,
     onDelete: (Int) -> Unit,
-    onCreate: () -> Unit
+    onCreate: () -> Unit,
+    miniPlayerVisible: Boolean = false
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         if (playlists.isEmpty()) {
