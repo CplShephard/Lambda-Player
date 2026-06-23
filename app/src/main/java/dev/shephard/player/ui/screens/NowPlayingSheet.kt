@@ -46,6 +46,7 @@ import dev.shephard.player.ui.components.BouncyIconButton
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.rememberBounceOverscrollEffect
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MusicNote
@@ -298,11 +299,22 @@ fun NowPlayingSheet(
                     contentDescription = strings.cancel,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Text(
-                    text = strings.nowPlaying,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    // Playlist Context Header (if playing from a playlist)
+                    if (state.currentPlaylistName != null) {
+                        Text(
+                            text = state.currentPlaylistName!!,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Text(
+                        text = strings.nowPlaying,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 // Sağ üst boş placeholder (Queue sağ alta taşındı)
                 Box(modifier = Modifier.size(48.dp))
             }
@@ -372,6 +384,18 @@ fun NowPlayingSheet(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+
+                        // Real-time Floating Lyrics (compact typography between title & progress)
+                        if (!state.currentLyric.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = state.currentLyric!!,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
             }
@@ -413,13 +437,36 @@ fun NowPlayingSheet(
                 }
             }
 
-            // Queue butonu — repeat'in tam üstünde, sağa hizalı
+            // Queue + Lyrics + Add buttons — aligned row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp, end = 4.dp),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // Dedicated Lyrics toggle button
+                BouncyIconButton(
+                    onClick = { /* TODO: open lyrics sheet or toggle */ },
+                    icon = Icons.Filled.QueueMusic, // placeholder icon; can be replaced with a lyrics icon
+                    contentDescription = "Lyrics",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    iconSize = 28.dp
+                )
+
+                Spacer(Modifier.width(8.dp))
+
+                // Smart "+" button (placeholder for later batch)
+                BouncyIconButton(
+                    onClick = { /* handled in batch 3 */ },
+                    icon = Icons.Filled.Add,
+                    contentDescription = "Add to playlist",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    iconSize = 28.dp
+                )
+
+                Spacer(Modifier.width(8.dp))
+
                 var showQueue by remember { mutableStateOf(false) }
                 BouncyIconButton(
                     onClick = { showQueue = true },
@@ -470,20 +517,49 @@ fun NowPlayingSheet(
                     tint = MaterialTheme.colorScheme.onBackground,
                     iconSize = 36.dp
                 )
+                // Bouncing scale + rotating Play/Pause icon
+                var playButtonScale by remember { mutableStateOf(1f) }
+                val animatedScale by animateFloatAsState(
+                    targetValue = playButtonScale,
+                    animationSpec = spring(dampingRatio = 0.4f, stiffness = 600f),
+                    label = "playButtonBounce"
+                )
+
                 Box(
                     modifier = Modifier
                         .size(72.dp)
+                        .graphicsLayer {
+                            scaleX = animatedScale
+                            scaleY = animatedScale
+                        }
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
-                        .bounceClick { playerViewModel.togglePlayPause() },
+                        .bounceClick {
+                            playButtonScale = 0.75f
+                            playerViewModel.togglePlayPause()
+                            // reset scale shortly after
+                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                kotlinx.coroutines.delay(80)
+                                playButtonScale = 1f
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (state.isPlaying) strings.pause else strings.play,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(36.dp)
-                    )
+                    AnimatedContent(
+                        targetState = state.isPlaying,
+                        transitionSpec = {
+                            (fadeIn(tween(180)) + scaleIn(initialScale = 0.6f))
+                                .togetherWith(fadeOut(tween(120)))
+                        },
+                        label = "playPauseIcon"
+                    ) { isPlaying ->
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (isPlaying) strings.pause else strings.play,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
                 }
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToNext() },

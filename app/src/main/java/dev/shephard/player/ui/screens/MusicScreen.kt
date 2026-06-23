@@ -11,11 +11,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,11 +29,16 @@ import androidx.compose.material.icons.Icons
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.rememberBounceOverscrollEffect
 import androidx.compose.material.icons.filled.FolderOff
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,6 +75,20 @@ fun MusicScreen(
         onGranted = { libraryViewModel.loadTracks() }
     )
 
+    // Instant real-time search
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredTracks = remember(tracks, searchQuery) {
+        if (searchQuery.isBlank()) tracks
+        else tracks.filter {
+            it.title.contains(searchQuery, ignoreCase = true) ||
+            it.artist.contains(searchQuery, ignoreCase = true) ||
+            it.album.contains(searchQuery, ignoreCase = true)
+        }
+    }
+
+    // Layout preference (default List) – can be wired to Settings later
+    var isGridLayout by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         if (permissionState.hasPermission) {
             libraryViewModel.loadTracks()
@@ -82,22 +107,57 @@ fun MusicScreen(
             EmptyState()
         }
         else -> {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .overscroll(rememberBounceOverscrollEffect()),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                items(
-                    items = tracks,
-                    key = { it.id }
-                ) { track ->
-                    val index = tracks.indexOf(track)
-                    TrackRow(
-                        track = track,
-                        onClick = { onTrackClick(tracks, index) }
-                    )
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Instant Search Bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    placeholder = { Text("Search songs, artists, albums...") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    singleLine = true
+                )
+
+                if (isGridLayout) {
+                    // Grid View (large covers + harmonized text)
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .overscroll(rememberBounceOverscrollEffect()),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(filteredTracks, key = { it.id }) { track ->
+                            val index = filteredTracks.indexOf(track)
+                            GridTrackCard(track = track) {
+                                onTrackClick(filteredTracks, index)
+                            }
+                        }
+                    }
+                } else {
+                    // List View (default)
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .overscroll(rememberBounceOverscrollEffect()),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(
+                            items = filteredTracks,
+                            key = { it.id }
+                        ) { track ->
+                            val index = filteredTracks.indexOf(track)
+                            TrackRowWithMenu(
+                                track = track,
+                                onClick = { onTrackClick(filteredTracks, index) }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -245,5 +305,127 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit) {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+// List row with 3-dot menu (Song Context Menu)
+@Composable
+private fun TrackRowWithMenu(track: AudioTrack, onClick: () -> Unit) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .bounceClick { onClick() }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            var artLoaded by remember(track.id) { mutableStateOf(false) }
+            AsyncImage(
+                model = track.albumArtUri,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop,
+                onState = { state -> artLoaded = state is AsyncImagePainter.State.Success }
+            )
+            if (!artLoaded) {
+                Icon(Icons.Filled.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp)
+        ) {
+            Text(
+                text = track.title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = track.artist,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Text(
+            text = track.formattedDuration(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        // 3-dots menu
+        Box {
+            Icon(
+                imageVector = Icons.Filled.MoreVert,
+                contentDescription = "More",
+                modifier = Modifier
+                    .size(28.dp)
+                    .clickable { showMenu = true }
+                    .padding(4.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                DropdownMenuItem(text = { Text("Edit Music") }, onClick = { showMenu = false /* TODO: open tag editor */ })
+                DropdownMenuItem(text = { Text("Delete Music", color = MaterialTheme.colorScheme.error) }, onClick = { showMenu = false /* TODO */ })
+            }
+        }
+    }
+}
+
+// Grid card with large cover + harmonized text
+@Composable
+private fun GridTrackCard(track: AudioTrack, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .bounceClick { onClick() }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            AsyncImage(
+                model = track.albumArtUri,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        }
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp)) {
+            Text(
+                text = track.title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = track.artist,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }

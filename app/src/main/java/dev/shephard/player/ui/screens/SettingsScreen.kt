@@ -510,7 +510,7 @@ fun SettingsScreen() {
 
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "${strings.version} 1.0.0",
+            text = "${strings.version} ${context.packageManager.getPackageInfo(context.packageName, 0).versionName}",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier

@@ -28,7 +28,8 @@ private val fadeSpring = spring<Float>(
 fun NavGraph(
     navController: NavHostController,
     modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
-    onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> }
+    onTrackClick: (List<AudioTrack>, Int) -> Unit = { _, _ -> },
+    miniPlayerVisible: Boolean = false
 ) {
     NavHost(
         navController = navController,
@@ -77,10 +78,10 @@ fun NavGraph(
         }
     ) {
         composable(Destination.Music.route) {
-            MusicScreen(onTrackClick = { tracks, index -> onTrackClick(tracks, index, null) })
+            MusicScreen(onTrackClick = onTrackClick)
         }
         composable(Destination.Playlists.route) {
-            PlaylistScreen(onTrackClick = { tracks, index -> onTrackClick(tracks, index, null) })
+            PlaylistScreen(onTrackClick = onTrackClick, miniPlayerVisible = miniPlayerVisible)
         }
         composable(Destination.Settings.route) {
             SettingsScreen()

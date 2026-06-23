@@ -82,7 +82,13 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
-private data class LocalPlaylist(val name: String, val trackIds: List<Long>, val coverUri: String? = null)
+private data class LocalPlaylist(
+    val name: String,
+    val trackIds: List<Long>,
+    val coverUri: String? = null,
+    val isPinned: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis()
+)
 
 private fun parsePlaylists(json: String): List<LocalPlaylist> = try {
     val arr = JSONArray(json)
@@ -90,7 +96,13 @@ private fun parsePlaylists(json: String): List<LocalPlaylist> = try {
         val obj = arr.getJSONObject(i)
         val ids = obj.optJSONArray("trackIds")
         val list = if (ids != null) (0 until ids.length()).map { ids.getLong(it) } else emptyList()
-        LocalPlaylist(obj.optString("name"), list, obj.optString("coverUri").takeIf { it.isNotEmpty() })
+        LocalPlaylist(
+            name = obj.optString("name"),
+            trackIds = list,
+            coverUri = obj.optString("coverUri").takeIf { it.isNotEmpty() },
+            isPinned = obj.optBoolean("isPinned", false),
+            createdAt = obj.optLong("createdAt", System.currentTimeMillis())
+        )
     }
 } catch (_: Exception) { emptyList() }
 
@@ -100,6 +112,8 @@ private fun encodePlaylists(items: List<LocalPlaylist>): String {
         val obj = JSONObject()
         obj.put("name", pl.name)
         obj.put("coverUri", pl.coverUri ?: "")
+        obj.put("isPinned", pl.isPinned)
+        obj.put("createdAt", pl.createdAt)
         val ids = JSONArray()
         pl.trackIds.forEach { ids.put(it) }
         obj.put("trackIds", ids)
@@ -111,7 +125,8 @@ private fun encodePlaylists(items: List<LocalPlaylist>): String {
 @Composable
 fun PlaylistScreen(
     libraryViewModel: LibraryViewModel = viewModel(),
-    onTrackClick: (List<AudioTrack>, Int) -> Unit = { _, _ -> }
+    onTrackClick: (List<AudioTrack>, Int) -> Unit = { _, _ -> },
+    miniPlayerVisible: Boolean = false
 ) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
@@ -449,23 +464,50 @@ private fun PlaylistListView(
                                 contentDescription = strings.play,
                                 tint = MaterialTheme.colorScheme.primary
                             )
-                            BouncyIconButton(
-                                onClick = { onDelete(idx) },
-                                icon = Icons.Filled.Delete,
-                                contentDescription = strings.delete,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            // 3-dot menu instead of destructive delete
+                            var showMenu by remember { mutableStateOf(false) }
+                            Box {
+                                BouncyIconButton(
+                                    onClick = { showMenu = true },
+                                    icon = Icons.Filled.MoreVert,
+                                    contentDescription = "More",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                DropdownMenu(
+                                    expanded = showMenu,
+                                    onDismissRequest = { showMenu = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Edit Playlist Name") },
+                                        onClick = { /* TODO: edit name */ showMenu = false }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Pin to Top") },
+                                        onClick = { /* TODO: pin logic (max 3) */ showMenu = false }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Delete Playlist", color = MaterialTheme.colorScheme.error) },
+                                        onClick = {
+                                            onDelete(idx)
+                                            showMenu = false
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
+        // Dynamically shift FAB upward when mini player is visible
+        val fabBottomPadding = if (miniPlayerVisible) 200.dp else 140.dp
+
         FloatingActionButton(
             onClick = onCreate,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 140.dp, end = 24.dp)
+                .padding(bottom = fabBottomPadding, end = 24.dp)
                 .bounceClick(onClick = onCreate),
             shape = RoundedCornerShape(20.dp),
             containerColor = MaterialTheme.colorScheme.primary

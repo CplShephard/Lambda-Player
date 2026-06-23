@@ -2,6 +2,9 @@ package dev.shephard.player.data
 
 import android.content.ContentUris
 import android.content.Context
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 
 object MediaStoreScanner {
@@ -68,5 +71,22 @@ object MediaStoreScanner {
         }
 
         return tracks
+    }
+
+    // Real-time Media Scanner: observes external storage for new audio files
+    fun observeMediaChanges(context: Context, onChange: () -> Unit): ContentObserver {
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                super.onChange(selfChange)
+                onChange()
+            }
+        }
+        val collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        context.contentResolver.registerContentObserver(collection, true, observer)
+        return observer
+    }
+
+    fun unregisterObserver(context: Context, observer: ContentObserver) {
+        context.contentResolver.unregisterContentObserver(observer)
     }
 }
