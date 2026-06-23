@@ -39,7 +39,9 @@ data class PlayerUiState(
     /** ARGB color extracted from current artwork; drives ambient glow. */
     val glowColorArgb: Int = 0xFF22C55E.toInt(),
     /** 0f..1f pulsing amplitude proxy for the ambient glow. */
-    val amplitude: Float = 0f
+    val amplitude: Float = 0f,
+    val currentPlaylistName: String? = null,
+    val currentLyric: String? = null
 )
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
