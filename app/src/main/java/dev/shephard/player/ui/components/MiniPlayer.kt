@@ -2,7 +2,6 @@ package dev.shephard.player.ui.components
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -13,8 +12,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,16 +34,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,7 +47,7 @@ import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PlayerUiState
-import kotlinx.coroutines.launch
+import dev.shephard.player.ui.components.bounceClick
 
 @Composable
 fun MiniPlayer(
@@ -67,15 +60,7 @@ fun MiniPlayer(
 ) {
     val track = state.currentTrack ?: return
 
-    // Yatay kaydırma: sağa → önceki, sola → sonraki (çoğu müzik uygulaması gibi).
-    // Bar parmakla birlikte kayar, bırakınca yumuşakça yerine döner.
-    val density = LocalDensity.current
-    val swipeThresholdPx = with(density) { 64.dp.toPx() }
-    val swipeX = remember { Animatable(0f) }
-    var swipeHandled by remember { mutableStateOf(false) }
-    val swipeScope = rememberCoroutineScope()
-
-    // Şarkı geçiş yönü takibi
+    // Track direction for art animation
     var lastTrackId by remember { mutableStateOf<Long?>(null) }
     var slideForward by remember { mutableStateOf(true) }
     val currentId = track.id
@@ -84,8 +69,6 @@ fun MiniPlayer(
     }
     if (lastTrackId != currentId) lastTrackId = currentId
 
-    // Smoothly animate the progress fraction so the bold bar feels alive,
-    // even between position-tick updates.
     val fraction = if (state.durationMs > 0L)
         (state.positionMs.toFloat() / state.durationMs.toFloat()).coerceIn(0f, 1f)
     else 0f
@@ -103,15 +86,13 @@ fun MiniPlayer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .graphicsLayer { translationX = swipeX.value }
                 .clip(RoundedCornerShape(14.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                // Pop-up bar is locked: swipe gestures disabled for stability
                 .bounceClick { onClick() }
                 .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Albüm kapağı — geçiş animasyonuyla
+            // Album art
             AnimatedContent(
                 targetState = track.id,
                 transitionSpec = {
@@ -154,7 +135,7 @@ fun MiniPlayer(
                 }
             }
 
-            // Şarkı başlığı + sanatçı — geçiş animasyonuyla
+            // Track info
             AnimatedContent(
                 targetState = track.id,
                 transitionSpec = {
@@ -189,7 +170,22 @@ fun MiniPlayer(
                 }
             }
 
-            // Play/Pause butonu — bounceClick ile
+            // Previous
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .bounceClick { onPreviousClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.SkipPrevious,
+                    contentDescription = "Previous",
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
+            }
+
+            // Play/Pause
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -213,7 +209,7 @@ fun MiniPlayer(
                 }
             }
 
-            // Next butonu — bounceClick ile
+            // Next
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -229,10 +225,6 @@ fun MiniPlayer(
             }
         }
 
-        // Spotify-style bold progress bar at the bottom of the mini player.
-        // 4.dp tall (thicker than the inline MinimalSeekBar inside the sheet),
-        // the inactive half uses surfaceVariant and the active half uses
-        // primary so it pops against the dark background.
         BoldProgressBar(
             fraction = animatedFraction,
             activeColor = MaterialTheme.colorScheme.primary,
@@ -244,11 +236,6 @@ fun MiniPlayer(
     }
 }
 
-/**
- * Thick, rounded progress bar meant to live beneath the mini player. Inspired
- * by Spotify's bold accent line. Drawn on a Canvas so it stays crisp at any
- * width and avoids the Material slider overhead.
- */
 @Composable
 fun BoldProgressBar(
     fraction: Float,

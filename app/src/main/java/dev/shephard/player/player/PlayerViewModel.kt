@@ -3,6 +3,8 @@ package dev.shephard.player.player
 import android.app.Application
 import android.content.ComponentName
 import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
+import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.AudioAttributes
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.sin
+import kotlin.random.Random
 
 data class PlayerUiState(
     val currentTrack: AudioTrack? = null,
@@ -36,12 +39,12 @@ data class PlayerUiState(
     val gaplessEnabled: Boolean = true,
     val playWithOthers: Boolean = false,
     val totalListeningMs: Long = 0L,
-    /** ARGB color extracted from current artwork; drives ambient glow. */
     val glowColorArgb: Int = 0xFF22C55E.toInt(),
-    /** 0f..1f pulsing amplitude proxy for the ambient glow. */
     val amplitude: Float = 0f,
     val currentPlaylistName: String? = null,
-    val currentLyric: String? = null
+    val likedSongIds: List<Long> = emptyList(),
+    val lyrics: List<String> = emptyList(),
+    val lyricsVisible: Boolean = false
 )
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
@@ -55,12 +58,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
     private var queueTracks: List<AudioTrack> = emptyList()
-
-    // Tracks whether the user is actively dragging the seek slider,
-    // so the periodic position observer doesn't fight the gesture.
     private var isUserSeeking: Boolean = false
-
     private var lastPlaybackTickMs: Long? = null
+    private var lastShuffleSeed: Int = Random.nextInt()
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -84,6 +84,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 performCrossfadeIn()
             }
             extractGlowColor(track)
+            loadLyrics(track)
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -110,6 +111,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         connectToService()
         observePosition()
         observeSettings()
+        observeLikedSongs()
     }
 
     private fun connectToService() {
@@ -123,19 +125,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             controller = controllerFuture?.get()
             controller?.addListener(playerListener)
             applyAudioFocusSetting(_uiState.value.playWithOthers)
-            // Service may already be playing (e.g. app was swiped from recents
-            // but playback continued). Pull the existing queue / current track
-            // back into the UI so the mini-player reappears immediately.
             syncFromController()
         }, androidx.core.content.ContextCompat.getMainExecutor(context))
     }
 
-    /**
-     * Rebuilds the in-memory queue and UI state from whatever the connected
-     * MediaController is currently holding. Called right after (re)connecting
-     * so that returning to the app restores the now-playing bar without the
-     * user needing to tap a new song.
-     */
     private fun syncFromController() {
         val c = controller ?: return
         val count = c.mediaItemCount
@@ -169,9 +162,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             lastPlaybackTickMs = System.currentTimeMillis()
         }
         extractGlowColor(current)
+        loadLyrics(current)
     }
 
-    /** Reconstructs an [AudioTrack] from a media item held by the player. */
     private fun MediaItem.toAudioTrack(): AudioTrack {
         val md = mediaMetadata
         val uri = localConfiguration?.uri ?: android.net.Uri.EMPTY
@@ -228,9 +221,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun observeLikedSongs() {
+        viewModelScope.launch {
+            prefs.likedSongIds.collect { json ->
+                val ids = try {
+                    org.json.JSONArray(json).let { arr ->
+                        (0 until arr.length()).map { arr.getLong(it) }
+                    }
+                } catch (_: Exception) { emptyList() }
+                _uiState.value = _uiState.value.copy(likedSongIds = ids)
+            }
+        }
+    }
+
     private fun applyAudioFocusSetting(playWithOthers: Boolean) {
-        // Disabling audio focus handling lets other apps' audio continue
-        // alongside Lambda Player when "Play together with other apps" is enabled.
         val handleAudioFocus = !playWithOthers
         controller?.setAudioAttributes(
             AudioAttributes.Builder()
@@ -280,7 +284,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun setQueueAndPlay(tracks: List<AudioTrack>, startIndex: Int) {
+    fun setQueueAndPlay(tracks: List<AudioTrack>, startIndex: Int, playlistName: String? = null) {
         val c = controller ?: return
         queueTracks = tracks
 
@@ -306,7 +310,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.value = _uiState.value.copy(
             queue = tracks,
             currentTrack = tracks.getOrNull(startIndex),
-            positionMs = 0L
+            positionMs = 0L,
+            currentPlaylistName = playlistName
         )
     }
 
@@ -323,19 +328,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         controller?.seekToPreviousMediaItem()
     }
 
-    /**
-     * Called continuously while the user drags the seek slider.
-     * Updates only the displayed position, without touching the player.
-     */
     fun onSeekPreview(positionMs: Long) {
         isUserSeeking = true
         _uiState.value = _uiState.value.copy(positionMs = positionMs)
     }
 
-    /**
-     * Called when the user releases the seek slider.
-     * Commits the seek to the player and resumes position observation.
-     */
     fun onSeekCommit(positionMs: Long) {
         controller?.seekTo(positionMs)
         _uiState.value = _uiState.value.copy(positionMs = positionMs)
@@ -351,47 +348,37 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         c.shuffleModeEnabled = !c.shuffleModeEnabled
     }
 
-    // True Random Remix — every press creates a completely fresh order
-    // WITHOUT stopping playback (uses moveMediaItem to avoid setMediaItems/prepare)
     fun remixQueue() {
         val c = controller ?: return
-        val currentQueue = _uiState.value.queue.toMutableList()
-        if (currentQueue.size < 2) return
+        val current = _uiState.value.queue
+        if (current.size <= 1) return
 
-        val currentTrack = _uiState.value.currentTrack ?: return
-        val currentIndex = currentQueue.indexOfFirst { it.id == currentTrack.id }
-        if (currentIndex < 0) return
+        lastShuffleSeed = Random.nextInt()
+        val currentIndex = current.indexOfFirst { it.id == _uiState.value.currentTrack?.id }.coerceAtLeast(0)
+        val currentTrack = current.getOrNull(currentIndex) ?: return
+        val rest = current.filterIndexed { i, _ -> i != currentIndex }.shuffled(Random(lastShuffleSeed))
+        val newOrder = listOf(currentTrack) + rest
 
-        // Remove current track temporarily and shuffle the rest
-        val remaining = currentQueue.toMutableList().apply { removeAt(currentIndex) }
-        remaining.shuffle() // fresh random every time
-
-        // Build new order: current track first, then shuffled remaining
-        val newOrder = mutableListOf<AudioTrack>().apply {
-            add(currentTrack)
-            addAll(remaining)
-        }
-
-        // Update local state immediately (UI reflects instantly)
         queueTracks = newOrder
-        _uiState.value = _uiState.value.copy(queue = newOrder)
+        _uiState.value = _uiState.value.copy(queue = newOrder, shuffleEnabled = true)
 
-        // Reorder in MediaController using only moveMediaItem (no playback interruption)
-        // We move items one by one to match the new desired order
-        val workingList = currentQueue.toMutableList()
-
-        for (targetPos in newOrder.indices) {
-            val targetTrack = newOrder[targetPos]
-            val currentPos = workingList.indexOfFirst { it.id == targetTrack.id }
-
-            if (currentPos != targetPos && currentPos >= 0) {
-                // Move item from currentPos to targetPos
-                c.moveMediaItem(currentPos, targetPos)
-                // Keep workingList in sync with controller
-                val movedItem = workingList.removeAt(currentPos)
-                workingList.add(targetPos, movedItem)
-            }
+        val mediaItems = newOrder.map { track ->
+            MediaItem.Builder()
+                .setMediaId(track.id.toString())
+                .setUri(track.uri)
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(track.title)
+                        .setArtist(track.artist)
+                        .setAlbumTitle(track.album)
+                        .setArtworkUri(track.albumArtUri)
+                        .build()
+                )
+                .build()
         }
+        c.setMediaItems(mediaItems, 0, c.currentPosition)
+        c.prepare()
+        c.play()
     }
 
     fun cycleRepeatMode() {
@@ -415,6 +402,44 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch { prefs.setPlayWithOthers(enabled) }
     }
 
+    fun playQueueItem(index: Int) {
+        val c = controller ?: return
+        val currentStart = queueTracks.indexOfFirst { it.id == _uiState.value.currentTrack?.id }.coerceAtLeast(0)
+        val actualIndex = currentStart + index
+        if (actualIndex in queueTracks.indices) {
+            c.seekTo(actualIndex, 0L)
+            c.play()
+        }
+    }
+
+    fun removeFromQueue(index: Int) {
+        val c = controller ?: return
+        val currentStart = queueTracks.indexOfFirst { it.id == _uiState.value.currentTrack?.id }.coerceAtLeast(0)
+        val actualIndex = currentStart + index
+        if (actualIndex in queueTracks.indices) {
+            val newList = queueTracks.toMutableList().apply { removeAt(actualIndex) }
+            queueTracks = newList
+            _uiState.value = _uiState.value.copy(queue = newList)
+            c.removeMediaItem(actualIndex)
+        }
+    }
+
+    fun playNext(queueIndex: Int) {
+        val c = controller ?: return
+        val currentStart = queueTracks.indexOfFirst { it.id == _uiState.value.currentTrack?.id }.coerceAtLeast(0)
+        val actualIndex = currentStart + queueIndex
+        if (actualIndex in queueTracks.indices) {
+            val track = queueTracks[actualIndex]
+            val newList = queueTracks.toMutableList().apply {
+                removeAt(actualIndex)
+                add(currentStart + 1, track)
+            }
+            queueTracks = newList
+            _uiState.value = _uiState.value.copy(queue = newList)
+            c.moveMediaItem(actualIndex, currentStart + 1)
+        }
+    }
+
     override fun onCleared() {
         flushListeningTime()
         controller?.removeListener(playerListener)
@@ -423,12 +448,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         super.onCleared()
     }
 
-    /**
-     * Moves a single queue item from one index to another without rebuilding
-     * the whole media list. Using [MediaController.moveMediaItem] keeps the
-     * current track playing (no restart, no position reset) and avoids the
-     * glitches caused by replacing every media item.
-     */
     fun moveQueueItem(fromIndex: Int, toIndex: Int) {
         val c = controller ?: return
         val current = _uiState.value.queue
@@ -437,28 +456,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val target = toIndex.coerceIn(0, current.size - 1)
         if (fromIndex == target) return
 
-        // Update local mirror first so the UI stays in sync immediately.
         val newOrder = current.toMutableList().apply {
             add(target, removeAt(fromIndex))
         }
         queueTracks = newOrder
         _uiState.value = _uiState.value.copy(queue = newOrder)
-
-        // Tell the player to move just that one item.
         runCatching { c.moveMediaItem(fromIndex, target) }
     }
 
-    /**
-     * Commits a full reordered list. Computes the minimal set of single-item
-     * moves so playback is never restarted.
-     */
     fun reorderQueue(newOrder: List<AudioTrack>) {
         val c = controller ?: return
         val old = _uiState.value.queue
         queueTracks = newOrder
         _uiState.value = _uiState.value.copy(queue = newOrder)
 
-        // Apply as incremental moves to preserve playback state.
         val working = old.toMutableList()
         for (targetIndex in newOrder.indices) {
             val track = newOrder[targetIndex]
@@ -466,6 +477,39 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (currentIndex >= 0 && currentIndex != targetIndex) {
                 working.add(targetIndex, working.removeAt(currentIndex))
                 runCatching { c.moveMediaItem(currentIndex, targetIndex) }
+            }
+        }
+    }
+
+    fun toggleLike(trackId: Long) {
+        viewModelScope.launch {
+            val current = _uiState.value.likedSongIds.toMutableList()
+            val newList = if (current.contains(trackId)) current.filter { it != trackId } else current + trackId
+            val json = org.json.JSONArray().apply { newList.forEach { put(it) } }.toString()
+            prefs.setLikedSongIds(json)
+        }
+    }
+
+    fun isLiked(trackId: Long): Boolean = _uiState.value.likedSongIds.contains(trackId)
+
+    fun addToLiked(trackId: Long) {
+        viewModelScope.launch {
+            val current = _uiState.value.likedSongIds.toMutableList()
+            if (!current.contains(trackId)) {
+                current.add(trackId)
+                val json = org.json.JSONArray().apply { current.forEach { put(it) } }.toString()
+                prefs.setLikedSongIds(json)
+            }
+        }
+    }
+
+    fun removeFromLiked(trackId: Long) {
+        viewModelScope.launch {
+            val current = _uiState.value.likedSongIds.toMutableList()
+            if (current.contains(trackId)) {
+                current.removeAll { it == trackId }
+                val json = org.json.JSONArray().apply { current.forEach { put(it) } }.toString()
+                prefs.setLikedSongIds(json)
             }
         }
     }
@@ -487,6 +531,82 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 _uiState.value = _uiState.value.copy(glowColorArgb = color)
             }
         }
+    }
+
+    private fun loadLyrics(track: AudioTrack?) {
+        if (track == null) {
+            _uiState.value = _uiState.value.copy(lyrics = emptyList(), lyricsVisible = false)
+            return
+        }
+        viewModelScope.launch {
+            val lyrics = withContext(Dispatchers.IO) {
+                runCatching {
+                    loadLyricsFromRetriever(track.uri)
+                        ?: loadLyricsFromLrcFile(track)
+                }.getOrDefault(emptyList())
+            }
+            _uiState.value = _uiState.value.copy(lyrics = lyrics, lyricsVisible = lyrics.isNotEmpty())
+        }
+    }
+
+    private fun loadLyricsFromRetriever(uri: android.net.Uri): List<String>? {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(getApplication(), uri)
+            val lyrics = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LYRICS)
+            retriever.release()
+            lyrics?.lines()?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }
+        } catch (e: Exception) {
+            retriever.release()
+            null
+        }
+    }
+
+    private fun loadLyricsFromLrcFile(track: AudioTrack): List<String>? {
+        val context = getApplication<Application>()
+        val resolver = context.contentResolver
+        val projection = arrayOf(MediaStore.Files.FileColumns._ID, MediaStore.Files.FileColumns.DISPLAY_NAME)
+        val cursor = resolver.query(
+            MediaStore.Files.getContentUri("external"),
+            projection,
+            "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ?",
+            arrayOf("%.lrc"),
+            null
+        )
+        cursor?.use { c ->
+            val idCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
+            val nameCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
+            val baseName = track.title.replace(" ", "_")
+            while (c.moveToNext()) {
+                val id = c.getLong(idCol)
+                val name = c.getString(nameCol) ?: continue
+                if (name.contains(baseName, ignoreCase = true) ||
+                    track.uri.lastPathSegment?.let { name.contains(it.substringBeforeLast("."), ignoreCase = true) } == true
+                ) {
+                    val lrcUri = android.content.ContentUris.withAppendedId(
+                        MediaStore.Files.getContentUri("external"), id
+                    )
+                    resolver.openInputStream(lrcUri)?.use { stream ->
+                        return parseLrc(stream.bufferedReader().readText())
+                    }
+                }
+            }
+        }
+        return null
+    }
+
+    private fun parseLrc(content: String): List<String> {
+        val regex = Regex("\\[\\d{2}:\\d{2}\\.\\d{2,3}\\](.*)")
+        return content.lines()
+            .mapNotNull { line ->
+                val match = regex.find(line)
+                match?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
+            }
+            .distinct()
+    }
+
+    fun toggleLyricsVisible() {
+        _uiState.value = _uiState.value.copy(lyricsVisible = !_uiState.value.lyricsVisible)
     }
 
     private fun startAmplitudePulse() {

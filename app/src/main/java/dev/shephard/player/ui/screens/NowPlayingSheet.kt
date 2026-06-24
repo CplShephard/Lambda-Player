@@ -1,20 +1,8 @@
-@file:OptIn(ExperimentalFoundationApi::class)
+@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 
 package dev.shephard.player.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -22,34 +10,34 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import dev.shephard.player.ui.components.BouncyIconButton
-import dev.shephard.player.ui.components.bounceClick
-import dev.shephard.player.ui.components.rememberBounceOverscrollEffect
-import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -81,27 +69,36 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import dev.shephard.player.data.AudioTrack
+import dev.shephard.player.data.formattedDuration
 import dev.shephard.player.player.PlayerViewModel
+import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.RepeatMode
+import dev.shephard.player.ui.components.BouncyIconButton
 import dev.shephard.player.ui.components.MinimalSeekBar
+import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.components.rememberBounceOverscrollEffect
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import kotlin.math.absoluteValue
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingSheet(
     playerViewModel: PlayerViewModel = viewModel(),
@@ -113,18 +110,13 @@ fun NowPlayingSheet(
 
     val density = LocalDensity.current
     val dismissThresholdPx = with(density) { 140.dp.toPx() }
-    // Animatable drag offset so a partial pull-down springs smoothly back
-    // to the top instead of snapping (fixes the "buggy" feel).
-    val dragOffset = remember { Animatable(0f) }
+    val dragOffset = remember { androidx.compose.animation.core.Animatable(0f) }
     val dragScope = rememberCoroutineScope()
 
-    // Albüm kapağında yatay kaydırma: sağa → önceki, sola → sonraki.
-    // Kapak parmakla birlikte kayar, bırakınca yumuşakça yerine döner.
     val swipeThresholdPx = with(density) { 80.dp.toPx() }
-    val artSwipeX = remember { Animatable(0f) }
+    val artSwipeX = remember { androidx.compose.animation.core.Animatable(0f) }
     var artSwipeHandled by remember { mutableStateOf(false) }
 
-    // Şarkı geçiş yönü takibi
     var lastTrackId by remember { mutableStateOf<Long?>(null) }
     var slideForward by remember { mutableStateOf(true) }
     val currentId = track?.id ?: -1L
@@ -139,16 +131,19 @@ fun NowPlayingSheet(
     }
 
     val glow = Color(state.glowColorArgb)
-    val pulse by animateFloatAsState(
+    val pulse by androidx.compose.animation.core.animateFloatAsState(
         targetValue = 0.8f + state.amplitude * 0.6f,
-        animationSpec = tween(120),
+        animationSpec = androidx.compose.animation.core.tween(120),
         label = "glowPulse"
     )
-    val glowAlpha by animateFloatAsState(
+    val glowAlpha by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (track == null) 0f else 0.6f + state.amplitude * 0.35f,
-        animationSpec = tween(220),
+        animationSpec = androidx.compose.animation.core.tween(220),
         label = "glowAlpha"
     )
+
+    val playButtonScale = remember { androidx.compose.animation.core.Animatable(1f) }
+    val playButtonScope = rememberCoroutineScope()
 
     Box(
         modifier = Modifier
@@ -158,21 +153,18 @@ fun NowPlayingSheet(
             .draggable(
                 orientation = Orientation.Vertical,
                 state = rememberDraggableState { delta ->
-                    // Only allow dragging downward; clamp at the top edge.
                     val next = (dragOffset.value + delta).coerceAtLeast(0f)
                     dragScope.launch { dragOffset.snapTo(next) }
                 },
                 onDragStopped = { velocity ->
                     if (dragOffset.value > dismissThresholdPx || velocity > 2500f) {
                         onDismiss()
-                        // Reset for next time after the close animation runs.
                         dragScope.launch { dragOffset.snapTo(0f) }
                     } else {
-                        // Smoothly glide back up to the top.
                         dragScope.launch {
                             dragOffset.animateTo(
                                 targetValue = 0f,
-                                animationSpec = spring(
+                                animationSpec = androidx.compose.animation.core.spring(
                                     dampingRatio = 0.82f,
                                     stiffness = 320f
                                 )
@@ -182,16 +174,7 @@ fun NowPlayingSheet(
                 }
             )
     ) {
-        // ----- Ambient glow background -----
-        // Two stacked layers so the color reads as a vertical wash that
-        // covers the top ~70% of the screen and fades smoothly into pure
-        // black at the bottom 30%:
-        //   1) A vertical gradient wash (broad, screen-wide).
-        //   2) A radial highlight centered roughly where the cover sits,
-        //      which gives the glow a focal point.
-        // Both layers share the same dynamic glow color (driven by the
-        // dominant color extracted from the album art) and pulse together
-        // with the playback amplitude.
+        // Ambient glow background
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -200,15 +183,10 @@ fun NowPlayingSheet(
                 .background(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
-                            // 0%   – top, brightest
                             0.00f to glow.copy(alpha = 0.95f),
-                            // 35%  – upper-mid, still vivid
                             0.35f to glow.copy(alpha = 0.65f),
-                            // 65%  – start of fade
                             0.65f to glow.copy(alpha = 0.18f),
-                            // 75%  – almost gone
                             0.75f to glow.copy(alpha = 0.04f),
-                            // 80%+ – pure black
                             0.80f to Color.Transparent,
                             1.00f to Color.Transparent
                         )
@@ -241,36 +219,22 @@ fun NowPlayingSheet(
                 .padding(horizontal = 24.dp)
                 .pointerInput(track?.id) {
                     detectHorizontalDragGestures(
-                        onDragStart = {
-                            artSwipeHandled = false
-                        },
+                        onDragStart = { artSwipeHandled = false },
                         onDragEnd = {
                             dragScope.launch {
-                                artSwipeX.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = spring(
-                                        dampingRatio = 0.8f,
-                                        stiffness = 400f
-                                    )
-                                )
+                                artSwipeX.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 400f))
                             }
                             artSwipeHandled = false
                         },
                         onDragCancel = {
                             dragScope.launch {
-                                artSwipeX.animateTo(
-                                    0f,
-                                    spring(dampingRatio = 0.8f, stiffness = 400f)
-                                )
+                                artSwipeX.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 400f))
                             }
                             artSwipeHandled = false
                         }
                     ) { change, dragAmount ->
                         change.consume()
-                        dragScope.launch {
-                            val next = artSwipeX.value + dragAmount * 0.6f
-                            artSwipeX.snapTo(next)
-                        }
+                        dragScope.launch { artSwipeX.snapTo(artSwipeX.value + dragAmount * 0.6f) }
                         if (!artSwipeHandled) {
                             if (artSwipeX.value <= -swipeThresholdPx) {
                                 playerViewModel.skipToNext()
@@ -283,14 +247,12 @@ fun NowPlayingSheet(
                     }
                 }
         ) {
-            // Top row: collapse sol + nowplaying orta + boş sağ
+            // Top row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures { _, _ -> }
-                    },
+                    .pointerInput(Unit) { detectHorizontalDragGestures { _, _ -> } },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -301,35 +263,32 @@ fun NowPlayingSheet(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    // Playlist Context Header (if playing from a playlist)
-                    if (state.currentPlaylistName != null) {
-                        Text(
-                            text = state.currentPlaylistName!!,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
                     Text(
                         text = strings.nowPlaying,
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (state.currentPlaylistName != null) {
+                        Text(
+                            text = state.currentPlaylistName!!,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
                 }
-                // Sağ üst boş placeholder (Queue sağ alta taşındı)
                 Box(modifier = Modifier.size(48.dp))
             }
 
-            // Albüm kapağı + başlık — geçiş animasyonlu
-            AnimatedContent(
+            // Album art + title
+            androidx.compose.animation.AnimatedContent(
                 targetState = track?.id ?: -1L,
                 transitionSpec = {
                     val dir = if (slideForward)
-                        AnimatedContentTransitionScope.SlideDirection.Left
+                        androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Left
                     else
-                        AnimatedContentTransitionScope.SlideDirection.Right
-                    (slideIntoContainer(dir, tween(380)) + fadeIn() + scaleIn(initialScale = 0.92f))
-                        .togetherWith(slideOutOfContainer(dir, tween(380)) + fadeOut() + scaleOut(targetScale = 0.92f))
+                        androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Right
+                    (slideIntoContainer(dir, androidx.compose.animation.core.tween(380)) + androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(initialScale = 0.92f))
+                        .togetherWith(slideOutOfContainer(dir, androidx.compose.animation.core.tween(380)) + androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(targetScale = 0.92f))
                 },
                 label = "trackSwap",
                 modifier = Modifier.fillMaxWidth()
@@ -340,11 +299,9 @@ fun NowPlayingSheet(
                             .fillMaxWidth()
                             .padding(top = 24.dp)
                             .aspectRatio(1f)
-                            // Kapak parmakla birlikte kaysın + uçlara doğru hafif soluklaşsın.
                             .graphicsLayer {
                                 translationX = artSwipeX.value
-                                alpha = 1f - (kotlin.math.abs(artSwipeX.value) / (size.width.coerceAtLeast(1f)))
-                                    .coerceIn(0f, 0.35f)
+                                alpha = 1f - (kotlin.math.abs(artSwipeX.value) / (size.width.coerceAtLeast(1f))).coerceIn(0f, 0.35f)
                             }
                             .clip(RoundedCornerShape(28.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant),
@@ -385,27 +342,31 @@ fun NowPlayingSheet(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-
-                        // Real-time Floating Lyrics (compact typography between title & progress)
-                        if (!state.currentLyric.isNullOrBlank()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = state.currentLyric!!,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1
-                            )
-                        }
                     }
                 }
             }
 
-            // Spacer pushes the seek bar + controls toward the bottom of the
-            // screen, leaving a clean black area at the bottom (~30% of the
-            // screen height on typical phones). Combined with the vertical
-            // gradient glow that fades to transparent at ~80%, this gives
-            // the layout the "top 70% colored / bottom 30% pure black" feel.
+            // Lyrics preview
+            if (state.lyricsVisible && state.lyrics.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = state.lyrics.firstOrNull() ?: strings.noLyricsFound,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.weight(1f))
 
             // Seek bar
@@ -438,37 +399,20 @@ fun NowPlayingSheet(
                 }
             }
 
-            // Queue + Lyrics + Add buttons — aligned row
+            // Action buttons row: Queue, Lyrics, +/check
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp, end = 4.dp),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Dedicated Lyrics toggle button
-                BouncyIconButton(
-                    onClick = { /* TODO: open lyrics sheet or toggle */ },
-                    icon = Icons.Filled.QueueMusic, // placeholder icon; can be replaced with a lyrics icon
-                    contentDescription = "Lyrics",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    iconSize = 28.dp
-                )
-
-                Spacer(Modifier.width(8.dp))
-
-                // Smart "+" button (placeholder for later batch)
-                BouncyIconButton(
-                    onClick = { /* handled in batch 3 */ },
-                    icon = Icons.Filled.Add,
-                    contentDescription = "Add to playlist",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    iconSize = 28.dp
-                )
-
-                Spacer(Modifier.width(8.dp))
-
                 var showQueue by remember { mutableStateOf(false) }
+                var showPlaylists by remember { mutableStateOf(false) }
+                var showLyrics by remember { mutableStateOf(false) }
+                val trackId = track?.id ?: -1L
+                val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
+
                 BouncyIconButton(
                     onClick = { showQueue = true },
                     icon = Icons.Filled.QueueMusic,
@@ -476,6 +420,40 @@ fun NowPlayingSheet(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     iconSize = 28.dp
                 )
+                BouncyIconButton(
+                    onClick = { showLyrics = true },
+                    icon = Icons.Filled.Lyrics,
+                    contentDescription = strings.lyrics,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    iconSize = 28.dp
+                )
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isLiked) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        .bounceClick {
+                            if (trackId > 0) {
+                                if (isLiked) {
+                                    showPlaylists = true
+                                } else {
+                                    playerViewModel.addToLiked(trackId)
+                                }
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isLiked) Icons.Filled.Check else Icons.Filled.Add,
+                        contentDescription = if (isLiked) "Added" else "Add",
+                        tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
                 if (showQueue) {
                     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                     ModalBottomSheet(
@@ -486,29 +464,62 @@ fun NowPlayingSheet(
                         QueueList(
                             queue = state.queue,
                             currentTrackId = state.currentTrack?.id,
-                            onMove = { from, to -> playerViewModel.moveQueueItem(from, to) }
+                            onMove = { from, to -> playerViewModel.moveQueueItem(from, to) },
+                            onPlay = { playerViewModel.playQueueItem(it) },
+                            onRemove = { playerViewModel.removeFromQueue(it) },
+                            onPlayNext = { playerViewModel.playNext(it) },
+                            strings = strings
                         )
                     }
                 }
+
+                if (showLyrics) {
+                    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                    ModalBottomSheet(
+                        onDismissRequest = { showLyrics = false },
+                        sheetState = sheetState,
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp).height(420.dp)) {
+                            Text(strings.lyrics, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(12.dp))
+                            if (state.lyrics.isEmpty()) {
+                                Text(strings.noLyricsFound, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            } else {
+                                LazyColumn {
+                                    itemsIndexed(state.lyrics) { _, line ->
+                                        Text(line, modifier = Modifier.padding(vertical = 4.dp))
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(16.dp))
+                        }
+                    }
+                }
+
+                if (showPlaylists) {
+                    AddToPlaylistDrawer(
+                        trackId = trackId,
+                        onDismiss = { showPlaylists = false },
+                        strings = strings
+                    )
+                }
             }
 
-            // Kontroller — alt kenara daha yakın (Spacer(weight=1f) ile aşağı itildi).
+            // Controls
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp, bottom = 32.dp)
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures { _, _ -> }
-                    },
+                    .pointerInput(Unit) { detectHorizontalDragGestures { _, _ -> } },
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 BouncyIconButton(
-                    onClick = { playerViewModel.toggleShuffle() },
+                    onClick = { playerViewModel.remixQueue() },
                     icon = Icons.Filled.Shuffle,
-                    contentDescription = strings.shuffle,
-                    tint = if (state.shuffleEnabled) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    contentDescription = strings.remix,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     iconSize = 28.dp
                 )
                 BouncyIconButton(
@@ -518,39 +529,30 @@ fun NowPlayingSheet(
                     tint = MaterialTheme.colorScheme.onBackground,
                     iconSize = 36.dp
                 )
-                // Bouncing scale + rotating Play/Pause icon
-                var playButtonScale by remember { mutableStateOf(1f) }
-                val animatedScale by animateFloatAsState(
-                    targetValue = playButtonScale,
-                    animationSpec = spring(dampingRatio = 0.4f, stiffness = 600f),
-                    label = "playButtonBounce"
-                )
-
                 Box(
                     modifier = Modifier
                         .size(72.dp)
-                        .graphicsLayer {
-                            scaleX = animatedScale
-                            scaleY = animatedScale
-                        }
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
                         .bounceClick {
-                            playButtonScale = 0.75f
-                            playerViewModel.togglePlayPause()
-                            // reset scale shortly after
-                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                                kotlinx.coroutines.delay(80)
-                                playButtonScale = 1f
+                            playButtonScope.launch {
+                                playButtonScale.animateTo(0.85f, androidx.compose.animation.core.tween(80))
+                                playButtonScale.animateTo(1.1f, androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 600f))
+                                playButtonScale.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 600f))
                             }
+                            playerViewModel.togglePlayPause()
+                        }
+                        .graphicsLayer {
+                            scaleX = playButtonScale.value
+                            scaleY = playButtonScale.value
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    AnimatedContent(
+                    androidx.compose.animation.AnimatedContent(
                         targetState = state.isPlaying,
                         transitionSpec = {
-                            (fadeIn(tween(180)) + scaleIn(initialScale = 0.6f))
-                                .togetherWith(fadeOut(tween(120)))
+                            (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(150)) + androidx.compose.animation.scaleIn(initialScale = 0.5f))
+                                .togetherWith(androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(100)) + androidx.compose.animation.scaleOut(targetScale = 1.5f))
                         },
                         label = "playPauseIcon"
                     ) { isPlaying ->
@@ -579,8 +581,75 @@ fun NowPlayingSheet(
                 )
             }
         }
+    }
+}
 
+@Composable
+private fun AddToPlaylistDrawer(
+    trackId: Long,
+    onDismiss: () -> Unit,
+    strings: dev.shephard.player.ui.i18n.Strings
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs = remember { PreferencesManager(context) }
+    val json by prefs.playlistsJson.collectAsState(initial = "[]")
+    val playlists = remember(json) { parsePlaylists(json) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(modifier = Modifier.padding(16.dp).height(420.dp)) {
+            Text(strings.addToPlaylist, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp))
+            LazyColumn {
+                itemsIndexed(playlists) { idx, pl ->
+                    if (pl.isSystem) return@itemsIndexed
+                    val containsTrack = pl.trackIds.contains(trackId)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .bounceClick {
+                                if (!containsTrack) {
+                                    val updated = pl.copy(trackIds = pl.trackIds + trackId)
+                                    val all = playlists.toMutableList()
+                                    all[idx] = updated
+                                    scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                                }
+                            }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(pl.name, fontWeight = FontWeight.SemiBold)
+                            Text("${pl.trackIds.size} ${strings.trackCount}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (containsTrack) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (containsTrack) Icons.Filled.Check else Icons.Filled.Add,
+                                contentDescription = null,
+                                tint = if (containsTrack) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
     }
 }
 
@@ -588,27 +657,23 @@ fun NowPlayingSheet(
 private fun QueueList(
     queue: List<AudioTrack>,
     currentTrackId: Long?,
-    onMove: (from: Int, to: Int) -> Unit
+    onMove: (from: Int, to: Int) -> Unit,
+    onPlay: (index: Int) -> Unit,
+    onRemove: (index: Int) -> Unit,
+    onPlayNext: (index: Int) -> Unit,
+    strings: dev.shephard.player.ui.i18n.Strings
 ) {
-    val strings = LocalStrings.current
     val density = LocalDensity.current
-
-    // Only show current track + upcoming (Spotify-style: past tracks are hidden).
     val currentStartIndex = remember(queue, currentTrackId) {
         queue.indexOfFirst { it.id == currentTrackId }.coerceAtLeast(0)
     }
-
-    // Local mirror of the visible slice so reordering feels instant while dragging.
     val items = remember { mutableStateListOf<AudioTrack>() }
     LaunchedEffect(queue, currentStartIndex) {
         items.clear()
         items.addAll(queue.drop(currentStartIndex))
     }
-
     val itemHeightDp = 64.dp
     val itemHeightPx = with(density) { itemHeightDp.toPx() }
-
-    // Index currently being dragged, and the accumulated vertical offset.
     var draggedIndex by remember { mutableIntStateOf(-1) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
 
@@ -628,12 +693,14 @@ private fun QueueList(
             itemsIndexed(items, key = { _, t -> t.id }) { index, track ->
                 val isDragged = index == draggedIndex
                 val isPlaying = track.id == currentTrackId
+                var offsetX by remember { mutableFloatStateOf(0f) }
+                val swipeThreshold = 120.dp
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(itemHeightDp)
-                        // Lift the dragged row visually and let it float above siblings.
+                        .offset(x = with(density) { offsetX.toDp() })
                         .graphicsLayer {
                             if (isDragged) {
                                 translationY = dragOffsetY
@@ -651,112 +718,104 @@ private fun QueueList(
                                 else -> Color.Transparent
                             }
                         )
+                        .clickable { onPlay(index) }
+                        .pointerInput(track.id) {
+                            detectHorizontalDragGestures(
+                                onDragEnd = {
+                                    when {
+                                        offsetX < -swipeThreshold.toPx() -> onPlayNext(index)
+                                        offsetX > swipeThreshold.toPx() -> onRemove(index)
+                                    }
+                                    offsetX = 0f
+                                }
+                            ) { change, dragAmount ->
+                                change.consume()
+                                offsetX += dragAmount
+                            }
+                        }
                         .padding(vertical = 6.dp, horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        var loaded by remember(track.id) { mutableStateOf(false) }
+                        AsyncImage(
+                            model = track.albumArtUri,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp)),
+                            contentScale = ContentScale.Crop,
+                            onState = { loaded = it is AsyncImagePainter.State.Success }
+                        )
+                        if (!loaded) {
+                            Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                    Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             track.title,
-                            color = if (isPlaying) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onBackground,
+                            color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             track.artist,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                             maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-
-                    // Up / Down + drag handle — hidden for the currently playing track (index 0).
+                    Text(
+                        track.formattedDuration(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.width(4.dp))
                     if (!isPlaying) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .bounceClick(enabled = index > 1) {
-                                if (index > 1) onMove(index + currentStartIndex, index + currentStartIndex - 1)
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
                         Icon(
-                            imageVector = Icons.Filled.KeyboardArrowUp,
-                            contentDescription = "Move up",
-                            tint = if (index > 1) MaterialTheme.colorScheme.onSurfaceVariant
-                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .bounceClick(enabled = index < items.size - 1) {
-                                if (index < items.size - 1) onMove(index + currentStartIndex, index + currentStartIndex + 1)
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.KeyboardArrowDown,
-                            contentDescription = "Move down",
-                            tint = if (index < items.size - 1) MaterialTheme.colorScheme.onSurfaceVariant
-                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-
-                    // Drag handle — live reordering as you drag.
-                    Icon(
-                        imageVector = Icons.Filled.DragHandle,
-                        contentDescription = "Reorder",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .size(28.dp)
-                            .pointerInput(track.id) {
-                                detectDragGestures(
-                                    onDragStart = {
-                                        draggedIndex = index
-                                        dragOffsetY = 0f
-                                    },
-                                    onDragEnd = {
-                                        // Persist the final order to the player.
-                                        // items is a slice starting at currentStartIndex, so offset back.
-                                        val from = queue.indexOfFirst { it.id == track.id }
-                                        val toSlice = items.indexOfFirst { it.id == track.id }
-                                        val to = if (toSlice >= 0) toSlice + currentStartIndex else -1
-                                        if (from >= 0 && to >= 0 && from != to) {
-                                            onMove(from, to)
+                            imageVector = Icons.Filled.DragHandle,
+                            contentDescription = "Reorder",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .pointerInput(track.id) {
+                                    detectDragGestures(
+                                        onDragStart = { draggedIndex = index; dragOffsetY = 0f },
+                                        onDragEnd = {
+                                            val toSlice = items.indexOfFirst { it.id == track.id }
+                                            val from = queue.indexOfFirst { it.id == track.id }
+                                            val to = if (toSlice >= 0) toSlice + currentStartIndex else -1
+                                            if (from >= 0 && to >= 0 && from != to) onMove(from, to)
+                                            draggedIndex = -1
+                                            dragOffsetY = 0f
+                                        },
+                                        onDragCancel = { draggedIndex = -1; dragOffsetY = 0f }
+                                    ) { change, dragAmount: Offset ->
+                                        change.consume()
+                                        dragOffsetY += dragAmount.y
+                                        val cur = draggedIndex
+                                        if (cur < 0) return@detectDragGestures
+                                        if (dragOffsetY > itemHeightPx / 2 && cur < items.size - 1) {
+                                            items.add(cur + 1, items.removeAt(cur))
+                                            draggedIndex = cur + 1
+                                            dragOffsetY -= itemHeightPx
+                                        } else if (dragOffsetY < -itemHeightPx / 2 && cur > 1) {
+                                            items.add(cur - 1, items.removeAt(cur))
+                                            draggedIndex = cur - 1
+                                            dragOffsetY += itemHeightPx
                                         }
-                                        draggedIndex = -1
-                                        dragOffsetY = 0f
-                                    },
-                                    onDragCancel = {
-                                        draggedIndex = -1
-                                        dragOffsetY = 0f
-                                    }
-                                ) { change, dragAmount: Offset ->
-                                    change.consume()
-                                    dragOffsetY += dragAmount.y
-                                    val cur = draggedIndex
-                                    if (cur < 0) return@detectDragGestures
-                                    // Swap with neighbour once dragged past half a row.
-                                    // cur > 1: index 0 is currently playing, never swap above it.
-                                    if (dragOffsetY > itemHeightPx / 2 && cur < items.size - 1) {
-                                        items.add(cur + 1, items.removeAt(cur))
-                                        draggedIndex = cur + 1
-                                        dragOffsetY -= itemHeightPx
-                                    } else if (dragOffsetY < -itemHeightPx / 2 && cur > 1) {
-                                        items.add(cur - 1, items.removeAt(cur))
-                                        draggedIndex = cur - 1
-                                        dragOffsetY += itemHeightPx
                                     }
                                 }
-                            }
-                    )
-                    } // end if (!isPlaying)
+                        )
+                    }
                 }
             }
         }

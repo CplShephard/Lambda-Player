@@ -22,17 +22,24 @@ object PrefsKeys {
     val ACCENT_COLOR = intPreferencesKey("accent_color")
     val WALLPAPER_URI = stringPreferencesKey("wallpaper_uri")
     val PLAYLISTS_JSON = stringPreferencesKey("playlists_json")
-    val LIKED_SONGS_IDS = stringPreferencesKey("liked_songs_ids")
     val WALLPAPER_BRIGHTNESS = floatPreferencesKey("wallpaper_brightness")
     val DARK_MODE = booleanPreferencesKey("dark_mode") // Legacy bool, kept for migration.
     val THEME_MODE = intPreferencesKey("theme_mode")
     val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+    val PLAYLISTS_LAYOUT = intPreferencesKey("playlists_layout")
+    val MUSICS_LAYOUT = intPreferencesKey("musics_layout")
+    val LIKED_SONG_IDS = stringPreferencesKey("liked_song_ids")
 }
 
 object ThemeModePreference {
     const val LIGHT = 0
     const val AUTO = 1
     const val DARK = 2
+}
+
+object LayoutMode {
+    const val LIST = 0
+    const val GRID = 1
 }
 
 class PreferencesManager(private val context: Context) {
@@ -69,14 +76,6 @@ class PreferencesManager(private val context: Context) {
         it[PrefsKeys.PLAYLISTS_JSON] ?: "[]"
     }
 
-    val likedSongsIds: Flow<Set<Long>> = context.dataStore.data.map { prefs ->
-        val json = prefs[PrefsKeys.LIKED_SONGS_IDS] ?: "[]"
-        try {
-            val arr = org.json.JSONArray(json)
-            (0 until arr.length()).map { arr.getLong(it) }.toSet()
-        } catch (_: Exception) { emptySet() }
-    }
-
     val darkMode: Flow<Boolean> = context.dataStore.data.map {
         it[PrefsKeys.DARK_MODE] ?: false
     }
@@ -91,6 +90,18 @@ class PreferencesManager(private val context: Context) {
 
     val dynamicColor: Flow<Boolean> = context.dataStore.data.map {
         it[PrefsKeys.DYNAMIC_COLOR] ?: false
+    }
+
+    val playlistsLayout: Flow<Int> = context.dataStore.data.map {
+        it[PrefsKeys.PLAYLISTS_LAYOUT] ?: LayoutMode.LIST
+    }
+
+    val musicsLayout: Flow<Int> = context.dataStore.data.map {
+        it[PrefsKeys.MUSICS_LAYOUT] ?: LayoutMode.LIST
+    }
+
+    val likedSongIds: Flow<String> = context.dataStore.data.map {
+        it[PrefsKeys.LIKED_SONG_IDS] ?: "[]"
     }
 
     /** 0f..1f — applied as a black scrim opacity on top of the wallpaper. */
@@ -133,12 +144,6 @@ class PreferencesManager(private val context: Context) {
         context.dataStore.edit { it[PrefsKeys.PLAYLISTS_JSON] = json }
     }
 
-    suspend fun setLikedSongsIds(ids: Set<Long>) {
-        val arr = org.json.JSONArray()
-        ids.forEach { arr.put(it) }
-        context.dataStore.edit { it[PrefsKeys.LIKED_SONGS_IDS] = arr.toString() }
-    }
-
     suspend fun setDarkMode(enabled: Boolean) {
         context.dataStore.edit {
             it[PrefsKeys.DARK_MODE] = enabled
@@ -160,6 +165,18 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setDynamicColor(enabled: Boolean) {
         context.dataStore.edit { it[PrefsKeys.DYNAMIC_COLOR] = enabled }
+    }
+
+    suspend fun setPlaylistsLayout(mode: Int) {
+        context.dataStore.edit { it[PrefsKeys.PLAYLISTS_LAYOUT] = mode }
+    }
+
+    suspend fun setMusicsLayout(mode: Int) {
+        context.dataStore.edit { it[PrefsKeys.MUSICS_LAYOUT] = mode }
+    }
+
+    suspend fun setLikedSongIds(json: String) {
+        context.dataStore.edit { it[PrefsKeys.LIKED_SONG_IDS] = json }
     }
 
     suspend fun setWallpaperBrightness(value: Float) {

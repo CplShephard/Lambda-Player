@@ -4,6 +4,7 @@ package dev.shephard.player.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,6 +36,8 @@ import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Person
@@ -69,6 +72,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
+import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
 import dev.shephard.player.ui.components.CustomColorPickerDialog
@@ -104,12 +108,12 @@ fun SettingsScreen() {
     val language by prefs.language.collectAsState(initial = "en")
     val themeMode by prefs.themeMode.collectAsState(initial = ThemeModePreference.LIGHT)
     val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
+    val playlistsLayout by prefs.playlistsLayout.collectAsState(initial = LayoutMode.LIST)
+    val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
 
     var langMenuOpen by remember { mutableStateOf(false) }
     var customPickerOpen by remember { mutableStateOf(false) }
 
-    // Galeriden fotoğraf seç — OpenDocument kalıcı (persistable) URI izni verir,
-    // böylece duvar kağıdı uygulama yeniden açıldığında da görünür kalır.
     val wallpaperPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -123,6 +127,13 @@ fun SettingsScreen() {
             scope.launch { prefs.setWallpaperUri(uri.toString()) }
         }
     }
+
+    val packageInfo = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0)
+        } catch (_: PackageManager.NameNotFoundException) { null }
+    }
+    val versionName = packageInfo?.versionName ?: "2.0"
 
     Column(
         modifier = Modifier
@@ -257,8 +268,6 @@ fun SettingsScreen() {
                 )
                 Spacer(Modifier.height(8.dp))
 
-                // 6 preset swatches + 7th "custom" slot with a rainbow ring icon.
-                // Dynamic color aktifken bu paletler sadece görünür kalır, tıklanamaz.
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     AccentPalette.forEach { argb ->
                         val selected = argb == accent
@@ -281,7 +290,6 @@ fun SettingsScreen() {
                             }
                         }
                     }
-                    // 7th slot — opens the custom picker
                     val isCustomSelected = accent !in AccentPalette
                     Box(
                         modifier = Modifier
@@ -316,8 +324,6 @@ fun SettingsScreen() {
                     }
                 }
 
-                // If a custom color is active, show a small swatch + hex so the
-                // user knows what they picked.
                 if (accent !in AccentPalette) {
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -339,7 +345,54 @@ fun SettingsScreen() {
 
             Spacer(Modifier.height(16.dp))
 
-            // Wallpaper — local fotoğraf seçimi
+            // Layout toggles
+            Text(
+                text = strings.playlistsLayout,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LayoutToggleChip(
+                    selected = playlistsLayout == LayoutMode.LIST,
+                    label = strings.list,
+                    icon = Icons.Filled.List,
+                    onClick = { scope.launch { prefs.setPlaylistsLayout(LayoutMode.LIST) } }
+                )
+                LayoutToggleChip(
+                    selected = playlistsLayout == LayoutMode.GRID,
+                    label = strings.grid,
+                    icon = Icons.Filled.ViewModule,
+                    onClick = { scope.launch { prefs.setPlaylistsLayout(LayoutMode.GRID) } }
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                text = strings.musicsLayout,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LayoutToggleChip(
+                    selected = musicsLayout == LayoutMode.LIST,
+                    label = strings.list,
+                    icon = Icons.Filled.List,
+                    onClick = { scope.launch { prefs.setMusicsLayout(LayoutMode.LIST) } }
+                )
+                LayoutToggleChip(
+                    selected = musicsLayout == LayoutMode.GRID,
+                    label = strings.grid,
+                    icon = Icons.Filled.ViewModule,
+                    onClick = { scope.launch { prefs.setMusicsLayout(LayoutMode.GRID) } }
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Wallpaper
             Text(
                 text = strings.wallpaper,
                 style = MaterialTheme.typography.bodyMedium,
@@ -347,7 +400,6 @@ fun SettingsScreen() {
             )
             Spacer(Modifier.height(8.dp))
 
-            // Önizleme
             if (wallpaper.isNotEmpty()) {
                 var previewLoaded by remember(wallpaper) { mutableStateOf(false) }
                 Box(
@@ -377,7 +429,6 @@ fun SettingsScreen() {
                 Spacer(Modifier.height(8.dp))
             }
 
-            // Galeriden seç butonu
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -401,7 +452,6 @@ fun SettingsScreen() {
                 )
             }
 
-            // Wallpaper brightness slider — only meaningful when a wallpaper is set.
             if (wallpaper.isNotEmpty()) {
                 Spacer(Modifier.height(14.dp))
                 Text(
@@ -442,7 +492,6 @@ fun SettingsScreen() {
                 }
             }
 
-            // Kaldır butonu
             if (wallpaper.isNotEmpty()) {
                 Spacer(Modifier.height(6.dp))
                 Row(
@@ -510,7 +559,7 @@ fun SettingsScreen() {
 
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "${strings.version} ${context.packageManager.getPackageInfo(context.packageName, 0).versionName}",
+            text = "${strings.version} $versionName",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
@@ -548,6 +597,39 @@ private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
 }
 
 private typealias ColumnScope = androidx.compose.foundation.layout.ColumnScope
+
+@Composable
+private fun LayoutToggleChip(
+    selected: Boolean,
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f)
+            )
+            .bounceClick { onClick() }
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
+        )
+        Text(
+            text = label,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
 
 @Composable
 private fun ThemeModeSegmentedSwitch(

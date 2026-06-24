@@ -33,3 +33,9 @@
 
 # AndroidX core
 -dontwarn androidx.**
+
+# JAudioTagger (MP3/M4A tag editing)
+-keep class org.jaudiotagger.** { *; }
+-dontwarn org.jaudiotagger.**
+-keep class java.awt.** { *; }
+-dontwarn java.awt.**
