@@ -543,7 +543,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 runCatching {
                     loadLyricsFromRetriever(track.uri)
                         ?: loadLyricsFromLrcFile(track)
-                }.getOrDefault(emptyList())
+                }.getOrNull() ?: emptyList()
             }
             _uiState.value = _uiState.value.copy(lyrics = lyrics, lyricsVisible = lyrics.isNotEmpty())
         }
@@ -553,7 +553,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(getApplication(), uri)
-            val lyrics = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LYRICS)
+            val lyrics = retriever.extractMetadata(28 /* MediaMetadataRetriever.METADATA_KEY_LYRICS */)
             retriever.release()
             lyrics?.lines()?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }
         } catch (e: Exception) {
