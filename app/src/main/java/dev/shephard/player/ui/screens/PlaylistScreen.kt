@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PinDrop
@@ -613,6 +614,8 @@ private fun PlaylistListView(
             }
         } else {
             if (layout == LayoutMode.GRID) {
+                val pinnedPlaylists = playlists.filter { it.pinned }
+                val unpinnedPlaylists = playlists.filter { !it.pinned }
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
                     modifier = Modifier
@@ -622,20 +625,37 @@ private fun PlaylistListView(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(playlists.size) { idx ->
-                        val pl = playlists[idx]
+                    if (pinnedPlaylists.size >= 2) {
+                        item(span = { GridItemSpan(2) }) {
+                            Text(
+                                text = strings.pinnedPlaylists,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        }
+                        items(pinnedPlaylists.size) { i ->
+                            val pl = pinnedPlaylists[i]
+                            val realIdx = playlists.indexOf(pl)
+                            val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+                            PlaylistGridCard(playlist = pl, plTracks = plTracks, strings = strings,
+                                onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                        }
+                        item(span = { GridItemSpan(2) }) {
+                            Spacer(Modifier.height(4.dp))
+                        }
+                    }
+                    items(unpinnedPlaylists.size) { i ->
+                        val pl = unpinnedPlaylists[i]
+                        val realIdx = playlists.indexOf(pl)
                         val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                        PlaylistGridCard(
-                            playlist = pl,
-                            plTracks = plTracks,
-                            strings = strings,
-                            onClick = { onOpen(idx) },
-                            onMenu = { onMenu(idx) },
-                            onPlay = { onPlay(pl) }
-                        )
+                        PlaylistGridCard(playlist = pl, plTracks = plTracks, strings = strings,
+                            onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
                     }
                 }
             } else {
+                val pinnedPlaylists = playlists.filter { it.pinned }
+                val unpinnedPlaylists = playlists.filter { !it.pinned }
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -643,17 +663,30 @@ private fun PlaylistListView(
                     contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(playlists.size) { idx ->
-                        val pl = playlists[idx]
+                    if (pinnedPlaylists.size >= 2) {
+                        item {
+                            Text(
+                                text = strings.pinnedPlaylists,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        }
+                        items(pinnedPlaylists.size) { i ->
+                            val pl = pinnedPlaylists[i]
+                            val realIdx = playlists.indexOf(pl)
+                            val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+                            PlaylistListCard(playlist = pl, plTracks = plTracks, strings = strings,
+                                onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                        }
+                        item { Spacer(Modifier.height(4.dp)) }
+                    }
+                    items(unpinnedPlaylists.size) { i ->
+                        val pl = unpinnedPlaylists[i]
+                        val realIdx = playlists.indexOf(pl)
                         val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                        PlaylistListCard(
-                            playlist = pl,
-                            plTracks = plTracks,
-                            strings = strings,
-                            onClick = { onOpen(idx) },
-                            onMenu = { onMenu(idx) },
-                            onPlay = { onPlay(pl) }
-                        )
+                        PlaylistListCard(playlist = pl, plTracks = plTracks, strings = strings,
+                            onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
                     }
                 }
             }
@@ -715,6 +748,21 @@ private fun PlaylistListCard(
                 val coverUri = playlist.coverUri?.let { Uri.parse(it) }
                 val firstArt = coverUri ?: plTracks.firstOrNull()?.albumArtUri
                 var artLoaded by remember(firstArt) { mutableStateOf(false) }
+                if (playlist.isSystem) {
+                    // Fixed Liked Songs cover
+                    Box(
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp))
+                            .background(Brush.linearGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
+                                )
+                            )),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Filled.Favorite, null, tint = Color.White, modifier = Modifier.size(26.dp))
+                    }
+                } else {
                 if (firstArt != null) {
                     AsyncImage(
                         model = firstArt,
@@ -731,6 +779,7 @@ private fun PlaylistListCard(
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
+                }
                 }
             }
 
@@ -803,6 +852,20 @@ private fun PlaylistGridCard(
             val coverUri = playlist.coverUri?.let { Uri.parse(it) }
             val firstArt = coverUri ?: plTracks.firstOrNull()?.albumArtUri
             var artLoaded by remember(firstArt) { mutableStateOf(false) }
+            if (playlist.isSystem) {
+                Box(
+                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))
+                        .background(Brush.linearGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
+                            )
+                        )),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Favorite, null, tint = Color.White, modifier = Modifier.size(48.dp))
+                }
+            } else {
             if (firstArt != null) {
                 AsyncImage(
                     model = firstArt,
@@ -819,6 +882,7 @@ private fun PlaylistGridCard(
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(48.dp)
                 )
+            }
             }
             BouncyIconButton(
                 onClick = onMenu,
@@ -923,9 +987,23 @@ private fun PlaylistDetailView(
                         .aspectRatio(1f)
                         .clip(RoundedCornerShape(20.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable { onPickCover() },
+                        .then(if (!playlist.isSystem) Modifier.clickable { onPickCover() } else Modifier),
                     contentAlignment = Alignment.Center
                 ) {
+                    if (playlist.isSystem) {
+                        Box(
+                            modifier = Modifier.fillMaxSize()
+                                .background(Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
+                                    )
+                                )),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.Favorite, null, tint = Color.White, modifier = Modifier.size(80.dp))
+                        }
+                    } else {
                     val coverUri = playlist.coverUri?.let { Uri.parse(it) }
                     val displayArt = coverUri ?: plTracks.firstOrNull()?.albumArtUri
                     if (displayArt != null) {
@@ -943,6 +1021,7 @@ private fun PlaylistDetailView(
                             modifier = Modifier.size(48.dp)
                         )
                     }
+                    if (!playlist.isSystem) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
@@ -959,6 +1038,8 @@ private fun PlaylistDetailView(
                             modifier = Modifier.size(18.dp)
                         )
                     }
+                    }
+                    } // end else (!isSystem)
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),

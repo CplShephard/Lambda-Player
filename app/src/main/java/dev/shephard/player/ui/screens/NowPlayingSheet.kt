@@ -2,6 +2,8 @@
 
 package dev.shephard.player.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -28,6 +31,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,6 +48,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -115,6 +121,22 @@ fun NowPlayingSheet(
     val dragOffset = remember { androidx.compose.animation.core.Animatable(0f) }
     val dragScope = rememberCoroutineScope()
 
+    // Trigger animated slide-down for button-press close
+    fun animatedDismiss() {
+        dragScope.launch {
+            val screenHeightPx = with(density) { 900.dp.toPx() }
+            dragOffset.animateTo(
+                targetValue = screenHeightPx,
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 280,
+                    easing = androidx.compose.animation.core.FastOutLinearInEasing
+                )
+            )
+            onDismiss()
+            dragOffset.snapTo(0f)
+        }
+    }
+
     val swipeThresholdPx = with(density) { 80.dp.toPx() }
     val artSwipeX = remember { androidx.compose.animation.core.Animatable(0f) }
     var artSwipeHandled by remember { mutableStateOf(false) }
@@ -158,8 +180,18 @@ fun NowPlayingSheet(
                 },
                 onDragStopped = { velocity ->
                     if (dragOffset.value > dismissThresholdPx || velocity > 2500f) {
-                        onDismiss()
-                        dragScope.launch { dragOffset.snapTo(0f) }
+                        dragScope.launch {
+                            val screenHeightPx = with(density) { 900.dp.toPx() }
+                            dragOffset.animateTo(
+                                targetValue = screenHeightPx,
+                                animationSpec = androidx.compose.animation.core.tween(
+                                    durationMillis = 280,
+                                    easing = androidx.compose.animation.core.FastOutLinearInEasing
+                                )
+                            )
+                            onDismiss()
+                            dragOffset.snapTo(0f)
+                        }
                     } else {
                         dragScope.launch {
                             dragOffset.animateTo(
@@ -257,7 +289,7 @@ fun NowPlayingSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 BouncyIconButton(
-                    onClick = onDismiss,
+                    onClick = { animatedDismiss() },
                     icon = Icons.Filled.KeyboardArrowDown,
                     contentDescription = strings.cancel,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -476,60 +508,108 @@ fun NowPlayingSheet(
                 }
 
                 if (showLyrics) {
-                    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-                    val scope = rememberCoroutineScope()
+                    val lyricsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                    val lyricsScope = rememberCoroutineScope()
+                    val lyricsContext = LocalContext.current
                     var isDownloading by remember { mutableStateOf(false) }
                     var downloadError by remember { mutableStateOf<String?>(null) }
+                    val lyricListState = rememberLazyListState()
+                    val syncedLyrics = state.syncedLyrics
+                    val currentMs = state.positionMs
+                    val activeIndex = if (syncedLyrics.isNotEmpty()) {
+                        syncedLyrics.indexOfLast { it.timeMs <= currentMs }.coerceAtLeast(0)
+                    } else -1
+
+                    // Auto-scroll to active line
+                    LaunchedEffect(activeIndex) {
+                        if (activeIndex >= 0 && syncedLyrics.isNotEmpty()) {
+                            lyricListState.animateScrollToItem(activeIndex)
+                        }
+                    }
+
+                    val lyricsFilePicker = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.OpenDocument()
+                    ) { uri ->
+                        if (uri != null) {
+                            lyricsScope.launch {
+                                val lines = withContext(Dispatchers.IO) {
+                                    try {
+                                        lyricsContext.contentResolver.openInputStream(uri)
+                                            ?.bufferedReader()?.readText()
+                                            ?.let { playerViewModel.parseLrcPublic(it) }
+                                    } catch (_: Exception) { null }
+                                }
+                                if (lines != null) playerViewModel.setManualLyrics(lines)
+                            }
+                        }
+                    }
+
                     ModalBottomSheet(
                         onDismissRequest = { showLyrics = false },
-                        sheetState = sheetState,
+                        sheetState = lyricsSheetState,
                         containerColor = MaterialTheme.colorScheme.surface
                     ) {
-                        Column(modifier = Modifier.padding(16.dp).height(420.dp)) {
-                            Text(strings.lyrics, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Column(modifier = Modifier.padding(16.dp).heightIn(min = 200.dp, max = 520.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                Text(strings.lyrics, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                if (state.lyrics.isEmpty()) {
+                                    // File picker button
+                                    androidx.compose.material3.IconButton(onClick = { lyricsFilePicker.launch(arrayOf("text/*", "application/octet-stream")) }) {
+                                        Icon(Icons.Filled.FolderOpen, contentDescription = strings.addLyricsFromFile, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
                             Spacer(Modifier.height(12.dp))
                             if (state.lyrics.isEmpty()) {
                                 Text(strings.noLyricsFound, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(16.dp))
-                                if (isDownloading) {
-                                    androidx.compose.material3.CircularProgressIndicator(
-                                        modifier = Modifier.size(28.dp),
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                } else {
-                                    val currentTrack = state.currentTrack
-                                    if (currentTrack != null) {
+                                val currentTrack = state.currentTrack
+                                if (currentTrack != null) {
+                                    if (isDownloading) {
+                                        androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(28.dp), color = MaterialTheme.colorScheme.primary)
+                                    } else {
                                         androidx.compose.material3.FilledTonalButton(
                                             onClick = {
                                                 isDownloading = true
                                                 downloadError = null
-                                                scope.launch {
+                                                lyricsScope.launch {
                                                     val result = withContext(Dispatchers.IO) {
                                                         fetchLyricsFromApi(currentTrack.artist, currentTrack.title)
                                                     }
                                                     isDownloading = false
-                                                    if (result != null) {
-                                                        playerViewModel.setManualLyrics(result)
-                                                    } else {
-                                                        downloadError = "Lyrics not found online."
-                                                    }
+                                                    if (result != null) playerViewModel.setManualLyrics(result)
+                                                    else downloadError = strings.noLyricsFound
                                                 }
                                             }
                                         ) {
-                                            Icon(Icons.Filled.Lyrics, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Icon(Icons.Filled.Lyrics, null, modifier = Modifier.size(18.dp))
                                             Spacer(Modifier.width(6.dp))
-                                            Text("Download Lyrics")
+                                            Text(strings.downloadLyrics)
                                         }
                                     }
-                                }
-                                downloadError?.let {
-                                    Spacer(Modifier.height(8.dp))
-                                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                    downloadError?.let {
+                                        Spacer(Modifier.height(8.dp))
+                                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                    }
                                 }
                             } else {
-                                LazyColumn {
-                                    itemsIndexed(state.lyrics) { _, line ->
-                                        Text(line, modifier = Modifier.padding(vertical = 4.dp))
+                                LazyColumn(state = lyricListState) {
+                                    itemsIndexed(state.lyrics) { idx, line ->
+                                        val isActive = idx == activeIndex
+                                        Text(
+                                            text = line,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .then(
+                                                    if (syncedLyrics.isNotEmpty()) Modifier.clickable {
+                                                        playerViewModel.seekTo(syncedLyrics.getOrNull(idx)?.timeMs ?: 0L)
+                                                    } else Modifier
+                                                )
+                                                .padding(vertical = 6.dp),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
                                     }
                                 }
                             }
@@ -639,6 +719,12 @@ private fun AddToPlaylistDrawer(
     val prefs = remember { PreferencesManager(context) }
     val json by prefs.playlistsJson.collectAsState(initial = "[]")
     val playlists = remember(json) { parsePlaylists(json) }
+    val likedJson by prefs.likedSongIds.collectAsState(initial = "[]")
+    val likedIds = remember(likedJson) {
+        try { org.json.JSONArray(likedJson).let { arr -> (0 until arr.length()).map { arr.getLong(it) } } }
+        catch (_: Exception) { emptyList() }
+    }
+    val isLiked = likedIds.contains(trackId)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -650,6 +736,49 @@ private fun AddToPlaylistDrawer(
             Text(strings.addToPlaylist, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
             LazyColumn {
+                // Liked Songs at top
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .bounceClick {
+                                scope.launch {
+                                    val newIds = if (isLiked) likedIds - trackId else likedIds + trackId
+                                    val arr = org.json.JSONArray().apply { newIds.forEach { put(it) } }
+                                    prefs.setLikedSongIds(arr.toString())
+                                }
+                            }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.Favorite, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(strings.likedSongs, fontWeight = FontWeight.SemiBold)
+                            Text("${likedIds.size} ${strings.trackCount}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Box(
+                            modifier = Modifier.size(32.dp).clip(CircleShape)
+                                .background(if (isLiked) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isLiked) Icons.Filled.Check else Icons.Filled.Add,
+                                contentDescription = null,
+                                tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+                // User playlists
                 itemsIndexed(playlists) { idx, pl ->
                     if (pl.isSystem) return@itemsIndexed
                     val containsTrack = pl.trackIds.contains(trackId)
@@ -658,12 +787,13 @@ private fun AddToPlaylistDrawer(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .bounceClick {
-                                if (!containsTrack) {
-                                    val updated = pl.copy(trackIds = pl.trackIds + trackId)
-                                    val all = playlists.toMutableList()
-                                    all[idx] = updated
-                                    scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
-                                }
+                                val updated = if (containsTrack)
+                                    pl.copy(trackIds = pl.trackIds - trackId)
+                                else
+                                    pl.copy(trackIds = pl.trackIds + trackId)
+                                val all = playlists.toMutableList()
+                                all[idx] = updated
+                                scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
                             }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -673,13 +803,8 @@ private fun AddToPlaylistDrawer(
                             Text("${pl.trackIds.size} ${strings.trackCount}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (containsTrack) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                                    else MaterialTheme.colorScheme.surfaceVariant
-                                ),
+                            modifier = Modifier.size(32.dp).clip(CircleShape)
+                                .background(if (containsTrack) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -876,19 +1001,32 @@ internal fun formatMillis(ms: Long): String {
 
 private fun fetchLyricsFromApi(artist: String, title: String): List<String>? {
     return try {
-        val encoded = java.net.URLEncoder.encode(artist.trim(), "UTF-8")
+        val encodedArtist = java.net.URLEncoder.encode(artist.trim(), "UTF-8")
         val encodedTitle = java.net.URLEncoder.encode(title.trim(), "UTF-8")
-        val url = java.net.URL("https://api.lyrics.ovh/v1/$encoded/$encodedTitle")
+        val url = java.net.URL("https://lrclib.net/api/get?artist_name=$encodedArtist&track_name=$encodedTitle")
         val conn = url.openConnection() as java.net.HttpURLConnection
         conn.connectTimeout = 8000
         conn.readTimeout = 8000
         conn.setRequestProperty("Accept", "application/json")
+        conn.setRequestProperty("User-Agent", "LambdaPlayer/2.5")
         if (conn.responseCode == 200) {
             val body = conn.inputStream.bufferedReader().readText()
             val json = org.json.JSONObject(body)
-            val lyrics = json.optString("lyrics")
-            if (lyrics.isBlank()) null
-            else lyrics.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
+            // Prefer plain lyrics over synced
+            val plain = json.optString("plainLyrics")
+            if (plain.isNotBlank()) {
+                return plain.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
+            }
+            // Fall back to synced lyrics (strip timestamps)
+            val synced = json.optString("syncedLyrics")
+            if (synced.isNotBlank()) {
+                return synced.lines()
+                    .mapNotNull { line ->
+                        val stripped = line.replace(Regex("^\\[\\d+:\\d+\\.\\d+]\\s*"), "").trim()
+                        stripped.ifBlank { null }
+                    }
+            }
+            null
         } else null
     } catch (_: Exception) { null }
 }

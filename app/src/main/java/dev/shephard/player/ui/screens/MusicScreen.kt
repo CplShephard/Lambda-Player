@@ -47,6 +47,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -127,44 +134,59 @@ fun MusicScreen(
             NoSearchResults(query = searchQuery, onClear = { libraryViewModel.setSearchQuery("") })
         }
         else -> {
+            val listState = rememberLazyListState()
+            val gridState = rememberLazyGridState()
+            val firstVisibleIndex = if (musicsLayout == LayoutMode.GRID)
+                gridState.firstVisibleItemIndex else listState.firstVisibleItemIndex
+            val firstVisibleOffset = if (musicsLayout == LayoutMode.GRID)
+                gridState.firstVisibleItemScrollOffset else listState.firstVisibleItemScrollOffset
+            val searchBarVisible = firstVisibleIndex == 0 || firstVisibleOffset == 0
+
             Column(modifier = Modifier.fillMaxSize()) {
-                // Search bar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .clip(RoundedCornerShape(30.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Collapsing search bar
+                AnimatedVisibility(
+                    visible = searchBarVisible || searchQuery.isNotEmpty(),
+                    enter = fadeIn() + slideInVertically { -it },
+                    exit = fadeOut() + slideOutVertically { -it }
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { libraryViewModel.setSearchQuery(it) },
-                        placeholder = { Text(strings.search, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = androidx.compose.material3.TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            disabledContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .clip(RoundedCornerShape(30.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
                         )
-                    )
+                        Spacer(Modifier.width(8.dp))
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { libraryViewModel.setSearchQuery(it) },
+                            placeholder = { Text(strings.search, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = androidx.compose.material3.TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                disabledIndicatorColor = Color.Transparent
+                            )
+                        )
+                    }
                 }
 
                 if (musicsLayout == LayoutMode.GRID) {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
+                        state = gridState,
                         modifier = Modifier
                             .fillMaxSize()
                             .overscroll(rememberBounceOverscrollEffect()),
@@ -183,6 +205,7 @@ fun MusicScreen(
                     }
                 } else {
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier
                             .fillMaxSize()
                             .overscroll(rememberBounceOverscrollEffect()),
@@ -618,6 +641,7 @@ private fun LoadingState() {
 
 @Composable
 private fun NoSearchResults(query: String, onClear: () -> Unit) {
+    val strings = LocalStrings.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -632,7 +656,7 @@ private fun NoSearchResults(query: String, onClear: () -> Unit) {
             modifier = Modifier.size(56.dp)
         )
         Text(
-            text = "\"$query\" için sonuç bulunamadı",
+            text = "\"$query\" — ${strings.noSearchResults}",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -644,7 +668,7 @@ private fun NoSearchResults(query: String, onClear: () -> Unit) {
         ) {
             Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
-            Text("Aramayı Temizle")
+            Text(strings.clearSearch)
         }
     }
 }

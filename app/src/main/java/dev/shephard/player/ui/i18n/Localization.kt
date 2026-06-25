@@ -94,6 +94,12 @@ data class Strings(
     val fileEdited: String,
     val fileEditError: String,
     val deleteTrackConfirm: String,
+    val noSearchResults: String,
+    val clearSearch: String,
+    val addLyricsFromFile: String,
+    val downloadLyrics: String,
+    val pinnedPlaylists: String,
+    val removeFromPlaylist: String,
 )
 
 private val EN = Strings(
@@ -161,7 +167,13 @@ private val EN = Strings(
     overwriteFile = "Overwrite existing file",
     fileEdited = "File edited successfully",
     fileEditError = "Could not edit file",
-    deleteTrackConfirm = "Delete this track from device?"
+    deleteTrackConfirm = "Delete this track from device?",
+    noSearchResults = "No results for",
+    clearSearch = "Clear Search",
+    addLyricsFromFile = "Add Lyrics from File",
+    downloadLyrics = "Download Lyrics",
+    pinnedPlaylists = "Pinned",
+    removeFromPlaylist = "Remove from playlist"
 )
 
 private val TR = EN.copy(
@@ -228,7 +240,13 @@ private val TR = EN.copy(
     overwriteFile = "Mevcut dosyanın üzerine yaz",
     fileEdited = "Dosya başarıyla düzenlendi",
     fileEditError = "Dosya düzenlenemedi",
-    deleteTrackConfirm = "Bu parçayı cihazdan sil?"
+    deleteTrackConfirm = "Bu parçayı cihazdan sil?",
+    noSearchResults = "Sonuç bulunamadı:",
+    clearSearch = "Aramayı Temizle",
+    addLyricsFromFile = "Dosyadan Lyrics Ekle",
+    downloadLyrics = "Lyrics İndir",
+    pinnedPlaylists = "Sabitlenmiş",
+    removeFromPlaylist = "Listeden çıkar"
 )
 
 private val ZH = EN.copy(
@@ -295,7 +313,13 @@ private val ZH = EN.copy(
     overwriteFile = "覆盖现有文件",
     fileEdited = "文件编辑成功",
     fileEditError = "无法编辑文件",
-    deleteTrackConfirm = "从设备删除此曲目？"
+    deleteTrackConfirm = "从设备删除此曲目？",
+    noSearchResults = "无结果：",
+    clearSearch = "清除搜索",
+    addLyricsFromFile = "从文件添加歌词",
+    downloadLyrics = "下载歌词",
+    pinnedPlaylists = "已置顶",
+    removeFromPlaylist = "从歌单移除"
 )
 
 private val ES = EN.copy(
@@ -362,7 +386,13 @@ private val ES = EN.copy(
     overwriteFile = "Sobrescribir archivo existente",
     fileEdited = "Archivo editado con éxito",
     fileEditError = "No se pudo editar el archivo",
-    deleteTrackConfirm = "¿Eliminar esta pista del dispositivo?"
+    deleteTrackConfirm = "¿Eliminar esta pista del dispositivo?",
+    noSearchResults = "Sin resultados para",
+    clearSearch = "Limpiar búsqueda",
+    addLyricsFromFile = "Añadir letra desde archivo",
+    downloadLyrics = "Descargar letra",
+    pinnedPlaylists = "Fijadas",
+    removeFromPlaylist = "Quitar de la lista"
 )
 
 private val RU = EN.copy(
@@ -429,7 +459,13 @@ private val RU = EN.copy(
     overwriteFile = "Перезаписать существующий файл",
     fileEdited = "Файл успешно отредактирован",
     fileEditError = "Не удалось отредактировать файл",
-    deleteTrackConfirm = "Удалить этот трек с устройства?"
+    deleteTrackConfirm = "Удалить этот трек с устройства?",
+    noSearchResults = "Нет результатов для",
+    clearSearch = "Очистить поиск",
+    addLyricsFromFile = "Добавить текст из файла",
+    downloadLyrics = "Скачать текст",
+    pinnedPlaylists = "Закреплённые",
+    removeFromPlaylist = "Удалить из списка"
 )
 
 private val KA = EN.copy(
@@ -496,7 +532,13 @@ private val KA = EN.copy(
     overwriteFile = "არსებული ფაილის ჩანაცვლება",
     fileEdited = "ფაილი წარმატებით შეიცვალა",
     fileEditError = "ფაილის ჩასწორება ვერ მოხერხდა",
-    deleteTrackConfirm = "წავშალოთ ეს ტრეკი მოწყობილობიდან?"
+    deleteTrackConfirm = "წავშალოთ ეს ტრეკი მოწყობილობიდან?",
+    noSearchResults = "შედეგი არ მოიძებნა:",
+    clearSearch = "ძიების გასუფთავება",
+    addLyricsFromFile = "ტექსტის დამატება ფაილიდან",
+    downloadLyrics = "ტექსტის ჩამოტვირთვა",
+    pinnedPlaylists = "დამაგრებული",
+    removeFromPlaylist = "სიისგან წაშლა"
 )
 
 private val AR = EN.copy(
@@ -563,7 +605,13 @@ private val AR = EN.copy(
     overwriteFile = "الكتابة فوق الملف الموجود",
     fileEdited = "تم تحرير الملف بنجاح",
     fileEditError = "تعذر تحرير الملف",
-    deleteTrackConfirm = "حذف هذا المقطع من الجهاز؟"
+    deleteTrackConfirm = "حذف هذا المقطع من الجهاز؟",
+    noSearchResults = "لا نتائج لـ",
+    clearSearch = "مسح البحث",
+    addLyricsFromFile = "إضافة كلمات من ملف",
+    downloadLyrics = "تحميل الكلمات",
+    pinnedPlaylists = "المثبتة",
+    removeFromPlaylist = "إزالة من القائمة"
 )
 
 val AllLanguages: List<Strings> = listOf(EN, TR, ZH, ES, RU, KA, AR)

@@ -27,6 +27,8 @@ import kotlinx.coroutines.withContext
 import kotlin.math.sin
 import kotlin.random.Random
 
+data class SyncedLyricLine(val timeMs: Long, val text: String)
+
 data class PlayerUiState(
     val currentTrack: AudioTrack? = null,
     val isPlaying: Boolean = false,
@@ -44,6 +46,7 @@ data class PlayerUiState(
     val currentPlaylistName: String? = null,
     val likedSongIds: List<Long> = emptyList(),
     val lyrics: List<String> = emptyList(),
+    val syncedLyrics: List<SyncedLyricLine> = emptyList(),
     val lyricsVisible: Boolean = false
 )
 
@@ -641,18 +644,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun parseLrc(content: String): List<String> {
-        val regex = Regex("\\[\\d{2}:\\d{2}\\.\\d{2,3}\\](.*)")
-        return content.lines()
-            .mapNotNull { line ->
-                val match = regex.find(line)
-                match?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
-            }
-            .distinct()
+        val regex = Regex("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})](.*)")
+        val synced = content.lines().mapNotNull { line ->
+            val match = regex.find(line) ?: return@mapNotNull null
+            val min = match.groupValues[1].toLongOrNull() ?: 0L
+            val sec = match.groupValues[2].toLongOrNull() ?: 0L
+            val ms = match.groupValues[3].padEnd(3, '0').take(3).toLongOrNull() ?: 0L
+            val text = match.groupValues[4].trim()
+            if (text.isEmpty()) null else SyncedLyricLine((min * 60 + sec) * 1000 + ms, text)
+        }
+        if (synced.isNotEmpty()) {
+            _uiState.value = _uiState.value.copy(syncedLyrics = synced)
+            return synced.map { it.text }
+        }
+        _uiState.value = _uiState.value.copy(syncedLyrics = emptyList())
+        return content.lines().map { it.trim() }.filter { it.isNotBlank() }
     }
 
     fun toggleLyricsVisible() {
         _uiState.value = _uiState.value.copy(lyricsVisible = !_uiState.value.lyricsVisible)
     }
+
+    fun parseLrcPublic(content: String): List<String> = parseLrc(content)
 
     fun setManualLyrics(lines: List<String>) {
         _uiState.value = _uiState.value.copy(lyrics = lines, lyricsVisible = true)

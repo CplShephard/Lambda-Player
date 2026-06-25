@@ -182,10 +182,7 @@ fun MainContainer(
                     initialOffsetY = { it },
                     animationSpec = spring(dampingRatio = 0.85f, stiffness = 180f)
                 ) + fadeIn(androidx.compose.animation.core.tween(300)),
-                exit = slideOutVertically(
-                    targetOffsetY = { it },
-                    animationSpec = spring(dampingRatio = 0.85f, stiffness = 180f)
-                ) + fadeOut(androidx.compose.animation.core.tween(250)),
+                exit = fadeOut(androidx.compose.animation.core.tween(50)),
                 modifier = Modifier.fillMaxSize()
             ) {
                 NowPlayingSheet(
@@ -201,6 +198,7 @@ fun MainContainer(
 private fun BrandHeader(currentRoute: String?) {
     val strings = LocalStrings.current
     val sectionTitle = when (currentRoute) {
+        Destination.Music.route -> strings.music
         Destination.Playlists.route -> strings.playlists
         Destination.Settings.route -> strings.settings
         else -> null
