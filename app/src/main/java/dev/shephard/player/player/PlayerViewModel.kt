@@ -385,7 +385,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             c.prepare()
             c.play()
             remixActive = false
-        _isRemixed.value = false
+            _isRemixed.value = false
             originalQueue = emptyList()
             return
         }
@@ -422,7 +422,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         c.play()
         remixActive = true
         _isRemixed.value = true
-    } {
+    }
+
+    fun cycleRepeatMode() {
         val c = controller ?: return
         c.repeatMode = when (c.repeatMode) {
             Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
