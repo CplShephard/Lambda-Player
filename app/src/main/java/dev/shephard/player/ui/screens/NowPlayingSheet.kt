@@ -96,6 +96,8 @@ import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.rememberBounceOverscrollEffect
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import kotlin.math.absoluteValue
 
@@ -475,6 +477,9 @@ fun NowPlayingSheet(
 
                 if (showLyrics) {
                     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                    val scope = rememberCoroutineScope()
+                    var isDownloading by remember { mutableStateOf(false) }
+                    var downloadError by remember { mutableStateOf<String?>(null) }
                     ModalBottomSheet(
                         onDismissRequest = { showLyrics = false },
                         sheetState = sheetState,
@@ -485,6 +490,42 @@ fun NowPlayingSheet(
                             Spacer(Modifier.height(12.dp))
                             if (state.lyrics.isEmpty()) {
                                 Text(strings.noLyricsFound, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.height(16.dp))
+                                if (isDownloading) {
+                                    androidx.compose.material3.CircularProgressIndicator(
+                                        modifier = Modifier.size(28.dp),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                } else {
+                                    val currentTrack = state.currentTrack
+                                    if (currentTrack != null) {
+                                        androidx.compose.material3.FilledTonalButton(
+                                            onClick = {
+                                                isDownloading = true
+                                                downloadError = null
+                                                scope.launch {
+                                                    val result = withContext(Dispatchers.IO) {
+                                                        fetchLyricsFromApi(currentTrack.artist, currentTrack.title)
+                                                    }
+                                                    isDownloading = false
+                                                    if (result != null) {
+                                                        playerViewModel.setManualLyrics(result)
+                                                    } else {
+                                                        downloadError = "Lyrics not found online."
+                                                    }
+                                                }
+                                            }
+                                        ) {
+                                            Icon(Icons.Filled.Lyrics, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Download Lyrics")
+                                        }
+                                    }
+                                }
+                                downloadError?.let {
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                }
                             } else {
                                 LazyColumn {
                                     itemsIndexed(state.lyrics) { _, line ->
@@ -831,4 +872,23 @@ internal fun formatMillis(ms: Long): String {
     val m = totalSec / 60
     val s = totalSec % 60
     return "%d:%02d".format(m, s)
+}
+
+private fun fetchLyricsFromApi(artist: String, title: String): List<String>? {
+    return try {
+        val encoded = java.net.URLEncoder.encode(artist.trim(), "UTF-8")
+        val encodedTitle = java.net.URLEncoder.encode(title.trim(), "UTF-8")
+        val url = java.net.URL("https://api.lyrics.ovh/v1/$encoded/$encodedTitle")
+        val conn = url.openConnection() as java.net.HttpURLConnection
+        conn.connectTimeout = 8000
+        conn.readTimeout = 8000
+        conn.setRequestProperty("Accept", "application/json")
+        if (conn.responseCode == 200) {
+            val body = conn.inputStream.bufferedReader().readText()
+            val json = org.json.JSONObject(body)
+            val lyrics = json.optString("lyrics")
+            if (lyrics.isBlank()) null
+            else lyrics.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
+        } else null
+    } catch (_: Exception) { null }
 }

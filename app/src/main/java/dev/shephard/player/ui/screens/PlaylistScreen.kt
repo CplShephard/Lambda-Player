@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.overscroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -158,6 +159,7 @@ internal fun ensureLikedSongsPlaylist(playlists: List<LocalPlaylist>, strings: d
 @Composable
 fun PlaylistScreen(
     libraryViewModel: LibraryViewModel = viewModel(),
+    hasMiniPlayer: Boolean = false,
     onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> }
 ) {
     val context = LocalContext.current
@@ -616,7 +618,7 @@ private fun PlaylistListView(
                     modifier = Modifier
                         .fillMaxSize()
                         .overscroll(rememberBounceOverscrollEffect()),
-                    contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 160.dp),
+                    contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -638,7 +640,7 @@ private fun PlaylistListView(
                     modifier = Modifier
                         .fillMaxSize()
                         .overscroll(rememberBounceOverscrollEffect()),
-                    contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 160.dp),
+                    contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(playlists.size) { idx ->
@@ -661,7 +663,7 @@ private fun PlaylistListView(
             onClick = onCreate,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 140.dp, end = 24.dp)
+                .padding(bottom = 180.dp, end = 24.dp)
                 .bounceClick(onClick = onCreate),
             shape = RoundedCornerShape(20.dp),
             containerColor = MaterialTheme.colorScheme.primary
@@ -818,22 +820,30 @@ private fun PlaylistGridCard(
                     modifier = Modifier.size(48.dp)
                 )
             }
-            Row(
+            BouncyIconButton(
+                onClick = onMenu,
+                icon = Icons.Filled.MoreVert,
+                contentDescription = "Menu",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
+                    .padding(4.dp)
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
                     .padding(8.dp)
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+                    .bounceClick { onPlay() },
+                contentAlignment = Alignment.Center
             ) {
-                BouncyIconButton(
-                    onClick = onPlay,
-                    icon = Icons.Filled.PlayArrow,
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
                     contentDescription = strings.play,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                BouncyIconButton(
-                    onClick = onMenu,
-                    icon = Icons.Filled.MoreVert,
-                    contentDescription = "Menu",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(22.dp)
                 )
             }
         }
@@ -873,7 +883,7 @@ private fun PlaylistDetailView(
             modifier = Modifier
                 .fillMaxSize()
                 .overscroll(rememberBounceOverscrollEffect()),
-            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 160.dp)
+            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp)
         ) {
             item {
                 Row(
@@ -1123,13 +1133,7 @@ private fun PlaylistTrackRow(
             )
         }
         Text(track.formattedDuration(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.width(4.dp))
-        BouncyIconButton(
-            onClick = onRemove,
-            icon = Icons.Filled.Delete,
-            contentDescription = "Remove",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Spacer(Modifier.width(8.dp))
     }
 }
 
@@ -1196,7 +1200,6 @@ private fun DraggablePlaylistTrackRow(
         }
         Text(track.formattedDuration(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(4.dp))
-        BouncyIconButton(onClick = onRemove, icon = Icons.Filled.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Icon(
             imageVector = Icons.Filled.DragHandle,
             contentDescription = "Reorder",

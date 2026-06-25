@@ -14,10 +14,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
+
+data class TrackOverride(
+    val title: String? = null,
+    val artist: String? = null,
+    val album: String? = null,
+    val coverUri: String? = null
+)
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val prefs = PreferencesManager(application)
 
     private val _tracks = MutableStateFlow<List<AudioTrack>>(emptyList())
     val tracks: StateFlow<List<AudioTrack>> = _tracks.asStateFlow()
@@ -34,10 +45,18 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val _filteredTracks = MutableStateFlow<List<AudioTrack>>(emptyList())
     val filteredTracks: StateFlow<List<AudioTrack>> = _filteredTracks.asStateFlow()
 
+    // trackId.toString() -> TrackOverride
+    private val _overrides = MutableStateFlow<Map<String, TrackOverride>>(emptyMap())
+    val overrides: StateFlow<Map<String, TrackOverride>> = _overrides.asStateFlow()
+
     private var contentObserver: ContentObserver? = null
 
     init {
         registerObserver()
+        viewModelScope.launch {
+            val json = prefs.trackOverridesJson.first()
+            _overrides.value = parseOverrides(json)
+        }
     }
 
     private fun registerObserver() {
@@ -59,7 +78,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             val result = withContext(Dispatchers.IO) {
                 MediaStoreScanner.queryAudioTracks(getApplication())
             }
-            _tracks.value = result
+            _tracks.value = applyOverridesToList(result, _overrides.value)
             _isLoading.value = false
             _hasScanned.value = true
             applyFilter()
@@ -69,6 +88,38 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
         applyFilter()
+    }
+
+    fun saveTrackOverride(trackId: Long, title: String, artist: String, album: String, coverUri: String?) {
+        viewModelScope.launch {
+            val current = _overrides.value.toMutableMap()
+            current[trackId.toString()] = TrackOverride(title, artist, album, coverUri)
+            _overrides.value = current
+            val json = encodeOverrides(current)
+            prefs.setTrackOverridesJson(json)
+            // Re-apply overrides to current raw track list
+            val rawJson = prefs.trackOverridesJson.first()
+            val newOverrides = parseOverrides(rawJson)
+            val raw = withContext(Dispatchers.IO) {
+                MediaStoreScanner.queryAudioTracks(getApplication())
+            }
+            _tracks.value = applyOverridesToList(raw, newOverrides)
+            applyFilter()
+        }
+    }
+
+    fun getOverride(trackId: Long): TrackOverride? = _overrides.value[trackId.toString()]
+
+    private fun applyOverridesToList(tracks: List<AudioTrack>, overrides: Map<String, TrackOverride>): List<AudioTrack> {
+        return tracks.map { track ->
+            val ov = overrides[track.id.toString()] ?: return@map track
+            track.copy(
+                title = ov.title?.takeIf { it.isNotBlank() } ?: track.title,
+                artist = ov.artist?.takeIf { it.isNotBlank() } ?: track.artist,
+                album = ov.album?.takeIf { it.isNotBlank() } ?: track.album,
+                albumArtUri = ov.coverUri?.let { Uri.parse(it) } ?: track.albumArtUri
+            )
+        }
     }
 
     private fun applyFilter() {
@@ -89,5 +140,37 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             getApplication<Application>().contentResolver.unregisterContentObserver(it)
         }
         super.onCleared()
+    }
+
+    companion object {
+        fun parseOverrides(json: String): Map<String, TrackOverride> {
+            return try {
+                val obj = JSONObject(json)
+                val map = mutableMapOf<String, TrackOverride>()
+                obj.keys().forEach { key ->
+                    val v = obj.getJSONObject(key)
+                    map[key] = TrackOverride(
+                        title = v.optString("title").takeIf { it.isNotEmpty() },
+                        artist = v.optString("artist").takeIf { it.isNotEmpty() },
+                        album = v.optString("album").takeIf { it.isNotEmpty() },
+                        coverUri = v.optString("coverUri").takeIf { it.isNotEmpty() }
+                    )
+                }
+                map
+            } catch (_: Exception) { emptyMap() }
+        }
+
+        fun encodeOverrides(map: Map<String, TrackOverride>): String {
+            val obj = JSONObject()
+            map.forEach { (key, ov) ->
+                val v = JSONObject()
+                ov.title?.let { v.put("title", it) }
+                ov.artist?.let { v.put("artist", it) }
+                ov.album?.let { v.put("album", it) }
+                ov.coverUri?.let { v.put("coverUri", it) }
+                obj.put(key, v)
+            }
+            return obj.toString()
+        }
     }
 }

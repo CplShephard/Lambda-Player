@@ -381,9 +381,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     .build()
             }
             val startIndex = restoreQueue.indexOfFirst { it.id == currentTrack?.id }.coerceAtLeast(0)
-            c.setMediaItems(mediaItems, startIndex, c.currentPosition)
-            c.prepare()
-            c.play()
+            val currentPos = c.currentPosition
+            val wasPlaying = c.isPlaying
+            c.setMediaItems(mediaItems, startIndex, currentPos)
+            if (wasPlaying) c.play()
             remixActive = false
             _isRemixed.value = false
             originalQueue = emptyList()
@@ -417,9 +418,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 )
                 .build()
         }
-        c.setMediaItems(mediaItems, 0, c.currentPosition)
-        c.prepare()
-        c.play()
+        val currentPos = c.currentPosition
+        val wasPlaying = c.isPlaying
+        c.setMediaItems(mediaItems, 0, currentPos)
+        if (wasPlaying) c.play()
         remixActive = true
         _isRemixed.value = true
     }
@@ -650,6 +652,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun toggleLyricsVisible() {
         _uiState.value = _uiState.value.copy(lyricsVisible = !_uiState.value.lyricsVisible)
+    }
+
+    fun setManualLyrics(lines: List<String>) {
+        _uiState.value = _uiState.value.copy(lyrics = lines, lyricsVisible = true)
     }
 
     private fun startAmplitudePulse() {

@@ -2,9 +2,7 @@
 
 package dev.shephard.player.ui.screens
 
-import android.content.ContentValues
 import android.content.Context
-import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -83,10 +81,6 @@ import dev.shephard.player.ui.components.rememberBounceOverscrollEffect
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.jaudiotagger.audio.AudioFileIO
-import org.jaudiotagger.tag.FieldKey
-import org.jaudiotagger.tag.images.StandardArtwork
-import java.io.File
 
 @Composable
 fun MusicScreen(
@@ -304,8 +298,8 @@ fun MusicScreen(
     trackToEdit?.let { track ->
         EditMusicDrawer(
             track = track,
-            onDismiss = { trackToEdit = null },
-            onSaved = { libraryViewModel.loadTracks() }
+            libraryViewModel = libraryViewModel,
+            onDismiss = { trackToEdit = null }
         )
     }
 }
@@ -466,18 +460,19 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
 @Composable
 private fun EditMusicDrawer(
     track: AudioTrack,
-    onDismiss: () -> Unit,
-    onSaved: () -> Unit
+    libraryViewModel: LibraryViewModel,
+    onDismiss: () -> Unit
 ) {
     val strings = LocalStrings.current
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    var titleText by remember { mutableStateOf(track.title) }
-    var artistText by remember { mutableStateOf(track.artist) }
-    var albumText by remember { mutableStateOf(track.album) }
-    var coverUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val existing = remember(track.id) { libraryViewModel.getOverride(track.id) }
+
+    var titleText by remember { mutableStateOf(existing?.title ?: track.title) }
+    var artistText by remember { mutableStateOf(existing?.artist ?: track.artist) }
+    var albumText by remember { mutableStateOf(existing?.album ?: track.album) }
+    var coverUri by remember { mutableStateOf<android.net.Uri?>(existing?.coverUri?.let { android.net.Uri.parse(it) }) }
 
     val coverPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -504,37 +499,14 @@ private fun EditMusicDrawer(
                 TextButton(onClick = onDismiss) { Text(strings.cancel) }
                 Text(strings.editMusic, fontWeight = FontWeight.SemiBold)
                 TextButton(onClick = {
-                    scope.launch(Dispatchers.IO) {
-                        runCatching {
-                            val filePath = getFilePathFromUri(context, track.uri)
-                            if (filePath != null) {
-                                val file = File(filePath)
-                                val audioFile = AudioFileIO.read(file)
-                                val tag = audioFile.tagOrCreateAndSetDefault
-                                tag.setField(FieldKey.TITLE, titleText)
-                                tag.setField(FieldKey.ARTIST, artistText)
-                                tag.setField(FieldKey.ALBUM, albumText)
-                                coverUri?.let { uri ->
-                                    context.contentResolver.openInputStream(uri)?.use { stream ->
-                                        val bytes = stream.readBytes()
-                                        val artwork = StandardArtwork().apply { setBinaryData(bytes) }
-                                        tag.setField(artwork)
-                                    }
-                                }
-                                AudioFileIO.write(audioFile)
-                                val values = ContentValues().apply {
-                                    put(MediaStore.Audio.Media.TITLE, titleText)
-                                    put(MediaStore.Audio.Media.ARTIST, artistText)
-                                    put(MediaStore.Audio.Media.ALBUM, albumText)
-                                }
-                                context.contentResolver.update(track.uri, values, null, null)
-                            }
-                        }
-                        kotlinx.coroutines.withContext(Dispatchers.Main) {
-                            onDismiss()
-                            onSaved()
-                        }
-                    }
+                    libraryViewModel.saveTrackOverride(
+                        trackId = track.id,
+                        title = titleText,
+                        artist = artistText,
+                        album = albumText,
+                        coverUri = coverUri?.toString()
+                    )
+                    onDismiss()
                 }) { Text(strings.apply, fontWeight = FontWeight.Bold) }
             }
             Spacer(Modifier.height(16.dp))
@@ -558,6 +530,17 @@ private fun EditMusicDrawer(
                 )
                 if (!loaded) {
                     Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(8.dp)
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Edit, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -586,21 +569,6 @@ private fun EditMusicDrawer(
     }
 }
 
-private fun getFilePathFromUri(context: Context, uri: android.net.Uri): String? {
-    var path: String? = null
-    if (uri.scheme == "content") {
-        val cursor = context.contentResolver.query(uri, arrayOf(MediaStore.Audio.Media.DATA), null, null, null)
-        cursor?.use {
-            if (it.moveToFirst()) {
-                path = it.getString(it.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA))
-            }
-        }
-    }
-    if (path == null) {
-        path = uri.path
-    }
-    return path
-}
 
 @Composable
 private fun PermissionRequest(onRequest: () -> Unit) {
