@@ -59,9 +59,10 @@ import dev.shephard.player.ui.i18n.stringsFor
 import dev.shephard.player.ui.screens.NowPlayingSheet
 
 // Now Playing ↔ app arasındaki dikey kayma geçişi (playlist geçişi gibi tek animasyon)
+// Düşük stiffness → daha yavaş, akıcı ve zarif bir hareket.
 private val nowPlayingSlideSpring = spring<IntOffset>(
-    dampingRatio = 0.88f,
-    stiffness = 235f
+    dampingRatio = 0.9f,
+    stiffness = 140f
 )
 
 @Composable
@@ -121,15 +122,15 @@ fun MainContainer(
                         (slideInVertically(
                             initialOffsetY = { it },
                             animationSpec = nowPlayingSlideSpring
-                        ) + fadeIn(tween(220))) togetherWith
-                            fadeOut(tween(180))
+                        ) + fadeIn(tween(380))) togetherWith
+                            fadeOut(tween(300))
                     } else {
                         // Kapanış: Now Playing aşağı kayar, uygulama geri belirir
-                        fadeIn(tween(220)) togetherWith
+                        fadeIn(tween(380)) togetherWith
                             (slideOutVertically(
                                 targetOffsetY = { it },
                                 animationSpec = nowPlayingSlideSpring
-                            ) + fadeOut(tween(180)))
+                            ) + fadeOut(tween(300)))
                     }
                 },
                 label = "nowPlaying",
