@@ -93,6 +93,8 @@ import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.formattedDuration
+import dev.shephard.player.data.slideForwardInQueue
+import dev.shephard.player.data.trackById
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.RepeatMode
@@ -121,31 +123,9 @@ fun NowPlayingSheet(
     val dragOffset = remember { androidx.compose.animation.core.Animatable(0f) }
     val dragScope = rememberCoroutineScope()
 
-    // Trigger animated slide-down for button-press close
-    fun animatedDismiss() {
-        dragScope.launch {
-            val screenHeightPx = with(density) { 900.dp.toPx() }
-            dragOffset.animateTo(
-                targetValue = screenHeightPx,
-                animationSpec = androidx.compose.animation.core.tween(
-                    durationMillis = 280,
-                    easing = androidx.compose.animation.core.FastOutLinearInEasing
-                )
-            )
-            onDismiss()
-            dragOffset.snapTo(0f)
-        }
-    }
-
     val swipeThresholdPx = with(density) { 80.dp.toPx() }
     val artSwipeX = remember { androidx.compose.animation.core.Animatable(0f) }
     var artSwipeHandled by remember { mutableStateOf(false) }
-
-    var lastTrackId by remember { mutableStateOf<Long?>(null) }
-    val currentId = track?.id ?: -1L
-    val navigationDirection by playerViewModel.navigationDirection.collectAsState()
-    val slideForward = navigationDirection >= 0
-    if (lastTrackId != currentId) lastTrackId = currentId
 
     LaunchedEffect(track?.id) {
         artSwipeX.snapTo(0f)
@@ -180,18 +160,8 @@ fun NowPlayingSheet(
                 },
                 onDragStopped = { velocity ->
                     if (dragOffset.value > dismissThresholdPx || velocity > 2500f) {
-                        dragScope.launch {
-                            val screenHeightPx = with(density) { 900.dp.toPx() }
-                            dragOffset.animateTo(
-                                targetValue = screenHeightPx,
-                                animationSpec = androidx.compose.animation.core.tween(
-                                    durationMillis = 280,
-                                    easing = androidx.compose.animation.core.FastOutLinearInEasing
-                                )
-                            )
-                            onDismiss()
-                            dragOffset.snapTo(0f)
-                        }
+                        // Geçiş MainContainer'daki AnimatedContent tarafından yapılır.
+                        onDismiss()
                     } else {
                         dragScope.launch {
                             dragOffset.animateTo(
@@ -289,7 +259,7 @@ fun NowPlayingSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 BouncyIconButton(
-                    onClick = { animatedDismiss() },
+                    onClick = onDismiss,
                     icon = Icons.Filled.KeyboardArrowDown,
                     contentDescription = strings.cancel,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -315,7 +285,8 @@ fun NowPlayingSheet(
             androidx.compose.animation.AnimatedContent(
                 targetState = track?.id ?: -1L,
                 transitionSpec = {
-                    val dir = if (slideForward)
+                    // Yönü kuyruktaki konuma göre belirle (sonraki=ileri/soldan, önceki=geri/sağdan)
+                    val dir = if (slideForwardInQueue(state.queue, initialState, targetState))
                         androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Left
                     else
                         androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Right
@@ -326,7 +297,10 @@ fun NowPlayingSheet(
                 },
                 label = "trackSwap",
                 modifier = Modifier.fillMaxWidth()
-            ) { _ ->
+            ) { targetId ->
+                // Dış kapsamdaki `track` yerine, bu slota ait id'den doğru parçayı bul.
+                // Böylece geçiş sırasında eski slotta ESKİ kapak, yeni slotta YENİ kapak görünür.
+                val displayTrack = state.queue.trackById(targetId) ?: track
                 Column {
                     Box(
                         modifier = Modifier
@@ -341,9 +315,9 @@ fun NowPlayingSheet(
                             .background(MaterialTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
-                        var artLoaded by remember(track?.id) { mutableStateOf(false) }
+                        var artLoaded by remember(targetId) { mutableStateOf(false) }
                         AsyncImage(
-                            model = track?.albumArtUri,
+                            model = displayTrack?.albumArtUri,
                             contentDescription = null,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,
@@ -366,13 +340,13 @@ fun NowPlayingSheet(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = track?.title ?: strings.nothingPlaying,
+                            text = displayTrack?.title ?: strings.nothingPlaying,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = track?.artist ?: strings.pickASong,
+                            text = displayTrack?.artist ?: strings.pickASong,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

@@ -46,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import dev.shephard.player.data.AudioTrack
+import dev.shephard.player.data.slideForwardInQueue
+import dev.shephard.player.data.trackById
 import dev.shephard.player.player.PlayerUiState
 import dev.shephard.player.ui.components.bounceClick
 
@@ -60,14 +62,7 @@ fun MiniPlayer(
 ) {
     val track = state.currentTrack ?: return
 
-    // Track direction for art animation
-    var lastTrackId by remember { mutableStateOf<Long?>(null) }
-    var slideForward by remember { mutableStateOf(true) }
-    val currentId = track.id
-    if (lastTrackId != null && lastTrackId != currentId) {
-        slideForward = currentId > (lastTrackId ?: 0L)
-    }
-    if (lastTrackId != currentId) lastTrackId = currentId
+    // Geçiş yönü AnimatedContent içinde kuyruk konumuna göre belirlenir.
 
     val fraction = if (state.durationMs > 0L)
         (state.positionMs.toFloat() / state.durationMs.toFloat()).coerceIn(0f, 1f)
@@ -96,7 +91,7 @@ fun MiniPlayer(
             AnimatedContent(
                 targetState = track.id,
                 transitionSpec = {
-                    val dir = if (slideForward)
+                    val dir = if (slideForwardInQueue(state.queue, initialState, targetState))
                         AnimatedContentTransitionScope.SlideDirection.Left
                     else
                         AnimatedContentTransitionScope.SlideDirection.Right
@@ -105,6 +100,7 @@ fun MiniPlayer(
                 },
                 label = "miniArt"
             ) { trackId ->
+                val displayTrack = state.queue.trackById(trackId) ?: track
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -114,7 +110,7 @@ fun MiniPlayer(
                 ) {
                     var artLoaded by remember(trackId) { mutableStateOf(false) }
                     AsyncImage(
-                        model = track.albumArtUri,
+                        model = displayTrack.albumArtUri,
                         contentDescription = null,
                         modifier = Modifier
                             .size(40.dp)
@@ -139,7 +135,7 @@ fun MiniPlayer(
             AnimatedContent(
                 targetState = track.id,
                 transitionSpec = {
-                    val dir = if (slideForward)
+                    val dir = if (slideForwardInQueue(state.queue, initialState, targetState))
                         AnimatedContentTransitionScope.SlideDirection.Left
                     else
                         AnimatedContentTransitionScope.SlideDirection.Right
@@ -150,10 +146,11 @@ fun MiniPlayer(
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 12.dp)
-            ) { _ ->
+            ) { trackId ->
+                val displayTrack = state.queue.trackById(trackId) ?: track
                 Column {
                     Text(
-                        text = track.title,
+                        text = displayTrack.title,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground,
@@ -161,7 +158,7 @@ fun MiniPlayer(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = track.artist,
+                        text = displayTrack.artist,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
