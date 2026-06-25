@@ -31,12 +31,10 @@ import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,11 +45,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.TextButton
@@ -88,17 +81,16 @@ import dev.shephard.player.ui.components.rememberBounceOverscrollEffect
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun MusicScreen(
     libraryViewModel: LibraryViewModel = viewModel(),
     onTrackClick: (List<AudioTrack>, Int) -> Unit = { _, _ -> }
 ) {
-    val tracks by libraryViewModel.filteredTracks.collectAsState()
-    val allTracks by libraryViewModel.tracks.collectAsState()
+    val tracks by libraryViewModel.tracks.collectAsState()
     val isLoading by libraryViewModel.isLoading.collectAsState()
     val hasScanned by libraryViewModel.hasScanned.collectAsState()
-    val searchQuery by libraryViewModel.searchQuery.collectAsState()
 
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
@@ -119,6 +111,28 @@ fun MusicScreen(
     var selectedTrackForMenu by remember { mutableStateOf<AudioTrack?>(null) }
     var trackToEdit by remember { mutableStateOf<AudioTrack?>(null) }
     var trackToDelete by remember { mutableStateOf<AudioTrack?>(null) }
+    val scope = rememberCoroutineScope()
+
+    // Tracks the file we're waiting on the system consent dialog to delete, so we
+    // can retry the delete after consent (required on Android 10) and rescan.
+    var pendingDeleteUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
+    // Handles the system consent dialog shown when deleting media files the app
+    // does not own (Android 10+). On approval we retry the delete then rescan.
+    val deleteConsentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        val uri = pendingDeleteUri
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            scope.launch(Dispatchers.IO) {
+                // On Android 11+ the file is already gone; on Android 10 consent only
+                // granted permission, so retry the delete before refreshing the list.
+                uri?.let { runCatching { context.contentResolver.delete(it, null, null) } }
+                withContext(Dispatchers.Main) { libraryViewModel.loadTracks() }
+            }
+        }
+        pendingDeleteUri = null
+    }
 
     when {
         !permissionState.hasPermission -> {
@@ -127,99 +141,49 @@ fun MusicScreen(
         isLoading -> {
             LoadingState()
         }
-        hasScanned && allTracks.isEmpty() -> {
+        hasScanned && tracks.isEmpty() -> {
             EmptyState()
-        }
-        hasScanned && tracks.isEmpty() && searchQuery.isNotEmpty() -> {
-            NoSearchResults(query = searchQuery, onClear = { libraryViewModel.setSearchQuery("") })
         }
         else -> {
             val listState = rememberLazyListState()
             val gridState = rememberLazyGridState()
-            val firstVisibleIndex = if (musicsLayout == LayoutMode.GRID)
-                gridState.firstVisibleItemIndex else listState.firstVisibleItemIndex
-            val firstVisibleOffset = if (musicsLayout == LayoutMode.GRID)
-                gridState.firstVisibleItemScrollOffset else listState.firstVisibleItemScrollOffset
-            val searchBarVisible = firstVisibleIndex == 0 || firstVisibleOffset == 0
 
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Collapsing search bar
-                AnimatedVisibility(
-                    visible = searchBarVisible || searchQuery.isNotEmpty(),
-                    enter = fadeIn() + slideInVertically { -it },
-                    exit = fadeOut() + slideOutVertically { -it }
+            if (musicsLayout == LayoutMode.GRID) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    state = gridState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .overscroll(rememberBounceOverscrollEffect()),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .clip(RoundedCornerShape(30.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(horizontal = 12.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Search,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { libraryViewModel.setSearchQuery(it) },
-                            placeholder = { Text(strings.search, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = androidx.compose.material3.TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                disabledIndicatorColor = Color.Transparent
-                            )
+                    items(tracks, key = { it.id }) { track ->
+                        val index = tracks.indexOf(track)
+                        GridTrackCard(
+                            track = track,
+                            onClick = { onTrackClick(tracks, index) },
+                            onMenuClick = { selectedTrackForMenu = track }
                         )
                     }
                 }
-
-                if (musicsLayout == LayoutMode.GRID) {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        state = gridState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .overscroll(rememberBounceOverscrollEffect()),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(tracks, key = { it.id }) { track ->
-                            val index = tracks.indexOf(track)
-                            GridTrackCard(
-                                track = track,
-                                onClick = { onTrackClick(tracks, index) },
-                                onMenuClick = { selectedTrackForMenu = track }
-                            )
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .overscroll(rememberBounceOverscrollEffect()),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        items(tracks, key = { it.id }) { track ->
-                            val index = tracks.indexOf(track)
-                            TrackRow(
-                                track = track,
-                                onClick = { onTrackClick(tracks, index) },
-                                onMenuClick = { selectedTrackForMenu = track }
-                            )
-                        }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .overscroll(rememberBounceOverscrollEffect()),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(tracks, key = { it.id }) { track ->
+                        val index = tracks.indexOf(track)
+                        TrackRow(
+                            track = track,
+                            onClick = { onTrackClick(tracks, index) },
+                            onMenuClick = { selectedTrackForMenu = track }
+                        )
                     }
                 }
             }
@@ -296,19 +260,48 @@ fun MusicScreen(
 
     // Delete confirmation
     trackToDelete?.let { track ->
-        val scope = rememberCoroutineScope()
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { trackToDelete = null },
             title = { Text(strings.delete) },
             text = { Text(strings.deleteTrackConfirm) },
             confirmButton = {
                 TextButton(onClick = {
-                    scope.launch(Dispatchers.IO) {
-                        try {
-                            context.contentResolver.delete(track.uri, null, null)
-                        } catch (_: Exception) { }
-                    }
+                    val toDelete = track
                     trackToDelete = null
+                    scope.launch(Dispatchers.IO) {
+                        val resolver = context.contentResolver
+                        val deletedDirectly = try {
+                            resolver.delete(toDelete.uri, null, null)
+                            true
+                        } catch (e: Exception) {
+                            // Files the app does not own can't be deleted silently.
+                            // Request a system consent dialog and let the user confirm.
+                            val intentSender = when {
+                                android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R ->
+                                    runCatching {
+                                        android.provider.MediaStore.createDeleteRequest(
+                                            resolver, listOf(toDelete.uri)
+                                        ).intentSender
+                                    }.getOrNull()
+                                android.os.Build.VERSION.SDK_INT >= 29 ->
+                                    (e as? android.app.RecoverableSecurityException)
+                                        ?.userAction?.actionIntent?.intentSender
+                                else -> null
+                            }
+                            if (intentSender != null) {
+                                val request = androidx.activity.result.IntentSenderRequest
+                                    .Builder(intentSender).build()
+                                withContext(Dispatchers.Main) {
+                                    pendingDeleteUri = toDelete.uri
+                                    deleteConsentLauncher.launch(request)
+                                }
+                            }
+                            false
+                        }
+                        if (deletedDirectly) {
+                            withContext(Dispatchers.Main) { libraryViewModel.loadTracks() }
+                        }
+                    }
                 }) { Text(strings.delete, color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
@@ -636,40 +629,6 @@ private fun LoadingState() {
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-    }
-}
-
-@Composable
-private fun NoSearchResults(query: String, onClear: () -> Unit) {
-    val strings = LocalStrings.current
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Search,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(56.dp)
-        )
-        Text(
-            text = "\"$query\" — ${strings.noSearchResults}",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.padding(top = 16.dp)
-        )
-        androidx.compose.material3.TextButton(
-            onClick = onClear,
-            modifier = Modifier.padding(top = 12.dp)
-        ) {
-            Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(strings.clearSearch)
-        }
     }
 }
 

@@ -380,27 +380,6 @@ fun NowPlayingSheet(
                 }
             }
 
-            // Lyrics preview
-            if (state.lyricsVisible && state.lyrics.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = state.lyrics.firstOrNull() ?: strings.noLyricsFound,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
             Spacer(modifier = Modifier.weight(1f))
 
             // Seek bar
@@ -742,7 +721,7 @@ private fun AddToPlaylistDrawer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .bounceClick {
+                            .clickable {
                                 scope.launch {
                                     val newIds = if (isLiked) likedIds - trackId else likedIds + trackId
                                     val arr = org.json.JSONArray().apply { newIds.forEach { put(it) } }
@@ -786,7 +765,7 @@ private fun AddToPlaylistDrawer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .bounceClick {
+                            .clickable {
                                 val updated = if (containsTrack)
                                     pl.copy(trackIds = pl.trackIds - trackId)
                                 else

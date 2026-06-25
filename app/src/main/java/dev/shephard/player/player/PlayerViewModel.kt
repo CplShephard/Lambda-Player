@@ -25,7 +25,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.sin
-import kotlin.random.Random
 
 data class SyncedLyricLine(val timeMs: Long, val text: String)
 
@@ -67,7 +66,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val isRemixed: StateFlow<Boolean> = _isRemixed.asStateFlow()
     private var isUserSeeking: Boolean = false
     private var lastPlaybackTickMs: Long? = null
-    private var lastShuffleSeed: Int = Random.nextInt()
 
     // -1 = backward, 1 = forward, 0 = unknown
     private val _navigationDirection = MutableStateFlow(1)
@@ -363,70 +361,57 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun remixQueue() {
         val c = controller ?: return
+        val current = _uiState.value.queue
+        val currentTrack = _uiState.value.currentTrack
+        if (current.size <= 1 || currentTrack == null) return
+
         if (remixActive) {
-            // Un-remix: restore original order
-            val currentTrack = _uiState.value.currentTrack
-            val restoreQueue = if (originalQueue.isNotEmpty()) originalQueue else _uiState.value.queue
+            // Restore the original order using surgical moveMediaItem calls so the
+            // currently playing track keeps playing and is never re-prepared.
+            val restoreQueue = if (originalQueue.isNotEmpty()) originalQueue else current
+            reorderPlayerPlaylist(c, current, restoreQueue)
             queueTracks = restoreQueue
             _uiState.value = _uiState.value.copy(queue = restoreQueue, shuffleEnabled = false)
-            val mediaItems = restoreQueue.map { track ->
-                MediaItem.Builder()
-                    .setMediaId(track.id.toString())
-                    .setUri(track.uri)
-                    .setMediaMetadata(
-                        MediaMetadata.Builder()
-                            .setTitle(track.title)
-                            .setArtist(track.artist)
-                            .setAlbumTitle(track.album)
-                            .setArtworkUri(track.albumArtUri)
-                            .build()
-                    )
-                    .build()
-            }
-            val startIndex = restoreQueue.indexOfFirst { it.id == currentTrack?.id }.coerceAtLeast(0)
-            val currentPos = c.currentPosition
-            val wasPlaying = c.isPlaying
-            c.setMediaItems(mediaItems, startIndex, currentPos)
-            if (wasPlaying) c.play()
             remixActive = false
             _isRemixed.value = false
             originalQueue = emptyList()
             return
         }
 
-        val current = _uiState.value.queue
-        if (current.size <= 1) return
-
         originalQueue = current
-        lastShuffleSeed = Random.nextInt()
-        val currentIndex = current.indexOfFirst { it.id == _uiState.value.currentTrack?.id }.coerceAtLeast(0)
-        val currentTrack = current.getOrNull(currentIndex) ?: return
-        val rest = current.filterIndexed { i, _ -> i != currentIndex }.shuffled(Random(lastShuffleSeed))
-        val newOrder = listOf(currentTrack) + rest
+        val currentIndex = current.indexOfFirst { it.id == currentTrack.id }.coerceAtLeast(0)
+        val currentTrackItem = current.getOrNull(currentIndex) ?: return
+        val rest = current.filterIndexed { i, _ -> i != currentIndex }.shuffled()
+        val newOrder = listOf(currentTrackItem) + rest
+
+        // Apply via moveMediaItem so the current song keeps playing (no glitch).
+        reorderPlayerPlaylist(c, current, newOrder)
 
         queueTracks = newOrder
         _uiState.value = _uiState.value.copy(queue = newOrder, shuffleEnabled = true)
-
-        val mediaItems = newOrder.map { track ->
-            MediaItem.Builder()
-                .setMediaId(track.id.toString())
-                .setUri(track.uri)
-                .setMediaMetadata(
-                    MediaMetadata.Builder()
-                        .setTitle(track.title)
-                        .setArtist(track.artist)
-                        .setAlbumTitle(track.album)
-                        .setArtworkUri(track.albumArtUri)
-                        .build()
-                )
-                .build()
-        }
-        val currentPos = c.currentPosition
-        val wasPlaying = c.isPlaying
-        c.setMediaItems(mediaItems, 0, currentPos)
-        if (wasPlaying) c.play()
         remixActive = true
         _isRemixed.value = true
+    }
+
+    /**
+     * Reorders the player's playlist from [fromOrder] into [toOrder] using
+     * ExoPlayer's [Player.moveMediaItem]. Unlike setMediaItems, moveMediaItem never
+     * re-prepares the currently playing item, so playback continues uninterrupted
+     * while the upcoming queue is reshuffled.
+     */
+    private fun reorderPlayerPlaylist(
+        c: Player,
+        fromOrder: List<AudioTrack>,
+        toOrder: List<AudioTrack>
+    ) {
+        val working = fromOrder.toMutableList()
+        for (target in toOrder.indices) {
+            val desiredId = toOrder[target].id
+            val currentPos = working.indexOfFirst { it.id == desiredId }
+            if (currentPos < 0 || currentPos == target) continue
+            runCatching { c.moveMediaItem(currentPos, target) }
+            working.add(target, working.removeAt(currentPos))
+        }
     }
 
     fun cycleRepeatMode() {
