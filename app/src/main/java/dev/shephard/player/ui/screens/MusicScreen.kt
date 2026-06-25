@@ -33,6 +33,7 @@ import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.MoreVert
@@ -93,6 +94,7 @@ fun MusicScreen(
     onTrackClick: (List<AudioTrack>, Int) -> Unit = { _, _ -> }
 ) {
     val tracks by libraryViewModel.filteredTracks.collectAsState()
+    val allTracks by libraryViewModel.tracks.collectAsState()
     val isLoading by libraryViewModel.isLoading.collectAsState()
     val hasScanned by libraryViewModel.hasScanned.collectAsState()
     val searchQuery by libraryViewModel.searchQuery.collectAsState()
@@ -124,8 +126,11 @@ fun MusicScreen(
         isLoading -> {
             LoadingState()
         }
-        hasScanned && tracks.isEmpty() -> {
+        hasScanned && allTracks.isEmpty() -> {
             EmptyState()
+        }
+        hasScanned && tracks.isEmpty() && searchQuery.isNotEmpty() -> {
+            NoSearchResults(query = searchQuery, onClear = { libraryViewModel.setSearchQuery("") })
         }
         else -> {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -525,9 +530,11 @@ private fun EditMusicDrawer(
                                 context.contentResolver.update(track.uri, values, null, null)
                             }
                         }
+                        kotlinx.coroutines.withContext(Dispatchers.Main) {
+                            onDismiss()
+                            onSaved()
+                        }
                     }
-                    onDismiss()
-                    onSaved()
                 }) { Text(strings.apply, fontWeight = FontWeight.Bold) }
             }
             Spacer(Modifier.height(16.dp))
@@ -638,6 +645,39 @@ private fun LoadingState() {
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+@Composable
+private fun NoSearchResults(query: String, onClear: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Search,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(56.dp)
+        )
+        Text(
+            text = "\"$query\" için sonuç bulunamadı",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.padding(top = 16.dp)
+        )
+        androidx.compose.material3.TextButton(
+            onClick = onClear,
+            modifier = Modifier.padding(top = 12.dp)
+        ) {
+            Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Aramayı Temizle")
+        }
     }
 }
 

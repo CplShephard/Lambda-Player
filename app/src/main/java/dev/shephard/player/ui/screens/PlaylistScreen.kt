@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalAnimationApi::class)
 
 package dev.shephard.player.ui.screens
 
@@ -240,7 +240,26 @@ fun PlaylistScreen(
 
     androidx.activity.compose.BackHandler(enabled = openIndex != null) { openIndex = null }
 
-    if (openIndex == null) {
+    androidx.compose.animation.AnimatedContent(
+        targetState = openIndex,
+        transitionSpec = {
+            if (targetState != null) {
+                // opening detail: slide in from right
+                androidx.compose.animation.ContentTransform(
+                    targetContentEnter = androidx.compose.animation.slideInHorizontally { it } + androidx.compose.animation.fadeIn(),
+                    initialContentExit = androidx.compose.animation.slideOutHorizontally { -it / 3 } + androidx.compose.animation.fadeOut()
+                )
+            } else {
+                // going back: slide in from left
+                androidx.compose.animation.ContentTransform(
+                    targetContentEnter = androidx.compose.animation.slideInHorizontally { -it / 3 } + androidx.compose.animation.fadeIn(),
+                    initialContentExit = androidx.compose.animation.slideOutHorizontally { it } + androidx.compose.animation.fadeOut()
+                )
+            }
+        },
+        label = "playlistNav"
+    ) { idx ->
+    if (idx == null) {
         PlaylistListView(
             playlists = playlists,
             tracks = tracks,
@@ -256,7 +275,7 @@ fun PlaylistScreen(
             onCreate = { showCreate = true; newName = "" }
         )
     } else {
-        val pl = playlists.getOrNull(openIndex ?: -1)
+        val pl = playlists.getOrNull(idx)
         if (pl == null) {
             openIndex = null
         } else {
@@ -277,32 +296,33 @@ fun PlaylistScreen(
                     } else {
                         val updated = pl.copy(trackIds = pl.trackIds.filterNot { it == trackId })
                         val all = playlists.toMutableList()
-                        all[openIndex!!] = updated
+                        all[idx] = updated
                         scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
                     }
                 },
                 onAddTracks = {
                     pickerSelected = pl.trackIds.toSet()
-                    trackPickerForIndex = openIndex
+                    trackPickerForIndex = idx
                 },
                 onPickCover = {
-                    showCoverPickerForIndex = openIndex
+                    showCoverPickerForIndex = idx
                     coverPicker.launch(arrayOf("image/*"))
                 },
                 onReorder = { newOrder ->
                     val updated = pl.copy(trackIds = newOrder.map { it.id }, sortMode = "custom")
                     val all = playlists.toMutableList()
-                    all[openIndex!!] = updated
+                    all[idx] = updated
                     scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
                 },
                 onChangeSort = { mode ->
                     val updated = pl.copy(sortMode = mode)
                     val all = playlists.toMutableList()
-                    all[openIndex!!] = updated
+                    all[idx] = updated
                     scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
                 }
             )
         }
+    }
     }
 
     if (showCreate) {

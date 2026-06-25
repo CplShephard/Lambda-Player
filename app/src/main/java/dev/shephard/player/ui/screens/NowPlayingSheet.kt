@@ -118,11 +118,9 @@ fun NowPlayingSheet(
     var artSwipeHandled by remember { mutableStateOf(false) }
 
     var lastTrackId by remember { mutableStateOf<Long?>(null) }
-    var slideForward by remember { mutableStateOf(true) }
     val currentId = track?.id ?: -1L
-    if (lastTrackId != null && lastTrackId != currentId) {
-        slideForward = currentId > (lastTrackId ?: 0L)
-    }
+    val navigationDirection by playerViewModel.navigationDirection.collectAsState()
+    val slideForward = navigationDirection >= 0
     if (lastTrackId != currentId) lastTrackId = currentId
 
     LaunchedEffect(track?.id) {
@@ -517,11 +515,12 @@ fun NowPlayingSheet(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val isRemixed by playerViewModel.isRemixed.collectAsState()
                 BouncyIconButton(
                     onClick = { playerViewModel.remixQueue() },
                     icon = Icons.Filled.Shuffle,
                     contentDescription = strings.remix,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (isRemixed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     iconSize = 28.dp
                 )
                 BouncyIconButton(
