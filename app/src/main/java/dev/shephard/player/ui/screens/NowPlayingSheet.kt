@@ -127,6 +127,12 @@ fun NowPlayingSheet(
     val artSwipeX = remember { androidx.compose.animation.core.Animatable(0f) }
     var artSwipeHandled by remember { mutableStateOf(false) }
 
+    // Sheet her ekrana geldiğinde dragOffset'i 0'a al: parmakla kapatıp tekrar açınca
+    // eski sürükleme miktarının (translationY) kalıcı gri boşluk bırakmasını engeller.
+    LaunchedEffect(Unit) {
+        dragOffset.snapTo(0f)
+    }
+
     LaunchedEffect(track?.id) {
         artSwipeX.snapTo(0f)
         artSwipeHandled = false
@@ -162,6 +168,9 @@ fun NowPlayingSheet(
                     if (dragOffset.value > dismissThresholdPx || velocity > 2500f) {
                         // Geçiş MainContainer'daki AnimatedContent tarafından yapılır.
                         onDismiss()
+                        // Kapanışta dragOffset'i sıfırla; aksi halde translationY çekildiği
+                        // değerde kalır ve sheeti tekrar açınca üstte gri boşluk kalır.
+                        dragScope.launch { dragOffset.snapTo(0f) }
                     } else {
                         dragScope.launch {
                             dragOffset.animateTo(

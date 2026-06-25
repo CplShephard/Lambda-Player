@@ -22,6 +22,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.sin
@@ -573,13 +574,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
         viewModelScope.launch {
             val lyrics = withContext(Dispatchers.IO) {
-                runCatching {
-                    loadLyricsFromRetriever(track.uri)
-                        ?: loadLyricsFromLrcFile(track)
-                }.getOrNull() ?: emptyList()
+                // 1) Kullanıcının daha önce indirip kalıcı kaydettiği lyrics (en yüksek öncelik)
+                loadSavedLyrics(track.id)
+                    // 2) Yoksa gömülü lyrics / .lrc dosyası dene
+                    ?: runCatching {
+                        loadLyricsFromRetriever(track.uri)
+                            ?: loadLyricsFromLrcFile(track)
+                    }.getOrNull()
+                    ?: emptyList()
             }
             _uiState.value = _uiState.value.copy(lyrics = lyrics, lyricsVisible = lyrics.isNotEmpty())
         }
+    }
+
+    /** Prefs'te trackId'ye göre kaydedilmiş lyrics varsa döndürür. */
+    private suspend fun loadSavedLyrics(trackId: Long): List<String>? {
+        return runCatching {
+            val json = prefs.lyricsJson.first()
+            val obj = org.json.JSONObject(json)
+            val arr = obj.optJSONArray(trackId.toString()) ?: return null
+            (0 until arr.length()).map { arr.getString(it) }.takeIf { it.isNotEmpty() }
+        }.getOrNull()
     }
 
     private fun loadLyricsFromRetriever(uri: android.net.Uri): List<String>? {
@@ -654,6 +669,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setManualLyrics(lines: List<String>) {
         _uiState.value = _uiState.value.copy(lyrics = lines, lyricsVisible = true)
+        // Kalıcı olarak kaydet — uygulamadan çıkıp tekrar girince lyrics kaybolmasın.
+        val trackId = _uiState.value.currentTrack?.id ?: return
+        if (lines.isEmpty()) return
+        viewModelScope.launch {
+            val json = prefs.lyricsJson.first()
+            val obj = runCatching { org.json.JSONObject(json) }.getOrNull() ?: org.json.JSONObject()
+            val arr = org.json.JSONArray()
+            lines.forEach { arr.put(it) }
+            obj.put(trackId.toString(), arr)
+            prefs.setLyricsJson(obj.toString())
+        }
     }
 
     private fun startAmplitudePulse() {
