@@ -287,8 +287,10 @@ fun NowPlayingSheet(
                         androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Left
                     else
                         androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Right
-                    (slideIntoContainer(dir, androidx.compose.animation.core.tween(380)) + androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(initialScale = 0.92f))
-                        .togetherWith(slideOutOfContainer(dir, androidx.compose.animation.core.tween(380)) + androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(targetScale = 0.92f))
+                    androidx.compose.animation.ContentTransform(
+                        targetContentEnter = slideIntoContainer(dir, androidx.compose.animation.core.tween(380)) + androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(initialScale = 0.92f),
+                        initialContentExit = slideOutOfContainer(dir, androidx.compose.animation.core.tween(380)) + androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(targetScale = 0.92f)
+                    )
                 },
                 label = "trackSwap",
                 modifier = Modifier.fillMaxWidth()
@@ -551,8 +553,10 @@ fun NowPlayingSheet(
                     androidx.compose.animation.AnimatedContent(
                         targetState = state.isPlaying,
                         transitionSpec = {
-                            (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(150)) + androidx.compose.animation.scaleIn(initialScale = 0.5f))
-                                .togetherWith(androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(100)) + androidx.compose.animation.scaleOut(targetScale = 1.5f))
+                            androidx.compose.animation.ContentTransform(
+                                targetContentEnter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(150)) + androidx.compose.animation.scaleIn(initialScale = 0.5f),
+                                initialContentExit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(100)) + androidx.compose.animation.scaleOut(targetScale = 1.5f)
+                            )
                         },
                         label = "playPauseIcon"
                     ) { isPlaying ->
