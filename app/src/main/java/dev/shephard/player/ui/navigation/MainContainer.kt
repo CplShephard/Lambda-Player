@@ -197,10 +197,7 @@ fun MainContainer(
                     initialOffsetY = { it },
                     animationSpec = nowPlayingEnterSpring
                 ) + fadeIn(tween(280)),
-                exit = slideOutVertically(
-                    targetOffsetY = { it },
-                    animationSpec = nowPlayingExitSpring
-                ) + fadeOut(tween(180)),
+                exit = fadeOut(tween(0)),
                 modifier = Modifier.fillMaxSize()
             ) {
                 NowPlayingSheet(

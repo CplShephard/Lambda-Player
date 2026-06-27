@@ -159,11 +159,14 @@ fun NowPlayingSheet(
     val playButtonScale = remember { androidx.compose.animation.core.Animatable(1f) }
     val playButtonScope = rememberCoroutineScope()
 
+    val sheetShape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
             .graphicsLayer { translationY = dragOffset.value.coerceAtLeast(0f) }
+            .clip(sheetShape)
+            .background(MaterialTheme.colorScheme.background)
             .draggable(
                 orientation = Orientation.Vertical,
                 state = rememberDraggableState { delta ->
@@ -172,11 +175,9 @@ fun NowPlayingSheet(
                 },
                 onDragStopped = { velocity ->
                     if (dragOffset.value > dismissThresholdPx || velocity > 2500f) {
-                        // Önce sheet'i ekran dışına hızlıca kaydır, sonra dismiss et.
-                        // Böylece AnimatedVisibility exit ile çakışma olmaz.
                         dragScope.launch {
                             val remaining = (screenHeightPx - dragOffset.value).coerceAtLeast(0f)
-                            val duration = (remaining / screenHeightPx * 200).toLong().coerceIn(80L, 200L)
+                            val duration = (remaining / screenHeightPx * 180).toLong().coerceIn(60L, 180L)
                             dragOffset.animateTo(
                                 targetValue = screenHeightPx,
                                 animationSpec = androidx.compose.animation.core.tween(
@@ -184,8 +185,9 @@ fun NowPlayingSheet(
                                     easing = androidx.compose.animation.core.FastOutLinearInEasing
                                 )
                             )
-                            dragOffset.snapTo(0f)
+                            // Sheet ekran dışında, AnimatedVisibility exit yok — direkt kapat
                             onDismiss()
+                            dragOffset.snapTo(0f)
                         }
                     } else {
                         dragScope.launch {
