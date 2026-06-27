@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -57,11 +58,15 @@ import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.i18n.stringsFor
 import dev.shephard.player.ui.screens.NowPlayingSheet
 
-// Now Playing ↔ app arasındaki dikey kayma geçişi (playlist geçişi gibi tek animasyon)
-// Düşük stiffness → daha yavaş, akıcı ve zarif bir hareket.
-private val nowPlayingSlideSpring = spring<IntOffset>(
-    dampingRatio = 0.9f,
-    stiffness = 140f
+// Açılış: yumuşak yaylı kayma
+private val nowPlayingEnterSpring = spring<IntOffset>(
+    dampingRatio = Spring.DampingRatioLowBouncy,
+    stiffness = 260f
+)
+// Kapanış: fazla overshoot olmadan hızlı ve smooth
+private val nowPlayingExitSpring = spring<IntOffset>(
+    dampingRatio = Spring.DampingRatioNoBouncy,
+    stiffness = 480f
 )
 
 @Composable
@@ -190,12 +195,12 @@ fun MainContainer(
                 visible = showNowPlaying,
                 enter = slideInVertically(
                     initialOffsetY = { it },
-                    animationSpec = nowPlayingSlideSpring
-                ) + fadeIn(tween(380)),
+                    animationSpec = nowPlayingEnterSpring
+                ) + fadeIn(tween(280)),
                 exit = slideOutVertically(
                     targetOffsetY = { it },
-                    animationSpec = nowPlayingSlideSpring
-                ) + fadeOut(tween(300)),
+                    animationSpec = nowPlayingExitSpring
+                ) + fadeOut(tween(180)),
                 modifier = Modifier.fillMaxSize()
             ) {
                 NowPlayingSheet(

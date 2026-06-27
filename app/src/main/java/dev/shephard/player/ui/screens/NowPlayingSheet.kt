@@ -84,6 +84,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -139,6 +140,11 @@ fun NowPlayingSheet(
     }
 
     val glow = Color(state.glowColorArgb)
+
+    // Drag dismiss için ekran yüksekliği (px)
+    val configuration = LocalConfiguration.current
+    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
+
     val pulse by androidx.compose.animation.core.animateFloatAsState(
         targetValue = 0.8f + state.amplitude * 0.6f,
         animationSpec = androidx.compose.animation.core.tween(120),
@@ -166,11 +172,21 @@ fun NowPlayingSheet(
                 },
                 onDragStopped = { velocity ->
                     if (dragOffset.value > dismissThresholdPx || velocity > 2500f) {
-                        // Geçiş MainContainer'daki AnimatedContent tarafından yapılır.
-                        onDismiss()
-                        // Kapanışta dragOffset'i sıfırla; aksi halde translationY çekildiği
-                        // değerde kalır ve sheeti tekrar açınca üstte gri boşluk kalır.
-                        dragScope.launch { dragOffset.snapTo(0f) }
+                        // Önce sheet'i ekran dışına hızlıca kaydır, sonra dismiss et.
+                        // Böylece AnimatedVisibility exit ile çakışma olmaz.
+                        dragScope.launch {
+                            val remaining = (screenHeightPx - dragOffset.value).coerceAtLeast(0f)
+                            val duration = (remaining / screenHeightPx * 200).toLong().coerceIn(80L, 200L)
+                            dragOffset.animateTo(
+                                targetValue = screenHeightPx,
+                                animationSpec = androidx.compose.animation.core.tween(
+                                    durationMillis = duration.toInt(),
+                                    easing = androidx.compose.animation.core.FastOutLinearInEasing
+                                )
+                            )
+                            dragOffset.snapTo(0f)
+                            onDismiss()
+                        }
                     } else {
                         dragScope.launch {
                             dragOffset.animateTo(
@@ -985,34 +1001,77 @@ internal fun formatMillis(ms: Long): String {
     return "%d:%02d".format(m, s)
 }
 
-private fun fetchLyricsFromApi(artist: String, title: String): List<String>? {
-    return try {
-        val encodedArtist = java.net.URLEncoder.encode(artist.trim(), "UTF-8")
-        val encodedTitle = java.net.URLEncoder.encode(title.trim(), "UTF-8")
-        val url = java.net.URL("https://lrclib.net/api/get?artist_name=$encodedArtist&track_name=$encodedTitle")
-        val conn = url.openConnection() as java.net.HttpURLConnection
-        conn.connectTimeout = 8000
-        conn.readTimeout = 8000
-        conn.setRequestProperty("Accept", "application/json")
-        conn.setRequestProperty("User-Agent", "LambdaPlayer/2.5")
-        if (conn.responseCode == 200) {
-            val body = conn.inputStream.bufferedReader().readText()
-            val json = org.json.JSONObject(body)
-            // Prefer plain lyrics over synced
-            val plain = json.optString("plainLyrics")
-            if (plain.isNotBlank()) {
-                return plain.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
-            }
-            // Fall back to synced lyrics (strip timestamps)
-            val synced = json.optString("syncedLyrics")
-            if (synced.isNotBlank()) {
-                return synced.lines()
-                    .mapNotNull { line ->
-                        val stripped = line.replace(Regex("^\\[\\d+:\\d+\\.\\d+]\\s*"), "").trim()
-                        stripped.ifBlank { null }
-                    }
-            }
-            null
-        } else null
-    } catch (_: Exception) { null }
+/** Parantez/köşeli parantez içindeki gereksiz ekleri temizler: "Title (feat. X)" → "Title" */
+private fun cleanTitle(title: String): String =
+    title.trim()
+        .replace(Regex("\\s*\\(feat\\.?[^)]*\\)", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("\\s*\\[feat\\.?[^]]*]", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("\\s*\\(ft\\.?[^)]*\\)", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("\\s*-\\s*(official|lyrics?|video|audio|remaster.*|live.*)$", RegexOption.IGNORE_CASE), "")
+        .trim()
+
+private fun httpGet(urlStr: String, timeoutMs: Int = 8000): String? = try {
+    val conn = java.net.URL(urlStr).openConnection() as java.net.HttpURLConnection
+    conn.connectTimeout = timeoutMs
+    conn.readTimeout = timeoutMs
+    conn.setRequestProperty("Accept", "application/json")
+    conn.setRequestProperty("User-Agent", "LambdaPlayer/2.5")
+    if (conn.responseCode == 200) conn.inputStream.bufferedReader().readText() else null
+} catch (_: Exception) { null }
+
+/** lrclib.net — synced lyrics desteği olan birincil kaynak */
+private fun fetchFromLrclib(artist: String, title: String): List<String>? {
+    val enc = { s: String -> java.net.URLEncoder.encode(s, "UTF-8") }
+    // Önce tam eşleşme dene
+    val body = httpGet("https://lrclib.net/api/get?artist_name=${enc(artist)}&track_name=${enc(title)}")
+        ?: httpGet("https://lrclib.net/api/get?artist_name=${enc(artist)}&track_name=${enc(cleanTitle(title))}")
+        ?: return null
+    val json = runCatching { org.json.JSONObject(body) }.getOrNull() ?: return null
+    val plain = json.optString("plainLyrics")
+    if (plain.isNotBlank()) return plain.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
+    val synced = json.optString("syncedLyrics")
+    if (synced.isNotBlank()) return synced.lines().mapNotNull { line ->
+        line.replace(Regex("^\\[\\d+:\\d+\\.\\d+]\\s*"), "").trim().ifBlank { null }
+    }
+    return null
 }
+
+/** lrclib search endpoint — tam eşleşme bulunamazsa en iyi sonucu alır */
+private fun fetchFromLrclibSearch(artist: String, title: String): List<String>? {
+    val enc = { s: String -> java.net.URLEncoder.encode(s, "UTF-8") }
+    val cleanT = cleanTitle(title)
+    val body = httpGet("https://lrclib.net/api/search?artist_name=${enc(artist)}&track_name=${enc(cleanT)}")
+        ?: return null
+    val arr = runCatching { org.json.JSONArray(body) }.getOrNull() ?: return null
+    if (arr.length() == 0) return null
+    val best = arr.getJSONObject(0)
+    val plain = best.optString("plainLyrics")
+    if (plain.isNotBlank()) return plain.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
+    val synced = best.optString("syncedLyrics")
+    if (synced.isNotBlank()) return synced.lines().mapNotNull { line ->
+        line.replace(Regex("^\\[\\d+:\\d+\\.\\d+]\\s*"), "").trim().ifBlank { null }
+    }
+    return null
+}
+
+/** lyrics.ovh — basit fallback, synced desteklemez ama geniş kataloğu var */
+private fun fetchFromLyricsOvh(artist: String, title: String): List<String>? {
+    val enc = { s: String -> java.net.URLEncoder.encode(s, "UTF-8") }
+    val body = httpGet("https://api.lyrics.ovh/v1/${enc(artist)}/${enc(cleanTitle(title))}")
+        ?: return null
+    val json = runCatching { org.json.JSONObject(body) }.getOrNull() ?: return null
+    val lyrics = json.optString("lyrics")
+    return lyrics.takeIf { it.isNotBlank() }
+        ?.lines()?.map { it.trimEnd() }?.filter { it.isNotBlank() }
+}
+
+/**
+ * Çoklu kaynak sırasıyla denenir:
+ * 1. lrclib GET (tam eşleşme)
+ * 2. lrclib SEARCH (bulanık eşleşme, temizlenmiş title)
+ * 3. lyrics.ovh (fallback)
+ */
+private fun fetchLyricsFromApi(artist: String, title: String): List<String>? =
+    fetchFromLrclib(artist, title)
+        ?: fetchFromLrclibSearch(artist, title)
+        ?: fetchFromLyricsOvh(artist, title)
