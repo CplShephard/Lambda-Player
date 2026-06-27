@@ -203,7 +203,7 @@ fun SettingsScreen() {
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                text = formatListeningTime(totalMs, strings.hourAbbr, strings.minAbbr, strings.secAbbr),
+                text = formatListeningTime(totalMs),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -718,11 +718,11 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
     }
 }
 
-private fun formatListeningTime(ms: Long, h: String = "h", m: String = "m", s: String = "s"): String {
+private fun formatListeningTime(ms: Long): String {
     val totalSec = ms / 1000
-    val hours = totalSec / 3600
-    val mins = (totalSec % 3600) / 60
-    val secs = totalSec % 60
-    return if (hours > 0) "%d$h %02d$m %02d$s".format(hours, mins, secs)
-    else "%d$m %02d$s".format(mins, secs)
+    val h = totalSec / 3600
+    val m = (totalSec % 3600) / 60
+    val s = totalSec % 60
+    return if (h > 0) "%dh %02dm %02ds".format(h, m, s)
+    else "%dm %02ds".format(m, s)
 }

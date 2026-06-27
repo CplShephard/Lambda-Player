@@ -21,7 +21,7 @@ object MediaStoreScanner {
         )
 
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} > 0"
-        val sortOrder = null
+        val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
 
         val cursor = context.contentResolver.query(
             collection,

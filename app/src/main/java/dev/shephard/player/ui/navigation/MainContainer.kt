@@ -1,15 +1,16 @@
 package dev.shephard.player.ui.navigation
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,23 +31,20 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalUriHandler
-import dev.shephard.player.player.ReleaseInfo
-import dev.shephard.player.player.checkForUpdate
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -61,10 +59,17 @@ import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.i18n.stringsFor
 import dev.shephard.player.ui.screens.NowPlayingSheet
 
+// Now Playing ↔ app arasındaki dikey kayma geçişi (playlist geçişi gibi tek animasyon)
+// Düşük stiffness → daha yavaş, akıcı ve zarif bir hareket.
+private val nowPlayingSlideSpring = spring<IntOffset>(
+    dampingRatio = 0.9f,
+    stiffness = 140f
+)
+
 @Composable
 fun MainContainer(
     playerViewModel: PlayerViewModel = viewModel(),
-    externalUri: android.net.Uri? = null
+    initialAudioUri: android.net.Uri? = null
 ) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
@@ -76,35 +81,20 @@ fun MainContainer(
     CompositionLocalProvider(LocalStrings provides strings) {
         val navController = rememberNavController()
         var showNowPlaying by remember { mutableStateOf(false) }
-        var updateInfo by remember { mutableStateOf<ReleaseInfo?>(null) }
-        val uriHandler = LocalUriHandler.current
-
-        LaunchedEffect(Unit) {
-            updateInfo = checkForUpdate("2.5")
-        }
 
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route
 
         val playerState by playerViewModel.uiState.collectAsState()
 
-        // Play file opened from file manager
-        val context = LocalContext.current
-        LaunchedEffect(externalUri) {
-            if (externalUri != null) {
-                val track = dev.shephard.player.data.AudioTrack(
-                    id = externalUri.hashCode().toLong(),
-                    title = externalUri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.') ?: "Unknown",
-                    artist = "Unknown",
-                    album = "Unknown",
-                    durationMs = 0L,
-                    uri = externalUri,
-                    albumArtUri = null
-                )
-                playerViewModel.setQueueAndPlay(listOf(track), 0, null)
+        LaunchedEffect(initialAudioUri) {
+            if (initialAudioUri != null) {
+                playerViewModel.playExternalUri(initialAudioUri)
                 showNowPlaying = true
             }
         }
+
+        // Back: collapse player first, then pop nav stack.
         BackHandler(enabled = showNowPlaying || currentRoute != Destination.Music.route) {
             when {
                 showNowPlaying -> showNowPlaying = false
@@ -112,130 +102,115 @@ fun MainContainer(
             }
         }
 
-        val rootScale by animateFloatAsState(
-            targetValue = if (showNowPlaying) 0.94f else 1f,
-            animationSpec = spring(dampingRatio = 0.85f, stiffness = 300f),
-            label = "rootScale"
-        )
-
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Wallpaper background
+            // Wallpaper background — her iki ekranın arkasında sabit
             if (wallpaper.isNotEmpty()) {
                 AsyncImage(
                     model = wallpaper,
                     contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { scaleX = rootScale; scaleY = rootScale },
+                    modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .graphicsLayer { scaleX = rootScale; scaleY = rootScale }
                         .background(MaterialTheme.colorScheme.background.copy(alpha = wallpaperBrightness))
                 )
             }
 
-            Scaffold(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { scaleX = rootScale; scaleY = rootScale },
-                containerColor = if (wallpaper.isEmpty())
-                    MaterialTheme.colorScheme.background else Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.onBackground,
-                topBar = {
-                    BrandHeader(currentRoute = currentRoute)
-                }
-            ) { innerPadding ->
-                Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-                    NavGraph(
-                        navController = navController,
-                        modifier = Modifier.fillMaxSize(),
-                        hasMiniPlayer = playerState.currentTrack != null,
-                        onTrackClick = { tracks, index, playlistName ->
-                            playerViewModel.setQueueAndPlay(tracks, index, playlistName)
-                            showNowPlaying = true
-                        }
-                    )
-
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .navigationBarsPadding()
-                    ) {
-                        AnimatedVisibility(
-                            visible = playerState.currentTrack != null,
-                            enter = fadeIn(androidx.compose.animation.core.tween(200)) + slideInVertically(
-                                initialOffsetY = { it / 2 },
-                                animationSpec = spring(0.85f, 300f)
-                            ),
-                            exit = fadeOut(androidx.compose.animation.core.tween(150)) + slideOutVertically(targetOffsetY = { it / 2 })
-                        ) {
-                            MiniPlayer(
-                                state = playerState,
-                                onClick = { showNowPlaying = true },
-                                onPlayPauseClick = { playerViewModel.togglePlayPause() },
-                                onNextClick = { playerViewModel.skipToNext() },
-                                onPreviousClick = { playerViewModel.skipToPrevious() }
-                            )
-                        }
-
-                        FloatingDock(
-                            currentRoute = currentRoute,
-                            onNavigate = { destination ->
-                                navController.navigate(destination.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            }
-                        )
-                        Spacer(Modifier.height(8.dp))
+            // Tek animasyonlu geçiş: uygulama ↔ Now Playing (Playlist list/detail gibi)
+            AnimatedContent(
+                targetState = showNowPlaying,
+                transitionSpec = {
+                    if (targetState) {
+                        // Açılış: Now Playing alttan yukarı kayar
+                        (slideInVertically(
+                            initialOffsetY = { it },
+                            animationSpec = nowPlayingSlideSpring
+                        ) + fadeIn(tween(380))) togetherWith
+                            fadeOut(tween(300))
+                    } else {
+                        // Kapanış: Now Playing aşağı kayar, uygulama geri belirir
+                        fadeIn(tween(380)) togetherWith
+                            (slideOutVertically(
+                                targetOffsetY = { it },
+                                animationSpec = nowPlayingSlideSpring
+                            ) + fadeOut(tween(300)))
                     }
-                }
-            }
-
-            // Update available dialog
-            updateInfo?.let { info ->
-                androidx.compose.material3.AlertDialog(
-                    onDismissRequest = { updateInfo = null },
-                    title = { androidx.compose.material3.Text(strings.updateAvailable) },
-                    text = { androidx.compose.material3.Text(strings.updateMessage.format(info.tagName)) },
-                    confirmButton = {
-                        androidx.compose.material3.TextButton(onClick = {
-                            uriHandler.openUri(info.htmlUrl)
-                            updateInfo = null
-                        }) { androidx.compose.material3.Text(strings.updateNow) }
-                    },
-                    dismissButton = {
-                        androidx.compose.material3.TextButton(onClick = { updateInfo = null }) {
-                            androidx.compose.material3.Text(strings.later)
-                        }
-                    }
-                )
-            }
-
-            AnimatedVisibility(
-                visible = showNowPlaying,
-                enter = slideInVertically(
-                    initialOffsetY = { it },
-                    animationSpec = spring(dampingRatio = 0.85f, stiffness = 180f)
-                ) + fadeIn(androidx.compose.animation.core.tween(300)),
-                exit = fadeOut(androidx.compose.animation.core.tween(50)),
+                },
+                label = "nowPlaying",
                 modifier = Modifier.fillMaxSize()
-            ) {
-                NowPlayingSheet(
-                    playerViewModel = playerViewModel,
-                    onDismiss = { showNowPlaying = false }
-                )
+            ) { isShowing ->
+                if (isShowing) {
+                    NowPlayingSheet(
+                        playerViewModel = playerViewModel,
+                        onDismiss = { showNowPlaying = false }
+                    )
+                } else {
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        containerColor = if (wallpaper.isEmpty())
+                            MaterialTheme.colorScheme.background else Color.Transparent,
+                        contentColor = MaterialTheme.colorScheme.onBackground,
+                        topBar = {
+                            BrandHeader(currentRoute = currentRoute)
+                        }
+                    ) { innerPadding ->
+                        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                            NavGraph(
+                                navController = navController,
+                                modifier = Modifier.fillMaxSize(),
+                                hasMiniPlayer = playerState.currentTrack != null,
+                                onTrackClick = { tracks, index, playlistName ->
+                                    playerViewModel.setQueueAndPlay(tracks, index, playlistName)
+                                    showNowPlaying = true
+                                }
+                            )
+
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .navigationBarsPadding()
+                            ) {
+                                AnimatedVisibility(
+                                    visible = playerState.currentTrack != null,
+                                    enter = fadeIn(tween(200)) + slideInVertically(
+                                        initialOffsetY = { it / 2 },
+                                        animationSpec = spring(0.85f, 300f)
+                                    ),
+                                    exit = fadeOut(tween(150)) + slideOutVertically(targetOffsetY = { it / 2 })
+                                ) {
+                                    MiniPlayer(
+                                        state = playerState,
+                                        onClick = { showNowPlaying = true },
+                                        onPlayPauseClick = { playerViewModel.togglePlayPause() },
+                                        onNextClick = { playerViewModel.skipToNext() },
+                                        onPreviousClick = { playerViewModel.skipToPrevious() }
+                                    )
+                                }
+
+                                FloatingDock(
+                                    currentRoute = currentRoute,
+                                    onNavigate = { destination ->
+                                        navController.navigate(destination.route) {
+                                            popUpTo(navController.graph.findStartDestination().id) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    }
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -287,10 +262,9 @@ private fun FloatingDock(
         Row(
             modifier = Modifier
                 .align(Alignment.Center)
-                .graphicsLayer { alpha = 0.92f }
+                .clip(RoundedCornerShape(50))
                 .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
-                    shape = RoundedCornerShape(50)
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
                 )
                 .padding(horizontal = 20.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),

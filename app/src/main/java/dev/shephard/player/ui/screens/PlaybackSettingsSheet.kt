@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.shephard.player.player.PlayerViewModel
+import dev.shephard.player.ui.i18n.LocalStrings
 
 @Composable
 fun PlaybackSettingsSheet(
@@ -36,6 +37,7 @@ fun PlaybackSettingsSheet(
     onBack: () -> Unit
 ) {
     val state by playerViewModel.uiState.collectAsState()
+    val strings = LocalStrings.current
 
     Column(
         modifier = Modifier
@@ -58,7 +60,7 @@ fun PlaybackSettingsSheet(
                 )
             }
             Text(
-                text = "Playback Settings",
+                text = strings.playbackSettings,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -67,7 +69,7 @@ fun PlaybackSettingsSheet(
         }
 
         SettingToggleRow(
-            title = "Crossfade",
+            title = strings.crossfade,
             subtitle = "Smoothly blend the end of a track into the next",
             checked = state.crossfadeEnabled,
             onCheckedChange = { playerViewModel.setCrossfadeEnabled(it) }
@@ -76,7 +78,7 @@ fun PlaybackSettingsSheet(
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
         SettingToggleRow(
-            title = "Gapless playback",
+            title = strings.gapless,
             subtitle = "Remove silence between consecutive tracks",
             checked = state.gaplessEnabled,
             onCheckedChange = { playerViewModel.setGaplessEnabled(it) }
@@ -85,7 +87,7 @@ fun PlaybackSettingsSheet(
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
         SettingToggleRow(
-            title = "Play together with other apps",
+            title = strings.playWithOthers,
             subtitle = "Allow audio from other apps to mix with Lambda Player",
             checked = state.playWithOthers,
             onCheckedChange = { playerViewModel.setPlayWithOthers(it) }
@@ -142,9 +144,16 @@ private fun SettingToggleRow(
 
 @Composable
 private fun ListeningStatsCard(totalListeningMs: Long) {
+    val strings = LocalStrings.current
     val totalSeconds = totalListeningMs / 1000
     val hours = totalSeconds / 3600
     val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    val formatted = buildList {
+        if (hours > 0) add("$hours ${strings.hourShort}")
+        if (minutes > 0 || hours > 0) add("$minutes ${strings.minuteShort}")
+        add("$seconds ${strings.secondShort}")
+    }.joinToString(" ")
 
     Column(
         modifier = Modifier
@@ -161,7 +170,7 @@ private fun ListeningStatsCard(totalListeningMs: Long) {
                 tint = MaterialTheme.colorScheme.primary
             )
             Text(
-                text = "Toplam Dinleme Süresi",
+                text = strings.totalListeningTime,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.padding(start = 12.dp)
@@ -169,11 +178,7 @@ private fun ListeningStatsCard(totalListeningMs: Long) {
         }
 
         Text(
-            text = if (hours > 0) {
-                "$hours saat $minutes dakika"
-            } else {
-                "$minutes dakika"
-            },
+            text = formatted,
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
@@ -181,7 +186,7 @@ private fun ListeningStatsCard(totalListeningMs: Long) {
         )
 
         Text(
-            text = "Lambda Player ile dinlediğin toplam süre",
+            text = strings.totalListeningDescription,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp)

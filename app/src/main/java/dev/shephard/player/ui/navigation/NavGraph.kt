@@ -15,13 +15,13 @@ import dev.shephard.player.ui.screens.SettingsScreen
 
 // Ekranlar arası animasyon — IntOffset spring ile
 private val springSpec = spring<androidx.compose.ui.unit.IntOffset>(
-    dampingRatio = 0.78f,
-    stiffness = 420f
+    dampingRatio = 0.8f,
+    stiffness = 380f
 )
 
 private val fadeSpring = spring<Float>(
     dampingRatio = 1f,
-    stiffness = 500f
+    stiffness = 380f
 )
 
 @Composable

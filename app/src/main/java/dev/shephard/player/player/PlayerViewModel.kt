@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.ComponentName
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
+import android.net.Uri
 import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -22,10 +23,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.sin
-import kotlin.random.Random
 
 data class SyncedLyricLine(val timeMs: Long, val text: String)
 
@@ -67,7 +68,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val isRemixed: StateFlow<Boolean> = _isRemixed.asStateFlow()
     private var isUserSeeking: Boolean = false
     private var lastPlaybackTickMs: Long? = null
-    private var lastShuffleSeed: Int = Random.nextInt()
 
     // -1 = backward, 1 = forward, 0 = unknown
     private val _navigationDirection = MutableStateFlow(1)
@@ -295,6 +295,44 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+
+    fun playExternalUri(uri: Uri) {
+        val c = controller ?: return
+        val track = AudioTrack(
+            id = uri.toString().hashCode().toLong(),
+            title = uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.') ?: "External audio",
+            artist = "",
+            album = "",
+            durationMs = 0L,
+            uri = uri,
+            albumArtUri = null
+        )
+        val item = MediaItem.Builder()
+            .setMediaId(track.id.toString())
+            .setUri(uri)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(track.title)
+                    .setArtist(track.artist)
+                    .setAlbumTitle(track.album)
+                    .build()
+            )
+            .build()
+
+        queueTracks = listOf(track)
+        c.setMediaItem(item)
+        c.prepare()
+        c.play()
+        _uiState.value = _uiState.value.copy(
+            queue = listOf(track),
+            currentTrack = track,
+            positionMs = 0L,
+            currentPlaylistName = null
+        )
+        extractGlowColor(track)
+        loadLyrics(track)
+    }
+
     fun setQueueAndPlay(tracks: List<AudioTrack>, startIndex: Int, playlistName: String? = null) {
         val c = controller ?: return
         queueTracks = tracks
@@ -363,70 +401,57 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun remixQueue() {
         val c = controller ?: return
+        val current = _uiState.value.queue
+        val currentTrack = _uiState.value.currentTrack
+        if (current.size <= 1 || currentTrack == null) return
+
         if (remixActive) {
-            // Un-remix: restore original order
-            val currentTrack = _uiState.value.currentTrack
-            val restoreQueue = if (originalQueue.isNotEmpty()) originalQueue else _uiState.value.queue
+            // Restore the original order using surgical moveMediaItem calls so the
+            // currently playing track keeps playing and is never re-prepared.
+            val restoreQueue = if (originalQueue.isNotEmpty()) originalQueue else current
+            reorderPlayerPlaylist(c, current, restoreQueue)
             queueTracks = restoreQueue
             _uiState.value = _uiState.value.copy(queue = restoreQueue, shuffleEnabled = false)
-            val mediaItems = restoreQueue.map { track ->
-                MediaItem.Builder()
-                    .setMediaId(track.id.toString())
-                    .setUri(track.uri)
-                    .setMediaMetadata(
-                        MediaMetadata.Builder()
-                            .setTitle(track.title)
-                            .setArtist(track.artist)
-                            .setAlbumTitle(track.album)
-                            .setArtworkUri(track.albumArtUri)
-                            .build()
-                    )
-                    .build()
-            }
-            val startIndex = restoreQueue.indexOfFirst { it.id == currentTrack?.id }.coerceAtLeast(0)
-            val currentPos = c.currentPosition
-            val wasPlaying = c.isPlaying
-            c.setMediaItems(mediaItems, startIndex, currentPos)
-            if (wasPlaying) c.play()
             remixActive = false
             _isRemixed.value = false
             originalQueue = emptyList()
             return
         }
 
-        val current = _uiState.value.queue
-        if (current.size <= 1) return
-
         originalQueue = current
-        lastShuffleSeed = Random.nextInt()
-        val currentIndex = current.indexOfFirst { it.id == _uiState.value.currentTrack?.id }.coerceAtLeast(0)
-        val currentTrack = current.getOrNull(currentIndex) ?: return
-        val rest = current.filterIndexed { i, _ -> i != currentIndex }.shuffled(Random(lastShuffleSeed))
-        val newOrder = listOf(currentTrack) + rest
+        val currentIndex = current.indexOfFirst { it.id == currentTrack.id }.coerceAtLeast(0)
+        val currentTrackItem = current.getOrNull(currentIndex) ?: return
+        val rest = current.filterIndexed { i, _ -> i != currentIndex }.shuffled()
+        val newOrder = listOf(currentTrackItem) + rest
+
+        // Apply via moveMediaItem so the current song keeps playing (no glitch).
+        reorderPlayerPlaylist(c, current, newOrder)
 
         queueTracks = newOrder
         _uiState.value = _uiState.value.copy(queue = newOrder, shuffleEnabled = true)
-
-        val mediaItems = newOrder.map { track ->
-            MediaItem.Builder()
-                .setMediaId(track.id.toString())
-                .setUri(track.uri)
-                .setMediaMetadata(
-                    MediaMetadata.Builder()
-                        .setTitle(track.title)
-                        .setArtist(track.artist)
-                        .setAlbumTitle(track.album)
-                        .setArtworkUri(track.albumArtUri)
-                        .build()
-                )
-                .build()
-        }
-        val currentPos = c.currentPosition
-        val wasPlaying = c.isPlaying
-        c.setMediaItems(mediaItems, 0, currentPos)
-        if (wasPlaying) c.play()
         remixActive = true
         _isRemixed.value = true
+    }
+
+    /**
+     * Reorders the player's playlist from [fromOrder] into [toOrder] using
+     * ExoPlayer's [Player.moveMediaItem]. Unlike setMediaItems, moveMediaItem never
+     * re-prepares the currently playing item, so playback continues uninterrupted
+     * while the upcoming queue is reshuffled.
+     */
+    private fun reorderPlayerPlaylist(
+        c: Player,
+        fromOrder: List<AudioTrack>,
+        toOrder: List<AudioTrack>
+    ) {
+        val working = fromOrder.toMutableList()
+        for (target in toOrder.indices) {
+            val desiredId = toOrder[target].id
+            val currentPos = working.indexOfFirst { it.id == desiredId }
+            if (currentPos < 0 || currentPos == target) continue
+            runCatching { c.moveMediaItem(currentPos, target) }
+            working.add(target, working.removeAt(currentPos))
+        }
     }
 
     fun cycleRepeatMode() {
@@ -588,13 +613,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
         viewModelScope.launch {
             val lyrics = withContext(Dispatchers.IO) {
-                runCatching {
-                    loadLyricsFromRetriever(track.uri)
-                        ?: loadLyricsFromLrcFile(track)
-                }.getOrNull() ?: emptyList()
+                // 1) Kullanıcının daha önce indirip kalıcı kaydettiği lyrics (en yüksek öncelik)
+                loadSavedLyrics(track.id)
+                    // 2) Yoksa gömülü lyrics / .lrc dosyası dene
+                    ?: runCatching {
+                        loadLyricsFromRetriever(track.uri)
+                            ?: loadLyricsFromLrcFile(track)
+                    }.getOrNull()
+                    ?: emptyList()
             }
             _uiState.value = _uiState.value.copy(lyrics = lyrics, lyricsVisible = lyrics.isNotEmpty())
         }
+    }
+
+    /** Prefs'te trackId'ye göre kaydedilmiş lyrics varsa döndürür. */
+    private suspend fun loadSavedLyrics(trackId: Long): List<String>? {
+        return runCatching {
+            val json = prefs.lyricsJson.first()
+            val obj = org.json.JSONObject(json)
+            val arr = obj.optJSONArray(trackId.toString()) ?: return null
+            (0 until arr.length()).map { arr.getString(it) }.takeIf { it.isNotEmpty() }
+        }.getOrNull()
     }
 
     private fun loadLyricsFromRetriever(uri: android.net.Uri): List<String>? {
@@ -669,6 +708,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setManualLyrics(lines: List<String>) {
         _uiState.value = _uiState.value.copy(lyrics = lines, lyricsVisible = true)
+        // Kalıcı olarak kaydet — uygulamadan çıkıp tekrar girince lyrics kaybolmasın.
+        val trackId = _uiState.value.currentTrack?.id ?: return
+        if (lines.isEmpty()) return
+        viewModelScope.launch {
+            val json = prefs.lyricsJson.first()
+            val obj = runCatching { org.json.JSONObject(json) }.getOrNull() ?: org.json.JSONObject()
+            val arr = org.json.JSONArray()
+            lines.forEach { arr.put(it) }
+            obj.put(trackId.toString(), arr)
+            prefs.setLyricsJson(obj.toString())
+        }
     }
 
     private fun startAmplitudePulse() {

@@ -76,6 +76,7 @@ data class Strings(
     val alphabetical: String,
     val timeAdded: String,
     val customOrder: String,
+    val sortByArtist: String,
     val songInfo: String,
     val addedToLikedSongs: String,
     val addToPlaylist: String,
@@ -100,13 +101,14 @@ data class Strings(
     val downloadLyrics: String,
     val pinnedPlaylists: String,
     val removeFromPlaylist: String,
+    val totalListeningDescription: String,
+    val hourShort: String,
+    val minuteShort: String,
+    val secondShort: String,
     val updateAvailable: String,
-    val updateMessage: String,
-    val updateNow: String,
+    val updateAvailableMessage: String,
+    val update: String,
     val later: String,
-    val hourAbbr: String,
-    val minAbbr: String,
-    val secAbbr: String,
 )
 
 private val EN = Strings(
@@ -157,6 +159,7 @@ private val EN = Strings(
     alphabetical = "Alphabetical",
     timeAdded = "Time added",
     customOrder = "Custom",
+    sortByArtist = "Artist",
     songInfo = "Song info",
     addedToLikedSongs = "Added to Liked Songs",
     addToPlaylist = "Add to playlist",
@@ -181,11 +184,14 @@ private val EN = Strings(
     downloadLyrics = "Download Lyrics",
     pinnedPlaylists = "Pinned",
     removeFromPlaylist = "Remove from playlist",
-    updateAvailable = "Update Available",
-    updateMessage = "Version %s is available. Update now?",
-    updateNow = "Update",
-    later = "Later",
-    hourAbbr = "h", minAbbr = "m", secAbbr = "s"
+    totalListeningDescription = "Total time you listened with Lambda Player",
+    hourShort = "h",
+    minuteShort = "m",
+    secondShort = "s",
+    updateAvailable = "Update available",
+    updateAvailableMessage = "A new GitHub release is available.",
+    update = "Update",
+    later = "Later"
 )
 
 private val TR = EN.copy(
@@ -235,6 +241,7 @@ private val TR = EN.copy(
     alphabetical = "Alfabetik",
     timeAdded = "Eklenme sırası",
     customOrder = "Özel sıra",
+    sortByArtist = "Sanatçı",
     songInfo = "Şarkı bilgisi",
     addedToLikedSongs = "Beğenilen Şarkılara eklendi",
     addToPlaylist = "Çalma listesine ekle",
@@ -259,11 +266,14 @@ private val TR = EN.copy(
     downloadLyrics = "Lyrics İndir",
     pinnedPlaylists = "Sabitlenmiş",
     removeFromPlaylist = "Listeden çıkar",
-    updateAvailable = "Güncelleme Mevcut",
-    updateMessage = "%s sürümü mevcut. Şimdi güncelleyin?",
-    updateNow = "Güncelle",
-    later = "Sonra",
-    hourAbbr = "s", minAbbr = "d", secAbbr = "sn"
+    totalListeningDescription = "Lambda Player ile dinlediğin toplam süre",
+    hourShort = "s",
+    minuteShort = "d",
+    secondShort = "sn",
+    updateAvailable = "Güncelleme var",
+    updateAvailableMessage = "GitHub'da yeni bir sürüm yayınlandı.",
+    update = "Güncelle",
+    later = "Daha sonra"
 )
 
 private val ZH = EN.copy(
@@ -313,6 +323,7 @@ private val ZH = EN.copy(
     alphabetical = "按字母顺序",
     timeAdded = "按添加时间",
     customOrder = "自定义",
+    sortByArtist = "艺术家",
     songInfo = "歌曲信息",
     addedToLikedSongs = "已添加到喜欢的歌曲",
     addToPlaylist = "添加到播放列表",
@@ -337,11 +348,14 @@ private val ZH = EN.copy(
     downloadLyrics = "下载歌词",
     pinnedPlaylists = "已置顶",
     removeFromPlaylist = "从歌单移除",
+    totalListeningDescription = "使用 Lambda Player 的总收听时间",
+    hourShort = "时",
+    minuteShort = "分",
+    secondShort = "秒",
     updateAvailable = "有可用更新",
-    updateMessage = "版本 %s 可用，是否更新？",
-    updateNow = "更新",
-    later = "稍后",
-    hourAbbr = "时", minAbbr = "分", secAbbr = "秒"
+    updateAvailableMessage = "GitHub 上有新版本。",
+    update = "更新",
+    later = "稍后"
 )
 
 private val ES = EN.copy(
@@ -391,6 +405,7 @@ private val ES = EN.copy(
     alphabetical = "Alfabético",
     timeAdded = "Añadido recientemente",
     customOrder = "Personalizado",
+    sortByArtist = "Artista",
     songInfo = "Información",
     addedToLikedSongs = "Añadido a favoritas",
     addToPlaylist = "Añadir a lista",
@@ -415,11 +430,14 @@ private val ES = EN.copy(
     downloadLyrics = "Descargar letra",
     pinnedPlaylists = "Fijadas",
     removeFromPlaylist = "Quitar de la lista",
+    totalListeningDescription = "Tiempo total que escuchaste con Lambda Player",
+    hourShort = "h",
+    minuteShort = "min",
+    secondShort = "s",
     updateAvailable = "Actualización disponible",
-    updateMessage = "La versión %s está disponible. ¿Actualizar ahora?",
-    updateNow = "Actualizar",
-    later = "Luego",
-    hourAbbr = "h", minAbbr = "m", secAbbr = "s"
+    updateAvailableMessage = "Hay una nueva versión en GitHub.",
+    update = "Actualizar",
+    later = "Más tarde"
 )
 
 private val RU = EN.copy(
@@ -469,6 +487,7 @@ private val RU = EN.copy(
     alphabetical = "По алфавиту",
     timeAdded = "По дате добавления",
     customOrder = "Свой порядок",
+    sortByArtist = "Исполнитель",
     songInfo = "Информация о треке",
     addedToLikedSongs = "Добавлено в любимые",
     addToPlaylist = "Добавить в плейлист",
@@ -493,11 +512,14 @@ private val RU = EN.copy(
     downloadLyrics = "Скачать текст",
     pinnedPlaylists = "Закреплённые",
     removeFromPlaylist = "Удалить из списка",
+    totalListeningDescription = "Общее время прослушивания в Lambda Player",
+    hourShort = "ч",
+    minuteShort = "мин",
+    secondShort = "с",
     updateAvailable = "Доступно обновление",
-    updateMessage = "Доступна версия %s. Обновить сейчас?",
-    updateNow = "Обновить",
-    later = "Позже",
-    hourAbbr = "ч", minAbbr = "м", secAbbr = "с"
+    updateAvailableMessage = "На GitHub доступен новый релиз.",
+    update = "Обновить",
+    later = "Позже"
 )
 
 private val KA = EN.copy(
@@ -547,6 +569,7 @@ private val KA = EN.copy(
     alphabetical = "ანბანის მიხედვით",
     timeAdded = "დამატების თარიღი",
     customOrder = "საკუთარი",
+    sortByArtist = "შემსრულებელი",
     songInfo = "სიმღერის ინფო",
     addedToLikedSongs = "მოწონებულებში დაემატა",
     addToPlaylist = "პლეილისტში დამატება",
@@ -571,11 +594,14 @@ private val KA = EN.copy(
     downloadLyrics = "ტექსტის ჩამოტვირთვა",
     pinnedPlaylists = "დამაგრებული",
     removeFromPlaylist = "სიისგან წაშლა",
+    totalListeningDescription = "Lambda Player-ით მოსმენის ჯამური დრო",
+    hourShort = "სთ",
+    minuteShort = "წთ",
+    secondShort = "წმ",
     updateAvailable = "განახლება ხელმისაწვდომია",
-    updateMessage = "ვერსია %s ხელმისაწვდომია. განახლება ახლა?",
-    updateNow = "განახლება",
-    later = "მოგვიანებით",
-    hourAbbr = "სთ", minAbbr = "წთ", secAbbr = "წმ"
+    updateAvailableMessage = "GitHub-ზე ახალი რელიზია.",
+    update = "განახლება",
+    later = "მოგვიანებით"
 )
 
 private val AR = EN.copy(
@@ -625,6 +651,7 @@ private val AR = EN.copy(
     alphabetical = "أبجدي",
     timeAdded = "وقت الإضافة",
     customOrder = "مخصص",
+    sortByArtist = "الفنان",
     songInfo = "معلومات الأغنية",
     addedToLikedSongs = "أُضيفت إلى المفضلة",
     addToPlaylist = "إضافة إلى قائمة",
@@ -649,11 +676,14 @@ private val AR = EN.copy(
     downloadLyrics = "تحميل الكلمات",
     pinnedPlaylists = "المثبتة",
     removeFromPlaylist = "إزالة من القائمة",
-    updateAvailable = "تحديث متاح",
-    updateMessage = "الإصدار %s متاح. هل تريد التحديث الآن؟",
-    updateNow = "تحديث",
-    later = "لاحقاً",
-    hourAbbr = "س", minAbbr = "د", secAbbr = "ث"
+    totalListeningDescription = "إجمالي وقت الاستماع باستخدام Lambda Player",
+    hourShort = "س",
+    minuteShort = "د",
+    secondShort = "ث",
+    updateAvailable = "يتوفر تحديث",
+    updateAvailableMessage = "يوجد إصدار جديد على GitHub.",
+    update = "تحديث",
+    later = "لاحقًا"
 )
 
 val AllLanguages: List<Strings> = listOf(EN, TR, ZH, ES, RU, KA, AR)

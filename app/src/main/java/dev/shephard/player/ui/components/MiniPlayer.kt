@@ -39,9 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import dev.shephard.player.data.AudioTrack
+import dev.shephard.player.data.slideForwardInQueue
+import dev.shephard.player.data.trackById
 import dev.shephard.player.player.PlayerUiState
 import dev.shephard.player.ui.components.bounceClick
 
@@ -63,13 +64,7 @@ fun MiniPlayer(
 ) {
     val track = state.currentTrack ?: return
 
-    var lastTrackId by remember { mutableStateOf<Long?>(null) }
-    var slideForward by remember { mutableStateOf(true) }
-    val currentId = track.id
-    if (lastTrackId != null && lastTrackId != currentId) {
-        slideForward = currentId > (lastTrackId ?: 0L)
-    }
-    if (lastTrackId != currentId) lastTrackId = currentId
+    // Geçiş yönü AnimatedContent içinde kuyruk konumuna göre belirlenir.
 
     val fraction = if (state.durationMs > 0L)
         (state.positionMs.toFloat() / state.durationMs.toFloat()).coerceIn(0f, 1f)
@@ -79,24 +74,11 @@ fun MiniPlayer(
         animationSpec = tween(durationMillis = 250),
         label = "miniProgress"
     )
-
-    val glowColor = Color(state.glowColorArgb)
+    val glow = Color(state.glowColorArgb)
     val animatedGlow by animateColorAsState(
-        targetValue = glowColor,
-        animationSpec = tween(durationMillis = 600),
-        label = "miniGlow"
-    )
-    val bgColor = animatedGlow.copy(
-        red = (animatedGlow.red * 0.18f).coerceAtMost(0.22f),
-        green = (animatedGlow.green * 0.18f).coerceAtMost(0.22f),
-        blue = (animatedGlow.blue * 0.18f).coerceAtMost(0.22f),
-        alpha = 1f
-    )
-    val bgGradient = Brush.horizontalGradient(
-        colors = listOf(
-            bgColor,
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)
-        )
+        targetValue = glow,
+        animationSpec = tween(durationMillis = 450),
+        label = "miniGlowColor"
     )
 
     Column(
@@ -108,15 +90,24 @@ fun MiniPlayer(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
-                .background(bgGradient)
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            animatedGlow.copy(alpha = 0.34f),
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+                            animatedGlow.copy(alpha = 0.18f)
+                        )
+                    )
+                )
                 .bounceClick { onClick() }
                 .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Album art
             AnimatedContent(
                 targetState = track.id,
                 transitionSpec = {
-                    val dir = if (slideForward)
+                    val dir = if (slideForwardInQueue(state.queue, initialState, targetState))
                         AnimatedContentTransitionScope.SlideDirection.Left
                     else
                         AnimatedContentTransitionScope.SlideDirection.Right
@@ -125,6 +116,7 @@ fun MiniPlayer(
                 },
                 label = "miniArt"
             ) { trackId ->
+                val displayTrack = state.queue.trackById(trackId) ?: track
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -134,7 +126,7 @@ fun MiniPlayer(
                 ) {
                     var artLoaded by remember(trackId) { mutableStateOf(false) }
                     AsyncImage(
-                        model = track.albumArtUri,
+                        model = displayTrack.albumArtUri,
                         contentDescription = null,
                         modifier = Modifier
                             .size(40.dp)
@@ -148,17 +140,18 @@ fun MiniPlayer(
                         Icon(
                             imageVector = Icons.Filled.MusicNote,
                             contentDescription = null,
-                            tint = animatedGlow,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                     }
                 }
             }
 
+            // Track info
             AnimatedContent(
                 targetState = track.id,
                 transitionSpec = {
-                    val dir = if (slideForward)
+                    val dir = if (slideForwardInQueue(state.queue, initialState, targetState))
                         AnimatedContentTransitionScope.SlideDirection.Left
                     else
                         AnimatedContentTransitionScope.SlideDirection.Right
@@ -169,10 +162,11 @@ fun MiniPlayer(
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 12.dp)
-            ) { _ ->
+            ) { trackId ->
+                val displayTrack = state.queue.trackById(trackId) ?: track
                 Column {
                     Text(
-                        text = track.title,
+                        text = displayTrack.title,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground,
@@ -180,7 +174,7 @@ fun MiniPlayer(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = track.artist,
+                        text = displayTrack.artist,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -189,6 +183,7 @@ fun MiniPlayer(
                 }
             }
 
+            // Previous
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -203,6 +198,7 @@ fun MiniPlayer(
                 )
             }
 
+            // Play/Pause
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -226,6 +222,7 @@ fun MiniPlayer(
                 }
             }
 
+            // Next
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -244,7 +241,7 @@ fun MiniPlayer(
         BoldProgressBar(
             fraction = animatedFraction,
             activeColor = animatedGlow,
-            inactiveColor = Color.White.copy(alpha = 0.12f),
+            inactiveColor = animatedGlow.copy(alpha = 0.18f),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 4.dp)

@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.text.Collator
+import java.util.Locale
 
 data class TrackOverride(
     val title: String? = null,
@@ -78,7 +80,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             val result = withContext(Dispatchers.IO) {
                 MediaStoreScanner.queryAudioTracks(getApplication())
             }
-            _tracks.value = applyOverridesToList(result, _overrides.value).sortedBy { it.title.lowercase() }
+            _tracks.value = applyOverridesToList(result, _overrides.value)
             _isLoading.value = false
             _hasScanned.value = true
             applyFilter()
@@ -103,7 +105,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             val raw = withContext(Dispatchers.IO) {
                 MediaStoreScanner.queryAudioTracks(getApplication())
             }
-            _tracks.value = applyOverridesToList(raw, newOverrides).sortedBy { it.title.lowercase() }
+            _tracks.value = applyOverridesToList(raw, newOverrides)
             applyFilter()
         }
     }
@@ -111,6 +113,10 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     fun getOverride(trackId: Long): TrackOverride? = _overrides.value[trackId.toString()]
 
     private fun applyOverridesToList(tracks: List<AudioTrack>, overrides: Map<String, TrackOverride>): List<AudioTrack> {
+        val collator = Collator.getInstance(Locale.getDefault()).apply {
+            strength = Collator.PRIMARY
+        }
+
         return tracks.map { track ->
             val ov = overrides[track.id.toString()] ?: return@map track
             track.copy(
@@ -119,20 +125,32 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 album = ov.album?.takeIf { it.isNotBlank() } ?: track.album,
                 albumArtUri = ov.coverUri?.let { Uri.parse(it) } ?: track.albumArtUri
             )
-        }
+        }.sortedWith(trackTitleComparator(collator))
     }
 
     private fun applyFilter() {
-        val query = _searchQuery.value.trim().lowercase()
-        _filteredTracks.value = if (query.isEmpty()) {
+        val query = _searchQuery.value.trim().lowercase(Locale.getDefault())
+        val collator = Collator.getInstance(Locale.getDefault()).apply {
+            strength = Collator.PRIMARY
+        }
+        val filtered = if (query.isEmpty()) {
             _tracks.value
         } else {
             _tracks.value.filter { track ->
-                track.title.lowercase().contains(query) ||
-                track.artist.lowercase().contains(query) ||
-                track.album.lowercase().contains(query)
+                track.title.lowercase(Locale.getDefault()).contains(query) ||
+                track.artist.lowercase(Locale.getDefault()).contains(query) ||
+                track.album.lowercase(Locale.getDefault()).contains(query)
             }
         }
+        _filteredTracks.value = filtered.sortedWith(trackTitleComparator(collator))
+    }
+
+    private fun trackTitleComparator(collator: Collator): Comparator<AudioTrack> = Comparator { a, b ->
+        val byTitle = collator.compare(a.title.trim(), b.title.trim())
+        if (byTitle != 0) return@Comparator byTitle
+        val byArtist = collator.compare(a.artist.trim(), b.artist.trim())
+        if (byArtist != 0) return@Comparator byArtist
+        a.id.compareTo(b.id)
     }
 
     override fun onCleared() {
