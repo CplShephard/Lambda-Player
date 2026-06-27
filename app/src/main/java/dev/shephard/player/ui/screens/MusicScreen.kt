@@ -26,7 +26,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -76,7 +75,7 @@ import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.rememberAudioPermissionState
 import dev.shephard.player.ui.components.bounceClick
-import dev.shephard.player.ui.components.rememberBounceOverscrollEffect
+import dev.shephard.player.ui.components.elasticOverscroll
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -153,7 +152,7 @@ fun MusicScreen(
                     state = gridState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .overscroll(rememberBounceOverscrollEffect()),
+                        .elasticOverscroll(gridState),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -172,7 +171,7 @@ fun MusicScreen(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .overscroll(rememberBounceOverscrollEffect()),
+                        .elasticOverscroll(listState),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {

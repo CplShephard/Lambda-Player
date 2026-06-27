@@ -50,6 +50,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.MiniPlayer
@@ -60,8 +61,8 @@ import dev.shephard.player.ui.screens.NowPlayingSheet
 
 // Açılış: yumuşak yaylı kayma
 private val nowPlayingEnterSpring = spring<IntOffset>(
-    dampingRatio = Spring.DampingRatioLowBouncy,
-    stiffness = 260f
+    dampingRatio = Spring.DampingRatioNoBouncy,
+    stiffness = 180f
 )
 // Kapanış: fazla overshoot olmadan hızlı ve smooth
 private val nowPlayingExitSpring = spring<IntOffset>(
@@ -93,6 +94,7 @@ fun MainContainer(
         LaunchedEffect(initialAudioUri) {
             if (initialAudioUri != null) {
                 playerViewModel.playExternalUri(initialAudioUri)
+                delay(120)
                 showNowPlaying = true
             }
         }

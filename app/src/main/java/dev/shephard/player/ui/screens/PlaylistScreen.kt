@@ -30,12 +30,11 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
@@ -97,7 +96,7 @@ import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.BouncyIconButton
 import dev.shephard.player.ui.components.bounceClick
-import dev.shephard.player.ui.components.rememberBounceOverscrollEffect
+import dev.shephard.player.ui.components.elasticOverscroll
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -368,10 +367,12 @@ fun PlaylistScreen(
             onDismissRequest = { trackPickerForIndex = null },
             title = { Text(strings.addTracks) },
             text = {
+                val pickerListState = rememberLazyListState()
                 LazyColumn(
+                    state = pickerListState,
                     modifier = Modifier
                         .height(400.dp)
-                        .overscroll(rememberBounceOverscrollEffect())
+                        .elasticOverscroll(pickerListState)
                 ) {
                     items(tracks) { t ->
                         val checked = t.id in pickerSelected
@@ -635,14 +636,17 @@ private fun PlaylistListView(
                 )
             }
         } else {
+            val playlistGridState = rememberLazyGridState()
+            val playlistListState = rememberLazyListState()
             if (layout == LayoutMode.GRID) {
                 val pinnedPlaylists = playlists.filter { it.pinned }
                 val unpinnedPlaylists = playlists.filter { !it.pinned }
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
+                    state = playlistGridState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .overscroll(rememberBounceOverscrollEffect()),
+                        .elasticOverscroll(playlistGridState),
                     contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -679,9 +683,10 @@ private fun PlaylistListView(
                 val pinnedPlaylists = playlists.filter { it.pinned }
                 val unpinnedPlaylists = playlists.filter { !it.pinned }
                 LazyColumn(
+                    state = playlistListState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .overscroll(rememberBounceOverscrollEffect()),
+                        .elasticOverscroll(playlistListState),
                     contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -969,12 +974,10 @@ private fun PlaylistDetailView(
     val itemHeightDp = 64.dp
     val itemHeightPx = with(density) { itemHeightDp.toPx() }
 
-    // Mutable working list used for live (drag-to-reorder) updates in custom mode.
     val reorderItems = remember { mutableStateListOf<AudioTrack>() }
     var draggedTrackId by remember { mutableStateOf<Long?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
 
-    // Keep the working list in sync with the source whenever the playlist tracks change.
     LaunchedEffect(plTracks) {
         if (draggedTrackId == null) {
             reorderItems.clear()
@@ -983,26 +986,48 @@ private fun PlaylistDetailView(
     }
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    val scrollScope = rememberCoroutineScope()
-    val autoScrollThresholdPx = with(density) { 72.dp.toPx() }
+    val coroutineScope = rememberCoroutineScope()
+    val autoScrollThresholdPx = with(density) { 80.dp.toPx() }
+    val autoScrollJob = remember { androidx.compose.runtime.mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
-    fun autoScrollIfNeeded(dragAmount: Float) {
-        val id = draggedTrackId ?: return
-        val layout = listState.layoutInfo
-        val draggedItemInfo = layout.visibleItemsInfo.firstOrNull { it.key == id } ?: return
-        val draggedTop = draggedItemInfo.offset + dragOffsetY
-        val draggedBottom = draggedTop + draggedItemInfo.size
-        val viewportTop = layout.viewportStartOffset + autoScrollThresholdPx
-        val viewportBottom = layout.viewportEndOffset - autoScrollThresholdPx
-        val distanceToBottom = draggedBottom - viewportBottom
-        val distanceToTop = viewportTop - draggedTop
-        val scrollBy = when {
-            distanceToBottom > 0f -> (distanceToBottom * 0.18f + 8f).coerceIn(8f, 28f)
-            distanceToTop > 0f -> -(distanceToTop * 0.18f + 8f).coerceIn(8f, 28f)
-            else -> 0f
+    fun startAutoScroll(direction: Int) {
+        if (autoScrollJob.value?.isActive == true) return
+        autoScrollJob.value = coroutineScope.launch {
+            while (true) {
+                val layout = listState.layoutInfo
+                val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.key == draggedTrackId }
+                if (draggedInfo == null) { kotlinx.coroutines.delay(16); continue }
+                val draggedCenter = draggedInfo.offset + dragOffsetY + itemHeightPx / 2
+                val viewportBottom = layout.viewportEndOffset.toFloat()
+                val distFromBottom = viewportBottom - autoScrollThresholdPx - draggedCenter
+                val distFromTop = draggedCenter - autoScrollThresholdPx
+                val speed = when {
+                    direction > 0 && distFromBottom < 0 -> ((-distFromBottom) * 0.3f).coerceIn(4f, 32f)
+                    direction < 0 && distFromTop < 0 -> ((-distFromTop) * 0.3f).coerceIn(4f, 32f)
+                    else -> 0f
+                }
+                if (speed > 0f) listState.scrollBy(speed * direction)
+                kotlinx.coroutines.delay(16)
+            }
         }
-        if (scrollBy != 0f) {
-            scrollScope.launch { listState.scrollBy(scrollBy) }
+    }
+
+    fun stopAutoScroll() {
+        autoScrollJob.value?.cancel()
+        autoScrollJob.value = null
+    }
+
+    fun checkAutoScroll() {
+        val layout = listState.layoutInfo
+        val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.key == draggedTrackId } ?: run {
+            stopAutoScroll(); return
+        }
+        val draggedCenter = draggedInfo.offset + dragOffsetY + itemHeightPx / 2
+        val viewportBottom = layout.viewportEndOffset.toFloat()
+        when {
+            draggedCenter > viewportBottom - autoScrollThresholdPx -> startAutoScroll(+1)
+            draggedCenter < autoScrollThresholdPx -> startAutoScroll(-1)
+            else -> stopAutoScroll()
         }
     }
 
@@ -1011,7 +1036,7 @@ private fun PlaylistDetailView(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .overscroll(rememberBounceOverscrollEffect()),
+                .elasticOverscroll(listState),
             contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp)
         ) {
             item {
@@ -1021,7 +1046,7 @@ private fun PlaylistDetailView(
                 ) {
                     BouncyIconButton(
                         onClick = onBack,
-                        icon = Icons.Filled.ArrowBack,
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = strings.cancel,
                         tint = MaterialTheme.colorScheme.onBackground
                     )
@@ -1228,15 +1253,16 @@ private fun PlaylistDetailView(
                             onDragStart = { draggedTrackId = t.id; dragOffsetY = 0f },
                             onDrag = { amount ->
                                 dragOffsetY += amount
-                                autoScrollIfNeeded(amount)
+                                checkAutoScroll()
                                 val id = draggedTrackId
                                 if (id != null) {
                                     val cur = reorderItems.indexOfFirst { it.id == id }
                                     if (cur >= 0) {
-                                        if (dragOffsetY > itemHeightPx / 2 && cur < reorderItems.size - 1) {
+                                        val center = dragOffsetY + itemHeightPx / 2
+                                        if (center > itemHeightPx && cur < reorderItems.size - 1) {
                                             reorderItems.add(cur + 1, reorderItems.removeAt(cur))
                                             dragOffsetY -= itemHeightPx
-                                        } else if (dragOffsetY < -itemHeightPx / 2 && cur > 0) {
+                                        } else if (center < -itemHeightPx / 2 && cur > 0) {
                                             reorderItems.add(cur - 1, reorderItems.removeAt(cur))
                                             dragOffsetY += itemHeightPx
                                         }
@@ -1244,13 +1270,18 @@ private fun PlaylistDetailView(
                                 }
                             },
                             onDragEnd = {
+                                stopAutoScroll()
                                 if (reorderItems.toList() != plTracks) {
                                     onReorder(reorderItems.toList())
                                 }
                                 draggedTrackId = null
                                 dragOffsetY = 0f
                             },
-                            onDragCancel = { draggedTrackId = null; dragOffsetY = 0f }
+                            onDragCancel = {
+                                stopAutoScroll()
+                                draggedTrackId = null
+                                dragOffsetY = 0f
+                            }
                         )
                     }
                 } else {

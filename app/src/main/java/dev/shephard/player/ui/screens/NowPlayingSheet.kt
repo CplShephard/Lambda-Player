@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -46,7 +45,7 @@ import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Favorite
@@ -102,7 +101,7 @@ import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.components.BouncyIconButton
 import dev.shephard.player.ui.components.MinimalSeekBar
 import dev.shephard.player.ui.components.bounceClick
-import dev.shephard.player.ui.components.rememberBounceOverscrollEffect
+import dev.shephard.player.ui.components.elasticOverscroll
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -185,9 +184,8 @@ fun NowPlayingSheet(
                                     easing = androidx.compose.animation.core.FastOutLinearInEasing
                                 )
                             )
-                            // Sheet ekran dışında, AnimatedVisibility exit yok — direkt kapat
+                            // Sheet ekran dışında — direkt kapat, reset LaunchedEffect(Unit)'e bırakılır
                             onDismiss()
-                            dragOffset.snapTo(0f)
                         }
                     } else {
                         dragScope.launch {
@@ -429,7 +427,7 @@ fun NowPlayingSheet(
 
                 BouncyIconButton(
                     onClick = { showQueue = true },
-                    icon = Icons.Filled.QueueMusic,
+                    icon = Icons.AutoMirrored.Filled.QueueMusic,
                     contentDescription = strings.queue,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     iconSize = 28.dp
@@ -573,7 +571,10 @@ fun NowPlayingSheet(
                                     }
                                 }
                             } else {
-                                LazyColumn(state = lyricListState) {
+                                LazyColumn(
+                                    state = lyricListState,
+                                    modifier = Modifier.elasticOverscroll(lyricListState)
+                                ) {
                                     itemsIndexed(state.lyrics) { idx, line ->
                                         val isActive = idx == activeIndex
                                         Text(
@@ -826,26 +827,49 @@ private fun QueueList(
     var draggedTrackId by remember { mutableStateOf<Long?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
     val listState = rememberLazyListState()
-    val scrollScope = rememberCoroutineScope()
-    val autoScrollThresholdPx = with(density) { 64.dp.toPx() }
+    val coroutineScope = rememberCoroutineScope()
+    val autoScrollThresholdPx = with(density) { 80.dp.toPx() }
+    // Continuous autoscroll — tek bir job, drag boyunca yaşar
+    val autoScrollJob = remember { androidx.compose.runtime.mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
-    fun autoScrollIfNeeded(dragAmount: Float) {
-        val id = draggedTrackId ?: return
-        val layout = listState.layoutInfo
-        val draggedItemInfo = layout.visibleItemsInfo.firstOrNull { it.key == id } ?: return
-        val draggedTop = draggedItemInfo.offset + dragOffsetY
-        val draggedBottom = draggedTop + draggedItemInfo.size
-        val viewportTop = layout.viewportStartOffset + autoScrollThresholdPx
-        val viewportBottom = layout.viewportEndOffset - autoScrollThresholdPx
-        val distanceToBottom = draggedBottom - viewportBottom
-        val distanceToTop = viewportTop - draggedTop
-        val scrollBy = when {
-            distanceToBottom > 0f -> (distanceToBottom * 0.18f + 8f).coerceIn(8f, 28f)
-            distanceToTop > 0f -> -(distanceToTop * 0.18f + 8f).coerceIn(8f, 28f)
-            else -> 0f
+    fun startAutoScroll(direction: Int) { // +1 down, -1 up
+        if (autoScrollJob.value?.isActive == true) return
+        autoScrollJob.value = coroutineScope.launch {
+            while (true) {
+                val layout = listState.layoutInfo
+                val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.key == draggedTrackId }
+                if (draggedInfo == null) { kotlinx.coroutines.delay(16); continue }
+                val draggedCenter = draggedInfo.offset + dragOffsetY + itemHeightPx / 2
+                val viewportBottom = layout.viewportEndOffset.toFloat()
+                val distFromBottom = viewportBottom - autoScrollThresholdPx - draggedCenter
+                val distFromTop = draggedCenter - autoScrollThresholdPx
+                val speed = when {
+                    direction > 0 && distFromBottom < 0 -> ((-distFromBottom) * 0.3f).coerceIn(4f, 32f)
+                    direction < 0 && distFromTop < 0 -> ((-distFromTop) * 0.3f).coerceIn(4f, 32f)
+                    else -> 0f
+                }
+                if (speed > 0f) listState.scrollBy(speed * direction)
+                kotlinx.coroutines.delay(16)
+            }
         }
-        if (scrollBy != 0f) {
-            scrollScope.launch { listState.scrollBy(scrollBy) }
+    }
+
+    fun stopAutoScroll() {
+        autoScrollJob.value?.cancel()
+        autoScrollJob.value = null
+    }
+
+    fun checkAutoScroll() {
+        val layout = listState.layoutInfo
+        val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.key == draggedTrackId } ?: run {
+            stopAutoScroll(); return
+        }
+        val draggedCenter = draggedInfo.offset + dragOffsetY + itemHeightPx / 2
+        val viewportBottom = layout.viewportEndOffset.toFloat()
+        when {
+            draggedCenter > viewportBottom - autoScrollThresholdPx -> startAutoScroll(+1)
+            draggedCenter < autoScrollThresholdPx -> startAutoScroll(-1)
+            else -> stopAutoScroll()
         }
     }
 
@@ -861,7 +885,6 @@ private fun QueueList(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(420.dp)
-                .overscroll(rememberBounceOverscrollEffect())
         ) {
             itemsIndexed(items, key = { _, t -> t.id }) { index, track ->
                 val isDragged = track.id == draggedTrackId
@@ -877,16 +900,16 @@ private fun QueueList(
                         .graphicsLayer {
                             if (isDragged) {
                                 translationY = dragOffsetY
-                                shadowElevation = 12f
-                                scaleX = 1.02f
-                                scaleY = 1.02f
+                                shadowElevation = 16f
+                                scaleX = 1.03f
+                                scaleY = 1.03f
                             }
                         }
                         .zIndex(if (isDragged) 1f else 0f)
                         .clip(RoundedCornerShape(12.dp))
                         .background(
                             when {
-                                isDragged -> MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                isDragged -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
                                 isPlaying -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
                                 else -> Color.Transparent
                             }
@@ -961,8 +984,12 @@ private fun QueueList(
                                 .size(28.dp)
                                 .pointerInput(track.id) {
                                     detectDragGestures(
-                                        onDragStart = { draggedTrackId = track.id; dragOffsetY = 0f },
+                                        onDragStart = {
+                                            draggedTrackId = track.id
+                                            dragOffsetY = 0f
+                                        },
                                         onDragEnd = {
+                                            stopAutoScroll()
                                             val toSlice = items.indexOfFirst { it.id == track.id }
                                             val from = queue.indexOfFirst { it.id == track.id }
                                             val to = if (toSlice >= 0) toSlice + currentStartIndex else -1
@@ -970,18 +997,25 @@ private fun QueueList(
                                             draggedTrackId = null
                                             dragOffsetY = 0f
                                         },
-                                        onDragCancel = { draggedTrackId = null; dragOffsetY = 0f }
+                                        onDragCancel = {
+                                            stopAutoScroll()
+                                            draggedTrackId = null
+                                            dragOffsetY = 0f
+                                        }
                                     ) { change, dragAmount: Offset ->
                                         change.consume()
                                         dragOffsetY += dragAmount.y
-                                        autoScrollIfNeeded(dragAmount.y)
+                                        checkAutoScroll()
+                                        // Position-based swap: dragged item'ın merkezi komşunun
+                                        // merkezini geçince swap yap
                                         val id = draggedTrackId ?: return@detectDragGestures
                                         val cur = items.indexOfFirst { it.id == id }
                                         if (cur < 0) return@detectDragGestures
-                                        if (dragOffsetY > itemHeightPx / 2 && cur < items.size - 1) {
+                                        val draggedCenter = dragOffsetY + itemHeightPx / 2
+                                        if (draggedCenter > itemHeightPx && cur < items.size - 1) {
                                             items.add(cur + 1, items.removeAt(cur))
                                             dragOffsetY -= itemHeightPx
-                                        } else if (dragOffsetY < -itemHeightPx / 2 && cur > 0) {
+                                        } else if (draggedCenter < -itemHeightPx / 2 && cur > 0) {
                                             items.add(cur - 1, items.removeAt(cur))
                                             dragOffsetY += itemHeightPx
                                         }

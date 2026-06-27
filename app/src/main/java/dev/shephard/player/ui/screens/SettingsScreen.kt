@@ -26,20 +26,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import dev.shephard.player.ui.components.bounceClick
-import dev.shephard.player.ui.components.rememberBounceOverscrollEffect
+import dev.shephard.player.ui.components.elasticOverscroll
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material.icons.filled.NightsStay
-import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Card
@@ -134,12 +133,13 @@ fun SettingsScreen() {
         } catch (_: PackageManager.NameNotFoundException) { null }
     }
     val versionName = packageInfo?.versionName ?: "2.0"
+    val settingsScrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .overscroll(rememberBounceOverscrollEffect())
+            .elasticOverscroll(settingsScrollState)
+            .verticalScroll(settingsScrollState)
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -187,7 +187,7 @@ fun SettingsScreen() {
                     }
                 }
                 Icon(
-                    imageVector = Icons.Filled.OpenInNew,
+                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                 )
@@ -356,7 +356,7 @@ fun SettingsScreen() {
                 LayoutToggleChip(
                     selected = playlistsLayout == LayoutMode.LIST,
                     label = strings.list,
-                    icon = Icons.Filled.List,
+                    icon = Icons.AutoMirrored.Filled.List,
                     onClick = { scope.launch { prefs.setPlaylistsLayout(LayoutMode.LIST) } }
                 )
                 LayoutToggleChip(
@@ -379,7 +379,7 @@ fun SettingsScreen() {
                 LayoutToggleChip(
                     selected = musicsLayout == LayoutMode.LIST,
                     label = strings.list,
-                    icon = Icons.Filled.List,
+                    icon = Icons.AutoMirrored.Filled.List,
                     onClick = { scope.launch { prefs.setMusicsLayout(LayoutMode.LIST) } }
                 )
                 LayoutToggleChip(
