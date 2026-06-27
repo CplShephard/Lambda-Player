@@ -150,9 +150,9 @@ private fun ListeningStatsCard(totalListeningMs: Long) {
     val minutes = (totalSeconds % 3600) / 60
     val seconds = totalSeconds % 60
     val formatted = buildList {
-        if (hours > 0) add("$hours ${strings.hourShort}")
-        if (minutes > 0 || hours > 0) add("$minutes ${strings.minuteShort}")
-        add("$seconds ${strings.secondShort}")
+        if (hours > 0) add("$hours${strings.hourShort}")
+        if (minutes > 0 || hours > 0) add("$minutes${strings.minuteShort}")
+        add("$seconds${strings.secondShort}")
     }.joinToString(" ")
 
     Column(

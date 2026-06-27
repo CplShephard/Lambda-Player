@@ -1,7 +1,6 @@
 package dev.shephard.player.ui.navigation
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -9,7 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -122,36 +120,9 @@ fun MainContainer(
                 )
             }
 
-            // Tek animasyonlu geçiş: uygulama ↔ Now Playing (Playlist list/detail gibi)
-            AnimatedContent(
-                targetState = showNowPlaying,
-                transitionSpec = {
-                    if (targetState) {
-                        // Açılış: Now Playing alttan yukarı kayar
-                        (slideInVertically(
-                            initialOffsetY = { it },
-                            animationSpec = nowPlayingSlideSpring
-                        ) + fadeIn(tween(380))) togetherWith
-                            fadeOut(tween(300))
-                    } else {
-                        // Kapanış: Now Playing aşağı kayar, uygulama geri belirir
-                        fadeIn(tween(380)) togetherWith
-                            (slideOutVertically(
-                                targetOffsetY = { it },
-                                animationSpec = nowPlayingSlideSpring
-                            ) + fadeOut(tween(300)))
-                    }
-                },
-                label = "nowPlaying",
-                modifier = Modifier.fillMaxSize()
-            ) { isShowing ->
-                if (isShowing) {
-                    NowPlayingSheet(
-                        playerViewModel = playerViewModel,
-                        onDismiss = { showNowPlaying = false }
-                    )
-                } else {
-                    Scaffold(
+            // Uygulama ağacını artık NowPlaying açılınca kaldırmıyoruz.
+            // Böylece playlist detail ekranının state'i korunuyor; sheet kapanınca aynı yerde kalır.
+            Scaffold(
                         modifier = Modifier.fillMaxSize(),
                         containerColor = if (wallpaper.isEmpty())
                             MaterialTheme.colorScheme.background else Color.Transparent,
@@ -167,6 +138,10 @@ fun MainContainer(
                                 hasMiniPlayer = playerState.currentTrack != null,
                                 onTrackClick = { tracks, index, playlistName ->
                                     playerViewModel.setQueueAndPlay(tracks, index, playlistName)
+                                    showNowPlaying = true
+                                },
+                                onPlaylistRemixClick = { tracks, playlistName ->
+                                    playerViewModel.setQueueAndPlayRemixed(tracks, playlistName)
                                     showNowPlaying = true
                                 }
                             )
@@ -210,7 +185,23 @@ fun MainContainer(
                             }
                         }
                     }
-                }
+
+            AnimatedVisibility(
+                visible = showNowPlaying,
+                enter = slideInVertically(
+                    initialOffsetY = { it },
+                    animationSpec = nowPlayingSlideSpring
+                ) + fadeIn(tween(380)),
+                exit = slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = nowPlayingSlideSpring
+                ) + fadeOut(tween(300)),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                NowPlayingSheet(
+                    playerViewModel = playerViewModel,
+                    onDismiss = { showNowPlaying = false }
+                )
             }
         }
     }

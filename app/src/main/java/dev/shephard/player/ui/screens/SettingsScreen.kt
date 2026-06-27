@@ -203,7 +203,7 @@ fun SettingsScreen() {
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                text = formatListeningTime(totalMs),
+                text = formatListeningTime(totalMs, strings),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -718,11 +718,20 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
     }
 }
 
-private fun formatListeningTime(ms: Long): String {
+private fun formatListeningTime(
+    ms: Long,
+    strings: dev.shephard.player.ui.i18n.Strings
+): String {
     val totalSec = ms / 1000
     val h = totalSec / 3600
     val m = (totalSec % 3600) / 60
     val s = totalSec % 60
-    return if (h > 0) "%dh %02dm %02ds".format(h, m, s)
-    else "%dm %02ds".format(m, s)
+    return if (h > 0) "%d%s %02d%s %02d%s".format(
+        h, strings.hourShort,
+        m, strings.minuteShort,
+        s, strings.secondShort
+    ) else "%d%s %02d%s".format(
+        m, strings.minuteShort,
+        s, strings.secondShort
+    )
 }

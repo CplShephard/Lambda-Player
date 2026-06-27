@@ -558,6 +558,16 @@ private fun EditMusicDrawer(
                     Icon(Icons.Filled.Edit, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
                 }
             }
+
+            if (coverUri != null) {
+                Spacer(Modifier.height(8.dp))
+                TextButton(
+                    onClick = { coverUri = null },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text(strings.removeCover, color = MaterialTheme.colorScheme.error)
+                }
+            }
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = titleText,

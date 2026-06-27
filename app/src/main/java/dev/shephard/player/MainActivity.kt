@@ -2,6 +2,7 @@ package dev.shephard.player
 
 import android.content.pm.ActivityInfo
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -24,9 +25,12 @@ import dev.shephard.player.ui.navigation.MainContainer
 import dev.shephard.player.ui.theme.LambdaPlayerTheme
 
 class MainActivity : ComponentActivity() {
+    private val externalAudioUriState = mutableStateOf<Uri?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        externalAudioUriState.value = audioUriFromIntent(intent)
         enableEdgeToEdge()
         setContent {
             val context = LocalContext.current
@@ -36,9 +40,7 @@ class MainActivity : ComponentActivity() {
             val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
             val languageCode by prefs.language.collectAsState(initial = "en")
             val strings = remember(languageCode) { stringsFor(languageCode) }
-            val initialAudioUri = remember {
-                intent?.takeIf { it.action == Intent.ACTION_VIEW }?.data
-            }
+            val initialAudioUri = externalAudioUriState.value
             LambdaPlayerTheme(
                 accentArgb = accent,
                 themeMode = themeMode,
@@ -70,5 +72,16 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        externalAudioUriState.value = audioUriFromIntent(intent)
+    }
+
+    private fun audioUriFromIntent(intent: Intent?): Uri? {
+        if (intent?.action != Intent.ACTION_VIEW) return null
+        return intent.data
     }
 }

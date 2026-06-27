@@ -29,7 +29,8 @@ fun NavGraph(
     navController: NavHostController,
     modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
     hasMiniPlayer: Boolean = false,
-    onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> }
+    onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
+    onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> }
 ) {
     NavHost(
         navController = navController,
@@ -81,7 +82,11 @@ fun NavGraph(
             MusicScreen(onTrackClick = { tracks, index -> onTrackClick(tracks, index, null) })
         }
         composable(Destination.Playlists.route) {
-            PlaylistScreen(onTrackClick = onTrackClick, hasMiniPlayer = hasMiniPlayer)
+            PlaylistScreen(
+                onTrackClick = onTrackClick,
+                onPlaylistRemixClick = onPlaylistRemixClick,
+                hasMiniPlayer = hasMiniPlayer
+            )
         }
         composable(Destination.Settings.route) {
             SettingsScreen()

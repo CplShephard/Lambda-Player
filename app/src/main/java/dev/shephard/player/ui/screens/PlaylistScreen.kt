@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PinDrop
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -68,7 +69,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -165,7 +165,8 @@ internal fun ensureLikedSongsPlaylist(playlists: List<LocalPlaylist>, strings: d
 fun PlaylistScreen(
     libraryViewModel: LibraryViewModel = viewModel(),
     hasMiniPlayer: Boolean = false,
-    onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> }
+    onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
+    onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
@@ -295,6 +296,7 @@ fun PlaylistScreen(
                 onBack = { openIndex = null },
                 onTrackClick = { list, i -> onTrackClick(list, i, if (pl.isSystem) strings.likedSongs else pl.name) },
                 onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name) },
+                onPlayRemix = { if (plTracks.isNotEmpty()) onPlaylistRemixClick(plTracks, if (pl.isSystem) strings.likedSongs else pl.name) },
                 onRemoveTrack = { trackId ->
                     if (pl.isSystem) {
                         val newLiked = likedIds - trackId
@@ -956,6 +958,7 @@ private fun PlaylistDetailView(
     onBack: () -> Unit,
     onTrackClick: (List<AudioTrack>, Int) -> Unit,
     onPlayAll: () -> Unit,
+    onPlayRemix: () -> Unit,
     onRemoveTrack: (Long) -> Unit,
     onAddTracks: () -> Unit,
     onPickCover: () -> Unit = {},
@@ -968,12 +971,12 @@ private fun PlaylistDetailView(
 
     // Mutable working list used for live (drag-to-reorder) updates in custom mode.
     val reorderItems = remember { mutableStateListOf<AudioTrack>() }
-    var draggedIndex by remember { mutableIntStateOf(-1) }
+    var draggedTrackId by remember { mutableStateOf<Long?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
 
     // Keep the working list in sync with the source whenever the playlist tracks change.
     LaunchedEffect(plTracks) {
-        if (draggedIndex < 0) {
+        if (draggedTrackId == null) {
             reorderItems.clear()
             reorderItems.addAll(plTracks)
         }
@@ -984,18 +987,18 @@ private fun PlaylistDetailView(
     val autoScrollThresholdPx = with(density) { 72.dp.toPx() }
 
     fun autoScrollIfNeeded(dragAmount: Float) {
-        if (draggedIndex < 0) return
+        val id = draggedTrackId ?: return
         val layout = listState.layoutInfo
-        val draggedItemInfo = layout.visibleItemsInfo.firstOrNull {
-            it.key == reorderItems.getOrNull(draggedIndex)?.id
-        } ?: return
+        val draggedItemInfo = layout.visibleItemsInfo.firstOrNull { it.key == id } ?: return
         val draggedTop = draggedItemInfo.offset + dragOffsetY
         val draggedBottom = draggedTop + draggedItemInfo.size
         val viewportTop = layout.viewportStartOffset + autoScrollThresholdPx
         val viewportBottom = layout.viewportEndOffset - autoScrollThresholdPx
+        val distanceToBottom = draggedBottom - viewportBottom
+        val distanceToTop = viewportTop - draggedTop
         val scrollBy = when {
-            draggedBottom > viewportBottom -> (dragAmount.coerceAtLeast(0f) + 18f).coerceAtMost(42f)
-            draggedTop < viewportTop -> (dragAmount.coerceAtMost(0f) - 18f).coerceAtLeast(-42f)
+            distanceToBottom > 0f -> (distanceToBottom * 0.18f + 8f).coerceIn(8f, 28f)
+            distanceToTop > 0f -> -(distanceToTop * 0.18f + 8f).coerceIn(8f, 28f)
             else -> 0f
         }
         if (scrollBy != 0f) {
@@ -1130,6 +1133,28 @@ private fun PlaylistDetailView(
                             fontWeight = FontWeight.SemiBold
                         )
                     }
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable(enabled = plTracks.isNotEmpty()) { onPlayRemix() }
+                            .padding(vertical = 12.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Filled.Shuffle,
+                            contentDescription = strings.remix,
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = strings.remix,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                     if (!playlist.isSystem) {
                         Row(
                             modifier = Modifier
@@ -1196,24 +1221,25 @@ private fun PlaylistDetailView(
                     itemsIndexed(reorderItems, key = { _, t -> t.id }) { i, t ->
                         DraggablePlaylistTrackRow(
                             track = t,
-                            isDragged = i == draggedIndex,
+                            isDragged = t.id == draggedTrackId,
                             dragOffsetY = dragOffsetY,
                             onTrackClick = { onTrackClick(reorderItems.toList(), i) },
                             onRemove = { onRemoveTrack(t.id) },
-                            onDragStart = { draggedIndex = i; dragOffsetY = 0f },
+                            onDragStart = { draggedTrackId = t.id; dragOffsetY = 0f },
                             onDrag = { amount ->
                                 dragOffsetY += amount
                                 autoScrollIfNeeded(amount)
-                                val cur = draggedIndex
-                                if (cur >= 0) {
-                                    if (dragOffsetY > itemHeightPx / 2 && cur < reorderItems.size - 1) {
-                                        reorderItems.add(cur + 1, reorderItems.removeAt(cur))
-                                        draggedIndex = cur + 1
-                                        dragOffsetY -= itemHeightPx
-                                    } else if (dragOffsetY < -itemHeightPx / 2 && cur > 0) {
-                                        reorderItems.add(cur - 1, reorderItems.removeAt(cur))
-                                        draggedIndex = cur - 1
-                                        dragOffsetY += itemHeightPx
+                                val id = draggedTrackId
+                                if (id != null) {
+                                    val cur = reorderItems.indexOfFirst { it.id == id }
+                                    if (cur >= 0) {
+                                        if (dragOffsetY > itemHeightPx / 2 && cur < reorderItems.size - 1) {
+                                            reorderItems.add(cur + 1, reorderItems.removeAt(cur))
+                                            dragOffsetY -= itemHeightPx
+                                        } else if (dragOffsetY < -itemHeightPx / 2 && cur > 0) {
+                                            reorderItems.add(cur - 1, reorderItems.removeAt(cur))
+                                            dragOffsetY += itemHeightPx
+                                        }
                                     }
                                 }
                             },
@@ -1221,10 +1247,10 @@ private fun PlaylistDetailView(
                                 if (reorderItems.toList() != plTracks) {
                                     onReorder(reorderItems.toList())
                                 }
-                                draggedIndex = -1
+                                draggedTrackId = null
                                 dragOffsetY = 0f
                             },
-                            onDragCancel = { draggedIndex = -1; dragOffsetY = 0f }
+                            onDragCancel = { draggedTrackId = null; dragOffsetY = 0f }
                         )
                     }
                 } else {

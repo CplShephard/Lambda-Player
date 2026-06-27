@@ -68,6 +68,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val isRemixed: StateFlow<Boolean> = _isRemixed.asStateFlow()
     private var isUserSeeking: Boolean = false
     private var lastPlaybackTickMs: Long? = null
+    private var pendingExternalUri: Uri? = null
 
     // -1 = backward, 1 = forward, 0 = unknown
     private val _navigationDirection = MutableStateFlow(1)
@@ -136,7 +137,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             controller = controllerFuture?.get()
             controller?.addListener(playerListener)
             applyAudioFocusSetting(_uiState.value.playWithOthers)
-            syncFromController()
+            val pending = pendingExternalUri
+            if (pending != null) {
+                pendingExternalUri = null
+                playExternalUri(pending)
+            } else {
+                syncFromController()
+            }
         }, androidx.core.content.ContextCompat.getMainExecutor(context))
     }
 
@@ -297,7 +304,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
 
     fun playExternalUri(uri: Uri) {
-        val c = controller ?: return
+        val c = controller
+        if (c == null) {
+            pendingExternalUri = uri
+            return
+        }
+        remixActive = false
+        _isRemixed.value = false
+        originalQueue = emptyList()
         val track = AudioTrack(
             id = uri.toString().hashCode().toLong(),
             title = uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.') ?: "External audio",
@@ -335,6 +349,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setQueueAndPlay(tracks: List<AudioTrack>, startIndex: Int, playlistName: String? = null) {
         val c = controller ?: return
+        remixActive = false
+        _isRemixed.value = false
+        originalQueue = emptyList()
         queueTracks = tracks
 
         val mediaItems = tracks.map { track ->
@@ -406,10 +423,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (current.size <= 1 || currentTrack == null) return
 
         if (remixActive) {
-            // Restore the original order using surgical moveMediaItem calls so the
-            // currently playing track keeps playing and is never re-prepared.
-            val restoreQueue = if (originalQueue.isNotEmpty()) originalQueue else current
-            reorderPlayerPlaylist(c, current, restoreQueue)
+            val restoreQueue = originalQueue
+                .takeIf { it.size == current.size && it.map(AudioTrack::id).toSet() == current.map(AudioTrack::id).toSet() }
+                ?: current
+            if (restoreQueue !== current && restoreQueue != current) {
+                reorderPlayerPlaylist(c, current, restoreQueue)
+            }
             queueTracks = restoreQueue
             _uiState.value = _uiState.value.copy(queue = restoreQueue, shuffleEnabled = false)
             remixActive = false
@@ -423,14 +442,50 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val currentTrackItem = current.getOrNull(currentIndex) ?: return
         val rest = current.filterIndexed { i, _ -> i != currentIndex }.shuffled()
         val newOrder = listOf(currentTrackItem) + rest
-
-        // Apply via moveMediaItem so the current song keeps playing (no glitch).
         reorderPlayerPlaylist(c, current, newOrder)
 
         queueTracks = newOrder
         _uiState.value = _uiState.value.copy(queue = newOrder, shuffleEnabled = true)
         remixActive = true
         _isRemixed.value = true
+    }
+
+    fun setQueueAndPlayRemixed(tracks: List<AudioTrack>, playlistName: String? = null) {
+        val c = controller ?: return
+        if (tracks.isEmpty()) return
+
+        val startIndex = tracks.indices.random()
+        val startTrack = tracks[startIndex]
+        val newOrder = listOf(startTrack) + tracks.filterIndexed { i, _ -> i != startIndex }.shuffled()
+        val mediaItems = newOrder.map { track ->
+            MediaItem.Builder()
+                .setMediaId(track.id.toString())
+                .setUri(track.uri)
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(track.title)
+                        .setArtist(track.artist)
+                        .setAlbumTitle(track.album)
+                        .setArtworkUri(track.albumArtUri)
+                        .build()
+                )
+                .build()
+        }
+
+        originalQueue = tracks
+        remixActive = true
+        _isRemixed.value = true
+        queueTracks = newOrder
+        c.setMediaItems(mediaItems, 0, 0L)
+        c.prepare()
+        c.play()
+        _uiState.value = _uiState.value.copy(
+            queue = newOrder,
+            currentTrack = startTrack,
+            positionMs = 0L,
+            shuffleEnabled = true,
+            currentPlaylistName = playlistName
+        )
     }
 
     /**

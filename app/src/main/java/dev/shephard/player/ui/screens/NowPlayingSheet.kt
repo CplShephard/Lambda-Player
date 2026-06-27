@@ -66,7 +66,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -806,25 +805,25 @@ private fun QueueList(
     }
     val itemHeightDp = 64.dp
     val itemHeightPx = with(density) { itemHeightDp.toPx() }
-    var draggedIndex by remember { mutableIntStateOf(-1) }
+    var draggedTrackId by remember { mutableStateOf<Long?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
     val listState = rememberLazyListState()
     val scrollScope = rememberCoroutineScope()
     val autoScrollThresholdPx = with(density) { 64.dp.toPx() }
 
     fun autoScrollIfNeeded(dragAmount: Float) {
-        if (draggedIndex < 0) return
+        val id = draggedTrackId ?: return
         val layout = listState.layoutInfo
-        val draggedItemInfo = layout.visibleItemsInfo.firstOrNull {
-            it.key == items.getOrNull(draggedIndex)?.id
-        } ?: return
+        val draggedItemInfo = layout.visibleItemsInfo.firstOrNull { it.key == id } ?: return
         val draggedTop = draggedItemInfo.offset + dragOffsetY
         val draggedBottom = draggedTop + draggedItemInfo.size
         val viewportTop = layout.viewportStartOffset + autoScrollThresholdPx
         val viewportBottom = layout.viewportEndOffset - autoScrollThresholdPx
+        val distanceToBottom = draggedBottom - viewportBottom
+        val distanceToTop = viewportTop - draggedTop
         val scrollBy = when {
-            draggedBottom > viewportBottom -> (dragAmount.coerceAtLeast(0f) + 18f).coerceAtMost(42f)
-            draggedTop < viewportTop -> (dragAmount.coerceAtMost(0f) - 18f).coerceAtLeast(-42f)
+            distanceToBottom > 0f -> (distanceToBottom * 0.18f + 8f).coerceIn(8f, 28f)
+            distanceToTop > 0f -> -(distanceToTop * 0.18f + 8f).coerceIn(8f, 28f)
             else -> 0f
         }
         if (scrollBy != 0f) {
@@ -847,7 +846,7 @@ private fun QueueList(
                 .overscroll(rememberBounceOverscrollEffect())
         ) {
             itemsIndexed(items, key = { _, t -> t.id }) { index, track ->
-                val isDragged = index == draggedIndex
+                val isDragged = track.id == draggedTrackId
                 val isPlaying = track.id == currentTrackId
                 var offsetX by remember { mutableFloatStateOf(0f) }
                 val swipeThreshold = 120.dp
@@ -944,29 +943,28 @@ private fun QueueList(
                                 .size(28.dp)
                                 .pointerInput(track.id) {
                                     detectDragGestures(
-                                        onDragStart = { draggedIndex = index; dragOffsetY = 0f },
+                                        onDragStart = { draggedTrackId = track.id; dragOffsetY = 0f },
                                         onDragEnd = {
                                             val toSlice = items.indexOfFirst { it.id == track.id }
                                             val from = queue.indexOfFirst { it.id == track.id }
                                             val to = if (toSlice >= 0) toSlice + currentStartIndex else -1
                                             if (from >= 0 && to >= 0 && from != to) onMove(from, to)
-                                            draggedIndex = -1
+                                            draggedTrackId = null
                                             dragOffsetY = 0f
                                         },
-                                        onDragCancel = { draggedIndex = -1; dragOffsetY = 0f }
+                                        onDragCancel = { draggedTrackId = null; dragOffsetY = 0f }
                                     ) { change, dragAmount: Offset ->
                                         change.consume()
                                         dragOffsetY += dragAmount.y
                                         autoScrollIfNeeded(dragAmount.y)
-                                        val cur = draggedIndex
+                                        val id = draggedTrackId ?: return@detectDragGestures
+                                        val cur = items.indexOfFirst { it.id == id }
                                         if (cur < 0) return@detectDragGestures
                                         if (dragOffsetY > itemHeightPx / 2 && cur < items.size - 1) {
                                             items.add(cur + 1, items.removeAt(cur))
-                                            draggedIndex = cur + 1
                                             dragOffsetY -= itemHeightPx
                                         } else if (dragOffsetY < -itemHeightPx / 2 && cur > 0) {
                                             items.add(cur - 1, items.removeAt(cur))
-                                            draggedIndex = cur - 1
                                             dragOffsetY += itemHeightPx
                                         }
                                     }

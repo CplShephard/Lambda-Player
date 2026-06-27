@@ -109,6 +109,7 @@ data class Strings(
     val updateAvailableMessage: String,
     val update: String,
     val later: String,
+    val removeCover: String,
 )
 
 private val EN = Strings(
@@ -191,7 +192,8 @@ private val EN = Strings(
     updateAvailable = "Update available",
     updateAvailableMessage = "A new GitHub release is available.",
     update = "Update",
-    later = "Later"
+    later = "Later",
+    removeCover = "Remove cover"
 )
 
 private val TR = EN.copy(
@@ -273,7 +275,8 @@ private val TR = EN.copy(
     updateAvailable = "Güncelleme var",
     updateAvailableMessage = "GitHub'da yeni bir sürüm yayınlandı.",
     update = "Güncelle",
-    later = "Daha sonra"
+    later = "Daha sonra",
+    removeCover = "Kapağı kaldır"
 )
 
 private val ZH = EN.copy(
@@ -355,7 +358,8 @@ private val ZH = EN.copy(
     updateAvailable = "有可用更新",
     updateAvailableMessage = "GitHub 上有新版本。",
     update = "更新",
-    later = "稍后"
+    later = "稍后",
+    removeCover = "移除封面"
 )
 
 private val ES = EN.copy(
@@ -437,7 +441,8 @@ private val ES = EN.copy(
     updateAvailable = "Actualización disponible",
     updateAvailableMessage = "Hay una nueva versión en GitHub.",
     update = "Actualizar",
-    later = "Más tarde"
+    later = "Más tarde",
+    removeCover = "Quitar portada"
 )
 
 private val RU = EN.copy(
@@ -519,7 +524,8 @@ private val RU = EN.copy(
     updateAvailable = "Доступно обновление",
     updateAvailableMessage = "На GitHub доступен новый релиз.",
     update = "Обновить",
-    later = "Позже"
+    later = "Позже",
+    removeCover = "Удалить обложку"
 )
 
 private val KA = EN.copy(
@@ -601,7 +607,8 @@ private val KA = EN.copy(
     updateAvailable = "განახლება ხელმისაწვდომია",
     updateAvailableMessage = "GitHub-ზე ახალი რელიზია.",
     update = "განახლება",
-    later = "მოგვიანებით"
+    later = "მოგვიანებით",
+    removeCover = "ყდის წაშლა"
 )
 
 private val AR = EN.copy(
@@ -683,7 +690,8 @@ private val AR = EN.copy(
     updateAvailable = "يتوفر تحديث",
     updateAvailableMessage = "يوجد إصدار جديد على GitHub.",
     update = "تحديث",
-    later = "لاحقًا"
+    later = "لاحقًا",
+    removeCover = "إزالة الغلاف"
 )
 
 val AllLanguages: List<Strings> = listOf(EN, TR, ZH, ES, RU, KA, AR)
