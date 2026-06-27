@@ -76,7 +76,6 @@ data class Strings(
     val alphabetical: String,
     val timeAdded: String,
     val customOrder: String,
-    val sortByArtist: String,
     val songInfo: String,
     val addedToLikedSongs: String,
     val addToPlaylist: String,
@@ -101,6 +100,13 @@ data class Strings(
     val downloadLyrics: String,
     val pinnedPlaylists: String,
     val removeFromPlaylist: String,
+    val updateAvailable: String,
+    val updateMessage: String,
+    val updateNow: String,
+    val later: String,
+    val hourAbbr: String,
+    val minAbbr: String,
+    val secAbbr: String,
 )
 
 private val EN = Strings(
@@ -151,7 +157,6 @@ private val EN = Strings(
     alphabetical = "Alphabetical",
     timeAdded = "Time added",
     customOrder = "Custom",
-    sortByArtist = "Artist",
     songInfo = "Song info",
     addedToLikedSongs = "Added to Liked Songs",
     addToPlaylist = "Add to playlist",
@@ -175,7 +180,12 @@ private val EN = Strings(
     addLyricsFromFile = "Add Lyrics from File",
     downloadLyrics = "Download Lyrics",
     pinnedPlaylists = "Pinned",
-    removeFromPlaylist = "Remove from playlist"
+    removeFromPlaylist = "Remove from playlist",
+    updateAvailable = "Update Available",
+    updateMessage = "Version %s is available. Update now?",
+    updateNow = "Update",
+    later = "Later",
+    hourAbbr = "h", minAbbr = "m", secAbbr = "s"
 )
 
 private val TR = EN.copy(
@@ -225,7 +235,6 @@ private val TR = EN.copy(
     alphabetical = "Alfabetik",
     timeAdded = "Eklenme sırası",
     customOrder = "Özel sıra",
-    sortByArtist = "Sanatçı",
     songInfo = "Şarkı bilgisi",
     addedToLikedSongs = "Beğenilen Şarkılara eklendi",
     addToPlaylist = "Çalma listesine ekle",
@@ -249,7 +258,12 @@ private val TR = EN.copy(
     addLyricsFromFile = "Dosyadan Lyrics Ekle",
     downloadLyrics = "Lyrics İndir",
     pinnedPlaylists = "Sabitlenmiş",
-    removeFromPlaylist = "Listeden çıkar"
+    removeFromPlaylist = "Listeden çıkar",
+    updateAvailable = "Güncelleme Mevcut",
+    updateMessage = "%s sürümü mevcut. Şimdi güncelleyin?",
+    updateNow = "Güncelle",
+    later = "Sonra",
+    hourAbbr = "s", minAbbr = "d", secAbbr = "sn"
 )
 
 private val ZH = EN.copy(
@@ -299,7 +313,6 @@ private val ZH = EN.copy(
     alphabetical = "按字母顺序",
     timeAdded = "按添加时间",
     customOrder = "自定义",
-    sortByArtist = "艺术家",
     songInfo = "歌曲信息",
     addedToLikedSongs = "已添加到喜欢的歌曲",
     addToPlaylist = "添加到播放列表",
@@ -323,7 +336,12 @@ private val ZH = EN.copy(
     addLyricsFromFile = "从文件添加歌词",
     downloadLyrics = "下载歌词",
     pinnedPlaylists = "已置顶",
-    removeFromPlaylist = "从歌单移除"
+    removeFromPlaylist = "从歌单移除",
+    updateAvailable = "有可用更新",
+    updateMessage = "版本 %s 可用，是否更新？",
+    updateNow = "更新",
+    later = "稍后",
+    hourAbbr = "时", minAbbr = "分", secAbbr = "秒"
 )
 
 private val ES = EN.copy(
@@ -373,7 +391,6 @@ private val ES = EN.copy(
     alphabetical = "Alfabético",
     timeAdded = "Añadido recientemente",
     customOrder = "Personalizado",
-    sortByArtist = "Artista",
     songInfo = "Información",
     addedToLikedSongs = "Añadido a favoritas",
     addToPlaylist = "Añadir a lista",
@@ -397,7 +414,12 @@ private val ES = EN.copy(
     addLyricsFromFile = "Añadir letra desde archivo",
     downloadLyrics = "Descargar letra",
     pinnedPlaylists = "Fijadas",
-    removeFromPlaylist = "Quitar de la lista"
+    removeFromPlaylist = "Quitar de la lista",
+    updateAvailable = "Actualización disponible",
+    updateMessage = "La versión %s está disponible. ¿Actualizar ahora?",
+    updateNow = "Actualizar",
+    later = "Luego",
+    hourAbbr = "h", minAbbr = "m", secAbbr = "s"
 )
 
 private val RU = EN.copy(
@@ -447,7 +469,6 @@ private val RU = EN.copy(
     alphabetical = "По алфавиту",
     timeAdded = "По дате добавления",
     customOrder = "Свой порядок",
-    sortByArtist = "Исполнитель",
     songInfo = "Информация о треке",
     addedToLikedSongs = "Добавлено в любимые",
     addToPlaylist = "Добавить в плейлист",
@@ -471,7 +492,12 @@ private val RU = EN.copy(
     addLyricsFromFile = "Добавить текст из файла",
     downloadLyrics = "Скачать текст",
     pinnedPlaylists = "Закреплённые",
-    removeFromPlaylist = "Удалить из списка"
+    removeFromPlaylist = "Удалить из списка",
+    updateAvailable = "Доступно обновление",
+    updateMessage = "Доступна версия %s. Обновить сейчас?",
+    updateNow = "Обновить",
+    later = "Позже",
+    hourAbbr = "ч", minAbbr = "м", secAbbr = "с"
 )
 
 private val KA = EN.copy(
@@ -521,7 +547,6 @@ private val KA = EN.copy(
     alphabetical = "ანბანის მიხედვით",
     timeAdded = "დამატების თარიღი",
     customOrder = "საკუთარი",
-    sortByArtist = "შემსრულებელი",
     songInfo = "სიმღერის ინფო",
     addedToLikedSongs = "მოწონებულებში დაემატა",
     addToPlaylist = "პლეილისტში დამატება",
@@ -545,7 +570,12 @@ private val KA = EN.copy(
     addLyricsFromFile = "ტექსტის დამატება ფაილიდან",
     downloadLyrics = "ტექსტის ჩამოტვირთვა",
     pinnedPlaylists = "დამაგრებული",
-    removeFromPlaylist = "სიისგან წაშლა"
+    removeFromPlaylist = "სიისგან წაშლა",
+    updateAvailable = "განახლება ხელმისაწვდომია",
+    updateMessage = "ვერსია %s ხელმისაწვდომია. განახლება ახლა?",
+    updateNow = "განახლება",
+    later = "მოგვიანებით",
+    hourAbbr = "სთ", minAbbr = "წთ", secAbbr = "წმ"
 )
 
 private val AR = EN.copy(
@@ -595,7 +625,6 @@ private val AR = EN.copy(
     alphabetical = "أبجدي",
     timeAdded = "وقت الإضافة",
     customOrder = "مخصص",
-    sortByArtist = "الفنان",
     songInfo = "معلومات الأغنية",
     addedToLikedSongs = "أُضيفت إلى المفضلة",
     addToPlaylist = "إضافة إلى قائمة",
@@ -619,7 +648,12 @@ private val AR = EN.copy(
     addLyricsFromFile = "إضافة كلمات من ملف",
     downloadLyrics = "تحميل الكلمات",
     pinnedPlaylists = "المثبتة",
-    removeFromPlaylist = "إزالة من القائمة"
+    removeFromPlaylist = "إزالة من القائمة",
+    updateAvailable = "تحديث متاح",
+    updateMessage = "الإصدار %s متاح. هل تريد التحديث الآن؟",
+    updateNow = "تحديث",
+    later = "لاحقاً",
+    hourAbbr = "س", minAbbr = "د", secAbbr = "ث"
 )
 
 val AllLanguages: List<Strings> = listOf(EN, TR, ZH, ES, RU, KA, AR)

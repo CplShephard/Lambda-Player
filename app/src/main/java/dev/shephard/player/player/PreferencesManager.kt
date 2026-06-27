@@ -29,8 +29,7 @@ object PrefsKeys {
     val PLAYLISTS_LAYOUT = intPreferencesKey("playlists_layout")
     val MUSICS_LAYOUT = intPreferencesKey("musics_layout")
     val LIKED_SONG_IDS = stringPreferencesKey("liked_song_ids")
-    val TRACK_OVERRIDES_JSON = stringPreferencesKey("track-overrides_json")
-    val LYRICS_JSON = stringPreferencesKey("lyrics_json")
+    val TRACK_OVERRIDES_JSON = stringPreferencesKey("track_overrides_json")
 }
 
 object ThemeModePreference {
@@ -110,11 +109,6 @@ class PreferencesManager(private val context: Context) {
         it[PrefsKeys.TRACK_OVERRIDES_JSON] ?: "{}"
     }
 
-    /** JSON object: {"trackId": ["line1","line2", ...], ...} — indirilen/yüklenen lyrics. */
-    val lyricsJson: Flow<String> = context.dataStore.data.map {
-        it[PrefsKeys.LYRICS_JSON] ?: "{}"
-    }
-
     /** 0f..1f — applied as a black scrim opacity on top of the wallpaper. */
     val wallpaperBrightness: Flow<Float> = context.dataStore.data.map {
         it[PrefsKeys.WALLPAPER_BRIGHTNESS] ?: 0.55f
@@ -192,10 +186,6 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setTrackOverridesJson(json: String) {
         context.dataStore.edit { it[PrefsKeys.TRACK_OVERRIDES_JSON] = json }
-    }
-
-    suspend fun setLyricsJson(json: String) {
-        context.dataStore.edit { it[PrefsKeys.LYRICS_JSON] = json }
     }
 
     suspend fun setWallpaperBrightness(value: Float) {

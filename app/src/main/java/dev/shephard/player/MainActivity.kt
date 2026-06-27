@@ -1,5 +1,6 @@
 package dev.shephard.player
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,6 +17,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val externalUri: Uri? = if (intent?.action == android.content.Intent.ACTION_VIEW) {
+            intent.data
+        } else null
+
         setContent {
             val context = LocalContext.current
             val prefs = remember { PreferencesManager(context) }
@@ -27,7 +33,7 @@ class MainActivity : ComponentActivity() {
                 themeMode = themeMode,
                 dynamicColor = dynamicColor
             ) {
-                MainContainer()
+                MainContainer(externalUri = externalUri)
             }
         }
     }

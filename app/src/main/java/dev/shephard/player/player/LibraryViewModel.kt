@@ -78,7 +78,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             val result = withContext(Dispatchers.IO) {
                 MediaStoreScanner.queryAudioTracks(getApplication())
             }
-            _tracks.value = applyOverridesToList(result, _overrides.value)
+            _tracks.value = applyOverridesToList(result, _overrides.value).sortedBy { it.title.lowercase() }
             _isLoading.value = false
             _hasScanned.value = true
             applyFilter()
@@ -103,7 +103,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             val raw = withContext(Dispatchers.IO) {
                 MediaStoreScanner.queryAudioTracks(getApplication())
             }
-            _tracks.value = applyOverridesToList(raw, newOverrides)
+            _tracks.value = applyOverridesToList(raw, newOverrides).sortedBy { it.title.lowercase() }
             applyFilter()
         }
     }

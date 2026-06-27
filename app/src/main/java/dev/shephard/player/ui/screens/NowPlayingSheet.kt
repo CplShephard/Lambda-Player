@@ -93,8 +93,6 @@ import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.formattedDuration
-import dev.shephard.player.data.slideForwardInQueue
-import dev.shephard.player.data.trackById
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.RepeatMode
@@ -123,15 +121,31 @@ fun NowPlayingSheet(
     val dragOffset = remember { androidx.compose.animation.core.Animatable(0f) }
     val dragScope = rememberCoroutineScope()
 
+    // Trigger animated slide-down for button-press close
+    fun animatedDismiss() {
+        dragScope.launch {
+            val screenHeightPx = with(density) { 900.dp.toPx() }
+            dragOffset.animateTo(
+                targetValue = screenHeightPx,
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 280,
+                    easing = androidx.compose.animation.core.FastOutLinearInEasing
+                )
+            )
+            onDismiss()
+            dragOffset.snapTo(0f)
+        }
+    }
+
     val swipeThresholdPx = with(density) { 80.dp.toPx() }
     val artSwipeX = remember { androidx.compose.animation.core.Animatable(0f) }
     var artSwipeHandled by remember { mutableStateOf(false) }
 
-    // Sheet her ekrana geldiğinde dragOffset'i 0'a al: parmakla kapatıp tekrar açınca
-    // eski sürükleme miktarının (translationY) kalıcı gri boşluk bırakmasını engeller.
-    LaunchedEffect(Unit) {
-        dragOffset.snapTo(0f)
-    }
+    var lastTrackId by remember { mutableStateOf<Long?>(null) }
+    val currentId = track?.id ?: -1L
+    val navigationDirection by playerViewModel.navigationDirection.collectAsState()
+    val slideForward = navigationDirection >= 0
+    if (lastTrackId != currentId) lastTrackId = currentId
 
     LaunchedEffect(track?.id) {
         artSwipeX.snapTo(0f)
@@ -166,11 +180,18 @@ fun NowPlayingSheet(
                 },
                 onDragStopped = { velocity ->
                     if (dragOffset.value > dismissThresholdPx || velocity > 2500f) {
-                        // Geçiş MainContainer'daki AnimatedContent tarafından yapılır.
-                        onDismiss()
-                        // Kapanışta dragOffset'i sıfırla; aksi halde translationY çekildiği
-                        // değerde kalır ve sheeti tekrar açınca üstte gri boşluk kalır.
-                        dragScope.launch { dragOffset.snapTo(0f) }
+                        dragScope.launch {
+                            val screenHeightPx = with(density) { 900.dp.toPx() }
+                            dragOffset.animateTo(
+                                targetValue = screenHeightPx,
+                                animationSpec = androidx.compose.animation.core.tween(
+                                    durationMillis = 280,
+                                    easing = androidx.compose.animation.core.FastOutLinearInEasing
+                                )
+                            )
+                            onDismiss()
+                            dragOffset.snapTo(0f)
+                        }
                     } else {
                         dragScope.launch {
                             dragOffset.animateTo(
@@ -268,7 +289,7 @@ fun NowPlayingSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 BouncyIconButton(
-                    onClick = onDismiss,
+                    onClick = { animatedDismiss() },
                     icon = Icons.Filled.KeyboardArrowDown,
                     contentDescription = strings.cancel,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -294,8 +315,7 @@ fun NowPlayingSheet(
             androidx.compose.animation.AnimatedContent(
                 targetState = track?.id ?: -1L,
                 transitionSpec = {
-                    // Yönü kuyruktaki konuma göre belirle (sonraki=ileri/soldan, önceki=geri/sağdan)
-                    val dir = if (slideForwardInQueue(state.queue, initialState, targetState))
+                    val dir = if (slideForward)
                         androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Left
                     else
                         androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Right
@@ -306,10 +326,7 @@ fun NowPlayingSheet(
                 },
                 label = "trackSwap",
                 modifier = Modifier.fillMaxWidth()
-            ) { targetId ->
-                // Dış kapsamdaki `track` yerine, bu slota ait id'den doğru parçayı bul.
-                // Böylece geçiş sırasında eski slotta ESKİ kapak, yeni slotta YENİ kapak görünür.
-                val displayTrack = state.queue.trackById(targetId) ?: track
+            ) { _ ->
                 Column {
                     Box(
                         modifier = Modifier
@@ -324,9 +341,9 @@ fun NowPlayingSheet(
                             .background(MaterialTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
-                        var artLoaded by remember(targetId) { mutableStateOf(false) }
+                        var artLoaded by remember(track?.id) { mutableStateOf(false) }
                         AsyncImage(
-                            model = displayTrack?.albumArtUri,
+                            model = track?.albumArtUri,
                             contentDescription = null,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,
@@ -349,17 +366,38 @@ fun NowPlayingSheet(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = displayTrack?.title ?: strings.nothingPlaying,
+                            text = track?.title ?: strings.nothingPlaying,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = displayTrack?.artist ?: strings.pickASong,
+                            text = track?.artist ?: strings.pickASong,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                }
+            }
+
+            // Lyrics preview
+            if (state.lyricsVisible && state.lyrics.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = state.lyrics.firstOrNull() ?: strings.noLyricsFound,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
 
@@ -704,7 +742,7 @@ private fun AddToPlaylistDrawer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable {
+                            .bounceClick {
                                 scope.launch {
                                     val newIds = if (isLiked) likedIds - trackId else likedIds + trackId
                                     val arr = org.json.JSONArray().apply { newIds.forEach { put(it) } }
@@ -748,7 +786,7 @@ private fun AddToPlaylistDrawer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable {
+                            .bounceClick {
                                 val updated = if (containsTrack)
                                     pl.copy(trackIds = pl.trackIds - trackId)
                                 else
@@ -805,6 +843,7 @@ private fun QueueList(
     }
     val itemHeightDp = 64.dp
     val itemHeightPx = with(density) { itemHeightDp.toPx() }
+    val coroutineScope = rememberCoroutineScope()
     var draggedIndex by remember { mutableIntStateOf(-1) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
 
@@ -815,7 +854,9 @@ private fun QueueList(
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(bottom = 8.dp)
         )
+        val queueListState = rememberLazyListState()
         LazyColumn(
+            state = queueListState,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(420.dp)
@@ -942,6 +983,14 @@ private fun QueueList(
                                             items.add(cur - 1, items.removeAt(cur))
                                             draggedIndex = cur - 1
                                             dragOffsetY += itemHeightPx
+                                        }
+                                        // Auto-scroll at boundaries
+                                        val firstVisible = queueListState.firstVisibleItemIndex
+                                        val lastVisible = queueListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: firstVisible
+                                        if (draggedIndex <= firstVisible && firstVisible > 0) {
+                                            coroutineScope.launch { queueListState.scrollToItem((firstVisible - 1).coerceAtLeast(0)) }
+                                        } else if (draggedIndex >= lastVisible && lastVisible < items.size - 1) {
+                                            coroutineScope.launch { queueListState.scrollToItem((lastVisible + 1).coerceAtMost(items.size - 1)) }
                                         }
                                     }
                                 }
