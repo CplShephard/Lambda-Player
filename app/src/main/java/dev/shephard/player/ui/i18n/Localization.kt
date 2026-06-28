@@ -53,6 +53,7 @@ data class Strings(
     val apply: String,
     val wallpaperBrightness: String,
     val brightness: String,
+    val cardOpacity: String,
     val darkMode: String,
     val lightMode: String,
     val autoMode: String,
@@ -114,7 +115,7 @@ data class Strings(
 
 private val EN = Strings(
     code = "en", displayName = "English (US)",
-    music = "Music", playlists = "Playlists", settings = "Settings",
+    music = "Musics", playlists = "Playlists", settings = "Settings",
     nowPlaying = "Now Playing", queue = "Queue",
     play = "Play", pause = "Pause", next = "Next", previous = "Previous",
     shuffle = "Shuffle", repeat = "Repeat",
@@ -137,6 +138,7 @@ private val EN = Strings(
     hexPlaceholder = "#RRGGBB", apply = "Apply",
     wallpaperBrightness = "Wallpaper Brightness",
     brightness = "Brightness",
+    cardOpacity = "Card Opacity",
     darkMode = "Dark mode",
     lightMode = "Light mode",
     autoMode = "Auto",
@@ -198,7 +200,7 @@ private val EN = Strings(
 
 private val TR = EN.copy(
     code = "tr", displayName = "Türkçe",
-    music = "Müzik", playlists = "Çalma Listeleri", settings = "Ayarlar",
+    music = "Müzikler", playlists = "Çalma Listeleri", settings = "Ayarlar",
     nowPlaying = "Şimdi Çalınıyor", queue = "Sıra",
     play = "Oynat", pause = "Duraklat", next = "Sonraki", previous = "Önceki",
     shuffle = "Karıştır", repeat = "Tekrarla",
@@ -221,6 +223,7 @@ private val TR = EN.copy(
     hexPlaceholder = "#RRGGBB", apply = "Uygula",
     wallpaperBrightness = "Duvar Kağıdı Parlaklığı",
     brightness = "Parlaklık",
+    cardOpacity = "Kart Saydamlığı",
     darkMode = "Karanlık mod",
     lightMode = "Aydınlık mod",
     autoMode = "Otomatik",
@@ -281,7 +284,7 @@ private val TR = EN.copy(
 
 private val ZH = EN.copy(
     code = "zh", displayName = "简体中文",
-    music = "音乐", playlists = "播放列表", settings = "设置",
+    music = "音乐库", playlists = "播放列表", settings = "设置",
     nowPlaying = "正在播放", queue = "队列",
     play = "播放", pause = "暂停", next = "下一首", previous = "上一首",
     shuffle = "随机", repeat = "重复",
@@ -304,6 +307,7 @@ private val ZH = EN.copy(
     hexPlaceholder = "#RRGGBB", apply = "应用",
     wallpaperBrightness = "壁纸亮度",
     brightness = "亮度",
+    cardOpacity = "卡片不透明度",
     darkMode = "深色模式",
     lightMode = "浅色模式",
     autoMode = "自动",
@@ -364,7 +368,7 @@ private val ZH = EN.copy(
 
 private val ES = EN.copy(
     code = "es", displayName = "Español",
-    music = "Música", playlists = "Listas", settings = "Ajustes",
+    music = "Músicas", playlists = "Listas", settings = "Ajustes",
     nowPlaying = "Reproduciendo", queue = "Cola",
     play = "Reproducir", pause = "Pausar", next = "Siguiente", previous = "Anterior",
     shuffle = "Aleatorio", repeat = "Repetir",
@@ -387,6 +391,7 @@ private val ES = EN.copy(
     hexPlaceholder = "#RRGGBB", apply = "Aplicar",
     wallpaperBrightness = "Brillo del fondo",
     brightness = "Brillo",
+    cardOpacity = "Opacidad de tarjeta",
     darkMode = "Modo oscuro",
     lightMode = "Modo claro",
     autoMode = "Auto",
@@ -447,7 +452,7 @@ private val ES = EN.copy(
 
 private val RU = EN.copy(
     code = "ru", displayName = "Русский",
-    music = "Музыка", playlists = "Плейлисты", settings = "Настройки",
+    music = "Музыки", playlists = "Плейлисты", settings = "Настройки",
     nowPlaying = "Сейчас играет", queue = "Очередь",
     play = "Играть", pause = "Пауза", next = "Дальше", previous = "Назад",
     shuffle = "Перемешать", repeat = "Повтор",
@@ -470,6 +475,7 @@ private val RU = EN.copy(
     hexPlaceholder = "#RRGGBB", apply = "Применить",
     wallpaperBrightness = "Яркость обоев",
     brightness = "Яркость",
+    cardOpacity = "Прозрачность карточки",
     darkMode = "Тёмный режим",
     lightMode = "Светлый режим",
     autoMode = "Авто",
@@ -530,7 +536,7 @@ private val RU = EN.copy(
 
 private val KA = EN.copy(
     code = "ka", displayName = "ქართული",
-    music = "მუზიკა", playlists = "პლეილისტები", settings = "პარამეტრები",
+    music = "მუსიკები", playlists = "პლეილისტები", settings = "პარამეტრები",
     nowPlaying = "ახლა უკრავს", queue = "რიგი",
     play = "დაკვრა", pause = "პაუზა", next = "შემდეგი", previous = "წინა",
     shuffle = "შერევა", repeat = "გამეორება",
@@ -553,6 +559,7 @@ private val KA = EN.copy(
     hexPlaceholder = "#RRGGBB", apply = "გამოყენება",
     wallpaperBrightness = "ფონის სიკაშკაშე",
     brightness = "სიკაშკაშე",
+    cardOpacity = "ბარათის გამჭვირვალობა",
     darkMode = "მუქი რეჟიმი",
     lightMode = "ღია რეჟიმი",
     autoMode = "ავტო",
@@ -613,7 +620,7 @@ private val KA = EN.copy(
 
 private val AR = EN.copy(
     code = "ar", displayName = "العربية",
-    music = "الموسيقى", playlists = "قوائم التشغيل", settings = "الإعدادات",
+    music = "الموسيقيات", playlists = "قوائم التشغيل", settings = "الإعدادات",
     nowPlaying = "قيد التشغيل", queue = "قائمة الانتظار",
     play = "تشغيل", pause = "إيقاف مؤقت", next = "التالي", previous = "السابق",
     shuffle = "عشوائي", repeat = "تكرار",
@@ -636,6 +643,7 @@ private val AR = EN.copy(
     hexPlaceholder = "#RRGGBB", apply = "تطبيق",
     wallpaperBrightness = "سطوع الخلفية",
     brightness = "السطوع",
+    cardOpacity = "شفافية البطاقة",
     darkMode = "الوضع الداكن",
     lightMode = "الوضع الفاتح",
     autoMode = "تلقائي",

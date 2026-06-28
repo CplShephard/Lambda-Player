@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -198,7 +200,7 @@ fun MainContainer(
                 enter = slideInVertically(
                     initialOffsetY = { it },
                     animationSpec = nowPlayingEnterSpring
-                ) + fadeIn(tween(280)),
+                ) + fadeIn(tween(120)),
                 exit = fadeOut(tween(0)),
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -221,18 +223,40 @@ private fun BrandHeader(currentRoute: String?) {
         else -> null
     }
 
+    val context = LocalContext.current
+    val versionName = remember {
+        try { context.packageManager.getPackageInfo(context.packageName, 0).versionName } catch (_: Exception) { "" }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
             .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
-        Text(
-            text = strings.appName,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = strings.appName.uppercase(),
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = dev.shephard.player.ui.theme.BrandFontFamily,
+                    letterSpacing = 2.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            if (versionName.isNotEmpty()) {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = versionName,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = dev.shephard.player.ui.theme.BrandFontFamily,
+                        letterSpacing = 1.sp
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
+            }
+        }
         if (sectionTitle != null) {
             Text(
                 text = sectionTitle,

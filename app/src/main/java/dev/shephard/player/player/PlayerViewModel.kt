@@ -312,39 +312,60 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         remixActive = false
         _isRemixed.value = false
         originalQueue = emptyList()
-        val track = AudioTrack(
-            id = uri.toString().hashCode().toLong(),
-            title = uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.') ?: "External audio",
-            artist = "",
-            album = "",
-            durationMs = 0L,
-            uri = uri,
-            albumArtUri = null
-        )
-        val item = MediaItem.Builder()
-            .setMediaId(track.id.toString())
-            .setUri(uri)
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(track.title)
-                    .setArtist(track.artist)
-                    .setAlbumTitle(track.album)
-                    .build()
-            )
-            .build()
 
-        queueTracks = listOf(track)
-        c.setMediaItem(item)
-        c.prepare()
-        c.play()
-        _uiState.value = _uiState.value.copy(
-            queue = listOf(track),
-            currentTrack = track,
-            positionMs = 0L,
-            currentPlaylistName = null
-        )
-        extractGlowColor(track)
-        loadLyrics(track)
+        viewModelScope.launch {
+            // Embedded album art'ı arka planda çek
+            val artUri: Uri? = withContext(Dispatchers.IO) {
+                runCatching {
+                    val retriever = MediaMetadataRetriever()
+                    retriever.setDataSource(getApplication(), uri)
+                    val bytes = retriever.embeddedPicture
+                    retriever.release()
+                    if (bytes != null) {
+                        // Bitmap'i app cache'e yaz, content URI olarak dön
+                        val cacheFile = java.io.File(getApplication<Application>().cacheDir, "ext_art_${uri.hashCode()}.jpg")
+                        cacheFile.writeBytes(bytes)
+                        Uri.fromFile(cacheFile)
+                    } else null
+                }.getOrNull()
+            }
+
+            val rawTitle = uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.') ?: "External audio"
+            val track = AudioTrack(
+                id = uri.toString().hashCode().toLong(),
+                title = rawTitle,
+                artist = "",
+                album = "",
+                durationMs = 0L,
+                uri = uri,
+                albumArtUri = artUri
+            )
+            val item = MediaItem.Builder()
+                .setMediaId(track.id.toString())
+                .setUri(uri)
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(track.title)
+                        .setArtist(track.artist)
+                        .setAlbumTitle(track.album)
+                        .setArtworkUri(artUri)
+                        .build()
+                )
+                .build()
+
+            queueTracks = listOf(track)
+            c.setMediaItem(item)
+            c.prepare()
+            c.play()
+            _uiState.value = _uiState.value.copy(
+                queue = listOf(track),
+                currentTrack = track,
+                positionMs = 0L,
+                currentPlaylistName = null
+            )
+            extractGlowColor(track)
+            loadLyrics(track)
+        }
     }
 
     fun setQueueAndPlay(tracks: List<AudioTrack>, startIndex: Int, playlistName: String? = null) {
@@ -760,6 +781,57 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun parseLrcPublic(content: String): List<String> = parseLrc(content)
+
+    /**
+     * Metadata override kaydedildikten sonra çağrılır.
+     * currentTrack ve queue'deki ilgili track'i anında günceller →
+     * NowPlayingSheet ve MiniPlayer yeni title/cover'ı hemen gösterir.
+     */
+    fun notifyTrackUpdated(updatedTrack: AudioTrack) {
+        val current = _uiState.value
+        val updatedQueue = current.queue.map { if (it.id == updatedTrack.id) updatedTrack else it }
+        queueTracks = queueTracks.map { if (it.id == updatedTrack.id) updatedTrack else it }
+        val updatedCurrent = if (current.currentTrack?.id == updatedTrack.id) updatedTrack else current.currentTrack
+        _uiState.value = current.copy(queue = updatedQueue, currentTrack = updatedCurrent)
+        if (updatedCurrent?.id == updatedTrack.id) {
+            extractGlowColor(updatedTrack)
+        }
+    }
+
+    /**
+     * Playlist'e yeni track eklendiğinde queue'ye de ekler.
+     * remixActive = true → rastgele pozisyona yerleştirir (currentTrack'ten sonra)
+     * remixActive = false → queue'nun sonuna ekler
+     */
+    fun addTrackToQueue(track: AudioTrack) {
+        val c = controller ?: return
+        val current = _uiState.value
+        val currentIdx = queueTracks.indexOfFirst { it.id == current.currentTrack?.id }.coerceAtLeast(0)
+        val insertIdx = if (remixActive) {
+            val remaining = queueTracks.size - currentIdx - 1
+            if (remaining > 0) currentIdx + 1 + (0 until remaining).random()
+            else queueTracks.size
+        } else {
+            queueTracks.size
+        }
+        val newQueue = queueTracks.toMutableList().also { it.add(insertIdx, track) }
+        queueTracks = newQueue
+
+        val mediaItem = MediaItem.Builder()
+            .setMediaId(track.id.toString())
+            .setUri(track.uri)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(track.title)
+                    .setArtist(track.artist)
+                    .setAlbumTitle(track.album)
+                    .setArtworkUri(track.albumArtUri)
+                    .build()
+            )
+            .build()
+        c.addMediaItem(insertIdx, mediaItem)
+        _uiState.value = current.copy(queue = newQueue)
+    }
 
     fun setManualLyrics(lines: List<String>) {
         _uiState.value = _uiState.value.copy(lyrics = lines, lyricsVisible = true)

@@ -23,6 +23,7 @@ object PrefsKeys {
     val WALLPAPER_URI = stringPreferencesKey("wallpaper_uri")
     val PLAYLISTS_JSON = stringPreferencesKey("playlists_json")
     val WALLPAPER_BRIGHTNESS = floatPreferencesKey("wallpaper_brightness")
+    val CARD_ALPHA = floatPreferencesKey("card_alpha")
     val DARK_MODE = booleanPreferencesKey("dark_mode") // Legacy bool, kept for migration.
     val THEME_MODE = intPreferencesKey("theme_mode")
     val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
@@ -120,6 +121,11 @@ class PreferencesManager(private val context: Context) {
         it[PrefsKeys.WALLPAPER_BRIGHTNESS] ?: 0.55f
     }
 
+    /** 0f..1f — opacity of card/surface backgrounds. Default 0.85 keeps wallpaper visible. */
+    val cardAlpha: Flow<Float> = context.dataStore.data.map {
+        it[PrefsKeys.CARD_ALPHA] ?: 0.85f
+    }
+
     suspend fun setCrossfadeEnabled(enabled: Boolean) {
         context.dataStore.edit { it[PrefsKeys.CROSSFADE_ENABLED] = enabled }
     }
@@ -200,5 +206,9 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setWallpaperBrightness(value: Float) {
         context.dataStore.edit { it[PrefsKeys.WALLPAPER_BRIGHTNESS] = value.coerceIn(0f, 1f) }
+    }
+
+    suspend fun setCardAlpha(value: Float) {
+        context.dataStore.edit { it[PrefsKeys.CARD_ALPHA] = value.coerceIn(0f, 1f) }
     }
 }

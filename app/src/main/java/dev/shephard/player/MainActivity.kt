@@ -38,13 +38,15 @@ class MainActivity : ComponentActivity() {
             val accent by prefs.accentColor.collectAsState(initial = 0xFF22C55E.toInt())
             val themeMode by prefs.themeMode.collectAsState(initial = dev.shephard.player.player.ThemeModePreference.LIGHT)
             val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
+            val cardAlpha by prefs.cardAlpha.collectAsState(initial = 0.85f)
             val languageCode by prefs.language.collectAsState(initial = "en")
             val strings = remember(languageCode) { stringsFor(languageCode) }
             val initialAudioUri = externalAudioUriState.value
             LambdaPlayerTheme(
                 accentArgb = accent,
                 themeMode = themeMode,
-                dynamicColor = dynamicColor
+                dynamicColor = dynamicColor,
+                cardAlpha = cardAlpha
             ) {
                 var availableRelease by remember { mutableStateOf<GithubReleaseInfo?>(null) }
                 LaunchedEffect(Unit) {

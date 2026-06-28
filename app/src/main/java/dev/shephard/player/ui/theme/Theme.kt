@@ -286,6 +286,7 @@ fun LambdaPlayerTheme(
     darkTheme: Boolean = false,
     themeMode: Int = if (darkTheme) ThemeModePreference.DARK else ThemeModePreference.LIGHT,
     dynamicColor: Boolean = false,
+    cardAlpha: Float = 0.85f,
     content: @Composable () -> Unit
 ) {
     val useDarkTheme = when (themeMode) {
@@ -295,16 +296,24 @@ fun LambdaPlayerTheme(
     }
 
     val accentColor = Color(accentArgb)
+    // onPrimary: accent'in luminance'ına göre beyaz veya siyah
+    val accentLuminance = 0.2126f * accentColor.red + 0.7152f * accentColor.green + 0.0722f * accentColor.blue
+    val onAccent = if (accentLuminance > 0.35f) Color(0xFF111111) else Color.White
+
     val context = LocalContext.current
-    val colorScheme = when {
+    val baseScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         useDarkTheme -> darkScheme.copy(
             primary = accentColor,
+            onPrimary = onAccent,
             secondary = accentColor,
+            onSecondary = onAccent,
             tertiary = accentColor.copy(alpha = 0.7f),
+            onTertiary = onAccent,
             primaryContainer = accentColor.copy(red = accentColor.red * 0.3f, green = accentColor.green * 0.3f, blue = accentColor.blue * 0.3f, alpha = 1f),
+            onPrimaryContainer = onAccent.copy(alpha = 0.87f),
             secondaryContainer = accentColor.copy(red = accentColor.red * 0.18f, green = accentColor.green * 0.18f, blue = accentColor.blue * 0.18f, alpha = 1f),
             surface = Color(0xFF0D0D0D).copy(
                 red = 0.05f + accentColor.red * 0.04f,
@@ -314,34 +323,42 @@ fun LambdaPlayerTheme(
             surfaceVariant = Color(0xFF1A1A1A).copy(
                 red = 0.10f + accentColor.red * 0.06f,
                 green = 0.10f + accentColor.green * 0.06f,
-                blue = 0.10f + accentColor.blue * 0.06f
+                blue = 0.10f + accentColor.blue * 0.06f,
+                alpha = cardAlpha
             ),
             surfaceContainer = Color(0xFF1A1A1A).copy(
                 red = 0.12f + accentColor.red * 0.07f,
                 green = 0.12f + accentColor.green * 0.07f,
-                blue = 0.12f + accentColor.blue * 0.07f
+                blue = 0.12f + accentColor.blue * 0.07f,
+                alpha = cardAlpha
             ),
             surfaceContainerHigh = Color(0xFF1A1A1A).copy(
                 red = 0.15f + accentColor.red * 0.08f,
                 green = 0.15f + accentColor.green * 0.08f,
-                blue = 0.15f + accentColor.blue * 0.08f
+                blue = 0.15f + accentColor.blue * 0.08f,
+                alpha = cardAlpha
             ),
             surfaceContainerHighest = Color(0xFF1A1A1A).copy(
                 red = 0.18f + accentColor.red * 0.09f,
                 green = 0.18f + accentColor.green * 0.09f,
-                blue = 0.18f + accentColor.blue * 0.09f
+                blue = 0.18f + accentColor.blue * 0.09f,
+                alpha = cardAlpha
             ),
         )
         else -> lightScheme.copy(
             primary = accentColor,
+            onPrimary = onAccent,
             secondary = accentColor,
+            onSecondary = onAccent,
             tertiary = accentColor.copy(alpha = 0.7f),
+            onTertiary = onAccent,
             primaryContainer = accentColor.copy(
                 red = 0.85f + accentColor.red * 0.15f,
                 green = 0.85f + accentColor.green * 0.15f,
                 blue = 0.85f + accentColor.blue * 0.15f,
                 alpha = 1f
             ),
+            onPrimaryContainer = onAccent,
             secondaryContainer = accentColor.copy(
                 red = 0.88f + accentColor.red * 0.12f,
                 green = 0.88f + accentColor.green * 0.12f,
@@ -351,17 +368,19 @@ fun LambdaPlayerTheme(
             surfaceVariant = Color(0xFFFFFFFF).copy(
                 red = (0.88f + accentColor.red * 0.12f).coerceAtMost(1f),
                 green = (0.88f + accentColor.green * 0.12f).coerceAtMost(1f),
-                blue = (0.88f + accentColor.blue * 0.12f).coerceAtMost(1f)
+                blue = (0.88f + accentColor.blue * 0.12f).coerceAtMost(1f),
+                alpha = cardAlpha
             ),
             surfaceContainer = Color(0xFFFFFFFF).copy(
                 red = (0.92f + accentColor.red * 0.08f).coerceAtMost(1f),
                 green = (0.92f + accentColor.green * 0.08f).coerceAtMost(1f),
-                blue = (0.92f + accentColor.blue * 0.08f).coerceAtMost(1f)
+                blue = (0.92f + accentColor.blue * 0.08f).coerceAtMost(1f),
+                alpha = cardAlpha
             ),
         )
     }
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = baseScheme,
         typography = AppTypography,
         content = content
     )

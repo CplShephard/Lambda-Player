@@ -104,6 +104,7 @@ fun SettingsScreen() {
     val accent by prefs.accentColor.collectAsState(initial = AccentPalette.first())
     val wallpaper by prefs.wallpaperUri.collectAsState(initial = "")
     val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = 0.55f)
+    val cardAlpha by prefs.cardAlpha.collectAsState(initial = 0.85f)
     val language by prefs.language.collectAsState(initial = "en")
     val themeMode by prefs.themeMode.collectAsState(initial = ThemeModePreference.LIGHT)
     val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
@@ -485,6 +486,38 @@ fun SettingsScreen() {
                     )
                     Text(
                         text = "${((1f - wallpaperBrightness) * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+                // Card opacity slider
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = strings.cardOpacity,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = 12.dp)
+                    )
+                    Slider(
+                        value = cardAlpha,
+                        onValueChange = {
+                            scope.launch { prefs.setCardAlpha(it) }
+                        },
+                        valueRange = 0f..1f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "${(cardAlpha * 100).toInt()}%",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 8.dp)

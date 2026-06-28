@@ -2,6 +2,8 @@
 
 package dev.shephard.player.ui.screens
 
+import android.os.Build
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -72,9 +74,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -144,16 +146,43 @@ fun NowPlayingSheet(
     val configuration = LocalConfiguration.current
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
 
+    // pulse artık gradient radius'unu değil sadece graphicsLayer scale'ini etkiliyor
+    // → Brush her frame yeniden oluşturulmuyor, sadece transform matrix değişiyor
     val pulse by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = 0.8f + state.amplitude * 0.6f,
-        animationSpec = androidx.compose.animation.core.tween(120),
+        targetValue = 0.85f + state.amplitude * 0.15f,
+        animationSpec = androidx.compose.animation.core.tween(180),
         label = "glowPulse"
     )
     val glowAlpha by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (track == null) 0f else 0.6f + state.amplitude * 0.35f,
-        animationSpec = androidx.compose.animation.core.tween(220),
+        targetValue = if (track == null) 0f else 0.55f + state.amplitude * 0.2f,
+        animationSpec = androidx.compose.animation.core.tween(300),
         label = "glowAlpha"
     )
+
+    // Glow brush'ları remember ile stabilize et — glow rengi değişince yeniden oluşturulsun,
+    // ama pulse/amplitude her değiştiğinde Brush allocation olmasın
+    val verticalGlowBrush = remember(glow) {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0.00f to glow.copy(alpha = 0.90f),
+                0.40f to glow.copy(alpha = 0.55f),
+                0.70f to glow.copy(alpha = 0.12f),
+                0.80f to Color.Transparent,
+                1.00f to Color.Transparent
+            )
+        )
+    }
+    val radialGlowBrush = remember(glow) {
+        Brush.radialGradient(
+            colors = listOf(
+                glow.copy(alpha = 0.55f),
+                glow.copy(alpha = 0.15f),
+                Color.Transparent
+            ),
+            center = Offset(0f, 320f),
+            radius = 680f
+        )
+    }
 
     val playButtonScale = remember { androidx.compose.animation.core.Animatable(1f) }
     val playButtonScope = rememberCoroutineScope()
@@ -201,41 +230,35 @@ fun NowPlayingSheet(
                 }
             )
     ) {
-        // Ambient glow background
+        // Ambient glow background — blur artık graphicsLayer renderEffect ile (API 31+)
+        // veya daha küçük dp değeriyle yapılıyor; Brush sabit, scale animasyonu ucuz
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { alpha = glowAlpha }
-                .blur(110.dp)
-                .background(
-                    Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0.00f to glow.copy(alpha = 0.95f),
-                            0.35f to glow.copy(alpha = 0.65f),
-                            0.65f to glow.copy(alpha = 0.18f),
-                            0.75f to glow.copy(alpha = 0.04f),
-                            0.80f to Color.Transparent,
-                            1.00f to Color.Transparent
-                        )
-                    )
-                )
+                .graphicsLayer {
+                    alpha = glowAlpha
+                    scaleX = pulse
+                    scaleY = pulse
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        renderEffect = android.graphics.RenderEffect
+                            .createBlurEffect(180f, 180f, android.graphics.Shader.TileMode.CLAMP)
+                            .asComposeRenderEffect()
+                    }
+                }
+                .background(verticalGlowBrush)
         )
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { alpha = glowAlpha }
-                .blur(150.dp)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            glow.copy(alpha = 0.65f),
-                            glow.copy(alpha = 0.20f),
-                            Color.Transparent
-                        ),
-                        center = Offset(0f, 320f),
-                        radius = 680f * pulse
-                    )
-                )
+                .graphicsLayer {
+                    alpha = glowAlpha * 0.85f
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        renderEffect = android.graphics.RenderEffect
+                            .createBlurEffect(220f, 220f, android.graphics.Shader.TileMode.CLAMP)
+                            .asComposeRenderEffect()
+                    }
+                }
+                .background(radialGlowBrush)
         )
 
         Column(
@@ -468,10 +491,40 @@ fun NowPlayingSheet(
 
                 if (showQueue) {
                     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                    val sheetScope = rememberCoroutineScope()
                     ModalBottomSheet(
                         onDismissRequest = { showQueue = false },
                         sheetState = sheetState,
-                        containerColor = MaterialTheme.colorScheme.surface
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        gesturesEnabled = false,
+                        dragHandle = {
+                            // Sadece bu handle'dan sürükleyince sheet kapanır,
+                            // liste scroll'u ile çakışmaz.
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 10.dp)
+                                    .pointerInput(Unit) {
+                                        detectDragGestures(
+                                            onDragEnd = {
+                                                sheetScope.launch {
+                                                    sheetState.hide()
+                                                    showQueue = false
+                                                }
+                                            }
+                                        ) { change, _ -> change.consume() }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(32.dp)
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                                )
+                            }
+                        }
                     ) {
                         QueueList(
                             queue = state.queue,
@@ -525,7 +578,34 @@ fun NowPlayingSheet(
                     ModalBottomSheet(
                         onDismissRequest = { showLyrics = false },
                         sheetState = lyricsSheetState,
-                        containerColor = MaterialTheme.colorScheme.surface
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        gesturesEnabled = false,
+                        dragHandle = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 10.dp)
+                                    .pointerInput(Unit) {
+                                        detectDragGestures(
+                                            onDragEnd = {
+                                                lyricsScope.launch {
+                                                    lyricsSheetState.hide()
+                                                    showLyrics = false
+                                                }
+                                            }
+                                        ) { change, _ -> change.consume() }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(32.dp)
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                                )
+                            }
+                        }
                     ) {
                         Column(modifier = Modifier.padding(16.dp).heightIn(min = 200.dp, max = 520.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -602,6 +682,8 @@ fun NowPlayingSheet(
                 if (showPlaylists) {
                     AddToPlaylistDrawer(
                         trackId = trackId,
+                        track = track,
+                        playerViewModel = playerViewModel,
                         onDismiss = { showPlaylists = false },
                         strings = strings
                     )
@@ -692,6 +774,8 @@ fun NowPlayingSheet(
 @Composable
 private fun AddToPlaylistDrawer(
     trackId: Long,
+    track: AudioTrack?,
+    playerViewModel: PlayerViewModel,
     onDismiss: () -> Unit,
     strings: dev.shephard.player.ui.i18n.Strings
 ) {
@@ -775,6 +859,10 @@ private fun AddToPlaylistDrawer(
                                 val all = playlists.toMutableList()
                                 all[idx] = updated
                                 scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                                // Queue'ye ekle (yalnızca ekleniyorsa, kaldırılmıyorsa)
+                                if (!containsTrack && track != null) {
+                                    playerViewModel.addTrackToQueue(track)
+                                }
                             }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -885,149 +973,188 @@ private fun QueueList(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(420.dp)
+                .elasticOverscroll(listState)
         ) {
             itemsIndexed(items, key = { _, t -> t.id }) { index, track ->
-                val isDragged = track.id == draggedTrackId
-                val isPlaying = track.id == currentTrackId
-                var offsetX by remember { mutableFloatStateOf(0f) }
-                val swipeThreshold = 120.dp
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(itemHeightDp)
-                        .offset(x = with(density) { offsetX.toDp() })
-                        .graphicsLayer {
-                            if (isDragged) {
-                                translationY = dragOffsetY
-                                shadowElevation = 16f
-                                scaleX = 1.03f
-                                scaleY = 1.03f
-                            }
-                        }
-                        .zIndex(if (isDragged) 1f else 0f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            when {
-                                isDragged -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                                isPlaying -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                                else -> Color.Transparent
-                            }
-                        )
-                        .clickable { onPlay(index) }
-                        .pointerInput(track.id) {
-                            detectHorizontalDragGestures(
-                                onDragEnd = {
-                                    when {
-                                        offsetX < -swipeThreshold.toPx() -> onPlayNext(index)
-                                        offsetX > swipeThreshold.toPx() -> onRemove(index)
-                                    }
-                                    offsetX = 0f
-                                }
-                            ) { change, dragAmount ->
-                                change.consume()
-                                offsetX += dragAmount
-                            }
-                        }
-                        .padding(vertical = 6.dp, horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        var loaded by remember(track.id) { mutableStateOf(false) }
-                        AsyncImage(
-                            model = track.albumArtUri,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp)),
-                            contentScale = ContentScale.Crop,
-                            onState = { loaded = it is AsyncImagePainter.State.Success }
-                        )
-                        if (!loaded) {
-                            Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                        }
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            track.title,
-                            color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            track.artist,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Text(
-                        track.formattedDuration(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    if (!isPlaying) {
-                        Icon(
-                            imageVector = Icons.Filled.DragHandle,
-                            contentDescription = "Reorder",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .size(28.dp)
-                                .pointerInput(track.id) {
-                                    detectDragGestures(
-                                        onDragStart = {
-                                            draggedTrackId = track.id
-                                            dragOffsetY = 0f
-                                        },
-                                        onDragEnd = {
-                                            stopAutoScroll()
-                                            val toSlice = items.indexOfFirst { it.id == track.id }
-                                            val from = queue.indexOfFirst { it.id == track.id }
-                                            val to = if (toSlice >= 0) toSlice + currentStartIndex else -1
-                                            if (from >= 0 && to >= 0 && from != to) onMove(from, to)
-                                            draggedTrackId = null
-                                            dragOffsetY = 0f
-                                        },
-                                        onDragCancel = {
-                                            stopAutoScroll()
-                                            draggedTrackId = null
-                                            dragOffsetY = 0f
-                                        }
-                                    ) { change, dragAmount: Offset ->
-                                        change.consume()
-                                        dragOffsetY += dragAmount.y
-                                        checkAutoScroll()
-                                        // Position-based swap: dragged item'ın merkezi komşunun
-                                        // merkezini geçince swap yap
-                                        val id = draggedTrackId ?: return@detectDragGestures
-                                        val cur = items.indexOfFirst { it.id == id }
-                                        if (cur < 0) return@detectDragGestures
-                                        val draggedCenter = dragOffsetY + itemHeightPx / 2
-                                        if (draggedCenter > itemHeightPx && cur < items.size - 1) {
-                                            items.add(cur + 1, items.removeAt(cur))
-                                            dragOffsetY -= itemHeightPx
-                                        } else if (draggedCenter < -itemHeightPx / 2 && cur > 0) {
-                                            items.add(cur - 1, items.removeAt(cur))
-                                            dragOffsetY += itemHeightPx
-                                        }
-                                    }
-                                }
-                        )
-                    }
+                val isDragged by remember(track.id) {
+                    androidx.compose.runtime.derivedStateOf { draggedTrackId == track.id }
                 }
+                val dragY by remember(track.id) {
+                    androidx.compose.runtime.derivedStateOf { if (draggedTrackId == track.id) dragOffsetY else 0f }
+                }
+                QueueTrackItem(
+                    track = track,
+                    isPlaying = track.id == currentTrackId,
+                    isDragged = isDragged,
+                    dragOffsetY = dragY,
+                    density = density,
+                    itemHeightDp = itemHeightDp,
+                    onPlay = { onPlay(index) },
+                    onPlayNext = { onPlayNext(index) },
+                    onRemove = { onRemove(index) },
+                    onDragStart = {
+                        draggedTrackId = track.id
+                        dragOffsetY = 0f
+                    },
+                    onDrag = { dy ->
+                        dragOffsetY += dy
+                        checkAutoScroll()
+                        val id = draggedTrackId ?: return@QueueTrackItem
+                        val cur = items.indexOfFirst { it.id == id }
+                        if (cur < 0) return@QueueTrackItem
+                        val draggedCenter = dragOffsetY + itemHeightPx / 2
+                        if (draggedCenter > itemHeightPx && cur < items.size - 1) {
+                            items.add(cur + 1, items.removeAt(cur))
+                            dragOffsetY -= itemHeightPx
+                        } else if (draggedCenter < -itemHeightPx / 2 && cur > 0) {
+                            items.add(cur - 1, items.removeAt(cur))
+                            dragOffsetY += itemHeightPx
+                        }
+                    },
+                    onDragEnd = {
+                        stopAutoScroll()
+                        val toSlice = items.indexOfFirst { it.id == track.id }
+                        val from = queue.indexOfFirst { it.id == track.id }
+                        val to = if (toSlice >= 0) toSlice + currentStartIndex else -1
+                        if (from >= 0 && to >= 0 && from != to) onMove(from, to)
+                        draggedTrackId = null
+                        dragOffsetY = 0f
+                    },
+                    onDragCancel = {
+                        stopAutoScroll()
+                        draggedTrackId = null
+                        dragOffsetY = 0f
+                    }
+                )
             }
         }
     }
     Spacer(Modifier.height(16.dp))
+}
+
+@Composable
+private fun QueueTrackItem(
+    track: AudioTrack,
+    isPlaying: Boolean,
+    isDragged: Boolean,
+    dragOffsetY: Float,
+    density: androidx.compose.ui.unit.Density,
+    itemHeightDp: androidx.compose.ui.unit.Dp,
+    onPlay: () -> Unit,
+    onPlayNext: () -> Unit,
+    onRemove: () -> Unit,
+    onDragStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
+) {
+    val swipeThresholdPx = with(density) { 120.dp.toPx() }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    val duration = remember(track.id) { track.formattedDuration() }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(itemHeightDp)
+            .offset(x = with(density) { offsetX.toDp() })
+            .graphicsLayer {
+                if (isDragged) {
+                    translationY = dragOffsetY
+                    shadowElevation = 16f
+                    scaleX = 1.03f
+                    scaleY = 1.03f
+                }
+            }
+            .zIndex(if (isDragged) 1f else 0f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                when {
+                    isDragged -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                    isPlaying -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    else -> Color.Transparent
+                }
+            )
+            .clickable { onPlay() }
+            .pointerInput(track.id) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        when {
+                            offsetX < -swipeThresholdPx -> onPlayNext()
+                            offsetX > swipeThresholdPx -> onRemove()
+                        }
+                        offsetX = 0f
+                    }
+                ) { change, dragAmount ->
+                    change.consume()
+                    offsetX += dragAmount
+                }
+            }
+            .padding(vertical = 6.dp, horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            var loaded by remember { mutableStateOf(false) }
+            AsyncImage(
+                model = track.albumArtUri,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp)),
+                contentScale = ContentScale.Crop,
+                onSuccess = { loaded = true }
+            )
+            if (!loaded) {
+                Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                track.title,
+                color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                track.artist,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Text(
+            duration,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.width(4.dp))
+        if (!isPlaying) {
+            Icon(
+                imageVector = Icons.Filled.DragHandle,
+                contentDescription = "Reorder",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .size(28.dp)
+                    .pointerInput(track.id) {
+                        detectDragGestures(
+                            onDragStart = { onDragStart() },
+                            onDragEnd = { onDragEnd() },
+                            onDragCancel = { onDragCancel() }
+                        ) { change, dragAmount: Offset ->
+                            change.consume()
+                            onDrag(dragAmount.y)
+                        }
+                    }
+            )
+        }
+    }
 }
 
 internal fun formatMillis(ms: Long): String {

@@ -58,7 +58,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -72,6 +71,7 @@ import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.formattedDuration
 import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.LibraryViewModel
+import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.rememberAudioPermissionState
 import dev.shephard.player.ui.components.bounceClick
@@ -84,7 +84,9 @@ import kotlinx.coroutines.withContext
 @Composable
 fun MusicScreen(
     libraryViewModel: LibraryViewModel = viewModel(),
-    onTrackClick: (List<AudioTrack>, Int) -> Unit = { _, _ -> }
+    playerViewModel: PlayerViewModel = viewModel(),
+    onTrackClick: (List<AudioTrack>, Int) -> Unit = { _, _ -> },
+    hasMiniPlayer: Boolean = false
 ) {
     val tracks by libraryViewModel.tracks.collectAsState()
     val isLoading by libraryViewModel.isLoading.collectAsState()
@@ -153,7 +155,11 @@ fun MusicScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .elasticOverscroll(gridState),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    contentPadding = PaddingValues(
+                        horizontal = 12.dp,
+                        top = 8.dp,
+                        bottom = if (hasMiniPlayer) 176.dp else 96.dp
+                    ),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -172,7 +178,11 @@ fun MusicScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .elasticOverscroll(listState),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    contentPadding = PaddingValues(
+                        horizontal = 16.dp,
+                        top = 8.dp,
+                        bottom = if (hasMiniPlayer) 176.dp else 96.dp
+                    ),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(tracks, key = { it.id }) { track ->
@@ -313,6 +323,7 @@ fun MusicScreen(
         EditMusicDrawer(
             track = track,
             libraryViewModel = libraryViewModel,
+            playerViewModel = playerViewModel,
             onDismiss = { trackToEdit = null }
         )
     }
@@ -327,16 +338,8 @@ private fun GridTrackCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.04f),
-                        Color.Transparent
-                    )
-                )
-            )
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             .bounceClick { onClick() }
             .padding(8.dp)
     ) {
@@ -398,16 +401,8 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.02f),
-                        Color.Transparent
-                    )
-                )
-            )
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             .bounceClick { onClick() }
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -475,6 +470,7 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
 private fun EditMusicDrawer(
     track: AudioTrack,
     libraryViewModel: LibraryViewModel,
+    playerViewModel: PlayerViewModel,
     onDismiss: () -> Unit
 ) {
     val strings = LocalStrings.current
@@ -520,6 +516,14 @@ private fun EditMusicDrawer(
                         album = albumText,
                         coverUri = coverUri?.toString()
                     )
+                    // NowPlaying ve MiniPlayer'ı anında güncelle
+                    val updatedTrack = track.copy(
+                        title = titleText.ifBlank { track.title },
+                        artist = artistText.ifBlank { track.artist },
+                        album = albumText.ifBlank { track.album },
+                        albumArtUri = coverUri ?: track.albumArtUri
+                    )
+                    playerViewModel.notifyTrackUpdated(updatedTrack)
                     onDismiss()
                 }) { Text(strings.apply, fontWeight = FontWeight.Bold) }
             }

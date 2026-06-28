@@ -745,22 +745,14 @@ private fun PlaylistListCard(
     onPlay: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.Transparent
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.03f),
-                        Color.Transparent
-                    )
-                )
-            )
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             .clickable { onClick() }
     ) {
         Row(
@@ -857,16 +849,8 @@ private fun PlaylistGridCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.03f),
-                        Color.Transparent
-                    )
-                )
-            )
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             .bounceClick { onClick() }
             .padding(12.dp)
     ) {
@@ -1309,16 +1293,8 @@ private fun PlaylistTrackRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.06f),
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.02f),
-                        Color.Transparent
-                    )
-                )
-            )
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             .bounceClick { onClick() }
             .padding(vertical = 8.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically

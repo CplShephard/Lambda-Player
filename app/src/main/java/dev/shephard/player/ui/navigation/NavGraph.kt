@@ -79,7 +79,10 @@ fun NavGraph(
         }
     ) {
         composable(Destination.Music.route) {
-            MusicScreen(onTrackClick = { tracks, index -> onTrackClick(tracks, index, null) })
+            MusicScreen(
+                onTrackClick = { tracks, index -> onTrackClick(tracks, index, null) },
+                hasMiniPlayer = hasMiniPlayer
+            )
         }
         composable(Destination.Playlists.route) {
             PlaylistScreen(
