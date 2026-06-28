@@ -445,6 +445,12 @@ fun NowPlayingSheet(
                 var showQueue by remember { mutableStateOf(false) }
                 var showPlaylists by remember { mutableStateOf(false) }
                 var showLyrics by remember { mutableStateOf(false) }
+
+                // State'ler if dışında — Compose composition kuralı
+                val queueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                val queueSheetScope = rememberCoroutineScope()
+                val lyricsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                val lyricsSheetScope = rememberCoroutineScope()
                 val trackId = track?.id ?: -1L
                 val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
 
@@ -490,16 +496,11 @@ fun NowPlayingSheet(
                 }
 
                 if (showQueue) {
-                    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-                    val sheetScope = rememberCoroutineScope()
                     ModalBottomSheet(
                         onDismissRequest = { showQueue = false },
-                        sheetState = sheetState,
+                        sheetState = queueSheetState,
                         containerColor = MaterialTheme.colorScheme.surface,
-                        gesturesEnabled = false,
                         dragHandle = {
-                            // Sadece bu handle'dan sürükleyince sheet kapanır,
-                            // liste scroll'u ile çakışmaz.
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -507,8 +508,8 @@ fun NowPlayingSheet(
                                     .pointerInput(Unit) {
                                         detectDragGestures(
                                             onDragEnd = {
-                                                sheetScope.launch {
-                                                    sheetState.hide()
+                                                queueSheetScope.launch {
+                                                    queueSheetState.hide()
                                                     showQueue = false
                                                 }
                                             }
@@ -539,8 +540,6 @@ fun NowPlayingSheet(
                 }
 
                 if (showLyrics) {
-                    val lyricsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-                    val lyricsScope = rememberCoroutineScope()
                     val lyricsContext = LocalContext.current
                     var isDownloading by remember { mutableStateOf(false) }
                     var downloadError by remember { mutableStateOf<String?>(null) }
@@ -562,7 +561,7 @@ fun NowPlayingSheet(
                         contract = ActivityResultContracts.OpenDocument()
                     ) { uri ->
                         if (uri != null) {
-                            lyricsScope.launch {
+                            lyricsSheetScope.launch {
                                 val lines = withContext(Dispatchers.IO) {
                                     try {
                                         lyricsContext.contentResolver.openInputStream(uri)
@@ -579,7 +578,6 @@ fun NowPlayingSheet(
                         onDismissRequest = { showLyrics = false },
                         sheetState = lyricsSheetState,
                         containerColor = MaterialTheme.colorScheme.surface,
-                        gesturesEnabled = false,
                         dragHandle = {
                             Box(
                                 modifier = Modifier
@@ -588,7 +586,7 @@ fun NowPlayingSheet(
                                     .pointerInput(Unit) {
                                         detectDragGestures(
                                             onDragEnd = {
-                                                lyricsScope.launch {
+                                                lyricsSheetScope.launch {
                                                     lyricsSheetState.hide()
                                                     showLyrics = false
                                                 }
@@ -630,7 +628,7 @@ fun NowPlayingSheet(
                                             onClick = {
                                                 isDownloading = true
                                                 downloadError = null
-                                                lyricsScope.launch {
+                                                lyricsSheetScope.launch {
                                                     val result = withContext(Dispatchers.IO) {
                                                         fetchLyricsFromApi(currentTrack.artist, currentTrack.title)
                                                     }

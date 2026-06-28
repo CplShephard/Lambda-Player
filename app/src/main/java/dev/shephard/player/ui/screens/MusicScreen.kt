@@ -156,7 +156,8 @@ fun MusicScreen(
                         .fillMaxSize()
                         .elasticOverscroll(gridState),
                     contentPadding = PaddingValues(
-                        horizontal = 12.dp,
+                        start = 12.dp,
+                        end = 12.dp,
                         top = 8.dp,
                         bottom = if (hasMiniPlayer) 176.dp else 96.dp
                     ),
@@ -179,7 +180,8 @@ fun MusicScreen(
                         .fillMaxSize()
                         .elasticOverscroll(listState),
                     contentPadding = PaddingValues(
-                        horizontal = 16.dp,
+                        start = 16.dp,
+                        end = 16.dp,
                         top = 8.dp,
                         bottom = if (hasMiniPlayer) 176.dp else 96.dp
                     ),
