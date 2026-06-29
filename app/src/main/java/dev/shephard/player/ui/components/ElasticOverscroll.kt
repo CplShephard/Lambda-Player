@@ -114,8 +114,6 @@ private fun Modifier.elasticOverscrollInternal(
 
     val connection = remember(maxStretchPx, baseResistance, stiffness, dampingRatio) {
         ElasticNestedScrollConnection(
-            canScrollBackward = canScrollBackward,
-            canScrollForward = canScrollForward,
             overscrollY = overscrollY,
             scope = scope,
             maxStretchPx = maxStretchPx,
@@ -136,8 +134,6 @@ private fun Modifier.elasticOverscrollInternal(
 }
 
 private class ElasticNestedScrollConnection(
-    private val canScrollBackward: () -> Boolean,
-    private val canScrollForward: () -> Boolean,
     private val overscrollY: Animatable<Float, AnimationVector1D>,
     private val scope: CoroutineScope,
     private val maxStretchPx: Float,
@@ -152,17 +148,15 @@ private class ElasticNestedScrollConnection(
         val current = overscrollY.value
         if (dy == 0f || current == 0f) return Offset.Zero
 
-        // Lastik açıkken kullanıcı ters yöne giderse önce translationY'yi kapat.
+        // Lastik gerilmişken ters yöne gidilirse önce lastigi kapat.
         if (current.sign == dy.sign) return Offset.Zero
 
         val consumedY = if (abs(dy) > abs(current)) -current else dy
         val newValue = (current + consumedY).coerceIn(-maxStretchPx, maxStretchPx)
-
         scope.launch {
             overscrollY.stop()
             overscrollY.snapTo(if (abs(newValue) < 0.5f) 0f else newValue)
         }
-
         return Offset(x = 0f, y = consumedY)
     }
 
@@ -176,20 +170,12 @@ private class ElasticNestedScrollConnection(
         val dy = available.y
         if (dy == 0f) return Offset.Zero
 
-        val atTop = !canScrollBackward()
-        val atBottom = !canScrollForward()
-        val shouldStretchTop = atTop && dy > 0f
-        val shouldStretchBottom = atBottom && dy < 0f
-        if (!shouldStretchTop && !shouldStretchBottom) return Offset.Zero
-
+        // Liste tüketemediği kısım (sınırda) → elastic'e ver, gecikme yok.
         val next = rubberBand(current = overscrollY.value, delta = dy)
-
         scope.launch {
             overscrollY.stop()
             overscrollY.snapTo(next)
         }
-
-        // Scrollable tüketemediği sınır dışı drag'i biz tükettik.
         return Offset(x = 0f, y = dy)
     }
 

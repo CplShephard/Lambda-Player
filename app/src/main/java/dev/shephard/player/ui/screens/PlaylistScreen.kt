@@ -70,6 +70,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -961,11 +962,12 @@ private fun PlaylistDetailView(
     val itemHeightPx = with(density) { itemHeightDp.toPx() }
 
     val reorderItems = remember { mutableStateListOf<AudioTrack>() }
-    var draggedTrackId by remember { mutableStateOf<Long?>(null) }
+    var draggedIndex by remember { mutableIntStateOf(-1) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    var scrollAccum by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(plTracks) {
-        if (draggedTrackId == null) {
+        if (draggedIndex < 0) {
             reorderItems.clear()
             reorderItems.addAll(plTracks)
         }
@@ -973,46 +975,73 @@ private fun PlaylistDetailView(
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
-    val autoScrollThresholdPx = with(density) { 80.dp.toPx() }
+    val autoScrollThresholdPx = with(density) { 72.dp.toPx() }
     val autoScrollJob = remember { androidx.compose.runtime.mutableStateOf<kotlinx.coroutines.Job?>(null) }
-
-    fun startAutoScroll(direction: Int) {
-        if (autoScrollJob.value?.isActive == true) return
-        autoScrollJob.value = coroutineScope.launch {
-            while (true) {
-                val layout = listState.layoutInfo
-                val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.key == draggedTrackId }
-                if (draggedInfo == null) { kotlinx.coroutines.delay(16); continue }
-                val draggedCenter = draggedInfo.offset + dragOffsetY + itemHeightPx / 2
-                val viewportBottom = layout.viewportEndOffset.toFloat()
-                val distFromBottom = viewportBottom - autoScrollThresholdPx - draggedCenter
-                val distFromTop = draggedCenter - autoScrollThresholdPx
-                val speed = when {
-                    direction > 0 && distFromBottom < 0 -> ((-distFromBottom) * 0.3f).coerceIn(4f, 32f)
-                    direction < 0 && distFromTop < 0 -> ((-distFromTop) * 0.3f).coerceIn(4f, 32f)
-                    else -> 0f
-                }
-                if (speed > 0f) listState.scrollBy(speed * direction)
-                kotlinx.coroutines.delay(16)
-            }
-        }
-    }
 
     fun stopAutoScroll() {
         autoScrollJob.value?.cancel()
         autoScrollJob.value = null
     }
 
-    fun checkAutoScroll() {
-        val layout = listState.layoutInfo
-        val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.key == draggedTrackId } ?: run {
-            stopAutoScroll(); return
+    fun trySwap() {
+        val cur = draggedIndex
+        if (cur < 0 || cur >= reorderItems.size) return
+        val effective = dragOffsetY + scrollAccum
+        if (effective > itemHeightPx * 0.55f && cur < reorderItems.size - 1) {
+            reorderItems.add(cur + 1, reorderItems.removeAt(cur))
+            draggedIndex = cur + 1
+            dragOffsetY -= itemHeightPx
+            scrollAccum = 0f
+        } else if (effective < -itemHeightPx * 0.55f && cur > 0) {
+            reorderItems.add(cur - 1, reorderItems.removeAt(cur))
+            draggedIndex = cur - 1
+            dragOffsetY += itemHeightPx
+            scrollAccum = 0f
         }
-        val draggedCenter = draggedInfo.offset + dragOffsetY + itemHeightPx / 2
+    }
+
+    fun startAutoScroll(direction: Int) {
+        if (autoScrollJob.value?.isActive == true) return
+        autoScrollJob.value = coroutineScope.launch {
+            while (true) {
+                val cur = draggedIndex
+                if (cur < 0 || cur >= reorderItems.size) { kotlinx.coroutines.delay(16); continue }
+                val layout = listState.layoutInfo
+                val trackKey = reorderItems[cur].id
+                val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.key == trackKey }
+                if (draggedInfo == null) { kotlinx.coroutines.delay(16); continue }
+                val draggedTop = draggedInfo.offset + dragOffsetY
+                val draggedBottom = draggedTop + itemHeightPx
+                val viewportBottom = layout.viewportEndOffset.toFloat()
+                val distFromBottom = draggedBottom - (viewportBottom - autoScrollThresholdPx)
+                val distFromTop = autoScrollThresholdPx - draggedTop
+                val speed = when {
+                    direction > 0 && distFromBottom > 0 -> (distFromBottom * 0.25f).coerceIn(3f, 28f)
+                    direction < 0 && distFromTop > 0 -> (distFromTop * 0.25f).coerceIn(3f, 28f)
+                    else -> { stopAutoScroll(); return@launch }
+                }
+                val scrolled = speed * direction
+                listState.scrollBy(scrolled)
+                scrollAccum += scrolled
+                trySwap()
+                kotlinx.coroutines.delay(16)
+            }
+        }
+    }
+
+    fun checkAutoScroll() {
+        val cur = draggedIndex
+        if (cur < 0 || cur >= reorderItems.size) { stopAutoScroll(); return }
+        val layout = listState.layoutInfo
+        val trackKey = reorderItems[cur].id
+        val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.key == trackKey }
+            ?: run { stopAutoScroll(); return }
+        val draggedTop = draggedInfo.offset + dragOffsetY
+        val draggedBottom = draggedTop + itemHeightPx
         val viewportBottom = layout.viewportEndOffset.toFloat()
         when {
-            draggedCenter > viewportBottom - autoScrollThresholdPx -> startAutoScroll(+1)
-            draggedCenter < autoScrollThresholdPx -> startAutoScroll(-1)
+            draggedBottom > viewportBottom - autoScrollThresholdPx -> startAutoScroll(+1)
+            draggedTop < autoScrollThresholdPx -> startAutoScroll(-1)
             else -> stopAutoScroll()
         }
     }
@@ -1232,41 +1261,34 @@ private fun PlaylistDetailView(
                     itemsIndexed(reorderItems, key = { _, t -> t.id }) { i, t ->
                         DraggablePlaylistTrackRow(
                             track = t,
-                            isDragged = t.id == draggedTrackId,
-                            dragOffsetY = dragOffsetY,
+                            isDragged = i == draggedIndex,
+                            dragOffsetY = if (i == draggedIndex) dragOffsetY else 0f,
                             onTrackClick = { onTrackClick(reorderItems.toList(), i) },
                             onRemove = { onRemoveTrack(t.id) },
-                            onDragStart = { draggedTrackId = t.id; dragOffsetY = 0f },
+                            onDragStart = {
+                                draggedIndex = i
+                                dragOffsetY = 0f
+                                scrollAccum = 0f
+                            },
                             onDrag = { amount ->
                                 dragOffsetY += amount
+                                trySwap()
                                 checkAutoScroll()
-                                val id = draggedTrackId
-                                if (id != null) {
-                                    val cur = reorderItems.indexOfFirst { it.id == id }
-                                    if (cur >= 0) {
-                                        val center = dragOffsetY + itemHeightPx / 2
-                                        if (center > itemHeightPx && cur < reorderItems.size - 1) {
-                                            reorderItems.add(cur + 1, reorderItems.removeAt(cur))
-                                            dragOffsetY -= itemHeightPx
-                                        } else if (center < -itemHeightPx / 2 && cur > 0) {
-                                            reorderItems.add(cur - 1, reorderItems.removeAt(cur))
-                                            dragOffsetY += itemHeightPx
-                                        }
-                                    }
-                                }
                             },
                             onDragEnd = {
                                 stopAutoScroll()
                                 if (reorderItems.toList() != plTracks) {
                                     onReorder(reorderItems.toList())
                                 }
-                                draggedTrackId = null
+                                draggedIndex = -1
                                 dragOffsetY = 0f
+                                scrollAccum = 0f
                             },
                             onDragCancel = {
                                 stopAutoScroll()
-                                draggedTrackId = null
+                                draggedIndex = -1
                                 dragOffsetY = 0f
+                                scrollAccum = 0f
                             }
                         )
                     }

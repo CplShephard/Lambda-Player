@@ -228,42 +228,49 @@ private fun BrandHeader(currentRoute: String?) {
         try { context.packageManager.getPackageInfo(context.packageName, 0).versionName } catch (_: Exception) { "" }
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .clip(RoundedCornerShape(bottomStart = 30.dp, bottomEnd = 30.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
     ) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = strings.appName.uppercase(),
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontFamily = dev.shephard.player.ui.theme.BrandFontFamily,
-                    letterSpacing = 2.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            if (versionName.isNotEmpty()) {
-                Spacer(Modifier.width(8.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 20.dp)
+        ) {
+            Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    text = versionName,
-                    style = MaterialTheme.typography.labelSmall.copy(
+                    text = strings.appName.uppercase(),
+                    style = MaterialTheme.typography.titleLarge.copy(
                         fontFamily = dev.shephard.player.ui.theme.BrandFontFamily,
-                        letterSpacing = 1.sp
+                        letterSpacing = 2.sp,
+                        fontWeight = FontWeight.Bold
                     ),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 2.dp)
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                if (versionName.isNotEmpty()) {
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = versionName,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontFamily = dev.shephard.player.ui.theme.BrandFontFamily,
+                            letterSpacing = 2.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            if (sectionTitle != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = sectionTitle,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
-        if (sectionTitle != null) {
-            Text(
-                text = sectionTitle,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
-            )
         }
     }
 }

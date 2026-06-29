@@ -303,7 +303,15 @@ fun LambdaPlayerTheme(
     val context = LocalContext.current
     val baseScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            val base = if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            // cardAlpha'yı dynamic scheme'in surface renklerine de uygula
+            base.copy(
+                surfaceVariant = base.surfaceVariant.copy(alpha = cardAlpha),
+                surfaceContainer = base.surfaceContainer.copy(alpha = cardAlpha),
+                surfaceContainerHigh = base.surfaceContainerHigh.copy(alpha = cardAlpha),
+                surfaceContainerHighest = base.surfaceContainerHighest.copy(alpha = cardAlpha),
+                surfaceContainerLow = base.surfaceContainerLow.copy(alpha = cardAlpha),
+            )
         }
         useDarkTheme -> darkScheme.copy(
             primary = accentColor,

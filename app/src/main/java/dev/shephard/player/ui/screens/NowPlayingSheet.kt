@@ -67,6 +67,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -905,56 +906,94 @@ private fun QueueList(
     }
     val items = remember { mutableStateListOf<AudioTrack>() }
     LaunchedEffect(queue, currentStartIndex) {
-        items.clear()
-        items.addAll(queue.drop(currentStartIndex))
-    }
-    val itemHeightDp = 64.dp
-    val itemHeightPx = with(density) { itemHeightDp.toPx() }
-    var draggedTrackId by remember { mutableStateOf<Long?>(null) }
-    var dragOffsetY by remember { mutableFloatStateOf(0f) }
-    val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
-    val autoScrollThresholdPx = with(density) { 80.dp.toPx() }
-    // Continuous autoscroll — tek bir job, drag boyunca yaşar
-    val autoScrollJob = remember { androidx.compose.runtime.mutableStateOf<kotlinx.coroutines.Job?>(null) }
-
-    fun startAutoScroll(direction: Int) { // +1 down, -1 up
-        if (autoScrollJob.value?.isActive == true) return
-        autoScrollJob.value = coroutineScope.launch {
-            while (true) {
-                val layout = listState.layoutInfo
-                val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.key == draggedTrackId }
-                if (draggedInfo == null) { kotlinx.coroutines.delay(16); continue }
-                val draggedCenter = draggedInfo.offset + dragOffsetY + itemHeightPx / 2
-                val viewportBottom = layout.viewportEndOffset.toFloat()
-                val distFromBottom = viewportBottom - autoScrollThresholdPx - draggedCenter
-                val distFromTop = draggedCenter - autoScrollThresholdPx
-                val speed = when {
-                    direction > 0 && distFromBottom < 0 -> ((-distFromBottom) * 0.3f).coerceIn(4f, 32f)
-                    direction < 0 && distFromTop < 0 -> ((-distFromTop) * 0.3f).coerceIn(4f, 32f)
-                    else -> 0f
-                }
-                if (speed > 0f) listState.scrollBy(speed * direction)
-                kotlinx.coroutines.delay(16)
-            }
+        if (items.map { it.id } != queue.drop(currentStartIndex).map { it.id }) {
+            items.clear()
+            items.addAll(queue.drop(currentStartIndex))
         }
     }
+
+    val itemHeightDp = 64.dp
+    val itemHeightPx = with(density) { itemHeightDp.toPx() }
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+
+    // Drag state — hepsi tek yerde
+    var draggedIndex by remember { mutableIntStateOf(-1) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    var scrollAccum by remember { mutableFloatStateOf(0f) } // autoscroll'un biriktirdiği kaydırma
+
+    val autoScrollJob = remember { androidx.compose.runtime.mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    val autoScrollThresholdPx = with(density) { 72.dp.toPx() }
 
     fun stopAutoScroll() {
         autoScrollJob.value?.cancel()
         autoScrollJob.value = null
     }
 
+    // Swap: dragOffsetY + scrollAccum toplamı bir item yüksekliğini geçince yap
+    fun trySwap() {
+        val cur = draggedIndex
+        if (cur < 0) return
+        val effective = dragOffsetY + scrollAccum
+        if (effective > itemHeightPx * 0.55f && cur < items.size - 1) {
+            items.add(cur + 1, items.removeAt(cur))
+            draggedIndex = cur + 1
+            dragOffsetY -= itemHeightPx
+            scrollAccum = 0f
+        } else if (effective < -itemHeightPx * 0.55f && cur > 0) {
+            items.add(cur - 1, items.removeAt(cur))
+            draggedIndex = cur - 1
+            dragOffsetY += itemHeightPx
+            scrollAccum = 0f
+        }
+    }
+
+    fun startAutoScroll(direction: Int) {
+        if (autoScrollJob.value?.isActive == true) return
+        autoScrollJob.value = coroutineScope.launch {
+            while (true) {
+                val layout = listState.layoutInfo
+                val cur = draggedIndex
+                if (cur < 0) { kotlinx.coroutines.delay(16); continue }
+                val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.index == cur }
+                if (draggedInfo == null) { kotlinx.coroutines.delay(16); continue }
+
+                val draggedTop = draggedInfo.offset + dragOffsetY
+                val draggedBottom = draggedTop + itemHeightPx
+                val viewportBottom = layout.viewportEndOffset.toFloat()
+
+                val distFromBottom = draggedBottom - (viewportBottom - autoScrollThresholdPx)
+                val distFromTop = autoScrollThresholdPx - draggedTop
+
+                val speed = when {
+                    direction > 0 && distFromBottom > 0 -> (distFromBottom * 0.25f).coerceIn(3f, 28f)
+                    direction < 0 && distFromTop > 0 -> (distFromTop * 0.25f).coerceIn(3f, 28f)
+                    else -> { stopAutoScroll(); return@launch }
+                }
+                val scrolled = speed * direction
+                listState.scrollBy(scrolled)
+                // Autoscroll miktarını biriktir → trySwap bunu kullanır
+                scrollAccum += scrolled
+                trySwap()
+                kotlinx.coroutines.delay(16)
+            }
+        }
+    }
+
     fun checkAutoScroll() {
         val layout = listState.layoutInfo
-        val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.key == draggedTrackId } ?: run {
-            stopAutoScroll(); return
-        }
-        val draggedCenter = draggedInfo.offset + dragOffsetY + itemHeightPx / 2
+        val cur = draggedIndex
+        if (cur < 0) { stopAutoScroll(); return }
+        val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.index == cur }
+            ?: run { stopAutoScroll(); return }
+
+        val draggedTop = draggedInfo.offset + dragOffsetY
+        val draggedBottom = draggedTop + itemHeightPx
         val viewportBottom = layout.viewportEndOffset.toFloat()
+
         when {
-            draggedCenter > viewportBottom - autoScrollThresholdPx -> startAutoScroll(+1)
-            draggedCenter < autoScrollThresholdPx -> startAutoScroll(-1)
+            draggedBottom > viewportBottom - autoScrollThresholdPx -> startAutoScroll(+1)
+            draggedTop < autoScrollThresholdPx -> startAutoScroll(-1)
             else -> stopAutoScroll()
         }
     }
@@ -974,12 +1013,9 @@ private fun QueueList(
                 .elasticOverscroll(listState)
         ) {
             itemsIndexed(items, key = { _, t -> t.id }) { index, track ->
-                val isDragged by remember(track.id) {
-                    androidx.compose.runtime.derivedStateOf { draggedTrackId == track.id }
-                }
-                val dragY by remember(track.id) {
-                    androidx.compose.runtime.derivedStateOf { if (draggedTrackId == track.id) dragOffsetY else 0f }
-                }
+                val isDragged = index == draggedIndex
+                val dragY = if (isDragged) dragOffsetY else 0f
+
                 QueueTrackItem(
                     track = track,
                     isPlaying = track.id == currentTrackId,
@@ -991,37 +1027,30 @@ private fun QueueList(
                     onPlayNext = { onPlayNext(index) },
                     onRemove = { onRemove(index) },
                     onDragStart = {
-                        draggedTrackId = track.id
+                        draggedIndex = index
                         dragOffsetY = 0f
+                        scrollAccum = 0f
                     },
                     onDrag = { dy ->
                         dragOffsetY += dy
+                        trySwap()
                         checkAutoScroll()
-                        val id = draggedTrackId ?: return@QueueTrackItem
-                        val cur = items.indexOfFirst { it.id == id }
-                        if (cur < 0) return@QueueTrackItem
-                        val draggedCenter = dragOffsetY + itemHeightPx / 2
-                        if (draggedCenter > itemHeightPx && cur < items.size - 1) {
-                            items.add(cur + 1, items.removeAt(cur))
-                            dragOffsetY -= itemHeightPx
-                        } else if (draggedCenter < -itemHeightPx / 2 && cur > 0) {
-                            items.add(cur - 1, items.removeAt(cur))
-                            dragOffsetY += itemHeightPx
-                        }
                     },
                     onDragEnd = {
                         stopAutoScroll()
-                        val toSlice = items.indexOfFirst { it.id == track.id }
+                        val cur = draggedIndex
                         val from = queue.indexOfFirst { it.id == track.id }
-                        val to = if (toSlice >= 0) toSlice + currentStartIndex else -1
+                        val to = if (cur >= 0) cur + currentStartIndex else -1
                         if (from >= 0 && to >= 0 && from != to) onMove(from, to)
-                        draggedTrackId = null
+                        draggedIndex = -1
                         dragOffsetY = 0f
+                        scrollAccum = 0f
                     },
                     onDragCancel = {
                         stopAutoScroll()
-                        draggedTrackId = null
+                        draggedIndex = -1
                         dragOffsetY = 0f
+                        scrollAccum = 0f
                     }
                 )
             }
