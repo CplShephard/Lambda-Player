@@ -29,7 +29,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import dev.shephard.player.ui.components.bounceClick
-import dev.shephard.player.ui.components.elasticOverscroll
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.BrokenImage
@@ -139,7 +138,6 @@ fun SettingsScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .elasticOverscroll(settingsScrollState)
             .verticalScroll(settingsScrollState)
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)

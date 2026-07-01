@@ -8,8 +8,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,8 +67,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -79,10 +75,9 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -92,6 +87,8 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.formattedDuration
 import dev.shephard.player.player.LayoutMode
@@ -99,7 +96,6 @@ import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.BouncyIconButton
 import dev.shephard.player.ui.components.bounceClick
-import dev.shephard.player.ui.components.elasticOverscroll
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -375,7 +371,6 @@ fun PlaylistScreen(
                     state = pickerListState,
                     modifier = Modifier
                         .height(400.dp)
-                        .elasticOverscroll(pickerListState)
                 ) {
                     items(tracks) { t ->
                         val checked = t.id in pickerSelected
@@ -648,8 +643,7 @@ private fun PlaylistListView(
                     columns = GridCells.Fixed(2),
                     state = playlistGridState,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .elasticOverscroll(playlistGridState),
+                        .fillMaxSize(),
                     contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -688,8 +682,7 @@ private fun PlaylistListView(
                 LazyColumn(
                     state = playlistListState,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .elasticOverscroll(playlistListState),
+                        .fillMaxSize(),
                     contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -957,92 +950,39 @@ private fun PlaylistDetailView(
     onReorder: (List<AudioTrack>) -> Unit = {},
     onChangeSort: (String) -> Unit = {}
 ) {
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val itemHeightDp = 64.dp
-    val itemHeightPx = with(density) { itemHeightDp.toPx() }
-
+    // OuterTune'daki LocalPlaylistScreen deseni: gerçek liste mutableStateListOf,
+    // reorderableState onMove callback'i doğrudan bu listeyi günceller, drag bitince
+    // (isAnyItemDragging false olunca) tek seferde onReorder tetiklenir.
     val reorderItems = remember { mutableStateListOf<AudioTrack>() }
-    var draggedIndex by remember { mutableIntStateOf(-1) }
-    var dragOffsetY by remember { mutableFloatStateOf(0f) }
-    var scrollAccum by remember { mutableFloatStateOf(0f) }
+    var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
     LaunchedEffect(plTracks) {
-        if (draggedIndex < 0) {
+        if (reorderItems.map { it.id } != plTracks.map { it.id }) {
             reorderItems.clear()
             reorderItems.addAll(plTracks)
         }
     }
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
-    val autoScrollThresholdPx = with(density) { 72.dp.toPx() }
-    val autoScrollJob = remember { androidx.compose.runtime.mutableStateOf<kotlinx.coroutines.Job?>(null) }
-
-    fun stopAutoScroll() {
-        autoScrollJob.value?.cancel()
-        autoScrollJob.value = null
-    }
-
-    fun trySwap() {
-        val cur = draggedIndex
-        if (cur < 0 || cur >= reorderItems.size) return
-        val effective = dragOffsetY + scrollAccum
-        if (effective > itemHeightPx * 0.55f && cur < reorderItems.size - 1) {
-            reorderItems.add(cur + 1, reorderItems.removeAt(cur))
-            draggedIndex = cur + 1
-            dragOffsetY -= itemHeightPx
-            scrollAccum = 0f
-        } else if (effective < -itemHeightPx * 0.55f && cur > 0) {
-            reorderItems.add(cur - 1, reorderItems.removeAt(cur))
-            draggedIndex = cur - 1
-            dragOffsetY += itemHeightPx
-            scrollAccum = 0f
+    val reorderableState = rememberReorderableLazyListState(
+        lazyListState = listState
+    ) { from, to ->
+        val currentDragInfo = dragInfo
+        dragInfo = if (currentDragInfo == null) {
+            from.index to to.index
+        } else {
+            currentDragInfo.first to to.index
         }
+        reorderItems.add(to.index, reorderItems.removeAt(from.index))
     }
-
-    fun startAutoScroll(direction: Int) {
-        if (autoScrollJob.value?.isActive == true) return
-        autoScrollJob.value = coroutineScope.launch {
-            while (true) {
-                val cur = draggedIndex
-                if (cur < 0 || cur >= reorderItems.size) { kotlinx.coroutines.delay(16); continue }
-                val layout = listState.layoutInfo
-                val trackKey = reorderItems[cur].id
-                val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.key == trackKey }
-                if (draggedInfo == null) { kotlinx.coroutines.delay(16); continue }
-                val draggedTop = draggedInfo.offset + dragOffsetY
-                val draggedBottom = draggedTop + itemHeightPx
-                val viewportBottom = layout.viewportEndOffset.toFloat()
-                val distFromBottom = draggedBottom - (viewportBottom - autoScrollThresholdPx)
-                val distFromTop = autoScrollThresholdPx - draggedTop
-                val speed = when {
-                    direction > 0 && distFromBottom > 0 -> (distFromBottom * 0.25f).coerceIn(3f, 28f)
-                    direction < 0 && distFromTop > 0 -> (distFromTop * 0.25f).coerceIn(3f, 28f)
-                    else -> { stopAutoScroll(); return@launch }
+    LaunchedEffect(reorderableState.isAnyItemDragging) {
+        if (!reorderableState.isAnyItemDragging) {
+            dragInfo?.let { (from, to) ->
+                dragInfo = null
+                if (from != to && reorderItems.toList() != plTracks) {
+                    onReorder(reorderItems.toList())
                 }
-                val scrolled = speed * direction
-                listState.scrollBy(scrolled)
-                scrollAccum += scrolled
-                trySwap()
-                kotlinx.coroutines.delay(16)
             }
-        }
-    }
-
-    fun checkAutoScroll() {
-        val cur = draggedIndex
-        if (cur < 0 || cur >= reorderItems.size) { stopAutoScroll(); return }
-        val layout = listState.layoutInfo
-        val trackKey = reorderItems[cur].id
-        val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.key == trackKey }
-            ?: run { stopAutoScroll(); return }
-        val draggedTop = draggedInfo.offset + dragOffsetY
-        val draggedBottom = draggedTop + itemHeightPx
-        val viewportBottom = layout.viewportEndOffset.toFloat()
-        when {
-            draggedBottom > viewportBottom - autoScrollThresholdPx -> startAutoScroll(+1)
-            draggedTop < autoScrollThresholdPx -> startAutoScroll(-1)
-            else -> stopAutoScroll()
         }
     }
 
@@ -1050,8 +990,7 @@ private fun PlaylistDetailView(
         LazyColumn(
             state = listState,
             modifier = Modifier
-                .fillMaxSize()
-                .elasticOverscroll(listState),
+                .fillMaxSize(),
             contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp)
         ) {
             item {
@@ -1259,38 +1198,18 @@ private fun PlaylistDetailView(
             } else {
                 if (playlist.sortMode == "custom" && !playlist.isSystem) {
                     itemsIndexed(reorderItems, key = { _, t -> t.id }) { i, t ->
-                        DraggablePlaylistTrackRow(
-                            track = t,
-                            isDragged = i == draggedIndex,
-                            dragOffsetY = if (i == draggedIndex) dragOffsetY else 0f,
-                            onTrackClick = { onTrackClick(reorderItems.toList(), i) },
-                            onRemove = { onRemoveTrack(t.id) },
-                            onDragStart = {
-                                draggedIndex = i
-                                dragOffsetY = 0f
-                                scrollAccum = 0f
-                            },
-                            onDrag = { amount ->
-                                dragOffsetY += amount
-                                trySwap()
-                                checkAutoScroll()
-                            },
-                            onDragEnd = {
-                                stopAutoScroll()
-                                if (reorderItems.toList() != plTracks) {
-                                    onReorder(reorderItems.toList())
-                                }
-                                draggedIndex = -1
-                                dragOffsetY = 0f
-                                scrollAccum = 0f
-                            },
-                            onDragCancel = {
-                                stopAutoScroll()
-                                draggedIndex = -1
-                                dragOffsetY = 0f
-                                scrollAccum = 0f
-                            }
-                        )
+                        ReorderableItem(
+                            state = reorderableState,
+                            key = t.id
+                        ) { isDragging ->
+                            DraggablePlaylistTrackRow(
+                                track = t,
+                                isDragged = isDragging,
+                                onTrackClick = { onTrackClick(reorderItems.toList(), i) },
+                                onRemove = { onRemoveTrack(t.id) },
+                                dragHandleModifier = Modifier.draggableHandle()
+                            )
+                        }
                     }
                 } else {
                     itemsIndexed(plTracks) { i, t ->
@@ -1370,26 +1289,19 @@ private fun PlaylistTrackRow(
 private fun DraggablePlaylistTrackRow(
     track: AudioTrack,
     isDragged: Boolean,
-    dragOffsetY: Float,
     onTrackClick: () -> Unit,
     onRemove: () -> Unit,
-    onDragStart: () -> Unit,
-    onDrag: (Float) -> Unit,
-    onDragEnd: () -> Unit,
-    onDragCancel: () -> Unit
+    dragHandleModifier: Modifier
 ) {
+    val elevation by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isDragged) 6.dp else 0.dp,
+        label = "playlistItemElevation"
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
-            .graphicsLayer {
-                if (isDragged) {
-                    translationY = dragOffsetY
-                    shadowElevation = 12f
-                    scaleX = 1.02f
-                    scaleY = 1.02f
-                }
-            }
+            .shadow(elevation, RoundedCornerShape(12.dp))
             .zIndex(if (isDragged) 1f else 0f)
             .clip(RoundedCornerShape(12.dp))
             .background(
@@ -1432,16 +1344,7 @@ private fun DraggablePlaylistTrackRow(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
                 .size(28.dp)
-                .pointerInput(track.id) {
-                    detectDragGestures(
-                        onDragStart = { onDragStart() },
-                        onDragEnd = { onDragEnd() },
-                        onDragCancel = { onDragCancel() }
-                    ) { change, dragAmount: androidx.compose.ui.geometry.Offset ->
-                        change.consume()
-                        onDrag(dragAmount.y)
-                    }
-                }
+                .then(dragHandleModifier)
         )
     }
 }

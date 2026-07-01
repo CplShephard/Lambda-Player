@@ -12,7 +12,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
@@ -67,7 +66,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,6 +75,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -94,6 +93,8 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.formattedDuration
 import dev.shephard.player.data.slideForwardInQueue
@@ -104,7 +105,6 @@ import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.components.BouncyIconButton
 import dev.shephard.player.ui.components.MinimalSeekBar
 import dev.shephard.player.ui.components.bounceClick
-import dev.shephard.player.ui.components.elasticOverscroll
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -188,7 +188,25 @@ fun NowPlayingSheet(
     val playButtonScale = remember { androidx.compose.animation.core.Animatable(1f) }
     val playButtonScope = rememberCoroutineScope()
 
-    val sheetShape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+    // Sheet tam ekran halindeyken (dragOffset == 0, yani parmakla etkileşimde değilken
+    // dinlenme pozisyonunda) üst cornerlar ekranı tamamen doldurmalı — tıpkı iOS'taki gibi.
+    // Kullanıcı sheet'i aşağı sürüklemeye başlar başlamaz corner'lar geri gelsin.
+    var isInteractingWithSheet by remember { mutableStateOf(false) }
+    val isFullyExpanded by remember {
+        androidx.compose.runtime.derivedStateOf { !isInteractingWithSheet && dragOffset.value <= 0.5f }
+    }
+    val sheetCornerRadius by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isFullyExpanded) 0.dp else 20.dp,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+        ),
+        label = "sheetCornerRadius"
+    )
+    val sheetShape = androidx.compose.foundation.shape.RoundedCornerShape(
+        topStart = sheetCornerRadius,
+        topEnd = sheetCornerRadius
+    )
 
     Box(
         modifier = Modifier
@@ -201,6 +219,9 @@ fun NowPlayingSheet(
                 state = rememberDraggableState { delta ->
                     val next = (dragOffset.value + delta).coerceAtLeast(0f)
                     dragScope.launch { dragOffset.snapTo(next) }
+                },
+                onDragStarted = {
+                    isInteractingWithSheet = true
                 },
                 onDragStopped = { velocity ->
                     if (dragOffset.value > dismissThresholdPx || velocity > 2500f) {
@@ -226,6 +247,7 @@ fun NowPlayingSheet(
                                     stiffness = 320f
                                 )
                             )
+                            isInteractingWithSheet = false
                         }
                     }
                 }
@@ -651,8 +673,7 @@ fun NowPlayingSheet(
                                 }
                             } else {
                                 LazyColumn(
-                                    state = lyricListState,
-                                    modifier = Modifier.elasticOverscroll(lyricListState)
+                                    state = lyricListState
                                 ) {
                                     itemsIndexed(state.lyrics) { idx, line ->
                                         val isActive = idx == activeIndex
@@ -900,10 +921,11 @@ private fun QueueList(
     onPlayNext: (index: Int) -> Unit,
     strings: dev.shephard.player.ui.i18n.Strings
 ) {
-    val density = LocalDensity.current
     val currentStartIndex = remember(queue, currentTrackId) {
         queue.indexOfFirst { it.id == currentTrackId }.coerceAtLeast(0)
     }
+    // OuterTune'daki gibi: gerçek liste mutableStateListOf ile tutulur, drag sırasında
+    // reorderableState onMove callback'i doğrudan bu listeyi günceller (item flicker olmadan).
     val items = remember { mutableStateListOf<AudioTrack>() }
     LaunchedEffect(queue, currentStartIndex) {
         if (items.map { it.id } != queue.drop(currentStartIndex).map { it.id }) {
@@ -912,89 +934,32 @@ private fun QueueList(
         }
     }
 
-    val itemHeightDp = 64.dp
-    val itemHeightPx = with(density) { itemHeightDp.toPx() }
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
 
-    // Drag state — hepsi tek yerde
-    var draggedIndex by remember { mutableIntStateOf(-1) }
-    var dragOffsetY by remember { mutableFloatStateOf(0f) }
-    var scrollAccum by remember { mutableFloatStateOf(0f) } // autoscroll'un biriktirdiği kaydırma
-
-    val autoScrollJob = remember { androidx.compose.runtime.mutableStateOf<kotlinx.coroutines.Job?>(null) }
-    val autoScrollThresholdPx = with(density) { 72.dp.toPx() }
-
-    fun stopAutoScroll() {
-        autoScrollJob.value?.cancel()
-        autoScrollJob.value = null
-    }
-
-    // Swap: dragOffsetY + scrollAccum toplamı bir item yüksekliğini geçince yap
-    fun trySwap() {
-        val cur = draggedIndex
-        if (cur < 0) return
-        val effective = dragOffsetY + scrollAccum
-        if (effective > itemHeightPx * 0.55f && cur < items.size - 1) {
-            items.add(cur + 1, items.removeAt(cur))
-            draggedIndex = cur + 1
-            dragOffsetY -= itemHeightPx
-            scrollAccum = 0f
-        } else if (effective < -itemHeightPx * 0.55f && cur > 0) {
-            items.add(cur - 1, items.removeAt(cur))
-            draggedIndex = cur - 1
-            dragOffsetY += itemHeightPx
-            scrollAccum = 0f
+    // Drag başlayıp bitene kadar olan from/to'yu tek seferde biriktirip
+    // gerçek move işlemini (onMove) sadece drag bitince tetikliyoruz —
+    // OuterTune'un Queue.kt'deki reorderableState + LaunchedEffect(isAnyItemDragging) deseni.
+    var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    val reorderableState = rememberReorderableLazyListState(
+        lazyListState = listState
+    ) { from, to ->
+        val currentDragInfo = dragInfo
+        dragInfo = if (currentDragInfo == null) {
+            from.index to to.index
+        } else {
+            currentDragInfo.first to to.index
         }
+        items.add(to.index, items.removeAt(from.index))
     }
-
-    fun startAutoScroll(direction: Int) {
-        if (autoScrollJob.value?.isActive == true) return
-        autoScrollJob.value = coroutineScope.launch {
-            while (true) {
-                val layout = listState.layoutInfo
-                val cur = draggedIndex
-                if (cur < 0) { kotlinx.coroutines.delay(16); continue }
-                val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.index == cur }
-                if (draggedInfo == null) { kotlinx.coroutines.delay(16); continue }
-
-                val draggedTop = draggedInfo.offset + dragOffsetY
-                val draggedBottom = draggedTop + itemHeightPx
-                val viewportBottom = layout.viewportEndOffset.toFloat()
-
-                val distFromBottom = draggedBottom - (viewportBottom - autoScrollThresholdPx)
-                val distFromTop = autoScrollThresholdPx - draggedTop
-
-                val speed = when {
-                    direction > 0 && distFromBottom > 0 -> (distFromBottom * 0.25f).coerceIn(3f, 28f)
-                    direction < 0 && distFromTop > 0 -> (distFromTop * 0.25f).coerceIn(3f, 28f)
-                    else -> { stopAutoScroll(); return@launch }
-                }
-                val scrolled = speed * direction
-                listState.scrollBy(scrolled)
-                // Autoscroll miktarını biriktir → trySwap bunu kullanır
-                scrollAccum += scrolled
-                trySwap()
-                kotlinx.coroutines.delay(16)
+    LaunchedEffect(reorderableState.isAnyItemDragging) {
+        if (!reorderableState.isAnyItemDragging) {
+            dragInfo?.let { (from, to) ->
+                dragInfo = null
+                if (from == to) return@LaunchedEffect
+                val fromInQueue = from + currentStartIndex
+                val toInQueue = to + currentStartIndex
+                if (fromInQueue != toInQueue) onMove(fromInQueue, toInQueue)
             }
-        }
-    }
-
-    fun checkAutoScroll() {
-        val layout = listState.layoutInfo
-        val cur = draggedIndex
-        if (cur < 0) { stopAutoScroll(); return }
-        val draggedInfo = layout.visibleItemsInfo.firstOrNull { it.index == cur }
-            ?: run { stopAutoScroll(); return }
-
-        val draggedTop = draggedInfo.offset + dragOffsetY
-        val draggedBottom = draggedTop + itemHeightPx
-        val viewportBottom = layout.viewportEndOffset.toFloat()
-
-        when {
-            draggedBottom > viewportBottom - autoScrollThresholdPx -> startAutoScroll(+1)
-            draggedTop < autoScrollThresholdPx -> startAutoScroll(-1)
-            else -> stopAutoScroll()
         }
     }
 
@@ -1010,49 +975,22 @@ private fun QueueList(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(420.dp)
-                .elasticOverscroll(listState)
         ) {
             itemsIndexed(items, key = { _, t -> t.id }) { index, track ->
-                val isDragged = index == draggedIndex
-                val dragY = if (isDragged) dragOffsetY else 0f
-
-                QueueTrackItem(
-                    track = track,
-                    isPlaying = track.id == currentTrackId,
-                    isDragged = isDragged,
-                    dragOffsetY = dragY,
-                    density = density,
-                    itemHeightDp = itemHeightDp,
-                    onPlay = { onPlay(index) },
-                    onPlayNext = { onPlayNext(index) },
-                    onRemove = { onRemove(index) },
-                    onDragStart = {
-                        draggedIndex = index
-                        dragOffsetY = 0f
-                        scrollAccum = 0f
-                    },
-                    onDrag = { dy ->
-                        dragOffsetY += dy
-                        trySwap()
-                        checkAutoScroll()
-                    },
-                    onDragEnd = {
-                        stopAutoScroll()
-                        val cur = draggedIndex
-                        val from = queue.indexOfFirst { it.id == track.id }
-                        val to = if (cur >= 0) cur + currentStartIndex else -1
-                        if (from >= 0 && to >= 0 && from != to) onMove(from, to)
-                        draggedIndex = -1
-                        dragOffsetY = 0f
-                        scrollAccum = 0f
-                    },
-                    onDragCancel = {
-                        stopAutoScroll()
-                        draggedIndex = -1
-                        dragOffsetY = 0f
-                        scrollAccum = 0f
-                    }
-                )
+                ReorderableItem(
+                    state = reorderableState,
+                    key = track.id
+                ) { isDragging ->
+                    QueueTrackItem(
+                        track = track,
+                        isPlaying = track.id == currentTrackId,
+                        isDragged = isDragging,
+                        onPlay = { onPlay(index) },
+                        onPlayNext = { onPlayNext(index) },
+                        onRemove = { onRemove(index) },
+                        dragHandleModifier = Modifier.draggableHandle()
+                    )
+                }
             }
         }
     }
@@ -1064,34 +1002,26 @@ private fun QueueTrackItem(
     track: AudioTrack,
     isPlaying: Boolean,
     isDragged: Boolean,
-    dragOffsetY: Float,
-    density: androidx.compose.ui.unit.Density,
-    itemHeightDp: androidx.compose.ui.unit.Dp,
     onPlay: () -> Unit,
     onPlayNext: () -> Unit,
     onRemove: () -> Unit,
-    onDragStart: () -> Unit,
-    onDrag: (Float) -> Unit,
-    onDragEnd: () -> Unit,
-    onDragCancel: () -> Unit,
+    dragHandleModifier: Modifier,
 ) {
+    val density = LocalDensity.current
     val swipeThresholdPx = with(density) { 120.dp.toPx() }
     var offsetX by remember { mutableFloatStateOf(0f) }
     val duration = remember(track.id) { track.formattedDuration() }
+    val elevation by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isDragged) 8.dp else 0.dp,
+        label = "queueItemElevation"
+    )
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(itemHeightDp)
+            .height(64.dp)
             .offset(x = with(density) { offsetX.toDp() })
-            .graphicsLayer {
-                if (isDragged) {
-                    translationY = dragOffsetY
-                    shadowElevation = 16f
-                    scaleX = 1.03f
-                    scaleY = 1.03f
-                }
-            }
+            .shadow(elevation, RoundedCornerShape(12.dp))
             .zIndex(if (isDragged) 1f else 0f)
             .clip(RoundedCornerShape(12.dp))
             .background(
@@ -1169,16 +1099,7 @@ private fun QueueTrackItem(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .size(28.dp)
-                    .pointerInput(track.id) {
-                        detectDragGestures(
-                            onDragStart = { onDragStart() },
-                            onDragEnd = { onDragEnd() },
-                            onDragCancel = { onDragCancel() }
-                        ) { change, dragAmount: Offset ->
-                            change.consume()
-                            onDrag(dragAmount.y)
-                        }
-                    }
+                    .then(dragHandleModifier)
             )
         }
     }

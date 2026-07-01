@@ -75,7 +75,6 @@ import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.rememberAudioPermissionState
 import dev.shephard.player.ui.components.bounceClick
-import dev.shephard.player.ui.components.elasticOverscroll
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -153,8 +152,7 @@ fun MusicScreen(
                     columns = GridCells.Fixed(2),
                     state = gridState,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .elasticOverscroll(gridState),
+                        .fillMaxSize(),
                     contentPadding = PaddingValues(
                         start = 12.dp,
                         end = 12.dp,
@@ -177,8 +175,7 @@ fun MusicScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .elasticOverscroll(listState),
+                        .fillMaxSize(),
                     contentPadding = PaddingValues(
                         start = 16.dp,
                         end = 16.dp,
