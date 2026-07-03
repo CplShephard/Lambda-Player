@@ -16,6 +16,7 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -31,6 +32,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -83,6 +86,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
@@ -106,6 +110,7 @@ import dev.shephard.player.ui.components.BouncyIconButton
 import dev.shephard.player.ui.components.GlassTint
 import dev.shephard.player.ui.components.LocalLiquidGlassEnabled
 import dev.shephard.player.ui.components.liquidGlass
+import dev.shephard.player.ui.components.liquidGlassLight
 import dev.shephard.player.ui.components.MinimalSeekBar
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -147,9 +152,15 @@ fun NowPlayingSheet(
 
     val glow = Color(state.glowColorArgb)
 
-    // Drag dismiss için ekran yüksekliği (px)
+    // Drag dismiss için pencerenin GERÇEK ölçülen yüksekliği (px). Daha önce
+    // LocalConfiguration.screenHeightDp kullanılıyordu, bu ise her zaman cihazın TÜM ekran
+    // yüksekliğini varsayıyor — Android freeform/split-screen pencerelerde (uygulama ekranın
+    // sadece bir kısmını kaplarken) bu değer gerçek pencere boyutundan çok daha büyük çıkıyor,
+    // bu da aşağı sürükleyip kapatma animasyonunun yanlış mesafeye gitmesine sebep oluyordu.
+    // onSizeChanged ile Compose'un bize verdiği GERÇEK ölçülen pencere boyutunu kullanıyoruz.
     val configuration = LocalConfiguration.current
-    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
+    var measuredHeightPx by remember { mutableFloatStateOf(with(density) { configuration.screenHeightDp.dp.toPx() }) }
+    val screenHeightPx = measuredHeightPx
 
     // pulse artık gradient radius'unu değil sadece graphicsLayer scale'ini etkiliyor
     // → Brush her frame yeniden oluşturulmuyor, sadece transform matrix değişiyor
@@ -215,6 +226,7 @@ fun NowPlayingSheet(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .onSizeChanged { measuredHeightPx = it.height.toFloat() }
             .graphicsLayer { translationY = dragOffset.value.coerceAtLeast(0f) }
             .clip(sheetShape)
             .background(MaterialTheme.colorScheme.background)
@@ -294,6 +306,7 @@ fun NowPlayingSheet(
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
+                .verticalScroll(rememberScrollState())
                 .pointerInput(track?.id) {
                     detectHorizontalDragGestures(
                         onDragStart = { artSwipeHandled = false },
@@ -377,34 +390,44 @@ fun NowPlayingSheet(
                 // Böylece geçiş sırasında eski slotta ESKİ kapak, yeni slotta YENİ kapak görünür.
                 val displayTrack = state.queue.trackById(targetId) ?: track
                 Column {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 24.dp)
-                            .aspectRatio(1f)
-                            .graphicsLayer {
-                                translationX = artSwipeX.value
-                                alpha = 1f - (kotlin.math.abs(artSwipeX.value) / (size.width.coerceAtLeast(1f))).coerceIn(0f, 0.35f)
-                            }
-                            .clip(RoundedCornerShape(28.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        var artLoaded by remember(targetId) { mutableStateOf(false) }
-                        AsyncImage(
-                            model = displayTrack?.albumArtUri,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                            onState = { artLoaded = it is AsyncImagePainter.State.Success }
-                        )
-                        if (!artLoaded) {
-                            Icon(
-                                imageVector = Icons.Filled.MusicNote,
+                    // BoxWithConstraints: freeform/split-screen pencerelerde asıl kullanılabilir
+                    // yüksekliği ölçer (LocalConfiguration.screenHeightDp tüm cihaz ekranını
+                    // varsayar, pencerenin gerçek boyutunu değil). Kapak resmi eskiden sadece
+                    // genişliğe göre kare oluyordu (aspectRatio(1f)); dar/kısa bir freeform
+                    // pencerede bu, alttaki seek bar ve oynatma butonlarını pencere dışına itiyordu.
+                    // Artık kapak, kullanılabilir yüksekliğin en fazla %42'si kadar büyüyebiliyor.
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                        val maxArtHeight = maxHeight * 0.42f
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 24.dp)
+                                .aspectRatio(1f)
+                                .heightIn(max = maxArtHeight)
+                                .graphicsLayer {
+                                    translationX = artSwipeX.value
+                                    alpha = 1f - (kotlin.math.abs(artSwipeX.value) / (size.width.coerceAtLeast(1f))).coerceIn(0f, 0.35f)
+                                }
+                                .clip(RoundedCornerShape(28.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            var artLoaded by remember(targetId) { mutableStateOf(false) }
+                            AsyncImage(
+                                model = displayTrack?.albumArtUri,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(72.dp)
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                                onState = { artLoaded = it is AsyncImagePainter.State.Success }
                             )
+                            if (!artLoaded) {
+                                Icon(
+                                    imageVector = Icons.Filled.MusicNote,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(72.dp)
+                                )
+                            }
                         }
                     }
 
@@ -429,7 +452,7 @@ fun NowPlayingSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Seek bar
             Column(modifier = Modifier.fillMaxWidth()) {
