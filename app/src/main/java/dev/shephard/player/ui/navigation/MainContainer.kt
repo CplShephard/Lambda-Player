@@ -57,6 +57,10 @@ import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.MiniPlayer
 import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.components.GlassTint
+import dev.shephard.player.ui.components.LocalLiquidGlassEnabled
+import dev.shephard.player.ui.components.liquidGlass
+import dev.shephard.player.ui.components.liquidGlassLight
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.i18n.stringsFor
 import dev.shephard.player.ui.screens.NowPlayingSheet
@@ -143,6 +147,7 @@ fun MainContainer(
                         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
                             NavGraph(
                                 navController = navController,
+                                playerViewModel = playerViewModel,
                                 modifier = Modifier.fillMaxSize(),
                                 hasMiniPlayer = playerState.currentTrack != null,
                                 onTrackClick = { tracks, index, playlistName ->
@@ -228,11 +233,19 @@ private fun BrandHeader(currentRoute: String?) {
         try { context.packageManager.getPackageInfo(context.packageName, 0).versionName } catch (_: Exception) { "" }
     }
 
+    val liquidGlassOn = LocalLiquidGlassEnabled.current
+    val headerShape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(bottomStart = 30.dp, bottomEnd = 30.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
+            .clip(headerShape)
+            .then(
+                if (liquidGlassOn) {
+                    Modifier.liquidGlass(enabled = true, shape = headerShape)
+                } else {
+                    Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
+                }
+            )
     ) {
         Column(
             modifier = Modifier
@@ -280,6 +293,7 @@ private fun FloatingDock(
     currentRoute: String?,
     onNavigate: (Destination) -> Unit
 ) {
+    val liquidGlassOn = LocalLiquidGlassEnabled.current
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -289,8 +303,14 @@ private fun FloatingDock(
             modifier = Modifier
                 .align(Alignment.Center)
                 .clip(RoundedCornerShape(50))
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                .then(
+                    if (liquidGlassOn) {
+                        Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(50))
+                    } else {
+                        Modifier.background(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                        )
+                    }
                 )
                 .padding(horizontal = 20.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -303,11 +323,21 @@ private fun FloatingDock(
                     modifier = Modifier
                         .size(48.dp)
                         .bounceClick { onNavigate(dest) }
-                        .background(
-                            color = if (selected)
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                            else Color.Transparent,
-                            shape = CircleShape
+                        .then(
+                            if (selected && liquidGlassOn) {
+                                Modifier.liquidGlassLight(
+                                    enabled = true,
+                                    shape = CircleShape,
+                                    tint = GlassTint.ACCENT
+                                )
+                            } else {
+                                Modifier.background(
+                                    color = if (selected)
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                    else Color.Transparent,
+                                    shape = CircleShape
+                                )
+                            }
                         ),
                     contentAlignment = Alignment.Center
                 ) {

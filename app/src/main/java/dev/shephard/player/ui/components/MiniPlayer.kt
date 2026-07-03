@@ -81,6 +81,9 @@ fun MiniPlayer(
         label = "miniGlowColor"
     )
 
+    val liquidGlassOn = LocalLiquidGlassEnabled.current
+    val miniPlayerShape = RoundedCornerShape(14.dp)
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -89,15 +92,32 @@ fun MiniPlayer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            animatedGlow.copy(alpha = 0.34f),
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-                            animatedGlow.copy(alpha = 0.18f)
+                .clip(miniPlayerShape)
+                .then(
+                    if (liquidGlassOn) {
+                        Modifier
+                            .liquidGlass(enabled = true, shape = miniPlayerShape)
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        animatedGlow.copy(alpha = 0.22f),
+                                        Color.Transparent,
+                                        animatedGlow.copy(alpha = 0.10f)
+                                    )
+                                ),
+                                miniPlayerShape
+                            )
+                    } else {
+                        Modifier.background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    animatedGlow.copy(alpha = 0.34f),
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+                                    animatedGlow.copy(alpha = 0.18f)
+                                )
+                            )
                         )
-                    )
+                    }
                 )
                 .bounceClick { onClick() }
                 .padding(8.dp),
@@ -188,6 +208,10 @@ fun MiniPlayer(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
+                    .then(
+                        if (liquidGlassOn) Modifier.liquidGlassLight(enabled = true, shape = RoundedCornerShape(8.dp))
+                        else Modifier
+                    )
                     .bounceClick { onPreviousClick() },
                 contentAlignment = Alignment.Center
             ) {
@@ -203,6 +227,14 @@ fun MiniPlayer(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
+                    .then(
+                        if (liquidGlassOn) Modifier.liquidGlassLight(
+                            enabled = true,
+                            shape = RoundedCornerShape(8.dp),
+                            tint = GlassTint.ACCENT
+                        )
+                        else Modifier
+                    )
                     .bounceClick { onPlayPauseClick() },
                 contentAlignment = Alignment.Center
             ) {
@@ -227,6 +259,10 @@ fun MiniPlayer(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
+                    .then(
+                        if (liquidGlassOn) Modifier.liquidGlassLight(enabled = true, shape = RoundedCornerShape(8.dp))
+                        else Modifier
+                    )
                     .bounceClick { onNextClick() },
                 contentAlignment = Alignment.Center
             ) {

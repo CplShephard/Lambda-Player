@@ -95,6 +95,10 @@ import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.BouncyIconButton
+import dev.shephard.player.ui.components.GlassTint
+import dev.shephard.player.ui.components.LocalLiquidGlassEnabled
+import dev.shephard.player.ui.components.liquidGlass
+import dev.shephard.player.ui.components.liquidGlassLight
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
@@ -738,6 +742,7 @@ private fun PlaylistListCard(
     onMenu: () -> Unit,
     onPlay: () -> Unit
 ) {
+    val liquidGlassOn = LocalLiquidGlassEnabled.current
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
@@ -746,7 +751,10 @@ private fun PlaylistListCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            .then(
+                if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(20.dp))
+                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            )
             .clickable { onClick() }
     ) {
         Row(
@@ -840,11 +848,15 @@ private fun PlaylistGridCard(
     onMenu: () -> Unit,
     onPlay: () -> Unit
 ) {
+    val liquidGlassOn = LocalLiquidGlassEnabled.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            .then(
+                if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(20.dp))
+                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            )
             .bounceClick { onClick() }
             .padding(12.dp)
     ) {
@@ -906,14 +918,17 @@ private fun PlaylistGridCard(
                     .padding(8.dp)
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
+                    .then(
+                        if (liquidGlassOn) Modifier.liquidGlassLight(enabled = true, shape = CircleShape, tint = GlassTint.ACCENT)
+                        else Modifier.background(MaterialTheme.colorScheme.primary)
+                    )
                     .bounceClick { onPlay() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Filled.PlayArrow,
                     contentDescription = strings.play,
-                    tint = MaterialTheme.colorScheme.onPrimary,
+                    tint = if (liquidGlassOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -950,14 +965,24 @@ private fun PlaylistDetailView(
     onReorder: (List<AudioTrack>) -> Unit = {},
     onChangeSort: (String) -> Unit = {}
 ) {
+    val liquidGlassOn = LocalLiquidGlassEnabled.current
+
     // OuterTune'daki LocalPlaylistScreen deseni: gerçek liste mutableStateListOf,
     // reorderableState onMove callback'i doğrudan bu listeyi günceller, drag bitince
     // (isAnyItemDragging false olunca) tek seferde onReorder tetiklenir.
+    //
+    // ÖNEMLİ BUGFIX: plTracks, üst ekranda tracks/likedIds değiştikçe (remember key'leri
+    // yüzünden) sürükleme sırasında bile YENİDEN oluşan bir liste. Bu yüzden LaunchedEffect(plTracks)
+    // her tetiklendiğinde reorderItems'ı resetlemek, kullanıcı henüz parmağını kaldırmadan
+    // listeyi eski sıraya döndürüp item'ların "iç içe girmesine" (index kayması, yanlış item'ın
+    // sürüklenmesi) sebep oluyordu. Çözüm: aktif drag sırasında (isAnyItemDragging) hiçbir zaman
+    // resetleme yapma; sadece drag bitmişken ve gerçekten farklı bir veri geldiğinde senkronize et.
     val reorderItems = remember { mutableStateListOf<AudioTrack>() }
     var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var isReordering by remember { mutableStateOf(false) }
 
-    LaunchedEffect(plTracks) {
-        if (reorderItems.map { it.id } != plTracks.map { it.id }) {
+    LaunchedEffect(plTracks, isReordering) {
+        if (!isReordering && reorderItems.map { it.id } != plTracks.map { it.id }) {
             reorderItems.clear()
             reorderItems.addAll(plTracks)
         }
@@ -976,10 +1001,11 @@ private fun PlaylistDetailView(
         reorderItems.add(to.index, reorderItems.removeAt(from.index))
     }
     LaunchedEffect(reorderableState.isAnyItemDragging) {
+        isReordering = reorderableState.isAnyItemDragging
         if (!reorderableState.isAnyItemDragging) {
             dragInfo?.let { (from, to) ->
                 dragInfo = null
-                if (from != to && reorderItems.toList() != plTracks) {
+                if (from != to && reorderItems.map { it.id } != plTracks.map { it.id }) {
                     onReorder(reorderItems.toList())
                 }
             }
@@ -1094,7 +1120,14 @@ private fun PlaylistDetailView(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(MaterialTheme.colorScheme.primary)
+                            .then(
+                                if (liquidGlassOn) Modifier.liquidGlass(
+                                    enabled = true,
+                                    shape = RoundedCornerShape(14.dp),
+                                    tint = GlassTint.ACCENT
+                                )
+                                else Modifier.background(MaterialTheme.colorScheme.primary)
+                            )
                             .clickable(enabled = plTracks.isNotEmpty()) { onPlayAll() }
                             .padding(vertical = 12.dp),
                         horizontalArrangement = Arrangement.Center,
@@ -1103,12 +1136,12 @@ private fun PlaylistDetailView(
                         Icon(
                             Icons.Filled.PlayArrow,
                             contentDescription = strings.play,
-                            tint = MaterialTheme.colorScheme.onPrimary
+                            tint = if (liquidGlassOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = strings.play,
-                            color = MaterialTheme.colorScheme.onPrimary,
+                            color = if (liquidGlassOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -1116,7 +1149,10 @@ private fun PlaylistDetailView(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .then(
+                                if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(14.dp))
+                                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                            )
                             .clickable(enabled = plTracks.isNotEmpty()) { onPlayRemix() }
                             .padding(vertical = 12.dp),
                         horizontalArrangement = Arrangement.Center,
@@ -1138,7 +1174,10 @@ private fun PlaylistDetailView(
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .then(
+                                    if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(14.dp))
+                                    else Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                                )
                                 .clickable { onAddTracks() }
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically

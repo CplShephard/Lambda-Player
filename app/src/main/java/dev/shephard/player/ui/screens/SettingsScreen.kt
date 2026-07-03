@@ -107,6 +107,7 @@ fun SettingsScreen() {
     val language by prefs.language.collectAsState(initial = "en")
     val themeMode by prefs.themeMode.collectAsState(initial = ThemeModePreference.LIGHT)
     val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
+    val liquidGlassEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
     val playlistsLayout by prefs.playlistsLayout.collectAsState(initial = LayoutMode.LIST)
     val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
 
@@ -388,6 +389,19 @@ fun SettingsScreen() {
                     onClick = { scope.launch { prefs.setMusicsLayout(LayoutMode.GRID) } }
                 )
             }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Liquid Glass — dock, kartlar, nowplaying/playlist butonları için buzlu cam görünümü
+            ToggleRow(label = strings.liquidGlass, checked = liquidGlassEnabled) { enabled ->
+                scope.launch { prefs.setLiquidGlassEnabled(enabled) }
+            }
+            Text(
+                text = strings.liquidGlassDescription,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp)
+            )
 
             Spacer(Modifier.height(16.dp))
 

@@ -32,6 +32,7 @@ object PrefsKeys {
     val LIKED_SONG_IDS = stringPreferencesKey("liked_song_ids")
     val TRACK_OVERRIDES_JSON = stringPreferencesKey("track-overrides_json")
     val LYRICS_JSON = stringPreferencesKey("lyrics_json")
+    val LIQUID_GLASS_ENABLED = booleanPreferencesKey("liquid_glass_enabled")
 }
 
 object ThemeModePreference {
@@ -93,6 +94,10 @@ class PreferencesManager(private val context: Context) {
 
     val dynamicColor: Flow<Boolean> = context.dataStore.data.map {
         it[PrefsKeys.DYNAMIC_COLOR] ?: false
+    }
+
+    val liquidGlassEnabled: Flow<Boolean> = context.dataStore.data.map {
+        it[PrefsKeys.LIQUID_GLASS_ENABLED] ?: false
     }
 
     val playlistsLayout: Flow<Int> = context.dataStore.data.map {
@@ -182,6 +187,10 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setDynamicColor(enabled: Boolean) {
         context.dataStore.edit { it[PrefsKeys.DYNAMIC_COLOR] = enabled }
+    }
+
+    suspend fun setLiquidGlassEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[PrefsKeys.LIQUID_GLASS_ENABLED] = enabled }
     }
 
     suspend fun setPlaylistsLayout(mode: Int) {

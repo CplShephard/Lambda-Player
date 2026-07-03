@@ -103,6 +103,9 @@ import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.components.BouncyIconButton
+import dev.shephard.player.ui.components.GlassTint
+import dev.shephard.player.ui.components.LocalLiquidGlassEnabled
+import dev.shephard.player.ui.components.liquidGlass
 import dev.shephard.player.ui.components.MinimalSeekBar
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -120,6 +123,7 @@ fun NowPlayingSheet(
     val state by playerViewModel.uiState.collectAsState()
     val track = state.currentTrack
     val strings = LocalStrings.current
+    val nowPlayingLiquidGlassOn = LocalLiquidGlassEnabled.current
 
     val density = LocalDensity.current
     val dismissThresholdPx = with(density) { 140.dp.toPx() }
@@ -495,9 +499,19 @@ fun NowPlayingSheet(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(
-                            if (isLiked) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                            else MaterialTheme.colorScheme.surfaceVariant
+                        .then(
+                            if (nowPlayingLiquidGlassOn) {
+                                Modifier.liquidGlassLight(
+                                    enabled = true,
+                                    shape = CircleShape,
+                                    tint = if (isLiked) GlassTint.ACCENT else GlassTint.SURFACE
+                                )
+                            } else {
+                                Modifier.background(
+                                    if (isLiked) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            }
                         )
                         .bounceClick {
                             if (trackId > 0) {
@@ -738,7 +752,17 @@ fun NowPlayingSheet(
                     modifier = Modifier
                         .size(72.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
+                        .then(
+                            if (nowPlayingLiquidGlassOn) {
+                                Modifier.liquidGlass(
+                                    enabled = true,
+                                    shape = CircleShape,
+                                    tint = GlassTint.ACCENT
+                                )
+                            } else {
+                                Modifier.background(MaterialTheme.colorScheme.primary)
+                            }
+                        )
                         .bounceClick {
                             playButtonScope.launch {
                                 playButtonScale.animateTo(0.85f, androidx.compose.animation.core.tween(80))
@@ -766,7 +790,7 @@ fun NowPlayingSheet(
                         Icon(
                             imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (isPlaying) strings.pause else strings.play,
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = if (nowPlayingLiquidGlassOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(36.dp)
                         )
                     }

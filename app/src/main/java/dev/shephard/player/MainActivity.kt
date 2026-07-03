@@ -10,6 +10,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -20,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.UpdateChecker
 import dev.shephard.player.player.GithubReleaseInfo
+import dev.shephard.player.ui.components.LocalLiquidGlassEnabled
 import dev.shephard.player.ui.i18n.stringsFor
 import dev.shephard.player.ui.navigation.MainContainer
 import dev.shephard.player.ui.theme.LambdaPlayerTheme
@@ -39,6 +41,7 @@ class MainActivity : ComponentActivity() {
             val themeMode by prefs.themeMode.collectAsState(initial = dev.shephard.player.player.ThemeModePreference.LIGHT)
             val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
             val cardAlpha by prefs.cardAlpha.collectAsState(initial = 0.85f)
+            val liquidGlassEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
             val languageCode by prefs.language.collectAsState(initial = "en")
             val strings = remember(languageCode) { stringsFor(languageCode) }
             val initialAudioUri = externalAudioUriState.value
@@ -48,6 +51,7 @@ class MainActivity : ComponentActivity() {
                 dynamicColor = dynamicColor,
                 cardAlpha = cardAlpha
             ) {
+                CompositionLocalProvider(LocalLiquidGlassEnabled provides liquidGlassEnabled) {
                 var availableRelease by remember { mutableStateOf<GithubReleaseInfo?>(null) }
                 LaunchedEffect(Unit) {
                     availableRelease = UpdateChecker.checkLatestRelease()
@@ -71,6 +75,7 @@ class MainActivity : ComponentActivity() {
                             TextButton(onClick = { availableRelease = null }) { Text(strings.later) }
                         }
                     )
+                }
                 }
             }
         }

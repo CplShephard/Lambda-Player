@@ -83,6 +83,22 @@ fun Modifier.bounceClick(
  * bounceClick modifier handles the click event (avoiding the double-fire
  * that would happen if we wrapped Material3 IconButton with bounceClick).
  */
+/**
+ * Convenience composable: a 48dp circular icon button with the bounce-on-tap
+ * animation applied. Drop-in replacement for Material3 [androidx.compose.material3.IconButton]
+ * — same accessibility semantics (it's still a Button role), same tap target,
+ * plus the spring scale on press.
+ *
+ * We implement it on top of a Box rather than Material3 IconButton so the
+ * bounceClick modifier handles the click event (avoiding the double-fire
+ * that would happen if we wrapped Material3 IconButton with bounceClick).
+ *
+ * Liquid Glass entegrasyonu: [LocalLiquidGlassEnabled] açıkken ve çağıran taraf bir
+ * `backgroundColor` verdiyse (yani dolu bir daire/buton isteniyorsa), düz renk yerine
+ * buzlu cam dolgusu + parlak kenarlık uygulanır. Bu sayede uygulamadaki her
+ * BouncyIconButton çağrısı (Now Playing sheet, playlist ekranı, dock vb.) tek bir
+ * yerden otomatik olarak yeni görünüme geçer.
+ */
 @Composable
 fun BouncyIconButton(
     onClick: () -> Unit,
@@ -92,11 +108,20 @@ fun BouncyIconButton(
     contentDescription: String? = null,
     tint: Color = MaterialTheme.colorScheme.onSurface,
     iconSize: Dp = 24.dp,
-    backgroundColor: Color? = null
+    backgroundColor: Color? = null,
+    glassTint: GlassTint = GlassTint.SURFACE
 ) {
+    val liquidGlassOn = LocalLiquidGlassEnabled.current
     val boxModifier = modifier
         .size(48.dp)
-        .let { if (backgroundColor != null) it.background(backgroundColor) else it }
+        .let {
+            when {
+                backgroundColor != null && liquidGlassOn ->
+                    it.liquidGlassLight(enabled = true, shape = androidx.compose.foundation.shape.CircleShape, tint = glassTint)
+                backgroundColor != null -> it.background(backgroundColor)
+                else -> it
+            }
+        }
         .bounceClick(enabled = enabled, onClick = onClick)
     Box(
         modifier = boxModifier,

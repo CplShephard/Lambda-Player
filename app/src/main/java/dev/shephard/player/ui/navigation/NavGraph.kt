@@ -5,10 +5,12 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import dev.shephard.player.data.AudioTrack
+import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.ui.screens.MusicScreen
 import dev.shephard.player.ui.screens.PlaylistScreen
 import dev.shephard.player.ui.screens.SettingsScreen
@@ -27,6 +29,7 @@ private val fadeSpring = spring<Float>(
 @Composable
 fun NavGraph(
     navController: NavHostController,
+    playerViewModel: PlayerViewModel = viewModel(),
     modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
     hasMiniPlayer: Boolean = false,
     onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
@@ -80,6 +83,7 @@ fun NavGraph(
     ) {
         composable(Destination.Music.route) {
             MusicScreen(
+                playerViewModel = playerViewModel,
                 onTrackClick = { tracks, index -> onTrackClick(tracks, index, null) },
                 hasMiniPlayer = hasMiniPlayer
             )

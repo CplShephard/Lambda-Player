@@ -74,6 +74,9 @@ import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.rememberAudioPermissionState
+import dev.shephard.player.ui.components.GlassTint
+import dev.shephard.player.ui.components.LocalLiquidGlassEnabled
+import dev.shephard.player.ui.components.liquidGlass
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
@@ -334,11 +337,15 @@ private fun GridTrackCard(
     onClick: () -> Unit,
     onMenuClick: () -> Unit
 ) {
+    val liquidGlassOn = LocalLiquidGlassEnabled.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            .then(
+                if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(20.dp))
+                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            )
             .bounceClick { onClick() }
             .padding(8.dp)
     ) {
@@ -397,11 +404,15 @@ private fun GridTrackCard(
 
 @Composable
 private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> Unit) {
+    val liquidGlassOn = LocalLiquidGlassEnabled.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            .then(
+                if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(20.dp))
+                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            )
             .bounceClick { onClick() }
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically

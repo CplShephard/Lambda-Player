@@ -111,6 +111,8 @@ data class Strings(
     val update: String,
     val later: String,
     val removeCover: String,
+    val liquidGlass: String,
+    val liquidGlassDescription: String,
 )
 
 private val EN = Strings(
@@ -195,7 +197,9 @@ private val EN = Strings(
     updateAvailableMessage = "A new GitHub release is available.",
     update = "Update",
     later = "Later",
-    removeCover = "Remove cover"
+    removeCover = "Remove cover",
+    liquidGlass = "Liquid Glass",
+    liquidGlassDescription = "Frosted glass look for cards and buttons"
 )
 
 private val TR = EN.copy(
@@ -279,7 +283,9 @@ private val TR = EN.copy(
     updateAvailableMessage = "GitHub'da yeni bir sürüm yayınlandı.",
     update = "Güncelle",
     later = "Daha sonra",
-    removeCover = "Kapağı kaldır"
+    removeCover = "Kapağı kaldır",
+    liquidGlass = "Sıvı Cam",
+    liquidGlassDescription = "Kartlar ve butonlar için buzlu cam görünümü"
 )
 
 private val ZH = EN.copy(
@@ -363,7 +369,9 @@ private val ZH = EN.copy(
     updateAvailableMessage = "GitHub 上有新版本。",
     update = "更新",
     later = "稍后",
-    removeCover = "移除封面"
+    removeCover = "移除封面",
+    liquidGlass = "液态玻璃",
+    liquidGlassDescription = "卡片和按钮的磨砂玻璃外观"
 )
 
 private val ES = EN.copy(
@@ -447,7 +455,9 @@ private val ES = EN.copy(
     updateAvailableMessage = "Hay una nueva versión en GitHub.",
     update = "Actualizar",
     later = "Más tarde",
-    removeCover = "Quitar portada"
+    removeCover = "Quitar portada",
+    liquidGlass = "Vidrio Líquido",
+    liquidGlassDescription = "Aspecto de vidrio esmerilado para tarjetas y botones"
 )
 
 private val RU = EN.copy(
@@ -531,7 +541,9 @@ private val RU = EN.copy(
     updateAvailableMessage = "На GitHub доступен новый релиз.",
     update = "Обновить",
     later = "Позже",
-    removeCover = "Удалить обложку"
+    removeCover = "Удалить обложку",
+    liquidGlass = "Жидкое стекло",
+    liquidGlassDescription = "Матовый стеклянный вид карточек и кнопок"
 )
 
 private val KA = EN.copy(
@@ -615,7 +627,9 @@ private val KA = EN.copy(
     updateAvailableMessage = "GitHub-ზე ახალი რელიზია.",
     update = "განახლება",
     later = "მოგვიანებით",
-    removeCover = "ყდის წაშლა"
+    removeCover = "ყდის წაშლა",
+    liquidGlass = "თხევადი შუშა",
+    liquidGlassDescription = "ყინულოვანი შუშის იერსახე ბარათებისა და ღილაკებისთვის"
 )
 
 private val AR = EN.copy(
@@ -699,7 +713,9 @@ private val AR = EN.copy(
     updateAvailableMessage = "يوجد إصدار جديد على GitHub.",
     update = "تحديث",
     later = "لاحقًا",
-    removeCover = "إزالة الغلاف"
+    removeCover = "إزالة الغلاف",
+    liquidGlass = "الزجاج السائل",
+    liquidGlassDescription = "مظهر زجاجي مصنفر للبطاقات والأزرار"
 )
 
 val AllLanguages: List<Strings> = listOf(EN, TR, ZH, ES, RU, KA, AR)
