@@ -11,6 +11,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -44,7 +45,8 @@ enum class GlassTint { SURFACE, ACCENT }
 fun Modifier.liquidGlass(
     enabled: Boolean,
     shape: Shape = RoundedCornerShape(20.dp),
-    tint: GlassTint = GlassTint.SURFACE
+    tint: GlassTint = GlassTint.SURFACE,
+    topEdgeHighlight: Boolean = true
 ): Modifier = composed {
     if (!enabled) return@composed this
 
@@ -61,18 +63,38 @@ fun Modifier.liquidGlass(
     }
 
     val glassBrush = Brush.verticalGradient(listOf(fillTop, fillBottom))
-    val highlightBrush = Brush.linearGradient(
-        colors = listOf(
-            Color.White.copy(alpha = 0.55f),
-            Color.White.copy(alpha = 0.05f),
-            Color.White.copy(alpha = 0.0f)
-        )
-    )
 
-    this
+    var result = this
         .clip(shape)
         .background(glassBrush, shape)
-        .border(width = 1.dp, brush = highlightBrush, shape = shape)
+
+    result = if (topEdgeHighlight) {
+        // Standart cam kenarlığı: tüm kenarlar boyunca ince, parlak bir highlight.
+        val highlightBrush = Brush.linearGradient(
+            colors = listOf(
+                Color.White.copy(alpha = 0.55f),
+                Color.White.copy(alpha = 0.05f),
+                Color.White.copy(alpha = 0.0f)
+            )
+        )
+        result.border(width = 1.dp, brush = highlightBrush, shape = shape)
+    } else {
+        // Üst kenarı düz (köşesiz) kartlarda -- ör. status bar'a yaslanan header -- üstte
+        // yapay bir beyaz çizgi oluşmaması için highlight'ı yalnızca sol/sağ/alt kenarlara
+        // uygularız; üst kenar tamamen çizilmeden bırakılır.
+        result.border(
+            width = 1.dp,
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.0f),
+                    Color.White.copy(alpha = 0.16f),
+                    Color.White.copy(alpha = 0.05f)
+                )
+            ),
+            shape = shape
+        )
+    }
+    result
 }
 
 /**

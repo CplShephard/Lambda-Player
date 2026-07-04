@@ -366,6 +366,7 @@ fun PlaylistScreen(
 
     val pickerIdx = trackPickerForIndex
     if (pickerIdx != null) {
+        val pickerLiquidGlassOn = LocalLiquidGlassEnabled.current
         AlertDialog(
             onDismissRequest = { trackPickerForIndex = null },
             title = { Text(strings.addTracks) },
@@ -374,20 +375,27 @@ fun PlaylistScreen(
                 LazyColumn(
                     state = pickerListState,
                     modifier = Modifier
-                        .height(400.dp)
+                        .height(400.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(tracks) { t ->
                         val checked = t.id in pickerSelected
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .then(
+                                    if (pickerLiquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(14.dp))
+                                    else if (checked) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+                                    else Modifier
+                                )
                                 .clickable {
                                     pickerSelected = if (checked)
                                         pickerSelected - t.id
                                     else
                                         pickerSelected + t.id
                                 }
-                                .padding(vertical = 4.dp),
+                                .padding(vertical = 4.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Checkbox(
@@ -1270,11 +1278,15 @@ private fun PlaylistTrackRow(
     onClick: () -> Unit,
     onRemove: () -> Unit
 ) {
+    val liquidGlassOn = LocalLiquidGlassEnabled.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            .then(
+                if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(20.dp))
+                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            )
             .bounceClick { onClick() }
             .padding(vertical = 8.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically

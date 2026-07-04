@@ -241,7 +241,7 @@ private fun BrandHeader(currentRoute: String?) {
             .clip(headerShape)
             .then(
                 if (liquidGlassOn) {
-                    Modifier.liquidGlass(enabled = true, shape = headerShape)
+                    Modifier.liquidGlass(enabled = true, shape = headerShape, topEdgeHighlight = false)
                 } else {
                     Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
                 }

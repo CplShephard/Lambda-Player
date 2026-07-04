@@ -509,14 +509,16 @@ fun NowPlayingSheet(
                     icon = Icons.AutoMirrored.Filled.QueueMusic,
                     contentDescription = strings.queue,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    iconSize = 28.dp
+                    iconSize = 28.dp,
+                    backgroundColor = if (nowPlayingLiquidGlassOn) Color.Transparent else null
                 )
                 BouncyIconButton(
                     onClick = { showLyrics = true },
                     icon = Icons.Filled.Lyrics,
                     contentDescription = strings.lyrics,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    iconSize = 28.dp
+                    iconSize = 28.dp,
+                    backgroundColor = if (nowPlayingLiquidGlassOn) Color.Transparent else null
                 )
                 Box(
                     modifier = Modifier

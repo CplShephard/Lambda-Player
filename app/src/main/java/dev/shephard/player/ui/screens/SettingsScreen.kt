@@ -4,10 +4,12 @@ package dev.shephard.player.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -74,6 +76,8 @@ import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
 import dev.shephard.player.ui.components.CustomColorPickerDialog
+import dev.shephard.player.ui.components.LocalLiquidGlassEnabled
+import dev.shephard.player.ui.components.liquidGlass
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
@@ -114,6 +118,49 @@ fun SettingsScreen() {
     var langMenuOpen by remember { mutableStateOf(false) }
     var customPickerOpen by remember { mutableStateOf(false) }
 
+    // Kırpılmış wallpaper her seferinde benzersiz isimli bir dosyaya yazılır; böylece Coil eski
+    // kırpımı önbellekten göstermez (content:// URI'lere sorgu parametresi eklemek FileProvider'da
+    // güvenilir değil, o yüzden dosya adını değiştiriyoruz).
+    var cropOutputUri by remember { mutableStateOf<Uri?>(null) }
+
+    val cropLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val output = cropOutputUri
+        if (result.resultCode == android.app.Activity.RESULT_OK && output != null) {
+            scope.launch { prefs.setWallpaperUri(output.toString()) }
+        }
+    }
+
+    fun launchSystemCrop(sourceUri: Uri) {
+        // Her kırpma için yeni bir çıktı dosyası hazırla.
+        val dir = java.io.File(context.cacheDir, "wallpaper").apply { mkdirs() }
+        val file = java.io.File(dir, "wallpaper_${System.currentTimeMillis()}.jpg")
+        cropOutputUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+
+        val cropIntent = Intent("com.android.camera.action.CROP").apply {
+            setDataAndType(sourceUri, "image/*")
+            putExtra("crop", "true")
+            putExtra("scale", true)
+            putExtra("outputX", 1080)
+            putExtra("outputY", 1920)
+            putExtra("aspectX", 9)
+            putExtra("aspectY", 16)
+            putExtra(android.provider.MediaStore.EXTRA_OUTPUT, cropOutputUri)
+            putExtra("outputFormat", android.graphics.Bitmap.CompressFormat.JPEG.toString())
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            clipData = android.content.ClipData.newUri(context.contentResolver, "wallpaper", sourceUri)
+        }
+        val canCrop = cropIntent.resolveActivity(context.packageManager) != null
+        if (canCrop) {
+            cropLauncher.launch(cropIntent)
+        } else {
+            // Cihazda sistem cropper'ı yoksa (bazı özel ROM'larda olabilir) seçilen görseli
+            // doğrudan kaydet — en azından wallpaper ayarlanabilsin.
+            scope.launch { prefs.setWallpaperUri(sourceUri.toString()) }
+        }
+    }
+
     val wallpaperPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -124,7 +171,7 @@ fun SettingsScreen() {
                     android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             } catch (_: SecurityException) { }
-            scope.launch { prefs.setWallpaperUri(uri.toString()) }
+            launchSystemCrop(uri)
         }
     }
 
@@ -147,10 +194,14 @@ fun SettingsScreen() {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .bounceClick { uriHandler.openUri("https://github.com/CplShephard") },
+                .bounceClick { uriHandler.openUri("https://github.com/CplShephard") }
+                .then(
+                    if (liquidGlassEnabled) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(20.dp))
+                    else Modifier
+                ),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                containerColor = if (liquidGlassEnabled) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant
             )
         ) {
             Row(
@@ -630,11 +681,17 @@ fun SettingsScreen() {
 
 @Composable
 private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
+    val liquidGlassOn = LocalLiquidGlassEnabled.current
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(20.dp))
+                else Modifier
+            ),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (liquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
         Column(modifier = Modifier.padding(20.dp)) { content() }
