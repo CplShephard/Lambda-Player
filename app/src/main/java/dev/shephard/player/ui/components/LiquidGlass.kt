@@ -15,8 +15,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.unit.dp
 
 /**
@@ -75,29 +77,30 @@ fun Modifier.liquidGlass(
 
     val glassBrush = Brush.verticalGradient(listOf(fillTop, fillBottom))
 
-    // ÖNEMLİ BUGFIX: Daha önce blur, bu composable'ın TAMAMINI kapsayan bir graphicsLayer
-    // üzerinden uygulanıyordu — bu da kartın üstündeki metin/kapak resmi gibi ÇOCUK
-    // composable'ları da (yani gerçek içeriği) bulanıklaştırıyordu. Doğrusu: blur'u SADECE
-    // arka plandaki dolgu rengine uygulamak, içeriğe hiç dokunmamak. Bunu `drawWithContent`
-    // içinde `drawIntoCanvas` ile AYRI bir native layer açıp (saveLayer), o katmana sadece
-    // dolgu rengini blur'layarak çizip, sonra `drawContent()` ile gerçek içeriği (metin,
-    // kapak resmi vs.) TAMAMEN net bırakarak üstüne çiziyoruz.
+    // ÖNEMLİ BUGFIX (derleme hatası + blur sızıntısı): Daha önce iki farklı hatalı yaklaşım
+    // denendi:
+    //  1) graphicsLayer + renderEffect'i composable'ın TAMAMINA uygulamak -> içerik (metin,
+    //     kapak resmi) de bulanıklaşıyordu.
+    //  2) android.graphics.Paint üzerinden saveLayer ile blur -> Paint sınıfında
+    //     setRenderEffect diye bir API yok (bu yalnızca View/RenderNode'da var), bu yüzden
+    //     derleme hatası veriyordu.
+    // Doğrusu: Compose'un GraphicsLayer API'sini (rememberGraphicsLayer + record + drawLayer)
+    // kullanmak. Bu, SADECE dolgu rengini ayrı, izole bir katmana kaydedip o katmana blur
+    // uygulamamızı sağlıyor; `drawContent()` bu katmanın tamamen dışında, üstte net çiziliyor.
+    val glassFillLayer = rememberGraphicsLayer()
+
     var result = this
         .clip(shape)
         .drawWithContent {
-            drawIntoCanvas { canvas ->
-                val paint = android.graphics.Paint()
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    paint.setRenderEffect(
-                        RenderEffect.createBlurEffect(18f, 18f, Shader.TileMode.CLAMP)
-                    )
-                }
-                val checkPoint = canvas.nativeCanvas.saveLayer(
-                    0f, 0f, size.width, size.height, paint
-                )
+            glassFillLayer.record {
                 drawRect(brush = glassBrush)
-                canvas.nativeCanvas.restoreToCount(checkPoint)
             }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                glassFillLayer.renderEffect = RenderEffect
+                    .createBlurEffect(18f, 18f, Shader.TileMode.CLAMP)
+                    .asComposeRenderEffect()
+            }
+            drawLayer(glassFillLayer)
             // Camın içinden ışık geçiyormuş hissi veren diyagonal specular sweep — bu katman
             // blurlanmaz, net kalır. İçerik (metin/kapak resmi) her zaman en üstte ve nettir.
             rotate(degrees = -20f, pivot = Offset(size.width * 0.3f, size.height * 0.3f)) {
