@@ -564,6 +564,14 @@ fun NowPlayingSheet(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .then(
+                                        if (nowPlayingLiquidGlassOn)
+                                            Modifier.liquidGlassSheetSurface(
+                                                enabled = true,
+                                                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                                            )
+                                        else Modifier
+                                    )
                                     .padding(vertical = 10.dp)
                                     .pointerInput(Unit) {
                                         detectDragGestures(
@@ -642,6 +650,14 @@ fun NowPlayingSheet(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .then(
+                                        if (nowPlayingLiquidGlassOn)
+                                            Modifier.liquidGlassSheetSurface(
+                                                enabled = true,
+                                                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                                            )
+                                        else Modifier
+                                    )
                                     .padding(vertical = 10.dp)
                                     .pointerInput(Unit) {
                                         detectDragGestures(
@@ -667,12 +683,12 @@ fun NowPlayingSheet(
                     ) {
                         Column(
                             modifier = Modifier
-                                .padding(16.dp)
+                                .fillMaxWidth()
                                 .then(
-                                    if (nowPlayingLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(24.dp))
+                                    if (nowPlayingLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
                                     else Modifier
                                 )
-                                .padding(if (nowPlayingLiquidGlassOn) 16.dp else 0.dp)
+                                .padding(16.dp)
                                 .heightIn(min = 200.dp, max = 520.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -872,16 +888,40 @@ private fun AddToPlaylistDrawer(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (addToPlaylistLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface
+        containerColor = if (addToPlaylistLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (addToPlaylistLiquidGlassOn)
+                            Modifier.liquidGlassSheetSurface(
+                                enabled = true,
+                                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                            )
+                        else Modifier
+                    )
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(32.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                )
+            }
+        }
     ) {
         Column(
             modifier = Modifier
-                .padding(16.dp)
+                .fillMaxWidth()
                 .then(
-                    if (addToPlaylistLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(24.dp))
+                    if (addToPlaylistLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
                     else Modifier
                 )
-                .padding(if (addToPlaylistLiquidGlassOn) 16.dp else 0.dp)
+                .padding(16.dp)
                 .height(420.dp)
         ) {
             Text(strings.addToPlaylist, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -1033,12 +1073,11 @@ private fun QueueList(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
             .then(
-                if (queueLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(24.dp))
+                if (queueLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
                 else Modifier
             )
-            .padding(if (queueLiquidGlassOn) 16.dp else 0.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Text(
             text = strings.queue,

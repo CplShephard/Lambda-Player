@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Button
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -207,16 +208,44 @@ fun MusicScreen(
         ModalBottomSheet(
             onDismissRequest = { selectedTrackForMenu = null },
             sheetState = sheetState,
-            containerColor = if (menuLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface
+            containerColor = if (menuLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+            dragHandle = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (menuLiquidGlassOn)
+                                Modifier.liquidGlassSheetSurface(
+                                    enabled = true,
+                                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                                )
+                            else Modifier
+                        )
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (menuLiquidGlassOn) {
+                        Box(
+                            modifier = Modifier
+                                .width(32.dp)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                        )
+                    } else {
+                        BottomSheetDefaults.DragHandle()
+                    }
+                }
+            }
         ) {
             Column(
                 modifier = Modifier
-                    .padding(16.dp)
+                    .fillMaxWidth()
                     .then(
-                        if (menuLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(24.dp))
+                        if (menuLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
                         else Modifier
                     )
-                    .padding(if (menuLiquidGlassOn) 16.dp else 0.dp)
+                    .padding(16.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
@@ -518,16 +547,44 @@ private fun EditMusicDrawer(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (editMusicLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface
+        containerColor = if (editMusicLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (editMusicLiquidGlassOn)
+                            Modifier.liquidGlassSheetSurface(
+                                enabled = true,
+                                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                            )
+                        else Modifier
+                    )
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (editMusicLiquidGlassOn) {
+                    Box(
+                        modifier = Modifier
+                            .width(32.dp)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                    )
+                } else {
+                    BottomSheetDefaults.DragHandle()
+                }
+            }
+        }
     ) {
         Column(
             modifier = Modifier
-                .padding(16.dp)
+                .fillMaxWidth()
                 .then(
-                    if (editMusicLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(24.dp))
+                    if (editMusicLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
                     else Modifier
                 )
-                .padding(if (editMusicLiquidGlassOn) 16.dp else 0.dp)
+                .padding(16.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

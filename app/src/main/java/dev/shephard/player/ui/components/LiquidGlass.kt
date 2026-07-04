@@ -3,7 +3,6 @@ package dev.shephard.player.ui.components
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.os.Build
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -15,11 +14,9 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.unit.dp
 
 /**
@@ -78,29 +75,31 @@ fun Modifier.liquidGlass(
 
     val glassBrush = Brush.verticalGradient(listOf(fillTop, fillBottom))
 
+    // ÖNEMLİ BUGFIX: Daha önce blur, bu composable'ın TAMAMINI kapsayan bir graphicsLayer
+    // üzerinden uygulanıyordu — bu da kartın üstündeki metin/kapak resmi gibi ÇOCUK
+    // composable'ları da (yani gerçek içeriği) bulanıklaştırıyordu. Doğrusu: blur'u SADECE
+    // arka plandaki dolgu rengine uygulamak, içeriğe hiç dokunmamak. Bunu `drawWithContent`
+    // içinde `drawIntoCanvas` ile AYRI bir native layer açıp (saveLayer), o katmana sadece
+    // dolgu rengini blur'layarak çizip, sonra `drawContent()` ile gerçek içeriği (metin,
+    // kapak resmi vs.) TAMAMEN net bırakarak üstüne çiziyoruz.
     var result = this
         .clip(shape)
-        // Dolgu katmanını AYRI bir offscreen grafik katmanında çiziyoruz ki API 31+'da
-        // sadece bu katmana (specular sweep'e değil) gerçek bir blur (RenderEffect)
-        // uygulayabilelim — sert gradient yerine gerçekten "buzlu camdan sızan ışık" hissi
-        // veren yumuşak bir dağılım oluşur, üstteki ışık şeridi ise net kalır.
-        .then(
-            Modifier
-                .graphicsLayer {
-                    compositingStrategy = CompositingStrategy.Offscreen
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        renderEffect = RenderEffect
-                            .createBlurEffect(18f, 18f, Shader.TileMode.CLAMP)
-                            .asComposeRenderEffect()
-                    }
-                }
-                .background(glassBrush, shape)
-        )
-        // Camın içinden ışık geçiyormuş hissi veren diyagonal specular sweep. Sabit (statik)
-        // bir açıda, üst-sol köşeden hafif parlak bir şerit halinde geçer — iOS 26 Liquid
-        // Glass'ın karakteristik "ışık kırılması" detayı. Bu katman blurlanmaz, net kalır.
         .drawWithContent {
-            drawContent()
+            drawIntoCanvas { canvas ->
+                val paint = android.graphics.Paint()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    paint.setRenderEffect(
+                        RenderEffect.createBlurEffect(18f, 18f, Shader.TileMode.CLAMP)
+                    )
+                }
+                val checkPoint = canvas.nativeCanvas.saveLayer(
+                    0f, 0f, size.width, size.height, paint
+                )
+                drawRect(brush = glassBrush)
+                canvas.nativeCanvas.restoreToCount(checkPoint)
+            }
+            // Camın içinden ışık geçiyormuş hissi veren diyagonal specular sweep — bu katman
+            // blurlanmaz, net kalır. İçerik (metin/kapak resmi) her zaman en üstte ve nettir.
             rotate(degrees = -20f, pivot = Offset(size.width * 0.3f, size.height * 0.3f)) {
                 drawRect(
                     brush = Brush.linearGradient(
@@ -124,6 +123,7 @@ fun Modifier.liquidGlass(
                     endY = size.height
                 )
             )
+            drawContent()
         }
 
     result = if (topEdgeHighlight) {
