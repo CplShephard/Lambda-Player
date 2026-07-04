@@ -32,8 +32,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -306,7 +304,6 @@ fun NowPlayingSheet(
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
-                .verticalScroll(rememberScrollState())
                 .pointerInput(track?.id) {
                     detectHorizontalDragGestures(
                         onDragStart = { artSwipeHandled = false },
@@ -452,7 +449,7 @@ fun NowPlayingSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.weight(1f))
 
             // Seek bar
             Column(modifier = Modifier.fillMaxWidth()) {
