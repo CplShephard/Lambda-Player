@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <!-- Wallpaper kırpma (ACTION_CROP) çıktısı ve önizleme için cache alt klasörü -->
-    <cache-path name="wallpaper_cache" path="wallpaper/" />
-    <files-path name="wallpaper_files" path="wallpaper/" />
+    <!-- Kalıcı olarak kopyalanan wallpaper ve kapak resimleri (filesDir altında, cache değil --
+         kullanıcı uygulamayı kapatıp açsa ya da sistem önbelleği temizlese bile kalıcı olmalı). -->
+    <files-path name="persisted_wallpaper" path="persisted_wallpaper/" />
+    <files-path name="persisted_covers" path="persisted_covers/" />
 </paths>

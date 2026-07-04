@@ -118,8 +118,11 @@ fun SettingsScreen() {
     var langMenuOpen by remember { mutableStateOf(false) }
     var customPickerOpen by remember { mutableStateOf(false) }
 
-    // Kırpılmış wallpaper her seferinde benzersiz isimli bir dosyaya yazılır; böylece Coil eski
-    // kırpımı önbellekten göstermez (content:// URI'lere sorgu parametresi eklemek FileProvider'da
+    // Kırpılmış wallpaper KALICI depolamaya (filesDir, cache DEĞİL) her seferinde benzersiz
+    // isimli bir dosyaya yazılır. Kalıcı depolama kullanmamızın sebebi: metin tercihleri gibi
+    // wallpaper'ın da kullanıcı uygulamayı kapatıp açtığında ya da sistem önbelleği
+    // temizlediğinde kaybolmaması. Benzersiz dosya adı ise Coil'in eski kırpımı önbellekten
+    // göstermesini engeller (content:// URI'lere sorgu parametresi eklemek FileProvider'da
     // güvenilir değil, o yüzden dosya adını değiştiriyoruz).
     var cropOutputUri by remember { mutableStateOf<Uri?>(null) }
 
@@ -133,10 +136,11 @@ fun SettingsScreen() {
     }
 
     fun launchSystemCrop(sourceUri: Uri) {
-        // Her kırpma için yeni bir çıktı dosyası hazırla.
-        val dir = java.io.File(context.cacheDir, "wallpaper").apply { mkdirs() }
+        // Her kırpma için KALICI depolamada (filesDir) yeni bir çıktı dosyası hazırla.
+        val dir = java.io.File(context.filesDir, "persisted_wallpaper").apply { mkdirs() }
         val file = java.io.File(dir, "wallpaper_${System.currentTimeMillis()}.jpg")
-        cropOutputUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val outputUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        cropOutputUri = outputUri
 
         val cropIntent = Intent("com.android.camera.action.CROP").apply {
             setDataAndType(sourceUri, "image/*")
@@ -146,18 +150,41 @@ fun SettingsScreen() {
             putExtra("outputY", 1920)
             putExtra("aspectX", 9)
             putExtra("aspectY", 16)
-            putExtra(android.provider.MediaStore.EXTRA_OUTPUT, cropOutputUri)
+            putExtra(android.provider.MediaStore.EXTRA_OUTPUT, outputUri)
             putExtra("outputFormat", android.graphics.Bitmap.CompressFormat.JPEG.toString())
+            putExtra("return-data", false)
+            putExtra("noFaceDetection", true)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             clipData = android.content.ClipData.newUri(context.contentResolver, "wallpaper", sourceUri)
         }
-        val canCrop = cropIntent.resolveActivity(context.packageManager) != null
+
+        // ÖNEMLİ BUGFIX ("Couldn't save changes due to an error"): Bazı OEM cropper'ları
+        // (ör. Xiaomi/HyperOS Gallery cropper) intent flag'leri üzerinden gelen örtük URI
+        // iznini yeterli bulmuyor ve çıktı dosyasına yazamayınca genel bir hata gösteriyor.
+        // Çözüm: crop işlemini gerçekten yürütecek her aktiviteye çıktı URI'si için AÇIKÇA
+        // (grantUriPermission ile) okuma+yazma izni vermek.
+        val resolvedActivities = context.packageManager.queryIntentActivities(cropIntent, 0)
+        for (info in resolvedActivities) {
+            val packageName = info.activityInfo?.packageName ?: continue
+            try {
+                context.grantUriPermission(
+                    packageName,
+                    outputUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (_: SecurityException) { }
+        }
+
+        val canCrop = resolvedActivities.isNotEmpty()
         if (canCrop) {
             cropLauncher.launch(cropIntent)
         } else {
             // Cihazda sistem cropper'ı yoksa (bazı özel ROM'larda olabilir) seçilen görseli
-            // doğrudan kaydet — en azından wallpaper ayarlanabilsin.
-            scope.launch { prefs.setWallpaperUri(sourceUri.toString()) }
+            // kalıcı depolamaya kopyalayıp kaydet — en azından wallpaper ayarlanabilsin.
+            scope.launch {
+                val persisted = dev.shephard.player.player.ImagePersistence.persistWallpaper(context, sourceUri)
+                if (persisted != null) prefs.setWallpaperUri(persisted.toString())
+            }
         }
     }
 

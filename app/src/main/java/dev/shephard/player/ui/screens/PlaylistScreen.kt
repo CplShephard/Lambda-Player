@@ -214,6 +214,77 @@ fun PlaylistScreen(
     var editPlaylistIndex by remember { mutableStateOf<Int?>(null) }
     var editPlaylistName by remember { mutableStateOf("") }
 
+    // Playlist kapak resmi için kırpma çıktısı KALICI depolamaya (filesDir) yazılır.
+    var playlistCoverCropOutputUri by remember { mutableStateOf<Uri?>(null) }
+    var playlistCoverCropForIndex by remember { mutableStateOf<Int?>(null) }
+
+    val playlistCoverCropLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val output = playlistCoverCropOutputUri
+        val idx = playlistCoverCropForIndex
+        if (result.resultCode == android.app.Activity.RESULT_OK && output != null && idx != null && idx in playlists.indices) {
+            val pl = playlists[idx]
+            val updated = pl.copy(coverUri = output.toString())
+            val all = playlists.toMutableList()
+            all[idx] = updated
+            scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+        }
+        playlistCoverCropForIndex = null
+    }
+
+    fun launchPlaylistCoverCrop(sourceUri: Uri, index: Int) {
+        val dir = java.io.File(context.filesDir, "persisted_covers").apply { mkdirs() }
+        val file = java.io.File(dir, "playlist_cover_${System.currentTimeMillis()}.jpg")
+        val outputUri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        playlistCoverCropOutputUri = outputUri
+        playlistCoverCropForIndex = index
+
+        val cropIntent = android.content.Intent("com.android.camera.action.CROP").apply {
+            setDataAndType(sourceUri, "image/*")
+            putExtra("crop", "true")
+            putExtra("scale", true)
+            // Playlist kapakları her zaman 1:1 (kare) olmalı.
+            putExtra("outputX", 512)
+            putExtra("outputY", 512)
+            putExtra("aspectX", 1)
+            putExtra("aspectY", 1)
+            putExtra(android.provider.MediaStore.EXTRA_OUTPUT, outputUri)
+            putExtra("outputFormat", android.graphics.Bitmap.CompressFormat.JPEG.toString())
+            putExtra("return-data", false)
+            putExtra("noFaceDetection", true)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            clipData = android.content.ClipData.newUri(context.contentResolver, "playlist_cover", sourceUri)
+        }
+
+        val resolvedActivities = context.packageManager.queryIntentActivities(cropIntent, 0)
+        for (info in resolvedActivities) {
+            val packageName = info.activityInfo?.packageName ?: continue
+            try {
+                context.grantUriPermission(
+                    packageName,
+                    outputUri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (_: SecurityException) { }
+        }
+
+        if (resolvedActivities.isNotEmpty()) {
+            playlistCoverCropLauncher.launch(cropIntent)
+        } else {
+            scope.launch {
+                val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, sourceUri)
+                if (persisted != null && index in playlists.indices) {
+                    val pl = playlists[index]
+                    val updated = pl.copy(coverUri = persisted.toString())
+                    val all = playlists.toMutableList()
+                    all[index] = updated
+                    prefs.setPlaylistsJson(encodePlaylists(all))
+                }
+            }
+        }
+    }
+
     val coverPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -225,12 +296,8 @@ fun PlaylistScreen(
                 )
             } catch (_: SecurityException) { }
             val idx = showCoverPickerForIndex
-            if (idx != null && idx in playlists.indices) {
-                val pl = playlists[idx]
-                val updated = pl.copy(coverUri = uri.toString())
-                val all = playlists.toMutableList()
-                all[idx] = updated
-                scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+            if (idx != null) {
+                launchPlaylistCoverCrop(uri, idx)
             }
             showCoverPickerForIndex = null
         }

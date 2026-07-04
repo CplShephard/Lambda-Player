@@ -531,6 +531,67 @@ private fun EditMusicDrawer(
     var artistText by remember { mutableStateOf(existing?.artist ?: track.artist) }
     var albumText by remember { mutableStateOf(existing?.album ?: track.album) }
     var coverUri by remember { mutableStateOf<android.net.Uri?>(existing?.coverUri?.let { android.net.Uri.parse(it) }) }
+    val coverScope = rememberCoroutineScope()
+
+    // Kapak resmi için kırpma çıktısı KALICI depolamaya (filesDir) yazılır -- kapaklar da
+    // wallpaper gibi metin tercihleri kadar kalıcı olmalı, sadece seçilen content:// URI'sine
+    // güvenmek yerine kendi kopyamızı tutuyoruz.
+    var coverCropOutputUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
+    val coverCropLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val output = coverCropOutputUri
+        if (result.resultCode == android.app.Activity.RESULT_OK && output != null) {
+            coverUri = output
+        }
+    }
+
+    fun launchCoverCrop(sourceUri: android.net.Uri) {
+        val dir = java.io.File(context.filesDir, "persisted_covers").apply { mkdirs() }
+        val file = java.io.File(dir, "cover_${System.currentTimeMillis()}.jpg")
+        val outputUri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        coverCropOutputUri = outputUri
+
+        val cropIntent = android.content.Intent("com.android.camera.action.CROP").apply {
+            setDataAndType(sourceUri, "image/*")
+            putExtra("crop", "true")
+            putExtra("scale", true)
+            // Kapak resimleri her zaman 1:1 (kare) olmalı.
+            putExtra("outputX", 512)
+            putExtra("outputY", 512)
+            putExtra("aspectX", 1)
+            putExtra("aspectY", 1)
+            putExtra(android.provider.MediaStore.EXTRA_OUTPUT, outputUri)
+            putExtra("outputFormat", android.graphics.Bitmap.CompressFormat.JPEG.toString())
+            putExtra("return-data", false)
+            putExtra("noFaceDetection", true)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            clipData = android.content.ClipData.newUri(context.contentResolver, "cover", sourceUri)
+        }
+
+        val resolvedActivities = context.packageManager.queryIntentActivities(cropIntent, 0)
+        for (info in resolvedActivities) {
+            val packageName = info.activityInfo?.packageName ?: continue
+            try {
+                context.grantUriPermission(
+                    packageName,
+                    outputUri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (_: SecurityException) { }
+        }
+
+        if (resolvedActivities.isNotEmpty()) {
+            coverCropLauncher.launch(cropIntent)
+        } else {
+            // Sistem cropper'ı yoksa seçilen görseli olduğu gibi kalıcı depolamaya kopyala.
+            coverScope.launch {
+                val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, sourceUri)
+                if (persisted != null) coverUri = persisted
+            }
+        }
+    }
 
     val coverPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -539,7 +600,7 @@ private fun EditMusicDrawer(
             try {
                 context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
             } catch (_: SecurityException) { }
-            coverUri = uri
+            launchCoverCrop(uri)
         }
     }
 
