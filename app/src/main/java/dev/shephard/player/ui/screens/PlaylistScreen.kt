@@ -99,6 +99,7 @@ import dev.shephard.player.ui.components.GlassTint
 import dev.shephard.player.ui.components.LocalLiquidGlassEnabled
 import dev.shephard.player.ui.components.liquidGlass
 import dev.shephard.player.ui.components.liquidGlassLight
+import dev.shephard.player.ui.components.liquidGlassSheetSurface
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
@@ -369,6 +370,9 @@ fun PlaylistScreen(
         val pickerLiquidGlassOn = LocalLiquidGlassEnabled.current
         AlertDialog(
             onDismissRequest = { trackPickerForIndex = null },
+            containerColor = if (pickerLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(28.dp),
+            modifier = if (pickerLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(28.dp)) else Modifier,
             title = { Text(strings.addTracks) },
             text = {
                 val pickerListState = rememberLazyListState()
@@ -385,8 +389,10 @@ fun PlaylistScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
                                 .then(
-                                    if (pickerLiquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(14.dp))
-                                    else if (checked) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+                                    if (checked) Modifier.background(
+                                        if (pickerLiquidGlassOn) Color.White.copy(alpha = 0.12f)
+                                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                                    )
                                     else Modifier
                                 )
                                 .clickable {
@@ -453,12 +459,21 @@ fun PlaylistScreen(
         val pl = playlists[menuIdx]
         val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val menuLiquidGlassOn = LocalLiquidGlassEnabled.current
         ModalBottomSheet(
             onDismissRequest = { playlistMenuIndex = null },
             sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = if (menuLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .then(
+                        if (menuLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(24.dp))
+                        else Modifier
+                    )
+                    .padding(if (menuLiquidGlassOn) 16.dp else 0.dp)
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -997,16 +1012,29 @@ private fun PlaylistDetailView(
     }
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    // ÖNEMLİ BUGFIX: reorderableState'in verdiği from.index / to.index, LazyColumn'daki TÜM
+    // item'lara göre mutlak konumdur (header, kapak/butonlar, sort selector gibi sürüklenemeyen
+    // item{} blokları dahil). reorderItems ise sadece parça listesini tutar ve bu header'ları
+    // içermez. İkisi arasındaki index farkını düzeltmezsek yanlış öğe taşınır/kaldırılır —
+    // dokunulan öğe yerinden oynamaz, komşu satırlar ise (yanlışlıkla) titreşerek tepki verir.
+    // Bu ekranda reorderable item'lardan önce İKİ ayrı item{} bloğu var: (1) geri tuşu + başlık/
+    // parça sayısı satırı, (2) kapak resmi + play/remix/add-tracks butonları + sıralama seçici.
+    // Bu yüzden sabit offset 2.
+    val reorderableHeaderItemCount = 2
     val reorderableState = rememberReorderableLazyListState(
         lazyListState = listState
     ) { from, to ->
-        val currentDragInfo = dragInfo
-        dragInfo = if (currentDragInfo == null) {
-            from.index to to.index
-        } else {
-            currentDragInfo.first to to.index
+        val fromIdx = from.index - reorderableHeaderItemCount
+        val toIdx = to.index - reorderableHeaderItemCount
+        if (fromIdx in reorderItems.indices && toIdx in reorderItems.indices) {
+            val currentDragInfo = dragInfo
+            dragInfo = if (currentDragInfo == null) {
+                fromIdx to toIdx
+            } else {
+                currentDragInfo.first to toIdx
+            }
+            reorderItems.add(toIdx, reorderItems.removeAt(fromIdx))
         }
-        reorderItems.add(to.index, reorderItems.removeAt(from.index))
     }
     LaunchedEffect(reorderableState.isAnyItemDragging) {
         isReordering = reorderableState.isAnyItemDragging

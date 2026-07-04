@@ -109,6 +109,7 @@ import dev.shephard.player.ui.components.GlassTint
 import dev.shephard.player.ui.components.LocalLiquidGlassEnabled
 import dev.shephard.player.ui.components.liquidGlass
 import dev.shephard.player.ui.components.liquidGlassLight
+import dev.shephard.player.ui.components.liquidGlassSheetSurface
 import dev.shephard.player.ui.components.MinimalSeekBar
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -558,7 +559,7 @@ fun NowPlayingSheet(
                     ModalBottomSheet(
                         onDismissRequest = { showQueue = false },
                         sheetState = queueSheetState,
-                        containerColor = MaterialTheme.colorScheme.surface,
+                        containerColor = if (nowPlayingLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
                         dragHandle = {
                             Box(
                                 modifier = Modifier
@@ -636,7 +637,7 @@ fun NowPlayingSheet(
                     ModalBottomSheet(
                         onDismissRequest = { showLyrics = false },
                         sheetState = lyricsSheetState,
-                        containerColor = MaterialTheme.colorScheme.surface,
+                        containerColor = if (nowPlayingLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
                         dragHandle = {
                             Box(
                                 modifier = Modifier
@@ -664,7 +665,16 @@ fun NowPlayingSheet(
                             }
                         }
                     ) {
-                        Column(modifier = Modifier.padding(16.dp).heightIn(min = 200.dp, max = 520.dp)) {
+                        Column(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .then(
+                                    if (nowPlayingLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(24.dp))
+                                    else Modifier
+                                )
+                                .padding(if (nowPlayingLiquidGlassOn) 16.dp else 0.dp)
+                                .heightIn(min = 200.dp, max = 520.dp)
+                        ) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                                 Text(strings.lyrics, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                                 if (state.lyrics.isEmpty()) {
@@ -857,13 +867,23 @@ private fun AddToPlaylistDrawer(
     }
     val isLiked = likedIds.contains(trackId)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val addToPlaylistLiquidGlassOn = LocalLiquidGlassEnabled.current
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = if (addToPlaylistLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface
     ) {
-        Column(modifier = Modifier.padding(16.dp).height(420.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .then(
+                    if (addToPlaylistLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(24.dp))
+                    else Modifier
+                )
+                .padding(if (addToPlaylistLiquidGlassOn) 16.dp else 0.dp)
+                .height(420.dp)
+        ) {
             Text(strings.addToPlaylist, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
             LazyColumn {
@@ -1009,7 +1029,17 @@ private fun QueueList(
         }
     }
 
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+    val queueLiquidGlassOn = LocalLiquidGlassEnabled.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .then(
+                if (queueLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(24.dp))
+                else Modifier
+            )
+            .padding(if (queueLiquidGlassOn) 16.dp else 0.dp)
+    ) {
         Text(
             text = strings.queue,
             style = MaterialTheme.typography.titleMedium,

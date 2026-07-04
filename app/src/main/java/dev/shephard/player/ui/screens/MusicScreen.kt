@@ -76,6 +76,7 @@ import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.rememberAudioPermissionState
 import dev.shephard.player.ui.components.LocalLiquidGlassEnabled
 import dev.shephard.player.ui.components.liquidGlass
+import dev.shephard.player.ui.components.liquidGlassSheetSurface
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
@@ -202,12 +203,21 @@ fun MusicScreen(
     // Track menu bottom sheet
     selectedTrackForMenu?.let { track ->
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val menuLiquidGlassOn = LocalLiquidGlassEnabled.current
         ModalBottomSheet(
             onDismissRequest = { selectedTrackForMenu = null },
             sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = if (menuLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .then(
+                        if (menuLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(24.dp))
+                        else Modifier
+                    )
+                    .padding(if (menuLiquidGlassOn) 16.dp else 0.dp)
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
@@ -504,12 +514,21 @@ private fun EditMusicDrawer(
         }
     }
 
+    val editMusicLiquidGlassOn = LocalLiquidGlassEnabled.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = if (editMusicLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .then(
+                    if (editMusicLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(24.dp))
+                    else Modifier
+                )
+                .padding(if (editMusicLiquidGlassOn) 16.dp else 0.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
