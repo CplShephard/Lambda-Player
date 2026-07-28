@@ -37,6 +37,18 @@ val LocalBlurEnabled = staticCompositionLocalOf { false }
  */
 val LocalAppBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 
+/**
+ * Backdrop recorded from the *page content* (the NavHost). ONLY composables that are drawn
+ * OUTSIDE that content — the floating dock, the mini player, the brand header — may sample
+ * this one.
+ *
+ * Sampling it from inside the content (e.g. a card in SettingsScreen) makes the layer both
+ * the source and a consumer of itself, which is exactly what made the app crash the moment
+ * the "Liquid Glass" switch was turned on. Everything inside the content must use
+ * [LocalAppBackdrop] (the background-only backdrop) instead.
+ */
+val LocalContentBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
+
 /** True when this device can actually run the Miuix blur pipeline (RenderEffect, API 31+). */
 val isBlurSupported: Boolean
     get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -56,7 +68,11 @@ val isLiquidGlassSupported: Boolean
  */
 @Composable
 fun rememberAppBlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
-    if (!enableBlur || !isRenderEffectSupported()) return null
+    // miuix-blur itself declares minSdk 33 and its AGSL shader paths need RuntimeShader
+    // (API 33). The manifest overrides that with tools:overrideLibrary, so on API 31/32 the
+    // classes load but the shader entry points blow up at draw time. Gate on API 33 as well
+    // as on RenderEffect support so those devices simply get the opaque fallback.
+    if (!enableBlur || !isLiquidGlassSupported || !isRenderEffectSupported()) return null
     val surfaceColor = MaterialTheme.colorScheme.surface
     return rememberLayerBackdrop {
         drawRect(surfaceColor)

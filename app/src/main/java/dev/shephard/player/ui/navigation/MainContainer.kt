@@ -62,6 +62,7 @@ import dev.shephard.player.ui.glass.FloatingBottomBar
 import dev.shephard.player.ui.glass.FloatingBottomBarItem
 import dev.shephard.player.ui.glass.FloatingBottomBarMode
 import dev.shephard.player.ui.glass.LocalAppBackdrop
+import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.glass.isLiquidGlassSupported
@@ -95,12 +96,26 @@ fun MainContainer(
     val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = 0.55f)
 
     val blurEnabled = LocalBlurEnabled.current
-    // The dock samples this backdrop; it is a GraphicsLayer capture of the whole app content.
-    val appBackdrop = rememberAppBlurBackdrop(blurEnabled)
+
+    // TWO separate backdrops, on purpose.
+    //
+    // `backgroundBackdrop` captures ONLY the wallpaper/background layer. Every blurred
+    // surface that lives *inside* the page content (cards, sheets, dialogs, the header,
+    // the mini player) samples this one.
+    //
+    // `contentBackdrop` captures the scrolling page content and is sampled ONLY by the
+    // floating dock, which is drawn outside that content.
+    //
+    // Previously there was a single backdrop that wrapped the page content while surfaces
+    // inside that very content sampled it — a layer reading itself. That recursion is what
+    // crashed the app as soon as the Liquid Glass switch was turned on.
+    val backgroundBackdrop = rememberAppBlurBackdrop(blurEnabled)
+    val contentBackdrop = rememberAppBlurBackdrop(blurEnabled)
 
     CompositionLocalProvider(
         LocalStrings provides strings,
-        LocalAppBackdrop provides appBackdrop,
+        LocalAppBackdrop provides backgroundBackdrop,
+        LocalContentBackdrop provides contentBackdrop,
     ) {
         val navController = rememberNavController()
         var showNowPlaying by remember { mutableStateOf(false) }
@@ -131,27 +146,46 @@ fun MainContainer(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Wallpaper background — her iki ekranın arkasında sabit
-            if (wallpaper.isNotEmpty()) {
-                AsyncImage(
-                    model = wallpaper,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
+            // Wallpaper background — her iki ekranın arkasında sabit.
+            // This whole background block is recorded into `backgroundBackdrop`, which is
+            // what in-content glass surfaces sample. It contains no glass surfaces itself,
+            // so there is no way for it to reference itself.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (backgroundBackdrop != null) Modifier.layerBackdrop(backgroundBackdrop)
+                        else Modifier
+                    )
+            ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background.copy(alpha = wallpaperBrightness))
+                        .background(MaterialTheme.colorScheme.background)
                 )
+                if (wallpaper.isNotEmpty()) {
+                    AsyncImage(
+                        model = wallpaper,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background.copy(alpha = wallpaperBrightness))
+                    )
+                }
             }
 
             // Uygulama ağacını artık NowPlaying açılınca kaldırmıyoruz.
             // Böylece playlist detail ekranının state'i korunuyor; sheet kapanınca aynı yerde kalır.
             Scaffold(
                         modifier = Modifier.fillMaxSize(),
-                        containerColor = if (wallpaper.isEmpty())
-                            MaterialTheme.colorScheme.background else Color.Transparent,
+                        // Always transparent: the background (and wallpaper) is painted by
+                        // the backdrop layer above, so an opaque Scaffold here would hide it
+                        // and leave every glass surface sampling a flat colour.
+                        containerColor = Color.Transparent,
                         contentColor = MaterialTheme.colorScheme.onBackground,
                         topBar = {
                             BrandHeader(currentRoute = currentRoute)
@@ -161,13 +195,15 @@ fun MainContainer(
                             NavGraph(
                                 navController = navController,
                                 playerViewModel = playerViewModel,
-                                // Capture the page content into the backdrop so the dock
-                                // blurs what scrolls underneath it — the dock itself is
-                                // outside this layer, which avoids feedback.
+                                // Capture the page content into the CONTENT backdrop so the
+                                // dock blurs what scrolls underneath it. The dock is drawn
+                                // outside this layer, so there is no feedback loop. Glass
+                                // surfaces inside the page sample the background backdrop
+                                // instead — never this one.
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .then(
-                                        if (appBackdrop != null) Modifier.layerBackdrop(appBackdrop)
+                                        if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop)
                                         else Modifier
                                     ),
                                 hasMiniPlayer = playerState.currentTrack != null,
@@ -319,7 +355,9 @@ private fun FloatingDock(
     onNavigate: (Destination) -> Unit
 ) {
     val blurOn = LocalBlurEnabled.current
-    val backdrop = LocalAppBackdrop.current
+    // The dock lives outside the page content, so it is the one component allowed to
+    // sample the content backdrop.
+    val backdrop = LocalContentBackdrop.current
 
     // Same three-way mode selection InstallerX uses:
     //  - LiquidGlass: full AGSL pipeline (lens refraction, chromatic aberration, bloom) on API 33+
