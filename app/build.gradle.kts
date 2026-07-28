@@ -1,17 +1,20 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
+    // AGP 9 ships built-in Kotlin support, so the standalone
+    // `org.jetbrains.kotlin.android` plugin must not be applied any more.
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
     namespace = "dev.shephard.player"
-    compileSdk = 34
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.shephard.player"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 7
         versionName = "5.0"
     }
@@ -46,14 +49,22 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs += listOf("-opt-in=androidx.compose.foundation.ExperimentalFoundationApi")
-    }
+
 
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+            freeCompilerArgs.addAll(
+                "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+                // miuix-blur's public API uses Kotlin context parameters.
+                "-Xcontext-parameters"
+            )
+        }
     }
 
     packaging {
@@ -78,12 +89,16 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("androidx.activity:activity-compose:1.9.1")
 
-    implementation(platform("androidx.compose:compose-bom:2024.10.00"))
+    implementation(platform("androidx.compose:compose-bom:2026.06.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+
+    // Miuix blur / shader — real Liquid Glass backdrop pipeline (AGSL RuntimeShader, API 33+)
+    implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.3")
+    implementation("top.yukonga.miuix.kmp:miuix-shader-android:0.9.3")
 
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("sh.calvin.reorderable:reorderable:3.0.0")

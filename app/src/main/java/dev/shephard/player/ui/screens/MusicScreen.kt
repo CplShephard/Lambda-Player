@@ -75,10 +75,11 @@ import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.rememberAudioPermissionState
-import dev.shephard.player.ui.components.LocalLiquidGlassEnabled
-import dev.shephard.player.ui.components.liquidGlass
-import dev.shephard.player.ui.components.liquidGlassSheetSurface
+import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.blurSurface
+import dev.shephard.player.ui.glass.blurSheetSurface
 import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -156,7 +157,8 @@ fun MusicScreen(
                     columns = GridCells.Fixed(2),
                     state = gridState,
                     modifier = Modifier
-                        .fillMaxSize(),
+                        .fillMaxSize()
+                        .overScrollVertical(),
                     contentPadding = PaddingValues(
                         start = 12.dp,
                         end = 12.dp,
@@ -179,7 +181,8 @@ fun MusicScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
-                        .fillMaxSize(),
+                        .fillMaxSize()
+                        .overScrollVertical(),
                     contentPadding = PaddingValues(
                         start = 16.dp,
                         end = 16.dp,
@@ -204,7 +207,7 @@ fun MusicScreen(
     // Track menu bottom sheet
     selectedTrackForMenu?.let { track ->
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        val menuLiquidGlassOn = LocalLiquidGlassEnabled.current
+        val menuLiquidGlassOn = LocalBlurEnabled.current
         ModalBottomSheet(
             onDismissRequest = { selectedTrackForMenu = null },
             sheetState = sheetState,
@@ -215,7 +218,7 @@ fun MusicScreen(
                         .fillMaxWidth()
                         .then(
                             if (menuLiquidGlassOn)
-                                Modifier.liquidGlassSheetSurface(
+                                Modifier.blurSheetSurface(
                                     enabled = true,
                                     shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
                                 )
@@ -242,7 +245,7 @@ fun MusicScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(
-                        if (menuLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
+                        if (menuLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
                         else Modifier
                     )
                     .padding(16.dp)
@@ -375,13 +378,13 @@ private fun GridTrackCard(
     onClick: () -> Unit,
     onMenuClick: () -> Unit
 ) {
-    val liquidGlassOn = LocalLiquidGlassEnabled.current
+    val liquidGlassOn = LocalBlurEnabled.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .then(
-                if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(20.dp))
+                if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
             .bounceClick { onClick() }
@@ -442,13 +445,13 @@ private fun GridTrackCard(
 
 @Composable
 private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> Unit) {
-    val liquidGlassOn = LocalLiquidGlassEnabled.current
+    val liquidGlassOn = LocalBlurEnabled.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .then(
-                if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(20.dp))
+                if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
             .bounceClick { onClick() }
@@ -604,7 +607,7 @@ private fun EditMusicDrawer(
         }
     }
 
-    val editMusicLiquidGlassOn = LocalLiquidGlassEnabled.current
+    val editMusicLiquidGlassOn = LocalBlurEnabled.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -615,7 +618,7 @@ private fun EditMusicDrawer(
                     .fillMaxWidth()
                     .then(
                         if (editMusicLiquidGlassOn)
-                            Modifier.liquidGlassSheetSurface(
+                            Modifier.blurSheetSurface(
                                 enabled = true,
                                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
                             )
@@ -642,7 +645,7 @@ private fun EditMusicDrawer(
             modifier = Modifier
                 .fillMaxWidth()
                 .then(
-                    if (editMusicLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
+                    if (editMusicLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
                     else Modifier
                 )
                 .padding(16.dp)

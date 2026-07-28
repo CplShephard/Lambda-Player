@@ -96,12 +96,13 @@ import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.BouncyIconButton
-import dev.shephard.player.ui.components.GlassTint
-import dev.shephard.player.ui.components.LocalLiquidGlassEnabled
-import dev.shephard.player.ui.components.liquidGlass
-import dev.shephard.player.ui.components.liquidGlassLight
-import dev.shephard.player.ui.components.liquidGlassSheetSurface
+import dev.shephard.player.ui.glass.GlassTint
+import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.blurSurface
+import dev.shephard.player.ui.glass.blurSurfaceCompact
+import dev.shephard.player.ui.glass.blurSheetSurface
 import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -435,19 +436,20 @@ fun PlaylistScreen(
 
     val pickerIdx = trackPickerForIndex
     if (pickerIdx != null) {
-        val pickerLiquidGlassOn = LocalLiquidGlassEnabled.current
+        val pickerLiquidGlassOn = LocalBlurEnabled.current
         AlertDialog(
             onDismissRequest = { trackPickerForIndex = null },
             containerColor = if (pickerLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(28.dp),
-            modifier = if (pickerLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(28.dp)) else Modifier,
+            modifier = if (pickerLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(28.dp)) else Modifier,
             title = { Text(strings.addTracks) },
             text = {
                 val pickerListState = rememberLazyListState()
                 LazyColumn(
                     state = pickerListState,
                     modifier = Modifier
-                        .height(400.dp),
+                        .height(400.dp)
+                        .overScrollVertical(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(tracks) { t ->
@@ -527,7 +529,7 @@ fun PlaylistScreen(
         val pl = playlists[menuIdx]
         val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        val menuLiquidGlassOn = LocalLiquidGlassEnabled.current
+        val menuLiquidGlassOn = LocalBlurEnabled.current
         ModalBottomSheet(
             onDismissRequest = { playlistMenuIndex = null },
             sheetState = sheetState,
@@ -538,7 +540,7 @@ fun PlaylistScreen(
                         .fillMaxWidth()
                         .then(
                             if (menuLiquidGlassOn)
-                                Modifier.liquidGlassSheetSurface(
+                                Modifier.blurSheetSurface(
                                     enabled = true,
                                     shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
                                 )
@@ -565,7 +567,7 @@ fun PlaylistScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(
-                        if (menuLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
+                        if (menuLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
                         else Modifier
                     )
                     .padding(16.dp)
@@ -766,7 +768,8 @@ private fun PlaylistListView(
                     columns = GridCells.Fixed(2),
                     state = playlistGridState,
                     modifier = Modifier
-                        .fillMaxSize(),
+                        .fillMaxSize()
+                        .overScrollVertical(),
                     contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -805,7 +808,8 @@ private fun PlaylistListView(
                 LazyColumn(
                     state = playlistListState,
                     modifier = Modifier
-                        .fillMaxSize(),
+                        .fillMaxSize()
+                        .overScrollVertical(),
                     contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -861,7 +865,7 @@ private fun PlaylistListCard(
     onMenu: () -> Unit,
     onPlay: () -> Unit
 ) {
-    val liquidGlassOn = LocalLiquidGlassEnabled.current
+    val liquidGlassOn = LocalBlurEnabled.current
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
@@ -871,7 +875,7 @@ private fun PlaylistListCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .then(
-                if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(20.dp))
+                if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
             .clickable { onClick() }
@@ -967,13 +971,13 @@ private fun PlaylistGridCard(
     onMenu: () -> Unit,
     onPlay: () -> Unit
 ) {
-    val liquidGlassOn = LocalLiquidGlassEnabled.current
+    val liquidGlassOn = LocalBlurEnabled.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .then(
-                if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(20.dp))
+                if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
             .bounceClick { onClick() }
@@ -1038,7 +1042,7 @@ private fun PlaylistGridCard(
                     .size(36.dp)
                     .clip(CircleShape)
                     .then(
-                        if (liquidGlassOn) Modifier.liquidGlassLight(enabled = true, shape = CircleShape, tint = GlassTint.ACCENT)
+                        if (liquidGlassOn) Modifier.blurSurfaceCompact(enabled = true, shape = CircleShape, tint = GlassTint.ACCENT)
                         else Modifier.background(MaterialTheme.colorScheme.primary)
                     )
                     .bounceClick { onPlay() },
@@ -1084,7 +1088,7 @@ private fun PlaylistDetailView(
     onReorder: (List<AudioTrack>) -> Unit = {},
     onChangeSort: (String) -> Unit = {}
 ) {
-    val liquidGlassOn = LocalLiquidGlassEnabled.current
+    val liquidGlassOn = LocalBlurEnabled.current
 
     // OuterTune'daki LocalPlaylistScreen deseni: gerçek liste mutableStateListOf,
     // reorderableState onMove callback'i doğrudan bu listeyi günceller, drag bitince
@@ -1148,7 +1152,8 @@ private fun PlaylistDetailView(
         LazyColumn(
             state = listState,
             modifier = Modifier
-                .fillMaxSize(),
+                .fillMaxSize()
+                .overScrollVertical(),
             contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp)
         ) {
             item {
@@ -1253,7 +1258,7 @@ private fun PlaylistDetailView(
                             .weight(1f)
                             .clip(RoundedCornerShape(14.dp))
                             .then(
-                                if (liquidGlassOn) Modifier.liquidGlass(
+                                if (liquidGlassOn) Modifier.blurSurface(
                                     enabled = true,
                                     shape = RoundedCornerShape(14.dp),
                                     tint = GlassTint.ACCENT
@@ -1282,7 +1287,7 @@ private fun PlaylistDetailView(
                             .weight(1f)
                             .clip(RoundedCornerShape(14.dp))
                             .then(
-                                if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(14.dp))
+                                if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(14.dp))
                                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                             )
                             .clickable(enabled = plTracks.isNotEmpty()) { onPlayRemix() }
@@ -1307,7 +1312,7 @@ private fun PlaylistDetailView(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(14.dp))
                                 .then(
-                                    if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(14.dp))
+                                    if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(14.dp))
                                     else Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                                 )
                                 .clickable { onAddTracks() }
@@ -1402,13 +1407,13 @@ private fun PlaylistTrackRow(
     onClick: () -> Unit,
     onRemove: () -> Unit
 ) {
-    val liquidGlassOn = LocalLiquidGlassEnabled.current
+    val liquidGlassOn = LocalBlurEnabled.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .then(
-                if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(20.dp))
+                if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
             .bounceClick { onClick() }

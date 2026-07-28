@@ -81,7 +81,7 @@ fun MiniPlayer(
         label = "miniGlowColor"
     )
 
-    val liquidGlassOn = LocalLiquidGlassEnabled.current
+    val liquidGlassOn = LocalBlurEnabled.current
     val miniPlayerShape = RoundedCornerShape(14.dp)
 
     Column(
@@ -96,7 +96,7 @@ fun MiniPlayer(
                 .then(
                     if (liquidGlassOn) {
                         Modifier
-                            .liquidGlass(enabled = true, shape = miniPlayerShape)
+                            .blurSurface(enabled = true, shape = miniPlayerShape)
                             .background(
                                 Brush.linearGradient(
                                     colors = listOf(
@@ -209,7 +209,7 @@ fun MiniPlayer(
                     .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .then(
-                        if (liquidGlassOn) Modifier.liquidGlassLight(enabled = true, shape = RoundedCornerShape(8.dp))
+                        if (liquidGlassOn) Modifier.blurSurfaceCompact(enabled = true, shape = RoundedCornerShape(8.dp))
                         else Modifier
                     )
                     .bounceClick { onPreviousClick() },
@@ -228,7 +228,7 @@ fun MiniPlayer(
                     .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .then(
-                        if (liquidGlassOn) Modifier.liquidGlassLight(
+                        if (liquidGlassOn) Modifier.blurSurfaceCompact(
                             enabled = true,
                             shape = RoundedCornerShape(8.dp),
                             tint = GlassTint.ACCENT
@@ -260,7 +260,7 @@ fun MiniPlayer(
                     .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .then(
-                        if (liquidGlassOn) Modifier.liquidGlassLight(enabled = true, shape = RoundedCornerShape(8.dp))
+                        if (liquidGlassOn) Modifier.blurSurfaceCompact(enabled = true, shape = RoundedCornerShape(8.dp))
                         else Modifier
                     )
                     .bounceClick { onNextClick() },

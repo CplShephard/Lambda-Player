@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -57,10 +58,15 @@ import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.MiniPlayer
 import dev.shephard.player.ui.components.bounceClick
-import dev.shephard.player.ui.components.GlassTint
-import dev.shephard.player.ui.components.LocalLiquidGlassEnabled
-import dev.shephard.player.ui.components.liquidGlass
-import dev.shephard.player.ui.components.liquidGlassLight
+import dev.shephard.player.ui.glass.FloatingBottomBar
+import dev.shephard.player.ui.glass.FloatingBottomBarItem
+import dev.shephard.player.ui.glass.FloatingBottomBarMode
+import dev.shephard.player.ui.glass.LocalAppBackdrop
+import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.blurSurface
+import dev.shephard.player.ui.glass.isLiquidGlassSupported
+import dev.shephard.player.ui.glass.rememberAppBlurBackdrop
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.i18n.stringsFor
 import dev.shephard.player.ui.screens.NowPlayingSheet
@@ -88,7 +94,14 @@ fun MainContainer(
     val wallpaper by prefs.wallpaperUri.collectAsState(initial = "")
     val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = 0.55f)
 
-    CompositionLocalProvider(LocalStrings provides strings) {
+    val blurEnabled = LocalBlurEnabled.current
+    // The dock samples this backdrop; it is a GraphicsLayer capture of the whole app content.
+    val appBackdrop = rememberAppBlurBackdrop(blurEnabled)
+
+    CompositionLocalProvider(
+        LocalStrings provides strings,
+        LocalAppBackdrop provides appBackdrop,
+    ) {
         val navController = rememberNavController()
         var showNowPlaying by remember { mutableStateOf(false) }
 
@@ -148,7 +161,15 @@ fun MainContainer(
                             NavGraph(
                                 navController = navController,
                                 playerViewModel = playerViewModel,
-                                modifier = Modifier.fillMaxSize(),
+                                // Capture the page content into the backdrop so the dock
+                                // blurs what scrolls underneath it — the dock itself is
+                                // outside this layer, which avoids feedback.
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .then(
+                                        if (appBackdrop != null) Modifier.layerBackdrop(appBackdrop)
+                                        else Modifier
+                                    ),
                                 hasMiniPlayer = playerState.currentTrack != null,
                                 onTrackClick = { tracks, index, playlistName ->
                                     playerViewModel.setQueueAndPlay(tracks, index, playlistName)
@@ -230,18 +251,22 @@ private fun BrandHeader(currentRoute: String?) {
 
     val context = LocalContext.current
     val versionName = remember {
-        try { context.packageManager.getPackageInfo(context.packageName, 0).versionName } catch (_: Exception) { "" }
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+        } catch (_: Exception) {
+            ""
+        }
     }
 
-    val liquidGlassOn = LocalLiquidGlassEnabled.current
+    val blurOn = LocalBlurEnabled.current
     val headerShape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(headerShape)
             .then(
-                if (liquidGlassOn) {
-                    Modifier.liquidGlass(enabled = true, shape = headerShape, topEdgeHighlight = false)
+                if (blurOn) {
+                    Modifier.blurSurface(enabled = true, shape = headerShape)
                 } else {
                     Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
                 }
@@ -293,61 +318,96 @@ private fun FloatingDock(
     currentRoute: String?,
     onNavigate: (Destination) -> Unit
 ) {
-    val liquidGlassOn = LocalLiquidGlassEnabled.current
+    val blurOn = LocalBlurEnabled.current
+    val backdrop = LocalAppBackdrop.current
+
+    // Same three-way mode selection InstallerX uses:
+    //  - LiquidGlass: full AGSL pipeline (lens refraction, chromatic aberration, bloom) on API 33+
+    //  - Blur:        plain gaussian backdrop blur on API 31–32
+    //  - None:        opaque pill, no backdrop sampling
+    val mode = when {
+        blurOn && backdrop != null && isLiquidGlassSupported -> FloatingBottomBarMode.LiquidGlass
+        blurOn && backdrop != null -> FloatingBottomBarMode.Blur
+        else -> FloatingBottomBarMode.None
+    }
+
+    val selectedIndex = bottomNavDestinations
+        .indexOfFirst { it.route == currentRoute }
+        .let { if (it < 0) 0 else it }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .clip(RoundedCornerShape(50))
-                .then(
-                    if (liquidGlassOn) {
-                        Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(50))
-                    } else {
-                        Modifier.background(
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+        if (backdrop != null) {
+            FloatingBottomBar(
+                selectedIndex = { selectedIndex },
+                onSelected = { index -> onNavigate(bottomNavDestinations[index]) },
+                backdrop = backdrop,
+                tabsCount = bottomNavDestinations.size,
+                mode = mode
+            ) {
+                bottomNavDestinations.forEachIndexed { index, dest ->
+                    val selected = index == selectedIndex
+                    FloatingBottomBarItem(
+                        onClick = { onNavigate(dest) },
+                        modifier = Modifier.defaultMinSize(minWidth = 76.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
+                            contentDescription = dest.label
                         )
                     }
-                )
-                .padding(horizontal = 20.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            bottomNavDestinations.forEach { dest ->
-                val selected = currentRoute == dest.route
-                val icon = if (selected) dest.selectedIcon else dest.unselectedIcon
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .bounceClick { onNavigate(dest) }
-                        .then(
-                            if (selected && liquidGlassOn) {
-                                Modifier.liquidGlassLight(
-                                    enabled = true,
-                                    shape = CircleShape,
-                                    tint = GlassTint.ACCENT
-                                )
-                            } else {
-                                Modifier.background(
-                                    color = if (selected)
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                                    else Color.Transparent,
-                                    shape = CircleShape
-                                )
-                            }
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = dest.label,
-                        tint = if (selected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
+            }
+        } else {
+            // Blur disabled or unsupported: keep the dock fully functional without a backdrop.
+            NonBlurDock(
+                selectedIndex = selectedIndex,
+                onNavigate = onNavigate
+            )
+        }
+    }
+}
+
+/**
+ * Fallback dock used when blur is switched off (or the device predates API 31), so the app
+ * never depends on a backdrop being present. Visually a plain Material 3 pill.
+ */
+@Composable
+private fun NonBlurDock(
+    selectedIndex: Int,
+    onNavigate: (Destination) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        bottomNavDestinations.forEachIndexed { index, dest ->
+            val selected = index == selectedIndex
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .bounceClick { onNavigate(dest) }
+                    .background(
+                        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                        else Color.Transparent,
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
+                    contentDescription = dest.label,
+                    tint = if (selected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

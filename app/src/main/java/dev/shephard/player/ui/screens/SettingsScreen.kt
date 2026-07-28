@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.components.overScrollVertical
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.BrokenImage
@@ -76,8 +77,8 @@ import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
 import dev.shephard.player.ui.components.CustomColorPickerDialog
-import dev.shephard.player.ui.components.LocalLiquidGlassEnabled
-import dev.shephard.player.ui.components.liquidGlass
+import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
@@ -219,6 +220,7 @@ fun SettingsScreen() {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(settingsScrollState)
+            .overScrollVertical()
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -228,7 +230,7 @@ fun SettingsScreen() {
                 .fillMaxWidth()
                 .bounceClick { uriHandler.openUri("https://github.com/CplShephard") }
                 .then(
-                    if (liquidGlassEnabled) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(20.dp))
+                    if (liquidGlassEnabled) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                     else Modifier
                 ),
             shape = RoundedCornerShape(20.dp),
@@ -726,12 +728,12 @@ private fun TotalListeningTimeCard(prefs: PreferencesManager) {
 
 @Composable
 private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
-    val liquidGlassOn = LocalLiquidGlassEnabled.current
+    val liquidGlassOn = LocalBlurEnabled.current
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (liquidGlassOn) Modifier.liquidGlass(enabled = true, shape = RoundedCornerShape(20.dp))
+                if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier
             ),
         shape = RoundedCornerShape(20.dp),

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -70,6 +71,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -110,13 +112,14 @@ import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.components.BouncyIconButton
-import dev.shephard.player.ui.components.GlassTint
-import dev.shephard.player.ui.components.LocalLiquidGlassEnabled
-import dev.shephard.player.ui.components.liquidGlass
-import dev.shephard.player.ui.components.liquidGlassLight
-import dev.shephard.player.ui.components.liquidGlassSheetSurface
+import dev.shephard.player.ui.glass.GlassTint
+import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.blurSurface
+import dev.shephard.player.ui.glass.blurSurfaceCompact
+import dev.shephard.player.ui.glass.blurSheetSurface
 import dev.shephard.player.ui.components.MinimalSeekBar
 import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -132,7 +135,7 @@ fun NowPlayingSheet(
     val state by playerViewModel.uiState.collectAsState()
     val track = state.currentTrack
     val strings = LocalStrings.current
-    val nowPlayingLiquidGlassOn = LocalLiquidGlassEnabled.current
+    val nowPlayingLiquidGlassOn = LocalBlurEnabled.current
 
     val density = LocalDensity.current
     val dismissThresholdPx = with(density) { 140.dp.toPx() }
@@ -388,9 +391,7 @@ fun NowPlayingSheet(
                     val artSnapLayoutInfoProvider = remember(artGridState) {
                         SnapLayoutInfoProvider(
                             lazyGridState = artGridState,
-                            positionInLayout = { layoutSize, itemSize ->
-                                layoutSize / 2f - itemSize / 2f
-                            }
+                            snapPosition = androidx.compose.foundation.gestures.snapping.SnapPosition.Center
                         )
                     }
 
@@ -571,7 +572,7 @@ fun NowPlayingSheet(
                         .clip(CircleShape)
                         .then(
                             if (nowPlayingLiquidGlassOn) {
-                                Modifier.liquidGlassLight(
+                                Modifier.blurSurfaceCompact(
                                     enabled = true,
                                     shape = CircleShape,
                                     tint = if (isLiked) GlassTint.ACCENT else GlassTint.SURFACE
@@ -615,7 +616,7 @@ fun NowPlayingSheet(
                                     .fillMaxWidth()
                                     .then(
                                         if (nowPlayingLiquidGlassOn)
-                                            Modifier.liquidGlassSheetSurface(
+                                            Modifier.blurSheetSurface(
                                                 enabled = true,
                                                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
                                             )
@@ -714,7 +715,7 @@ fun NowPlayingSheet(
                                     .fillMaxWidth()
                                     .then(
                                         if (nowPlayingLiquidGlassOn)
-                                            Modifier.liquidGlassSheetSurface(
+                                            Modifier.blurSheetSurface(
                                                 enabled = true,
                                                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
                                             )
@@ -755,7 +756,7 @@ fun NowPlayingSheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .then(
-                                    if (nowPlayingLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
+                                    if (nowPlayingLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
                                     else Modifier
                                 )
                                 .padding(16.dp)
@@ -805,7 +806,8 @@ fun NowPlayingSheet(
                                 }
                             } else {
                                 LazyColumn(
-                                    state = lyricListState
+                                    state = lyricListState,
+                                    modifier = Modifier.overScrollVertical()
                                 ) {
                                     itemsIndexed(state.lyrics) { idx, line ->
                                         val isActive = idx == activeIndex
@@ -872,7 +874,7 @@ fun NowPlayingSheet(
                         .clip(CircleShape)
                         .then(
                             if (nowPlayingLiquidGlassOn) {
-                                Modifier.liquidGlass(
+                                Modifier.blurSurface(
                                     enabled = true,
                                     shape = CircleShape,
                                     tint = GlassTint.ACCENT
@@ -953,7 +955,7 @@ private fun AddToPlaylistDrawer(
     }
     val isLiked = likedIds.contains(trackId)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val addToPlaylistLiquidGlassOn = LocalLiquidGlassEnabled.current
+    val addToPlaylistLiquidGlassOn = LocalBlurEnabled.current
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -965,7 +967,7 @@ private fun AddToPlaylistDrawer(
                     .fillMaxWidth()
                     .then(
                         if (addToPlaylistLiquidGlassOn)
-                            Modifier.liquidGlassSheetSurface(
+                            Modifier.blurSheetSurface(
                                 enabled = true,
                                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
                             )
@@ -988,7 +990,7 @@ private fun AddToPlaylistDrawer(
             modifier = Modifier
                 .fillMaxWidth()
                 .then(
-                    if (addToPlaylistLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
+                    if (addToPlaylistLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
                     else Modifier
                 )
                 .padding(16.dp)
@@ -996,7 +998,9 @@ private fun AddToPlaylistDrawer(
         ) {
             Text(strings.addToPlaylist, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
-            LazyColumn {
+            LazyColumn(
+                modifier = Modifier.overScrollVertical()
+            ) {
                 // Liked Songs at top
                 item {
                     Row(
@@ -1139,12 +1143,12 @@ private fun QueueList(
         }
     }
 
-    val queueLiquidGlassOn = LocalLiquidGlassEnabled.current
+    val queueLiquidGlassOn = LocalBlurEnabled.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (queueLiquidGlassOn) Modifier.liquidGlassSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
+                if (queueLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
                 else Modifier
             )
             .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -1160,6 +1164,7 @@ private fun QueueList(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(420.dp)
+                .overScrollVertical()
         ) {
             itemsIndexed(items, key = { _, t -> t.id }) { index, track ->
                 ReorderableItem(

@@ -111,8 +111,8 @@ data class Strings(
     val update: String,
     val later: String,
     val removeCover: String,
-    val liquidGlass: String,
-    val liquidGlassDescription: String,
+    val blurEffect: String,
+    val blurEffectDescription: String,
 )
 
 private val EN = Strings(
@@ -198,8 +198,8 @@ private val EN = Strings(
     update = "Update",
     later = "Later",
     removeCover = "Remove cover",
-    liquidGlass = "Liquid Glass",
-    liquidGlassDescription = "Frosted glass look for cards and buttons"
+    blurEffect = "Blur Effect",
+    blurEffectDescription = "Real background blur for the dock, cards and sheets. The dock turns into Liquid Glass on Android 13+."
 )
 
 private val TR = EN.copy(
@@ -284,8 +284,8 @@ private val TR = EN.copy(
     update = "Güncelle",
     later = "Daha sonra",
     removeCover = "Kapağı kaldır",
-    liquidGlass = "Sıvı Cam",
-    liquidGlassDescription = "Kartlar ve butonlar için buzlu cam görünümü"
+    blurEffect = "Bulanıklık Efekti",
+    blurEffectDescription = "Dock, kartlar ve sayfalar için gerçek arka plan bulanıklığı. Android 13+ cihazlarda dock Liquid Glass görünümüne geçer."
 )
 
 private val ZH = EN.copy(
@@ -370,8 +370,8 @@ private val ZH = EN.copy(
     update = "更新",
     later = "稍后",
     removeCover = "移除封面",
-    liquidGlass = "液态玻璃",
-    liquidGlassDescription = "卡片和按钮的磨砂玻璃外观"
+    blurEffect = "模糊效果",
+    blurEffectDescription = "为底栏、卡片和面板启用真实的背景模糊。Android 13+ 上底栏将呈现液态玻璃效果。"
 )
 
 private val ES = EN.copy(
@@ -456,8 +456,8 @@ private val ES = EN.copy(
     update = "Actualizar",
     later = "Más tarde",
     removeCover = "Quitar portada",
-    liquidGlass = "Vidrio Líquido",
-    liquidGlassDescription = "Aspecto de vidrio esmerilado para tarjetas y botones"
+    blurEffect = "Efecto de Desenfoque",
+    blurEffectDescription = "Desenfoque real del fondo para el dock, tarjetas y hojas. En Android 13+ el dock se convierte en Liquid Glass."
 )
 
 private val RU = EN.copy(
@@ -542,8 +542,8 @@ private val RU = EN.copy(
     update = "Обновить",
     later = "Позже",
     removeCover = "Удалить обложку",
-    liquidGlass = "Жидкое стекло",
-    liquidGlassDescription = "Матовый стеклянный вид карточек и кнопок"
+    blurEffect = "Эффект размытия",
+    blurEffectDescription = "Настоящее размытие фона для дока, карточек и панелей. На Android 13+ док становится Liquid Glass."
 )
 
 private val KA = EN.copy(
@@ -628,8 +628,8 @@ private val KA = EN.copy(
     update = "განახლება",
     later = "მოგვიანებით",
     removeCover = "ყდის წაშლა",
-    liquidGlass = "თხევადი შუშა",
-    liquidGlassDescription = "ყინულოვანი შუშის იერსახე ბარათებისა და ღილაკებისთვის"
+    blurEffect = "დაბინდვის ეფექტი",
+    blurEffectDescription = "ნამდვილი ფონის დაბინდვა დოკის, ბარათებისა და პანელებისთვის. Android 13+-ზე დოკი Liquid Glass ხდება."
 )
 
 private val AR = EN.copy(
@@ -714,8 +714,8 @@ private val AR = EN.copy(
     update = "تحديث",
     later = "لاحقًا",
     removeCover = "إزالة الغلاف",
-    liquidGlass = "الزجاج السائل",
-    liquidGlassDescription = "مظهر زجاجي مصنفر للبطاقات والأزرار"
+    blurEffect = "تأثير الضبابية",
+    blurEffectDescription = "ضبابية حقيقية للخلفية لشريط التنقل والبطاقات واللوحات. على Android 13+ يتحول الشريط إلى Liquid Glass."
 )
 
 val AllLanguages: List<Strings> = listOf(EN, TR, ZH, ES, RU, KA, AR)

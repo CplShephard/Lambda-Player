@@ -111,13 +111,13 @@ fun BouncyIconButton(
     backgroundColor: Color? = null,
     glassTint: GlassTint = GlassTint.SURFACE
 ) {
-    val liquidGlassOn = LocalLiquidGlassEnabled.current
+    val liquidGlassOn = LocalBlurEnabled.current
     val boxModifier = modifier
         .size(48.dp)
         .let {
             when {
                 backgroundColor != null && liquidGlassOn ->
-                    it.liquidGlassLight(enabled = true, shape = androidx.compose.foundation.shape.CircleShape, tint = glassTint)
+                    it.blurSurfaceCompact(enabled = true, shape = androidx.compose.foundation.shape.CircleShape, tint = glassTint)
                 backgroundColor != null -> it.background(backgroundColor)
                 else -> it
             }
