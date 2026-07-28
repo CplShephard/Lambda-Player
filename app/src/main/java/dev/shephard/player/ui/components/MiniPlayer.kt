@@ -51,7 +51,10 @@ import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.slideForwardInQueue
 import dev.shephard.player.data.trackById
 import dev.shephard.player.player.PlayerUiState
-import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.glass.GlassTint
+import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.blurSurface
+import dev.shephard.player.ui.glass.blurSurfaceCompact
 
 @Composable
 fun MiniPlayer(

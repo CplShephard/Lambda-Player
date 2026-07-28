@@ -21,6 +21,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.shephard.player.ui.glass.GlassTint
+import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.blurSurfaceCompact
 import kotlinx.coroutines.launch
 
 /**
@@ -93,7 +96,7 @@ fun Modifier.bounceClick(
  * bounceClick modifier handles the click event (avoiding the double-fire
  * that would happen if we wrapped Material3 IconButton with bounceClick).
  *
- * Liquid Glass entegrasyonu: [LocalLiquidGlassEnabled] açıkken ve çağıran taraf bir
+ * Liquid Glass entegrasyonu: [LocalBlurEnabled] açıkken ve çağıran taraf bir
  * `backgroundColor` verdiyse (yani dolu bir daire/buton isteniyorsa), düz renk yerine
  * buzlu cam dolgusu + parlak kenarlık uygulanır. Bu sayede uygulamadaki her
  * BouncyIconButton çağrısı (Now Playing sheet, playlist ekranı, dock vb.) tek bir

@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
             val themeMode by prefs.themeMode.collectAsState(initial = dev.shephard.player.player.ThemeModePreference.LIGHT)
             val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
             val cardAlpha by prefs.cardAlpha.collectAsState(initial = 0.85f)
-            val blurEnabled by prefs.blurEnabled.collectAsState(initial = false)
+            val blurEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
             val languageCode by prefs.language.collectAsState(initial = "en")
             val strings = remember(languageCode) { stringsFor(languageCode) }
             val initialAudioUri = externalAudioUriState.value

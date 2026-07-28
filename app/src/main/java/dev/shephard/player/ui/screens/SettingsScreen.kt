@@ -467,11 +467,11 @@ fun SettingsScreen() {
             Spacer(Modifier.height(16.dp))
 
             // Liquid Glass — dock, kartlar, nowplaying/playlist butonları için buzlu cam görünümü
-            ToggleRow(label = strings.liquidGlass, checked = liquidGlassEnabled) { enabled ->
+            ToggleRow(label = strings.blurEffect, checked = liquidGlassEnabled) { enabled ->
                 scope.launch { prefs.setLiquidGlassEnabled(enabled) }
             }
             Text(
-                text = strings.liquidGlassDescription,
+                text = strings.blurEffectDescription,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp)
