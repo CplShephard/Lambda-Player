@@ -32,7 +32,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.snapping.SnapLayoutInfoProvider
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -41,7 +47,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MusicNote
@@ -134,19 +139,43 @@ fun NowPlayingSheet(
     val dragOffset = remember { androidx.compose.animation.core.Animatable(0f) }
     val dragScope = rememberCoroutineScope()
 
-    val swipeThresholdPx = with(density) { 80.dp.toPx() }
-    val artSwipeX = remember { androidx.compose.animation.core.Animatable(0f) }
-    var artSwipeHandled by remember { mutableStateOf(false) }
-
     // Sheet her ekrana geldiğinde dragOffset'i 0'a al: parmakla kapatıp tekrar açınca
     // eski sürükleme miktarının (translationY) kalıcı gri boşluk bırakmasını engeller.
     LaunchedEffect(Unit) {
         dragOffset.snapTo(0f)
     }
 
-    LaunchedEffect(track?.id) {
-        artSwipeX.snapTo(0f)
-        artSwipeHandled = false
+    // Kapak resmi swipe-to-change-song: OuterTune'daki gibi sürekli aktif (togglesız),
+    // LazyHorizontalGrid + snap fling ile akıcı, native hızda swipe. Önceki/mevcut/sonraki
+    // parça queue içindeki index'e göre bulunur (controller'a gerek yok).
+    val currentQueueIndex = remember(state.queue, track?.id) {
+        state.queue.indexOfFirst { it.id == track?.id }
+    }
+    val previousArtTrack = if (currentQueueIndex > 0) state.queue.getOrNull(currentQueueIndex - 1) else null
+    val nextArtTrack = if (currentQueueIndex >= 0) state.queue.getOrNull(currentQueueIndex + 1) else null
+    val artSwipeItems = listOfNotNull(previousArtTrack, track, nextArtTrack)
+    val artSwipeCurrentIndex = artSwipeItems.indexOfFirst { it.id == track?.id }.coerceAtLeast(0)
+
+    val artGridState = rememberLazyGridState()
+    val artGridScrollOffset by remember { derivedStateOf { artGridState.firstVisibleItemScrollOffset } }
+    val artGridFirstVisibleIndex by remember { derivedStateOf { artGridState.firstVisibleItemIndex } }
+
+    // Kullanıcı bırakıp snap tamamlanınca (scroll durdu, offset==0) hedef indexe göre
+    // gerçek şarkı değişimini tetikle. OuterTune'daki Player.kt ile birebir aynı desen:
+    // key sadece scroll offset'i, scroll-in-progress kontrolü effect içinde.
+    LaunchedEffect(artGridScrollOffset) {
+        if (artGridState.isScrollInProgress || artGridScrollOffset != 0) return@LaunchedEffect
+        if (artGridFirstVisibleIndex > artSwipeCurrentIndex) {
+            playerViewModel.skipToNext()
+        } else if (artGridFirstVisibleIndex < artSwipeCurrentIndex) {
+            playerViewModel.skipToPrevious()
+        }
+    }
+
+    // Şarkı değiştiğinde (dışarıdan ya da swipe sonucu) grid'i doğru öğeye ortala.
+    LaunchedEffect(track?.id, state.queue) {
+        val index = artSwipeCurrentIndex
+        artGridState.scrollToItem(index)
     }
 
     val glow = Color(state.glowColorArgb)
@@ -205,12 +234,24 @@ fun NowPlayingSheet(
     // Sheet tam ekran halindeyken (dragOffset == 0, yani parmakla etkileşimde değilken
     // dinlenme pozisyonunda) üst cornerlar ekranı tamamen doldurmalı — tıpkı iOS'taki gibi.
     // Kullanıcı sheet'i aşağı sürüklemeye başlar başlamaz corner'lar geri gelsin.
+    //
+    // Açılış animasyonu (MainContainer'daki AnimatedVisibility + slideInVertically) sırasında
+    // corner radius 30dp olmalı (ekran henüz tam kaplanmadığı için köşeler görünür durumda
+    // kalmalı), animasyon bitip sheet dinlenme konumuna oturunca 0dp'ye insin — bu sayede
+    // ekran görüntüsü/ekran kaydında köşeler görünmez. hasEnteredRest, sheet ilk açıldığında
+    // bir kere gecikmeyle true olur ve girişte 30dp'nin gösterilmesini sağlar.
+    var hasEnteredRest by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        hasEnteredRest = false
+        kotlinx.coroutines.delay(380) // MainContainer'daki spring(stiffness=180) giriş süresine yakın
+        hasEnteredRest = true
+    }
     var isInteractingWithSheet by remember { mutableStateOf(false) }
     val isFullyExpanded by remember {
-        androidx.compose.runtime.derivedStateOf { !isInteractingWithSheet && dragOffset.value <= 0.5f }
+        androidx.compose.runtime.derivedStateOf { hasEnteredRest && !isInteractingWithSheet && dragOffset.value <= 0.5f }
     }
     val sheetCornerRadius by androidx.compose.animation.core.animateDpAsState(
-        targetValue = if (isFullyExpanded) 0.dp else 20.dp,
+        targetValue = if (isFullyExpanded) 0.dp else 30.dp,
         animationSpec = androidx.compose.animation.core.spring(
             dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
             stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
@@ -305,35 +346,6 @@ fun NowPlayingSheet(
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
-                .pointerInput(track?.id) {
-                    detectHorizontalDragGestures(
-                        onDragStart = { artSwipeHandled = false },
-                        onDragEnd = {
-                            dragScope.launch {
-                                artSwipeX.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 400f))
-                            }
-                            artSwipeHandled = false
-                        },
-                        onDragCancel = {
-                            dragScope.launch {
-                                artSwipeX.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 400f))
-                            }
-                            artSwipeHandled = false
-                        }
-                    ) { change, dragAmount ->
-                        change.consume()
-                        dragScope.launch { artSwipeX.snapTo(artSwipeX.value + dragAmount * 0.6f) }
-                        if (!artSwipeHandled) {
-                            if (artSwipeX.value <= -swipeThresholdPx) {
-                                playerViewModel.skipToNext()
-                                artSwipeHandled = true
-                            } else if (artSwipeX.value >= swipeThresholdPx) {
-                                playerViewModel.skipToPrevious()
-                                artSwipeHandled = true
-                            }
-                        }
-                    }
-                }
         ) {
             // Top row
             Row(
@@ -344,12 +356,7 @@ fun NowPlayingSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                BouncyIconButton(
-                    onClick = onDismiss,
-                    icon = Icons.Filled.KeyboardArrowDown,
-                    contentDescription = strings.cancel,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Box(modifier = Modifier.size(48.dp))
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = strings.nowPlaying,
@@ -368,67 +375,107 @@ fun NowPlayingSheet(
             }
 
             // Album art + title
-            androidx.compose.animation.AnimatedContent(
-                targetState = track?.id ?: -1L,
-                transitionSpec = {
-                    // Yönü kuyruktaki konuma göre belirle (sonraki=ileri/soldan, önceki=geri/sağdan)
-                    val dir = if (slideForwardInQueue(state.queue, initialState, targetState))
-                        androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Left
-                    else
-                        androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Right
-                    androidx.compose.animation.ContentTransform(
-                        targetContentEnter = slideIntoContainer(dir, androidx.compose.animation.core.tween(380)) + androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(initialScale = 0.92f),
-                        initialContentExit = slideOutOfContainer(dir, androidx.compose.animation.core.tween(380)) + androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(targetScale = 0.92f)
-                    )
-                },
-                label = "trackSwap",
-                modifier = Modifier.fillMaxWidth()
-            ) { targetId ->
-                // Dış kapsamdaki `track` yerine, bu slota ait id'den doğru parçayı bul.
-                // Böylece geçiş sırasında eski slotta ESKİ kapak, yeni slotta YENİ kapak görünür.
-                val displayTrack = state.queue.trackById(targetId) ?: track
-                Column {
-                    // BoxWithConstraints: freeform/split-screen pencerelerde asıl kullanılabilir
-                    // yüksekliği ölçer (LocalConfiguration.screenHeightDp tüm cihaz ekranını
-                    // varsayar, pencerenin gerçek boyutunu değil). Kapak resmi eskiden sadece
-                    // genişliğe göre kare oluyordu (aspectRatio(1f)); dar/kısa bir freeform
-                    // pencerede bu, alttaki seek bar ve oynatma butonlarını pencere dışına itiyordu.
-                    // Artık kapak, kullanılabilir yüksekliğin en fazla %42'si kadar büyüyebiliyor.
-                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                        val maxArtHeight = maxHeight * 0.42f
+            Column {
+                // Kapak resmi: OuterTune'daki "swipe to change songs" ile birebir aynı mekanizma —
+                // LazyHorizontalGrid + snap fling, togglesız her zaman aktif. Önceki/mevcut/sonraki
+                // kapak yan yana dizilir, snap tamamlanınca gerçek şarkı değişimi tetiklenir.
+                // Elle yazılmış detectHorizontalDragGestures + Animatable yerine native scroll
+                // fiziği (fling velocity, snap animasyonu) kullanıldığı için akıcılık OS seviyesinde.
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val maxArtHeight = maxHeight * 0.42f
+                    val artItemWidth = maxWidth
+
+                    val artSnapLayoutInfoProvider = remember(artGridState) {
+                        SnapLayoutInfoProvider(
+                            lazyGridState = artGridState,
+                            positionInLayout = { layoutSize, itemSize ->
+                                layoutSize / 2f - itemSize / 2f
+                            }
+                        )
+                    }
+
+                    if (artSwipeItems.isEmpty()) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 24.dp)
                                 .aspectRatio(1f)
                                 .heightIn(max = maxArtHeight)
-                                .graphicsLayer {
-                                    translationX = artSwipeX.value
-                                    alpha = 1f - (kotlin.math.abs(artSwipeX.value) / (size.width.coerceAtLeast(1f))).coerceIn(0f, 0.35f)
-                                }
                                 .clip(RoundedCornerShape(28.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
-                            var artLoaded by remember(targetId) { mutableStateOf(false) }
-                            AsyncImage(
-                                model = displayTrack?.albumArtUri,
+                            Icon(
+                                imageVector = Icons.Filled.MusicNote,
                                 contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
-                                onState = { artLoaded = it is AsyncImagePainter.State.Success }
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(72.dp)
                             )
-                            if (!artLoaded) {
-                                Icon(
-                                    imageVector = Icons.Filled.MusicNote,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(72.dp)
-                                )
+                        }
+                    } else {
+                        LazyHorizontalGrid(
+                            state = artGridState,
+                            rows = GridCells.Fixed(1),
+                            flingBehavior = rememberSnapFlingBehavior(artSnapLayoutInfoProvider),
+                            userScrollEnabled = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 24.dp)
+                                .aspectRatio(1f)
+                                .heightIn(max = maxArtHeight)
+                        ) {
+                            gridItemsIndexed(
+                                items = artSwipeItems,
+                                key = { _, item -> item.id }
+                            ) { _, itemTrack ->
+                                Box(
+                                    modifier = Modifier
+                                        .width(artItemWidth)
+                                        .fillMaxHeight()
+                                        .clip(RoundedCornerShape(28.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    var artLoaded by remember(itemTrack.id) { mutableStateOf(false) }
+                                    AsyncImage(
+                                        model = itemTrack.albumArtUri,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop,
+                                        onState = { artLoaded = it is AsyncImagePainter.State.Success }
+                                    )
+                                    if (!artLoaded) {
+                                        Icon(
+                                            imageVector = Icons.Filled.MusicNote,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(72.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
+                }
 
+                // Başlık/artist: şarkı id'sine göre ayrı fade+slide geçişi (kapaktan bağımsız,
+                // yön kuyruktaki konuma göre belirlenir).
+                androidx.compose.animation.AnimatedContent(
+                    targetState = track?.id ?: -1L,
+                    transitionSpec = {
+                        val dir = if (slideForwardInQueue(state.queue, initialState, targetState))
+                            androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Left
+                        else
+                            androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Right
+                        androidx.compose.animation.ContentTransform(
+                            targetContentEnter = slideIntoContainer(dir, androidx.compose.animation.core.tween(300)) + androidx.compose.animation.fadeIn(),
+                            initialContentExit = slideOutOfContainer(dir, androidx.compose.animation.core.tween(300)) + androidx.compose.animation.fadeOut()
+                        )
+                    },
+                    label = "titleSwap",
+                    modifier = Modifier.fillMaxWidth()
+                ) { targetId ->
+                    val displayTrack = state.queue.trackById(targetId) ?: track
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -561,6 +608,8 @@ fun NowPlayingSheet(
                         sheetState = queueSheetState,
                         containerColor = if (nowPlayingLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
                         dragHandle = {
+                            var handleDragAmount by remember { mutableStateOf(0f) }
+                            val handleDismissThresholdPx = with(LocalDensity.current) { 60.dp.toPx() }
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -575,13 +624,24 @@ fun NowPlayingSheet(
                                     .padding(vertical = 10.dp)
                                     .pointerInput(Unit) {
                                         detectDragGestures(
+                                            onDragStart = { handleDragAmount = 0f },
                                             onDragEnd = {
-                                                queueSheetScope.launch {
-                                                    queueSheetState.hide()
-                                                    showQueue = false
+                                                // Sadece gerçekten aşağı doğru anlamlı bir mesafe
+                                                // sürüklenmişse kapat (elle tutup çekme). Küçük
+                                                // dokunuş/titremeler artık kapatmıyor.
+                                                if (handleDragAmount > handleDismissThresholdPx) {
+                                                    queueSheetScope.launch {
+                                                        queueSheetState.hide()
+                                                        showQueue = false
+                                                    }
                                                 }
-                                            }
-                                        ) { change, _ -> change.consume() }
+                                                handleDragAmount = 0f
+                                            },
+                                            onDragCancel = { handleDragAmount = 0f }
+                                        ) { change, dragAmount ->
+                                            change.consume()
+                                            handleDragAmount += dragAmount.y
+                                        }
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -647,6 +707,8 @@ fun NowPlayingSheet(
                         sheetState = lyricsSheetState,
                         containerColor = if (nowPlayingLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
                         dragHandle = {
+                            var handleDragAmount by remember { mutableStateOf(0f) }
+                            val handleDismissThresholdPx = with(LocalDensity.current) { 60.dp.toPx() }
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -661,13 +723,21 @@ fun NowPlayingSheet(
                                     .padding(vertical = 10.dp)
                                     .pointerInput(Unit) {
                                         detectDragGestures(
+                                            onDragStart = { handleDragAmount = 0f },
                                             onDragEnd = {
-                                                lyricsSheetScope.launch {
-                                                    lyricsSheetState.hide()
-                                                    showLyrics = false
+                                                if (handleDragAmount > handleDismissThresholdPx) {
+                                                    lyricsSheetScope.launch {
+                                                        lyricsSheetState.hide()
+                                                        showLyrics = false
+                                                    }
                                                 }
-                                            }
-                                        ) { change, _ -> change.consume() }
+                                                handleDragAmount = 0f
+                                            },
+                                            onDragCancel = { handleDragAmount = 0f }
+                                        ) { change, dragAmount ->
+                                            change.consume()
+                                            handleDragAmount += dragAmount.y
+                                        }
                                     },
                                 contentAlignment = Alignment.Center
                             ) {

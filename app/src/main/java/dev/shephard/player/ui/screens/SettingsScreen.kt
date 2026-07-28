@@ -100,7 +100,12 @@ fun SettingsScreen() {
     val uriHandler = LocalUriHandler.current
     val strings = LocalStrings.current
 
-    val totalMs by prefs.totalListeningMs.collectAsState(initial = 0L)
+    // NOT: totalListeningMs BİLEREK burada collectAsState ile toplanmıyor. Bu değer
+    // PlayerViewModel'in observePosition() döngüsü tarafından her 500ms'de bir güncelleniyor
+    // (accrueListeningTime -> DataStore write -> Flow emit). Eğer burada üst seviyede
+    // toplansaydı, her 500ms'de TÜM SettingsScreen ağacı (tüm toggle'lar, slider'lar, kartlar)
+    // recompose olurdu — bu da toggle/slider etkileşimindeki kasmanın sebebiydi. Artık sadece
+    // TotalListeningTimeCard kendi izole collectAsState'ine sahip, recompose scope'u ona özel.
     val crossfade by prefs.crossfadeEnabled.collectAsState(initial = false)
     val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
     val playWith by prefs.playWithOthers.collectAsState(initial = false)
@@ -272,21 +277,10 @@ fun SettingsScreen() {
             }
         }
 
-        // Total listening time
-        SectionCard {
-            Text(
-                text = strings.totalListeningTime,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = formatListeningTime(totalMs, strings),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
+        // Total listening time — izole composable: totalListeningMs her 500ms değişse bile
+        // sadece bu kart recompose olur, geri kalan Settings ekranı (toggle'lar, slider'lar)
+        // etkilenmez.
+        TotalListeningTimeCard(prefs = prefs)
 
         // Playback Settings
         SectionCard {
@@ -702,6 +696,30 @@ fun SettingsScreen() {
             title = strings.customColorTitle,
             hexPlaceholder = strings.hexPlaceholder,
             applyLabel = strings.apply
+        )
+    }
+}
+
+// İzole edilmiş: totalListeningMs PlayerViewModel'in observePosition() döngüsü tarafından
+// her 500ms'de bir güncelleniyor. Bu değer buradaki KENDİ collectAsState'inde toplandığı için
+// recompose sadece bu küçük composable ile sınırlı kalıyor — SettingsScreen'in geri kalanı
+// (toggle'lar, slider'lar) her tick'te yeniden çizilmiyor.
+@Composable
+private fun TotalListeningTimeCard(prefs: PreferencesManager) {
+    val strings = LocalStrings.current
+    val totalMs by prefs.totalListeningMs.collectAsState(initial = 0L)
+    SectionCard {
+        Text(
+            text = strings.totalListeningTime,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = formatListeningTime(totalMs, strings),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
         )
     }
 }

@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <!-- Kalıcı olarak kopyalanan wallpaper ve kapak resimleri (filesDir altında, cache değil --
-         kullanıcı uygulamayı kapatıp açsa ya da sistem önbelleği temizlese bile kalıcı olmalı). -->
     <files-path name="persisted_wallpaper" path="persisted_wallpaper/" />
     <files-path name="persisted_covers" path="persisted_covers/" />
 </paths>
