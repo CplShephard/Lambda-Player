@@ -111,13 +111,14 @@ import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.components.BouncyIconButton
-import dev.shephard.player.ui.components.ControlledSheetDragHandle
 import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.glass.blurSurfaceCompact
 import dev.shephard.player.ui.glass.blurSheetSurface
 import dev.shephard.player.ui.components.MinimalSeekBar
+import dev.shephard.player.ui.components.MiuixSheetDefaults
+import dev.shephard.player.ui.components.MiuixSheetHandle
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -598,30 +599,15 @@ fun NowPlayingSheet(
                 var showPlaylists by remember { mutableStateOf(false) }
                 var showLyrics by remember { mutableStateOf(false) }
 
-                var allowQueueDismiss by remember { mutableStateOf(false) }
-                var allowLyricsDismiss by remember { mutableStateOf(false) }
-
-                // State'ler if dışında — Compose composition kuralı. Native swipe-to-dismiss
-                // kilitli; sadece custom handle 64dp+ aşağı sürüklenince Hidden'a izin veriyoruz.
-                val queueSheetState = rememberModalBottomSheetState(
-                    skipPartiallyExpanded = true,
-                    confirmValueChange = { target ->
-                        target != androidx.compose.material3.SheetValue.Hidden || allowQueueDismiss
-                    }
-                )
-                val lyricsSheetState = rememberModalBottomSheetState(
-                    skipPartiallyExpanded = true,
-                    confirmValueChange = { target ->
-                        target != androidx.compose.material3.SheetValue.Hidden || allowLyricsDismiss
-                    }
-                )
+                // State'ler if dışında — Compose composition kuralı
+                val queueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+                val lyricsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
                 val lyricsSheetScope = rememberCoroutineScope()
                 val trackId = track?.id ?: -1L
                 val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
 
                 BouncyIconButton(
                     onClick = {
-                        allowQueueDismiss = false
                         showQueue = true
                     },
                     icon = Icons.AutoMirrored.Filled.QueueMusic,
@@ -632,7 +618,6 @@ fun NowPlayingSheet(
                 )
                 BouncyIconButton(
                     onClick = {
-                        allowLyricsDismiss = false
                         showLyrics = true
                     },
                     icon = Icons.Filled.Lyrics,
@@ -682,16 +667,10 @@ fun NowPlayingSheet(
                     ModalBottomSheet(
                         onDismissRequest = { showQueue = false },
                         sheetState = queueSheetState,
-                        containerColor = if (nowPlayingLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+                        shape = MiuixSheetDefaults.Shape,
+                        containerColor = MiuixSheetDefaults.containerColor(nowPlayingLiquidGlassOn),
                         contentColor = MaterialTheme.colorScheme.onSurface,
-                        dragHandle = {
-                            ControlledSheetDragHandle(
-                                sheetState = queueSheetState,
-                                liquidGlassOn = nowPlayingLiquidGlassOn,
-                                onAllowDismiss = { allowQueueDismiss = true },
-                                onDismiss = { showQueue = false }
-                            )
-                        }
+                        dragHandle = { MiuixSheetHandle(nowPlayingLiquidGlassOn) }
                     ) {
                         QueueList(
                             queue = state.queue,
@@ -743,16 +722,10 @@ fun NowPlayingSheet(
                     ModalBottomSheet(
                         onDismissRequest = { showLyrics = false },
                         sheetState = lyricsSheetState,
-                        containerColor = if (nowPlayingLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+                        shape = MiuixSheetDefaults.Shape,
+                        containerColor = MiuixSheetDefaults.containerColor(nowPlayingLiquidGlassOn),
                         contentColor = MaterialTheme.colorScheme.onSurface,
-                        dragHandle = {
-                            ControlledSheetDragHandle(
-                                sheetState = lyricsSheetState,
-                                liquidGlassOn = nowPlayingLiquidGlassOn,
-                                onAllowDismiss = { allowLyricsDismiss = true },
-                                onDismiss = { showLyrics = false }
-                            )
-                        }
+                        dragHandle = { MiuixSheetHandle(nowPlayingLiquidGlassOn) }
                     ) {
                         Column(
                             modifier = Modifier
@@ -762,7 +735,7 @@ fun NowPlayingSheet(
                                     else Modifier
                                 )
                                 .padding(16.dp)
-                                .heightIn(min = 200.dp, max = 520.dp)
+                                .fillMaxHeight(0.88f)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                                 Text(strings.lyrics, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
@@ -956,28 +929,16 @@ private fun AddToPlaylistDrawer(
         catch (_: Exception) { emptyList() }
     }
     val isLiked = likedIds.contains(trackId)
-    var allowAddToPlaylistDismiss by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { target ->
-            target != androidx.compose.material3.SheetValue.Hidden || allowAddToPlaylistDismiss
-        }
-    )
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val addToPlaylistLiquidGlassOn = LocalBlurEnabled.current
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (addToPlaylistLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+        shape = MiuixSheetDefaults.Shape,
+        containerColor = MiuixSheetDefaults.containerColor(addToPlaylistLiquidGlassOn),
         contentColor = MaterialTheme.colorScheme.onSurface,
-        dragHandle = {
-            ControlledSheetDragHandle(
-                sheetState = sheetState,
-                liquidGlassOn = addToPlaylistLiquidGlassOn,
-                onAllowDismiss = { allowAddToPlaylistDismiss = true },
-                onDismiss = onDismiss
-            )
-        }
+        dragHandle = { MiuixSheetHandle(addToPlaylistLiquidGlassOn) }
     ) {
         Column(
             modifier = Modifier
@@ -987,12 +948,14 @@ private fun AddToPlaylistDrawer(
                     else Modifier
                 )
                 .padding(16.dp)
-                .height(420.dp)
+                .fillMaxHeight(0.88f)
         ) {
             Text(strings.addToPlaylist, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
             LazyColumn(
-                modifier = Modifier.overScrollVertical()
+                modifier = Modifier
+                    .weight(1f)
+                    .overScrollVertical()
             ) {
                 // Liked Songs at top
                 item {
@@ -1116,19 +1079,13 @@ private fun QueueList(
     val reorderableState = rememberReorderableLazyListState(
         lazyListState = listState
     ) { from, to ->
-        // The currently playing item is locked at the top of this relative queue.
-        // Other items may be dragged only as high as directly under it (index 1).
-        if (from.index == 0) return@rememberReorderableLazyListState
-        val safeToIndex = to.index.coerceAtLeast(1).coerceAtMost(items.lastIndex)
         val currentDragInfo = dragInfo
         dragInfo = if (currentDragInfo == null) {
-            from.index to safeToIndex
+            from.index to to.index
         } else {
-            currentDragInfo.first to safeToIndex
+            currentDragInfo.first to to.index
         }
-        if (from.index != safeToIndex) {
-            items.add(safeToIndex, items.removeAt(from.index))
-        }
+        items.add(to.index, items.removeAt(from.index))
     }
     LaunchedEffect(reorderableState.isAnyItemDragging) {
         if (!reorderableState.isAnyItemDragging) {
@@ -1146,6 +1103,7 @@ private fun QueueList(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .fillMaxHeight(0.88f)
             .then(
                 if (queueLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
                 else Modifier
@@ -1162,7 +1120,7 @@ private fun QueueList(
             state = listState,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(420.dp)
+                .weight(1f)
                 .overScrollVertical()
         ) {
             itemsIndexed(items, key = { _, t -> t.id }) { index, track ->
@@ -1177,7 +1135,7 @@ private fun QueueList(
                         onPlay = { onPlay(index) },
                         onPlayNext = { onPlayNext(index) },
                         onRemove = { onRemove(index) },
-                        dragHandleModifier = if (index == 0) Modifier else Modifier.draggableHandle()
+                        dragHandleModifier = Modifier.draggableHandle()
                     )
                 }
             }

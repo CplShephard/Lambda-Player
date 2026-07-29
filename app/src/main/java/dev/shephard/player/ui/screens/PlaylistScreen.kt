@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -59,6 +60,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -97,7 +99,8 @@ import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.BouncyIconButton
-import dev.shephard.player.ui.components.ControlledSheetDragHandle
+import dev.shephard.player.ui.components.MiuixSheetDefaults
+import dev.shephard.player.ui.components.MiuixSheetHandle
 import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
@@ -532,31 +535,20 @@ fun PlaylistScreen(
     if (menuIdx != null) {
         val pl = playlists[menuIdx]
         val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
-        var allowMenuDismiss by remember { mutableStateOf(false) }
-        val sheetState = rememberModalBottomSheetState(
-            skipPartiallyExpanded = true,
-            confirmValueChange = { target ->
-                target != androidx.compose.material3.SheetValue.Hidden || allowMenuDismiss
-            }
-        )
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
         val menuLiquidGlassOn = LocalBlurEnabled.current
         ModalBottomSheet(
             onDismissRequest = { playlistMenuIndex = null },
             sheetState = sheetState,
-            containerColor = if (menuLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+            shape = MiuixSheetDefaults.Shape,
+            containerColor = MiuixSheetDefaults.containerColor(menuLiquidGlassOn),
             contentColor = MaterialTheme.colorScheme.onSurface,
-            dragHandle = {
-                ControlledSheetDragHandle(
-                    sheetState = sheetState,
-                    liquidGlassOn = menuLiquidGlassOn,
-                    onAllowDismiss = { allowMenuDismiss = true },
-                    onDismiss = { playlistMenuIndex = null }
-                )
-            }
+            dragHandle = { MiuixSheetHandle(menuLiquidGlassOn) }
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .fillMaxHeight(0.88f)
                     .then(
                         if (menuLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
                         else Modifier
@@ -1296,8 +1288,7 @@ private fun PlaylistDetailView(
             modifier = Modifier
                 .fillMaxSize()
                 .overScrollVertical(),
-            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp)
         ) {
             item {
                 Row(
@@ -1616,8 +1607,6 @@ private fun DraggablePlaylistTrackRow(
     onRemove: () -> Unit,
     dragHandleModifier: Modifier
 ) {
-    val liquidGlassOn = LocalBlurEnabled.current
-    val rowShape = RoundedCornerShape(20.dp)
     val elevation by androidx.compose.animation.core.animateDpAsState(
         targetValue = if (isDragged) 6.dp else 0.dp,
         label = "playlistItemElevation"
@@ -1627,16 +1616,12 @@ private fun DraggablePlaylistTrackRow(
             .fillMaxWidth()
             .height(64.dp)
             .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onTrackClick() }
-            .shadow(elevation, rowShape)
+            .shadow(elevation, RoundedCornerShape(12.dp))
             .zIndex(if (isDragged) 1f else 0f)
-            .clip(rowShape)
-            .then(
-                if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = rowShape)
-                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
-            )
-            .then(
-                if (isDragged) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f), rowShape)
-                else Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (isDragged) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                else Color.Transparent
             )
             .padding(vertical = 6.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically

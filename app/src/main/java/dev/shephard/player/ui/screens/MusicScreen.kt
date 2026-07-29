@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Button
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -77,7 +79,8 @@ import dev.shephard.player.player.rememberAudioPermissionState
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.glass.blurSheetSurface
-import dev.shephard.player.ui.components.ControlledSheetDragHandle
+import dev.shephard.player.ui.components.MiuixSheetDefaults
+import dev.shephard.player.ui.components.MiuixSheetHandle
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
@@ -205,31 +208,20 @@ fun MusicScreen(
 
     // Track menu bottom sheet
     selectedTrackForMenu?.let { track ->
-        var allowTrackMenuDismiss by remember { mutableStateOf(false) }
-        val sheetState = rememberModalBottomSheetState(
-            skipPartiallyExpanded = true,
-            confirmValueChange = { target ->
-                target != androidx.compose.material3.SheetValue.Hidden || allowTrackMenuDismiss
-            }
-        )
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
         val menuLiquidGlassOn = LocalBlurEnabled.current
         ModalBottomSheet(
             onDismissRequest = { selectedTrackForMenu = null },
             sheetState = sheetState,
-            containerColor = if (menuLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+            shape = MiuixSheetDefaults.Shape,
+            containerColor = MiuixSheetDefaults.containerColor(menuLiquidGlassOn),
             contentColor = MaterialTheme.colorScheme.onSurface,
-            dragHandle = {
-                ControlledSheetDragHandle(
-                    sheetState = sheetState,
-                    liquidGlassOn = menuLiquidGlassOn,
-                    onAllowDismiss = { allowTrackMenuDismiss = true },
-                    onDismiss = { selectedTrackForMenu = null }
-                )
-            }
+            dragHandle = { MiuixSheetHandle(menuLiquidGlassOn) }
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .fillMaxHeight(0.88f)
                     .then(
                         if (menuLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
                         else Modifier
@@ -512,13 +504,7 @@ private fun EditMusicDrawer(
 ) {
     val strings = LocalStrings.current
     val context = LocalContext.current
-    var allowEditMusicDismiss by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { target ->
-            target != androidx.compose.material3.SheetValue.Hidden || allowEditMusicDismiss
-        }
-    )
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
     val existing = remember(track.id) { libraryViewModel.getOverride(track.id) }
 
@@ -603,20 +589,15 @@ private fun EditMusicDrawer(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (editMusicLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+        shape = MiuixSheetDefaults.Shape,
+        containerColor = MiuixSheetDefaults.containerColor(editMusicLiquidGlassOn),
         contentColor = MaterialTheme.colorScheme.onSurface,
-        dragHandle = {
-            ControlledSheetDragHandle(
-                sheetState = sheetState,
-                liquidGlassOn = editMusicLiquidGlassOn,
-                onAllowDismiss = { allowEditMusicDismiss = true },
-                onDismiss = onDismiss
-            )
-        }
+        dragHandle = { MiuixSheetHandle(editMusicLiquidGlassOn) }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .fillMaxHeight(0.88f)
                 .then(
                     if (editMusicLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
                     else Modifier
