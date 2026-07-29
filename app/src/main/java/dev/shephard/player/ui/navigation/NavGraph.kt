@@ -29,6 +29,14 @@ private fun routeOrder(route: String?): Int = when (route) {
     else -> if (route?.startsWith(PlaylistRoutes.DetailBase) == true) 2 else 0
 }
 
+// Alt sayfa mı? (Playlist Detail, Theme/Player/About Settings) — bunlar dock'un 3 ana
+// sekmesi değil, InstallerX'teki gibi "yeni bir sayfaya girme" hissi vermesi gereken
+// detay/ayar ekranları. Ana sekmeler arası (Music/Playlists/Settings) yatay tab-switch
+// animasyonunu kullanırken, bu alt sayfalar kendi push/pop transition'ını kullanır.
+private fun isSubPage(route: String?): Boolean =
+    route == SettingsRoutes.Theme || route == SettingsRoutes.Player || route == SettingsRoutes.About ||
+        route?.startsWith(PlaylistRoutes.DetailBase) == true
+
 // Ekranlar arası animasyon — IntOffset spring ile
 private val springSpec = spring<androidx.compose.ui.unit.IntOffset>(
     dampingRatio = 0.8f,
@@ -38,6 +46,13 @@ private val springSpec = spring<androidx.compose.ui.unit.IntOffset>(
 private val fadeSpring = spring<Float>(
     dampingRatio = 1f,
     stiffness = 380f
+)
+
+// Alt sayfalara giriş: InstallerX'teki "yeni sekme" hissi — sağdan biraz daha güçlü bir
+// push ile gelir, ana sekmeler arası geçişten görsel olarak ayrışır.
+private val subPageSpringSpec = spring<androidx.compose.ui.unit.IntOffset>(
+    dampingRatio = 0.86f,
+    stiffness = 420f
 )
 
 @Composable
@@ -53,35 +68,54 @@ fun NavGraph(
         navController = navController,
         startDestination = Destination.Music.route,
         modifier = modifier,
-        // Music→Playlist→Settings: soldan sağa sıralama → ileri = sola kayar
+        // Music→Playlist→Settings: soldan sağa sıralama → ileri = sola kayar.
+        // Alt sayfalara (Playlist Detail, Theme/Player/About Settings) girerken InstallerX'teki
+        // gibi ayrı, belirgin bir "yeni sayfa" push transition'ı kullanılır — ana sekmeler
+        // arası tab-switch hissinden görsel olarak ayrışır.
         enterTransition = {
-            val fromIdx = routeOrder(initialState.destination.route)
-            val toIdx = routeOrder(targetState.destination.route)
-            val dir = if (toIdx >= fromIdx)
-                AnimatedContentTransitionScope.SlideDirection.Left
-            else
-                AnimatedContentTransitionScope.SlideDirection.Right
-            slideIntoContainer(dir, springSpec) + fadeIn(fadeSpring)
+            val toRoute = targetState.destination.route
+            if (isSubPage(toRoute)) {
+                slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left, subPageSpringSpec) +
+                    fadeIn(fadeSpring)
+            } else {
+                val fromIdx = routeOrder(initialState.destination.route)
+                val toIdx = routeOrder(toRoute)
+                val dir = if (toIdx >= fromIdx)
+                    AnimatedContentTransitionScope.SlideDirection.Left
+                else
+                    AnimatedContentTransitionScope.SlideDirection.Right
+                slideIntoContainer(dir, springSpec) + fadeIn(fadeSpring)
+            }
         },
         exitTransition = {
-            val fromIdx = routeOrder(initialState.destination.route)
-            val toIdx = routeOrder(targetState.destination.route)
-            val dir = if (toIdx >= fromIdx)
-                AnimatedContentTransitionScope.SlideDirection.Left
-            else
-                AnimatedContentTransitionScope.SlideDirection.Right
-            slideOutOfContainer(dir, springSpec) + fadeOut(fadeSpring)
+            val toRoute = targetState.destination.route
+            if (isSubPage(toRoute)) {
+                slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left, subPageSpringSpec) +
+                    fadeOut(fadeSpring)
+            } else {
+                val fromIdx = routeOrder(initialState.destination.route)
+                val toIdx = routeOrder(toRoute)
+                val dir = if (toIdx >= fromIdx)
+                    AnimatedContentTransitionScope.SlideDirection.Left
+                else
+                    AnimatedContentTransitionScope.SlideDirection.Right
+                slideOutOfContainer(dir, springSpec) + fadeOut(fadeSpring)
+            }
         },
         popEnterTransition = {
+            val fromRoute = initialState.destination.route
+            val spec = if (isSubPage(fromRoute)) subPageSpringSpec else springSpec
             slideIntoContainer(
                 AnimatedContentTransitionScope.SlideDirection.Right,
-                springSpec
+                spec
             ) + fadeIn(fadeSpring)
         },
         popExitTransition = {
+            val fromRoute = initialState.destination.route
+            val spec = if (isSubPage(fromRoute)) subPageSpringSpec else springSpec
             slideOutOfContainer(
                 AnimatedContentTransitionScope.SlideDirection.Right,
-                springSpec
+                spec
             ) + fadeOut(fadeSpring)
         }
     ) {

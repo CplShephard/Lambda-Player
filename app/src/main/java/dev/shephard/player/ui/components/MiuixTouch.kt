@@ -15,25 +15,33 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 
 /**
  * InstallerX/Miuix-like tactile press feedback for big widgets/cards.
  *
- * Unlike the old bounceClick, this does not overshoot. The surface gently shrinks and bends
- * toward the pressed corner while the finger is down, then springs back when released.
+ * Basılı tutulan noktaya doğru sadece KÜÇÜLÜR (scale, transform origin parmağın olduğu
+ * nokta) — 3D eğilme/bükülme YOK, kullanıcı bunu istemedi. Bırakınca normal boyutuna
+ * geri döner.
+ *
+ * pointerInput artık sabit bir key (Unit) kullanıyor, `onClick` lambda'sı değil — önceki
+ * `pointerInput(enabled, onClick)` her recompose'ta YENİ bir closure aldığı için (çağıran
+ * taraf genelde `onClick = { onOpen(x) }` gibi inline lambda'lar geçiyor), gesture detector
+ * dokunma sırasında bir recompose olursa iptal edilip yeniden başlayabiliyordu — bu da
+ * `tryAwaitRelease()`'in hiç tamamlanmamasına, yani tıklamanın bazen hiç tetiklenmemesine
+ * yol açıyordu ("playliste basınca açılmıyor" şikayetinin kaynağı buydu). Güncel `onClick`
+ * artık `rememberUpdatedState` ile okunuyor, gesture detector'ı yeniden başlatmadan.
  */
 fun Modifier.miuixWidgetClick(
     enabled: Boolean = true,
     pressScale: Float = 0.94f,
-    maxTiltDegrees: Float = 7f,
+    maxTiltDegrees: Float = 7f, // Geriye dönük uyumluluk için parametre korunuyor, artık kullanılmıyor.
     onClick: () -> Unit
 ): Modifier = composed {
     var pressed by remember { mutableStateOf(false) }
     var pressOffset by remember { mutableStateOf(Offset.Zero) }
     var size by remember { mutableStateOf(IntSize.Zero) }
-    val density = LocalDensity.current
+    val currentOnClick by androidx.compose.runtime.rememberUpdatedState(onClick)
 
     val progress by animateFloatAsState(
         targetValue = if (pressed && enabled) 1f else 0f,
@@ -54,11 +62,8 @@ fun Modifier.miuixWidgetClick(
             transformOrigin = TransformOrigin(px, py)
             scaleX = 1f - (1f - pressScale) * progress
             scaleY = 1f - (1f - pressScale) * progress
-            rotationY = (0.5f - px) * maxTiltDegrees * progress
-            rotationX = (py - 0.5f) * maxTiltDegrees * progress
-            cameraDistance = 28f * density.density
         }
-        .pointerInput(enabled, onClick) {
+        .pointerInput(enabled) {
             detectTapGestures(
                 onPress = { offset ->
                     if (enabled) {
@@ -66,7 +71,7 @@ fun Modifier.miuixWidgetClick(
                         pressed = true
                         val released = tryAwaitRelease()
                         pressed = false
-                        if (released) onClick()
+                        if (released) currentOnClick()
                     }
                 }
             )
@@ -80,6 +85,7 @@ fun Modifier.pressScaleClick(
     onClick: () -> Unit
 ): Modifier = composed {
     var pressed by remember { mutableStateOf(false) }
+    val currentOnClick by androidx.compose.runtime.rememberUpdatedState(onClick)
     val scale by animateFloatAsState(
         targetValue = if (pressed && enabled) pressScale else 1f,
         animationSpec = spring(
@@ -94,14 +100,14 @@ fun Modifier.pressScaleClick(
             scaleX = scale
             scaleY = scale
         }
-        .pointerInput(enabled, onClick) {
+        .pointerInput(enabled) {
             detectTapGestures(
                 onPress = {
                     if (enabled) {
                         pressed = true
                         val released = tryAwaitRelease()
                         pressed = false
-                        if (released) onClick()
+                        if (released) currentOnClick()
                     }
                 }
             )

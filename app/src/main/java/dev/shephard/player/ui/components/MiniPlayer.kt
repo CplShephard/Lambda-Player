@@ -52,7 +52,7 @@ import dev.shephard.player.data.slideForwardInQueue
 import dev.shephard.player.data.trackById
 import dev.shephard.player.player.PlayerUiState
 import dev.shephard.player.ui.glass.LocalBlurEnabled
-import dev.shephard.player.ui.glass.LocalContentBackdrop
+import dev.shephard.player.ui.glass.LocalAppBackdrop
 import dev.shephard.player.ui.glass.miuixBlurSurface
 
 @Composable
@@ -84,7 +84,9 @@ fun MiniPlayer(
     )
 
     val liquidGlassOn = LocalBlurEnabled.current
-    val contentBackdrop = LocalContentBackdrop.current
+    // Dock ile aynı sebepten: pahalı contentBackdrop yerine ucuz, statik backgroundBackdrop
+    // (sadece wallpaper) sample ediliyor — bkz. MainContainer.kt'deki performans notu.
+    val contentBackdrop = LocalAppBackdrop.current
     val miniPlayerShape = RoundedCornerShape(14.dp)
 
     Column(
