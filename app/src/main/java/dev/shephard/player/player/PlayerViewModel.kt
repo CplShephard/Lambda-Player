@@ -68,7 +68,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val isRemixed: StateFlow<Boolean> = _isRemixed.asStateFlow()
     private var isUserSeeking: Boolean = false
     private var lastPlaybackTickMs: Long? = null
+    private var pendingListeningDeltaMs: Long = 0L
+    private var lastListeningStoreWriteMs: Long = 0L
     private var pendingExternalUri: Uri? = null
+
+    // The animated NowPlaying glow must not live inside PlayerUiState: updating that
+    // data class every ~80ms invalidates MainContainer/NavGraph/Settings while music is
+    // playing. Keep it in a tiny dedicated flow that only NowPlayingSheet observes.
+    private val _amplitude = MutableStateFlow(0f)
+    val amplitude: StateFlow<Float> = _amplitude.asStateFlow()
 
     // -1 = backward, 1 = forward, 0 = unknown
     private val _navigationDirection = MutableStateFlow(1)
@@ -78,7 +86,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
             if (isPlaying) {
-                lastPlaybackTickMs = System.currentTimeMillis()
+                val now = System.currentTimeMillis()
+                lastPlaybackTickMs = now
+                lastListeningStoreWriteMs = now
             } else {
                 flushListeningTime()
             }
@@ -177,7 +187,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             repeatMode = mode
         )
         if (c.isPlaying) {
-            lastPlaybackTickMs = System.currentTimeMillis()
+            val now = System.currentTimeMillis()
+            lastPlaybackTickMs = now
+            lastListeningStoreWriteMs = now
         }
         extractGlowColor(current)
         loadLyrics(current)
@@ -268,11 +280,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val last = lastPlaybackTickMs
         if (last != null) {
             val delta = (now - last).coerceIn(0L, 2000L)
-            if (delta > 0) {
-                viewModelScope.launch { prefs.addListeningTime(delta) }
-            }
+            if (delta > 0) pendingListeningDeltaMs += delta
         }
         lastPlaybackTickMs = now
+
+        // Do not write DataStore every 500ms. That was the hidden Settings jank source:
+        // every write emitted totalListeningMs, causing collectors to wake up constantly.
+        // Batch writes while keeping exact time in memory and flush on pause/track switch.
+        if (pendingListeningDeltaMs >= 10_000L || now - lastListeningStoreWriteMs >= 10_000L) {
+            flushPendingListeningTime()
+        }
     }
 
     private fun flushListeningTime() {
@@ -280,11 +297,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (last != null) {
             val now = System.currentTimeMillis()
             val delta = (now - last).coerceIn(0L, 2000L)
-            if (delta > 0) {
-                viewModelScope.launch { prefs.addListeningTime(delta) }
-            }
+            if (delta > 0) pendingListeningDeltaMs += delta
         }
         lastPlaybackTickMs = null
+        flushPendingListeningTime()
+    }
+
+    private fun flushPendingListeningTime() {
+        val delta = pendingListeningDeltaMs
+        if (delta <= 0L) return
+        pendingListeningDeltaMs = 0L
+        lastListeningStoreWriteMs = System.currentTimeMillis()
+        viewModelScope.launch(Dispatchers.IO) { prefs.addListeningTime(delta) }
     }
 
     private fun performCrossfadeIn() {
@@ -856,7 +880,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 val playing = _uiState.value.isPlaying
                 val target = if (playing) (0.55f + 0.45f * ((sin(t.toDouble()) + 1.0) / 2.0).toFloat())
                 else 0f
-                _uiState.value = _uiState.value.copy(amplitude = target)
+                _amplitude.value = target
                 delay(80)
             }
         }

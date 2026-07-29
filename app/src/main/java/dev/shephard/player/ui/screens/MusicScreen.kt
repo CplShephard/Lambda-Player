@@ -22,10 +22,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -79,6 +79,7 @@ import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.glass.blurSheetSurface
 import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
@@ -168,8 +169,7 @@ fun MusicScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(tracks, key = { it.id }) { track ->
-                        val index = tracks.indexOf(track)
+                    gridItemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
                         GridTrackCard(
                             track = track,
                             onClick = { onTrackClick(tracks, index) },
@@ -191,8 +191,7 @@ fun MusicScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(tracks, key = { it.id }) { track ->
-                        val index = tracks.indexOf(track)
+                    itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
                         TrackRow(
                             track = track,
                             onClick = { onTrackClick(tracks, index) },
@@ -387,7 +386,7 @@ private fun GridTrackCard(
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
-            .bounceClick { onClick() }
+            .miuixWidgetClick { onClick() }
             .padding(8.dp)
     ) {
         Box(
@@ -454,7 +453,7 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
-            .bounceClick { onClick() }
+            .miuixWidgetClick { onClick() }
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

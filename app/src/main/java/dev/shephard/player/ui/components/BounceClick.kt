@@ -1,18 +1,17 @@
 package dev.shephard.player.ui.components
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -24,7 +23,6 @@ import androidx.compose.ui.unit.dp
 import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurfaceCompact
-import kotlinx.coroutines.launch
 
 /**
  * Reusable tap-feedback Modifier: shrinks on press-down, then springs back
@@ -53,26 +51,26 @@ fun Modifier.bounceClick(
     onClick: () -> Unit
 ): Modifier = composed {
     val interactionSource = remember { MutableInteractionSource() }
-    val scope = rememberCoroutineScope()
-    val scale = remember { Animatable(1f) }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (enabled && isPressed) pressScale else 1f,
+        animationSpec = spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+            stiffness = stiffness
+        ),
+        label = "pressScale"
+    )
 
     this
         .clickable(
             interactionSource = interactionSource,
             indication = null,
             enabled = enabled,
-            onClick = {
-                scope.launch {
-                    scale.animateTo(pressScale, tween(80))
-                    scale.animateTo(overshoot, spring(dampingRatio = damping, stiffness = stiffness))
-                    scale.animateTo(1f, spring(dampingRatio = 0.7f, stiffness = stiffness))
-                }
-                onClick()
-            }
+            onClick = onClick
         )
         .graphicsLayer {
-            scaleX = scale.value
-            scaleY = scale.value
+            scaleX = scale
+            scaleY = scale
         }
 }
 

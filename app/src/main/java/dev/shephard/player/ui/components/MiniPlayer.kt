@@ -92,7 +92,7 @@ fun MiniPlayer(
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 6.dp)
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(miniPlayerShape)
@@ -122,10 +122,14 @@ fun MiniPlayer(
                         )
                     }
                 )
-                .bounceClick { onClick() }
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .bounceClick(pressScale = 0.97f) { onClick() }
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
             // Album art
             AnimatedContent(
                 targetState = track.id,
@@ -215,7 +219,7 @@ fun MiniPlayer(
                         if (liquidGlassOn) Modifier.blurSurfaceCompact(enabled = true, shape = RoundedCornerShape(8.dp))
                         else Modifier
                     )
-                    .bounceClick { onPreviousClick() },
+                    .bounceClick(pressScale = 0.92f) { onPreviousClick() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -238,7 +242,7 @@ fun MiniPlayer(
                         )
                         else Modifier
                     )
-                    .bounceClick { onPlayPauseClick() },
+                    .bounceClick(pressScale = 0.92f) { onPlayPauseClick() },
                 contentAlignment = Alignment.Center
             ) {
                 AnimatedContent(
@@ -266,7 +270,7 @@ fun MiniPlayer(
                         if (liquidGlassOn) Modifier.blurSurfaceCompact(enabled = true, shape = RoundedCornerShape(8.dp))
                         else Modifier
                     )
-                    .bounceClick { onNextClick() },
+                    .bounceClick(pressScale = 0.92f) { onNextClick() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -277,14 +281,16 @@ fun MiniPlayer(
             }
         }
 
-        BoldProgressBar(
-            fraction = animatedFraction,
-            activeColor = animatedGlow,
-            inactiveColor = animatedGlow.copy(alpha = 0.18f),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 4.dp)
-        )
+            BoldProgressBar(
+                fraction = animatedFraction,
+                activeColor = animatedGlow,
+                inactiveColor = animatedGlow.copy(alpha = 0.18f),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth(),
+                height = 3.dp
+            )
+        }
     }
 }
 

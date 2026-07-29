@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -31,12 +32,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material.icons.filled.NightsStay
@@ -94,22 +99,56 @@ private val AccentPalette = listOf(
 )
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    onOpenThemeSettings: () -> Unit = {},
+    onOpenPlayerSettings: () -> Unit = {},
+    onOpenAbout: () -> Unit = {}
+) {
+    val context = LocalContext.current
+    val prefs = remember { PreferencesManager(context) }
+    val strings = LocalStrings.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .overScrollVertical()
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // InstallerX tarzı ana Settings: üstte widget kart, altında üç büyük yönlendirme.
+        TotalListeningTimeCard(prefs = prefs)
+
+        SettingsNavigationCard(
+            icon = Icons.Filled.ColorLens,
+            title = strings.themeSettings,
+            summary = "Colors, wallpaper, Liquid Glass, layout and language",
+            onClick = onOpenThemeSettings
+        )
+        SettingsNavigationCard(
+            icon = Icons.Filled.MusicNote,
+            title = strings.playbackSettings,
+            summary = "Crossfade, gapless playback and audio focus",
+            onClick = onOpenPlayerSettings
+        )
+        SettingsNavigationCard(
+            icon = Icons.Filled.Info,
+            title = "About Lambda Player",
+            summary = "Version, project links and credits",
+            onClick = onOpenAbout
+        )
+
+        Spacer(Modifier.height(110.dp))
+    }
+}
+
+@Composable
+fun ThemeSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
-    val uriHandler = LocalUriHandler.current
     val strings = LocalStrings.current
 
-    // NOT: totalListeningMs BİLEREK burada collectAsState ile toplanmıyor. Bu değer
-    // PlayerViewModel'in observePosition() döngüsü tarafından her 500ms'de bir güncelleniyor
-    // (accrueListeningTime -> DataStore write -> Flow emit). Eğer burada üst seviyede
-    // toplansaydı, her 500ms'de TÜM SettingsScreen ağacı (tüm toggle'lar, slider'lar, kartlar)
-    // recompose olurdu — bu da toggle/slider etkileşimindeki kasmanın sebebiydi. Artık sadece
-    // TotalListeningTimeCard kendi izole collectAsState'ine sahip, recompose scope'u ona özel.
-    val crossfade by prefs.crossfadeEnabled.collectAsState(initial = false)
-    val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
-    val playWith by prefs.playWithOthers.collectAsState(initial = false)
     val accent by prefs.accentColor.collectAsState(initial = AccentPalette.first())
     val wallpaper by prefs.wallpaperUri.collectAsState(initial = "")
     val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = 0.55f)
@@ -123,76 +162,8 @@ fun SettingsScreen() {
 
     var langMenuOpen by remember { mutableStateOf(false) }
     var customPickerOpen by remember { mutableStateOf(false) }
-
-    // Kırpılmış wallpaper KALICI depolamaya (filesDir, cache DEĞİL) her seferinde benzersiz
-    // isimli bir dosyaya yazılır. Kalıcı depolama kullanmamızın sebebi: metin tercihleri gibi
-    // wallpaper'ın da kullanıcı uygulamayı kapatıp açtığında ya da sistem önbelleği
-    // temizlediğinde kaybolmaması. Benzersiz dosya adı ise Coil'in eski kırpımı önbellekten
-    // göstermesini engeller (content:// URI'lere sorgu parametresi eklemek FileProvider'da
-    // güvenilir değil, o yüzden dosya adını değiştiriyoruz).
-    var cropOutputUri by remember { mutableStateOf<Uri?>(null) }
-
-    val cropLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val output = cropOutputUri
-        if (result.resultCode == android.app.Activity.RESULT_OK && output != null) {
-            scope.launch { prefs.setWallpaperUri(output.toString()) }
-        }
-    }
-
-    fun launchSystemCrop(sourceUri: Uri) {
-        // Her kırpma için KALICI depolamada (filesDir) yeni bir çıktı dosyası hazırla.
-        val dir = java.io.File(context.filesDir, "persisted_wallpaper").apply { mkdirs() }
-        val file = java.io.File(dir, "wallpaper_${System.currentTimeMillis()}.jpg")
-        val outputUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        cropOutputUri = outputUri
-
-        val cropIntent = Intent("com.android.camera.action.CROP").apply {
-            setDataAndType(sourceUri, "image/*")
-            putExtra("crop", "true")
-            putExtra("scale", true)
-            putExtra("outputX", 1080)
-            putExtra("outputY", 1920)
-            putExtra("aspectX", 9)
-            putExtra("aspectY", 16)
-            putExtra(android.provider.MediaStore.EXTRA_OUTPUT, outputUri)
-            putExtra("outputFormat", android.graphics.Bitmap.CompressFormat.JPEG.toString())
-            putExtra("return-data", false)
-            putExtra("noFaceDetection", true)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            clipData = android.content.ClipData.newUri(context.contentResolver, "wallpaper", sourceUri)
-        }
-
-        // ÖNEMLİ BUGFIX ("Couldn't save changes due to an error"): Bazı OEM cropper'ları
-        // (ör. Xiaomi/HyperOS Gallery cropper) intent flag'leri üzerinden gelen örtük URI
-        // iznini yeterli bulmuyor ve çıktı dosyasına yazamayınca genel bir hata gösteriyor.
-        // Çözüm: crop işlemini gerçekten yürütecek her aktiviteye çıktı URI'si için AÇIKÇA
-        // (grantUriPermission ile) okuma+yazma izni vermek.
-        val resolvedActivities = context.packageManager.queryIntentActivities(cropIntent, 0)
-        for (info in resolvedActivities) {
-            val packageName = info.activityInfo?.packageName ?: continue
-            try {
-                context.grantUriPermission(
-                    packageName,
-                    outputUri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                )
-            } catch (_: SecurityException) { }
-        }
-
-        val canCrop = resolvedActivities.isNotEmpty()
-        if (canCrop) {
-            cropLauncher.launch(cropIntent)
-        } else {
-            // Cihazda sistem cropper'ı yoksa (bazı özel ROM'larda olabilir) seçilen görseli
-            // kalıcı depolamaya kopyalayıp kaydet — en azından wallpaper ayarlanabilsin.
-            scope.launch {
-                val persisted = dev.shephard.player.player.ImagePersistence.persistWallpaper(context, sourceUri)
-                if (persisted != null) prefs.setWallpaperUri(persisted.toString())
-            }
-        }
-    }
+    var wallpaperBrightnessValue by remember(wallpaperBrightness) { mutableStateOf(wallpaperBrightness) }
+    var cardAlphaValue by remember(cardAlpha) { mutableStateOf(cardAlpha) }
 
     val wallpaperPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -201,121 +172,26 @@ fun SettingsScreen() {
             try {
                 context.contentResolver.takePersistableUriPermission(
                     uri,
-                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             } catch (_: SecurityException) { }
-            launchSystemCrop(uri)
+            scope.launch {
+                val persisted = dev.shephard.player.player.ImagePersistence.persistWallpaper(context, uri)
+                prefs.setWallpaperUri((persisted ?: uri).toString())
+            }
         }
     }
 
-    val packageInfo = remember {
-        try {
-            context.packageManager.getPackageInfo(context.packageName, 0)
-        } catch (_: PackageManager.NameNotFoundException) { null }
-    }
-    val versionName = packageInfo?.versionName ?: "2.0"
-    val settingsScrollState = rememberScrollState()
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(settingsScrollState)
-            .overScrollVertical()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // User profile card
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .bounceClick { uriHandler.openUri("https://github.com/CplShephard") }
-                .then(
-                    if (liquidGlassEnabled) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
-                    else Modifier
-                ),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (liquidGlassEnabled) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.background),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Person,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Column(modifier = Modifier.padding(start = 16.dp)) {
-                        Text(
-                            text = "CplShephard",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Text(
-                            text = strings.viewGithub,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-
-        // Total listening time — izole composable: totalListeningMs her 500ms değişse bile
-        // sadece bu kart recompose olur, geri kalan Settings ekranı (toggle'lar, slider'lar)
-        // etkilenmez.
-        TotalListeningTimeCard(prefs = prefs)
-
-        // Playback Settings
+    SettingsPageScaffold(title = strings.themeSettings, onBack = onBack) {
         SectionCard {
-            Text(
-                text = strings.playbackSettings,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(Modifier.height(8.dp))
-            ToggleRow(label = strings.crossfade, checked = crossfade) {
-                scope.launch { prefs.setCrossfadeEnabled(it) }
-            }
-            ToggleRow(label = strings.gapless, checked = gapless) {
-                scope.launch { prefs.setGaplessEnabled(it) }
-            }
-            ToggleRow(label = strings.playWithOthers, checked = playWith) {
-                scope.launch { prefs.setPlayWithOthers(it) }
-            }
-        }
-
-        // Theme settings
-        SectionCard {
+            Text(strings.themeSettings, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+            Spacer(Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = strings.themeSettings,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(end = 16.dp)
-                )
+                Text(strings.darkMode, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 16.dp))
                 ThemeModeSegmentedSwitch(
                     selectedMode = themeMode,
                     lightLabel = strings.lightMode,
@@ -324,345 +200,146 @@ fun SettingsScreen() {
                     onModeSelected = { mode -> scope.launch { prefs.setThemeMode(mode) } }
                 )
             }
-
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
             ToggleRow(label = strings.dynamicColor, checked = dynamicColor) { enabled ->
                 if (enabled) customPickerOpen = false
                 scope.launch { prefs.setDynamicColor(enabled) }
             }
+            ToggleRow(label = strings.blurEffect, checked = liquidGlassEnabled) { enabled ->
+                scope.launch { prefs.setLiquidGlassEnabled(enabled) }
+            }
 
             Spacer(Modifier.height(12.dp))
-            Column(
-                modifier = Modifier.alpha(if (dynamicColor) 0.38f else 1f)
-            ) {
-                Text(
-                    text = strings.accentColor,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    AccentPalette.forEach { argb ->
-                        val selected = argb == accent
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(argb))
-                                .bounceClick(enabled = !dynamicColor) {
-                                    scope.launch { prefs.setAccentColor(argb) }
-                                }
-                        ) {
-                            if (selected) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.White.copy(alpha = 0.25f))
-                                )
-                            }
-                        }
-                    }
-                    val isCustomSelected = accent !in AccentPalette
+            Text(strings.accentColor, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AccentPalette.forEach { argb ->
+                    val selected = argb == accent
                     Box(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(
-                                brush = androidx.compose.ui.graphics.Brush.sweepGradient(
-                                    listOf(
-                                        Color(0xFFEF4444), Color(0xFFF59E0B), Color(0xFFFACC15),
-                                        Color(0xFF22C55E), Color(0xFF14B8A6), Color(0xFF3B82F6),
-                                        Color(0xFF8B5CF6), Color(0xFFEF4444)
-                                    )
-                                )
-                            )
-                            .bounceClick(enabled = !dynamicColor) { customPickerOpen = true },
+                            .background(Color(argb))
+                            .bounceClick(enabled = !dynamicColor) { scope.launch { prefs.setAccentColor(argb) } },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.ColorLens,
-                            contentDescription = strings.customColor,
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        if (isCustomSelected) {
+                        if (selected) {
                             Box(
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(28.dp)
                                     .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.18f))
+                                    .background(Color.White.copy(alpha = 0.28f))
                             )
                         }
                     }
                 }
-
-                if (accent !in AccentPalette) {
-                    Spacer(Modifier.height(10.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .clip(CircleShape)
-                                .background(Color(accent))
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(
+                            brush = androidx.compose.ui.graphics.Brush.sweepGradient(
+                                listOf(
+                                    Color(0xFFEF4444), Color(0xFFF59E0B), Color(0xFFFACC15),
+                                    Color(0xFF22C55E), Color(0xFF14B8A6), Color(0xFF3B82F6),
+                                    Color(0xFF8B5CF6), Color(0xFFEF4444)
+                                )
+                            )
                         )
-                        Spacer(Modifier.size(8.dp))
-                        Text(
-                            text = "#%06X".format(accent and 0xFFFFFF),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // Layout toggles
-            Text(
-                text = strings.playlistsLayout,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LayoutToggleChip(
-                    selected = playlistsLayout == LayoutMode.LIST,
-                    label = strings.list,
-                    icon = Icons.AutoMirrored.Filled.List,
-                    onClick = { scope.launch { prefs.setPlaylistsLayout(LayoutMode.LIST) } }
-                )
-                LayoutToggleChip(
-                    selected = playlistsLayout == LayoutMode.GRID,
-                    label = strings.grid,
-                    icon = Icons.Filled.ViewModule,
-                    onClick = { scope.launch { prefs.setPlaylistsLayout(LayoutMode.GRID) } }
+                        .bounceClick(enabled = !dynamicColor) { customPickerOpen = true }
                 )
             }
+        }
 
-            Spacer(Modifier.height(12.dp))
-
-            Text(
-                text = strings.musicsLayout,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LayoutToggleChip(
-                    selected = musicsLayout == LayoutMode.LIST,
-                    label = strings.list,
-                    icon = Icons.AutoMirrored.Filled.List,
-                    onClick = { scope.launch { prefs.setMusicsLayout(LayoutMode.LIST) } }
-                )
-                LayoutToggleChip(
-                    selected = musicsLayout == LayoutMode.GRID,
-                    label = strings.grid,
-                    icon = Icons.Filled.ViewModule,
-                    onClick = { scope.launch { prefs.setMusicsLayout(LayoutMode.GRID) } }
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // Liquid Glass — dock, kartlar, nowplaying/playlist butonları için buzlu cam görünümü
-            ToggleRow(label = strings.blurEffect, checked = liquidGlassEnabled) { enabled ->
-                scope.launch { prefs.setLiquidGlassEnabled(enabled) }
-            }
-            Text(
-                text = strings.blurEffectDescription,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            // Wallpaper
-            Text(
-                text = strings.wallpaper,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(8.dp))
-
+        SectionCard {
+            Text(strings.wallpaper, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+            Spacer(Modifier.height(10.dp))
             if (wallpaper.isNotEmpty()) {
                 var previewLoaded by remember(wallpaper) { mutableStateOf(false) }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .height(150.dp)
+                        .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.background),
                     contentAlignment = Alignment.Center
                 ) {
                     AsyncImage(
                         model = wallpaper,
                         contentDescription = "Wallpaper preview",
-                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
                         contentScale = ContentScale.Crop,
                         onState = { previewLoaded = it is AsyncImagePainter.State.Success }
                     )
-                    if (!previewLoaded) {
-                        Icon(
-                            imageVector = Icons.Filled.BrokenImage,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
+                    if (!previewLoaded) Icon(Icons.Filled.BrokenImage, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Spacer(Modifier.height(8.dp))
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.background)
-                    .bounceClick { wallpaperPicker.launch(arrayOf("image/*")) }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Image,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp)
-                )
-                Text(
-                    text = if (wallpaper.isEmpty()) strings.chooseFromGallery else strings.changeWallpaper,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            }
-
-            if (wallpaper.isNotEmpty()) {
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    text = strings.wallpaperBrightness,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(4.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = strings.brightness,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(end = 12.dp)
-                    )
-                    Slider(
-                        value = wallpaperBrightness,
-                        onValueChange = {
-                            scope.launch { prefs.setWallpaperBrightness(it) }
-                        },
-                        valueRange = 0f..1f,
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary,
-                            inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                        ),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = "${((1f - wallpaperBrightness) * 100).toInt()}%",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
-                // Card opacity slider
                 Spacer(Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = strings.cardOpacity,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(end = 12.dp)
-                    )
-                    Slider(
-                        value = cardAlpha,
-                        onValueChange = {
-                            scope.launch { prefs.setCardAlpha(it) }
-                        },
-                        valueRange = 0f..1f,
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary,
-                            inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                        ),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = "${(cardAlpha * 100).toInt()}%",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
             }
-
+            SettingsActionRow(
+                icon = Icons.Filled.Image,
+                title = if (wallpaper.isEmpty()) strings.chooseFromGallery else strings.changeWallpaper,
+                onClick = { wallpaperPicker.launch(arrayOf("image/*")) }
+            )
             if (wallpaper.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = strings.removeWallpaper,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier
-                            .bounceClick { scope.launch { prefs.setWallpaperUri("") } }
-                            .padding(8.dp)
+                Spacer(Modifier.height(12.dp))
+                Text(strings.wallpaperBrightness, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Slider(
+                    value = wallpaperBrightnessValue,
+                    onValueChange = { wallpaperBrightnessValue = it },
+                    onValueChangeFinished = { scope.launch { prefs.setWallpaperBrightness(wallpaperBrightnessValue) } },
+                    valueRange = 0f..1f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                     )
-                }
+                )
+                Text(strings.cardOpacity, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Slider(
+                    value = cardAlphaValue,
+                    onValueChange = { cardAlphaValue = it },
+                    onValueChangeFinished = { scope.launch { prefs.setCardAlpha(cardAlphaValue) } },
+                    valueRange = 0f..1f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                    )
+                )
+                Text(
+                    text = strings.removeWallpaper,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.bounceClick { scope.launch { prefs.setWallpaperUri("") } }.padding(8.dp)
+                )
             }
         }
 
-        // Language menu
         SectionCard {
-            Text(
-                text = strings.language,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            Text("Layout", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+            Spacer(Modifier.height(10.dp))
+            Text(strings.musicsLayout, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LayoutToggleChip(musicsLayout == LayoutMode.LIST, strings.list, Icons.AutoMirrored.Filled.List) { scope.launch { prefs.setMusicsLayout(LayoutMode.LIST) } }
+                LayoutToggleChip(musicsLayout == LayoutMode.GRID, strings.grid, Icons.Filled.ViewModule) { scope.launch { prefs.setMusicsLayout(LayoutMode.GRID) } }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(strings.playlistsLayout, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LayoutToggleChip(playlistsLayout == LayoutMode.LIST, strings.list, Icons.AutoMirrored.Filled.List) { scope.launch { prefs.setPlaylistsLayout(LayoutMode.LIST) } }
+                LayoutToggleChip(playlistsLayout == LayoutMode.GRID, strings.grid, Icons.Filled.ViewModule) { scope.launch { prefs.setPlaylistsLayout(LayoutMode.GRID) } }
+            }
+        }
+
+        SectionCard {
+            Text(strings.language, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
             Spacer(Modifier.height(8.dp))
             Box {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.background)
-                        .bounceClick { langMenuOpen = true }
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = AllLanguages.firstOrNull { it.code == language }?.displayName
-                            ?: language,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Icon(
-                        imageVector = Icons.Filled.ArrowDropDown,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                DropdownMenu(
-                    expanded = langMenuOpen,
-                    onDismissRequest = { langMenuOpen = false }
-                ) {
+                SettingsActionRow(
+                    icon = Icons.Filled.ArrowDropDown,
+                    title = AllLanguages.firstOrNull { it.code == language }?.displayName ?: language,
+                    onClick = { langMenuOpen = true }
+                )
+                DropdownMenu(expanded = langMenuOpen, onDismissRequest = { langMenuOpen = false }) {
                     AllLanguages.forEach { lang ->
                         DropdownMenuItem(
                             text = { Text(lang.displayName) },
@@ -676,15 +353,7 @@ fun SettingsScreen() {
             }
         }
 
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "${strings.version} $versionName",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 96.dp)
-        )
+        Spacer(Modifier.height(110.dp))
     }
 
     if (customPickerOpen && !dynamicColor) {
@@ -702,15 +371,172 @@ fun SettingsScreen() {
     }
 }
 
+@Composable
+fun PlayerSettingsScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val prefs = remember { PreferencesManager(context) }
+    val scope = rememberCoroutineScope()
+    val strings = LocalStrings.current
+    val crossfade by prefs.crossfadeEnabled.collectAsState(initial = false)
+    val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
+    val playWith by prefs.playWithOthers.collectAsState(initial = false)
+
+    SettingsPageScaffold(title = strings.playbackSettings, onBack = onBack) {
+        SectionCard {
+            Text(strings.playbackSettings, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+            Spacer(Modifier.height(8.dp))
+            ToggleRow(label = strings.crossfade, checked = crossfade) { scope.launch { prefs.setCrossfadeEnabled(it) } }
+            ToggleRow(label = strings.gapless, checked = gapless) { scope.launch { prefs.setGaplessEnabled(it) } }
+            ToggleRow(label = strings.playWithOthers, checked = playWith) { scope.launch { prefs.setPlayWithOthers(it) } }
+        }
+        Spacer(Modifier.height(110.dp))
+    }
+}
+
+@Composable
+fun AboutSettingsScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val strings = LocalStrings.current
+    val uriHandler = LocalUriHandler.current
+    val versionName = remember {
+        try { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
+        catch (_: PackageManager.NameNotFoundException) { "" }
+    }
+
+    SettingsPageScaffold(title = "About", onBack = onBack) {
+        SectionCard {
+            Text(strings.appName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+            Spacer(Modifier.height(6.dp))
+            Text("${strings.version} $versionName", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        SectionCard {
+            SettingsActionRow(
+                icon = Icons.AutoMirrored.Filled.OpenInNew,
+                title = "GitHub / CplShephard",
+                onClick = { uriHandler.openUri("https://github.com/CplShephard") }
+            )
+            SettingsActionRow(
+                icon = Icons.AutoMirrored.Filled.OpenInNew,
+                title = "InstallerX Revived",
+                onClick = { uriHandler.openUri("https://github.com/InstallerX-Revived/InstallerX") }
+            )
+            Text(
+                text = "Miuix / InstallerX inspired interface polish for Lambda Player.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+        Spacer(Modifier.height(110.dp))
+    }
+}
+
+
+@Composable
+private fun SettingsPageScaffold(
+    title: String,
+    onBack: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .overScrollVertical()
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
+                    .bounceClick { onBack() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
+            }
+            Spacer(Modifier.width(14.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        content()
+    }
+}
+
+@Composable
+private fun SettingsNavigationCard(
+    icon: ImageVector,
+    title: String,
+    summary: String,
+    onClick: () -> Unit
+) {
+    SectionCard(
+        modifier = Modifier.miuixWidgetClick { onClick() }
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+                Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun SettingsActionRow(
+    icon: ImageVector,
+    title: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.72f))
+            .miuixWidgetClick { onClick() }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+        Text(title, color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+    }
+}
+
 // İzole edilmiş: totalListeningMs PlayerViewModel'in observePosition() döngüsü tarafından
-// her 500ms'de bir güncelleniyor. Bu değer buradaki KENDİ collectAsState'inde toplandığı için
+// artık 10 saniyelik paketler halinde güncelleniyor. Bu değer buradaki KENDİ collectAsState'inde toplandığı için
 // recompose sadece bu küçük composable ile sınırlı kalıyor — SettingsScreen'in geri kalanı
 // (toggle'lar, slider'lar) her tick'te yeniden çizilmiyor.
 @Composable
 private fun TotalListeningTimeCard(prefs: PreferencesManager) {
     val strings = LocalStrings.current
     val totalMs by prefs.totalListeningMs.collectAsState(initial = 0L)
-    SectionCard {
+    SectionCard(modifier = Modifier.miuixWidgetClick { }) {
         Text(
             text = strings.totalListeningTime,
             style = MaterialTheme.typography.titleMedium,
@@ -727,10 +553,13 @@ private fun TotalListeningTimeCard(prefs: PreferencesManager) {
 }
 
 @Composable
-private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
+private fun SectionCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
     val liquidGlassOn = LocalBlurEnabled.current
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .then(
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))

@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -54,10 +53,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.MiniPlayer
-import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.glass.FloatingBottomBar
 import dev.shephard.player.ui.glass.FloatingBottomBarItem
 import dev.shephard.player.ui.glass.FloatingBottomBarMode
@@ -68,6 +68,7 @@ import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.glass.isLiquidGlassSupported
 import dev.shephard.player.ui.glass.rememberAppBlurBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.i18n.stringsFor
 import dev.shephard.player.ui.screens.NowPlayingSheet
@@ -122,8 +123,16 @@ fun MainContainer(
 
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route
+        val isBottomRoute = bottomNavDestinations.any { it.route == currentRoute } || currentRoute == null
 
-        val playerState by playerViewModel.uiState.collectAsState()
+        // Do not collect the whole PlayerUiState at the root: position/progress changes
+        // every 500ms while playing. Only the boolean that affects page bottom padding is
+        // observed here; the MiniPlayer subtree collects the full state by itself.
+        val hasMiniPlayer by remember(playerViewModel) {
+            playerViewModel.uiState
+                .map { it.currentTrack != null }
+                .distinctUntilChanged()
+        }.collectAsState(initial = false)
 
         LaunchedEffect(initialAudioUri) {
             if (initialAudioUri != null) {
@@ -137,6 +146,7 @@ fun MainContainer(
         BackHandler(enabled = showNowPlaying || currentRoute != Destination.Music.route) {
             when {
                 showNowPlaying -> showNowPlaying = false
+                !isBottomRoute -> navController.popBackStack()
                 else -> navController.popBackStack(Destination.Music.route, false)
             }
         }
@@ -188,7 +198,7 @@ fun MainContainer(
                         containerColor = Color.Transparent,
                         contentColor = MaterialTheme.colorScheme.onBackground,
                         topBar = {
-                            BrandHeader(currentRoute = currentRoute)
+                            if (isBottomRoute) BrandHeader(currentRoute = currentRoute)
                         }
                     ) { innerPadding ->
                         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
@@ -206,7 +216,7 @@ fun MainContainer(
                                         if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop)
                                         else Modifier
                                     ),
-                                hasMiniPlayer = playerState.currentTrack != null,
+                                hasMiniPlayer = hasMiniPlayer && isBottomRoute,
                                 onTrackClick = { tracks, index, playlistName ->
                                     playerViewModel.setQueueAndPlay(tracks, index, playlistName)
                                     showNowPlaying = true
@@ -223,36 +233,27 @@ fun MainContainer(
                                     .fillMaxWidth()
                                     .navigationBarsPadding()
                             ) {
-                                AnimatedVisibility(
-                                    visible = playerState.currentTrack != null,
-                                    enter = fadeIn(tween(200)) + slideInVertically(
-                                        initialOffsetY = { it / 2 },
-                                        animationSpec = spring(0.85f, 300f)
-                                    ),
-                                    exit = fadeOut(tween(150)) + slideOutVertically(targetOffsetY = { it / 2 })
-                                ) {
-                                    MiniPlayer(
-                                        state = playerState,
-                                        onClick = { showNowPlaying = true },
-                                        onPlayPauseClick = { playerViewModel.togglePlayPause() },
-                                        onNextClick = { playerViewModel.skipToNext() },
-                                        onPreviousClick = { playerViewModel.skipToPrevious() }
-                                    )
-                                }
-
-                                FloatingDock(
-                                    currentRoute = currentRoute,
-                                    onNavigate = { destination ->
-                                        navController.navigate(destination.route) {
-                                            popUpTo(navController.graph.findStartDestination().id) {
-                                                saveState = true
-                                            }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
-                                    }
+                                MiniPlayerHost(
+                                    playerViewModel = playerViewModel,
+                                    visible = hasMiniPlayer && isBottomRoute,
+                                    onOpenNowPlaying = { showNowPlaying = true }
                                 )
-                                Spacer(Modifier.height(8.dp))
+
+                                if (isBottomRoute) {
+                                    FloatingDock(
+                                        currentRoute = currentRoute,
+                                        onNavigate = { destination ->
+                                            navController.navigate(destination.route) {
+                                                popUpTo(navController.graph.findStartDestination().id) {
+                                                    saveState = true
+                                                }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        }
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                }
                             }
                         }
                     }
@@ -272,6 +273,31 @@ fun MainContainer(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun MiniPlayerHost(
+    playerViewModel: PlayerViewModel,
+    visible: Boolean,
+    onOpenNowPlaying: () -> Unit
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(200)) + slideInVertically(
+            initialOffsetY = { it / 2 },
+            animationSpec = spring(0.85f, 300f)
+        ),
+        exit = fadeOut(tween(150)) + slideOutVertically(targetOffsetY = { it / 2 })
+    ) {
+        val playerState by playerViewModel.uiState.collectAsState()
+        MiniPlayer(
+            state = playerState,
+            onClick = onOpenNowPlaying,
+            onPlayPauseClick = { playerViewModel.togglePlayPause() },
+            onNextClick = { playerViewModel.skipToNext() },
+            onPreviousClick = { playerViewModel.skipToPrevious() }
+        )
     }
 }
 
@@ -372,6 +398,20 @@ private fun FloatingDock(
     val selectedIndex = bottomNavDestinations
         .indexOfFirst { it.route == currentRoute }
         .let { if (it < 0) 0 else it }
+    val strings = LocalStrings.current
+
+    // KRİTİK: Daha önce backdrop == null (Liquid Glass kapalı ya da desteklenmiyor)
+    // durumunda TAMAMEN AYRI bir composable (NonBlurDock — farklı boyut, etiketsiz,
+    // farklı highlight stili) kullanılıyordu. Bu da "Liquid Glass kapanınca dock eski/
+    // farklı bir docka dönüşüyor" şikayetinin sebebiydi. InstallerX'te dock HER ZAMAN
+    // aynı FloatingBottomBar component'idir, sadece mode (LiquidGlass/Blur/None) değişir
+    // — görsel iskelet (pill şekli, boyut, etiketli sekmeler, drag ile geçiş, seçim
+    // highlight'ı) her modda birebir aynı kalır. Bu yüzden NonBlurDock tamamen kaldırıldı;
+    // backdrop null olduğunda gerçek bir Backdrop tipi gerektiği için (drawBackdrop API'si
+    // non-null ister) boş/no-op bir dummy backdrop veriyoruz — None modda zaten hiç
+    // sample edilmiyor, sadece tip uyumluluğu için var.
+    val dummyBackdrop = rememberLayerBackdrop()
+    val effectiveBackdrop = backdrop ?: dummyBackdrop
 
     Box(
         modifier = Modifier
@@ -379,73 +419,34 @@ private fun FloatingDock(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        if (backdrop != null) {
-            FloatingBottomBar(
-                selectedIndex = { selectedIndex },
-                onSelected = { index -> onNavigate(bottomNavDestinations[index]) },
-                backdrop = backdrop,
-                tabsCount = bottomNavDestinations.size,
-                mode = mode
-            ) {
-                bottomNavDestinations.forEachIndexed { index, dest ->
-                    val selected = index == selectedIndex
-                    FloatingBottomBarItem(
-                        onClick = { onNavigate(dest) },
-                        modifier = Modifier.defaultMinSize(minWidth = 76.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
-                            contentDescription = dest.label
-                        )
-                    }
+        FloatingBottomBar(
+            selectedIndex = { selectedIndex },
+            onSelected = { index -> onNavigate(bottomNavDestinations[index]) },
+            backdrop = effectiveBackdrop,
+            tabsCount = bottomNavDestinations.size,
+            mode = mode
+        ) {
+            bottomNavDestinations.forEachIndexed { index, dest ->
+                val selected = index == selectedIndex
+                val label = when (dest) {
+                    Destination.Music -> strings.music
+                    Destination.Playlists -> strings.playlists
+                    Destination.Settings -> strings.settings
                 }
-            }
-        } else {
-            // Blur disabled or unsupported: keep the dock fully functional without a backdrop.
-            NonBlurDock(
-                selectedIndex = selectedIndex,
-                onNavigate = onNavigate
-            )
-        }
-    }
-}
-
-/**
- * Fallback dock used when blur is switched off (or the device predates API 31), so the app
- * never depends on a backdrop being present. Visually a plain Material 3 pill.
- */
-@Composable
-private fun NonBlurDock(
-    selectedIndex: Int,
-    onNavigate: (Destination) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
-            .padding(horizontal = 20.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        bottomNavDestinations.forEachIndexed { index, dest ->
-            val selected = index == selectedIndex
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .bounceClick { onNavigate(dest) }
-                    .background(
-                        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                        else Color.Transparent,
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
-                    contentDescription = dest.label,
-                    tint = if (selected) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                FloatingBottomBarItem(
+                    onClick = { onNavigate(dest) },
+                    modifier = Modifier.defaultMinSize(minWidth = 76.dp)
+                ) {
+                    Icon(
+                        imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
+                        contentDescription = label
+                    )
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }

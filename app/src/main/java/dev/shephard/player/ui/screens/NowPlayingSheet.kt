@@ -10,7 +10,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -133,6 +132,7 @@ fun NowPlayingSheet(
     onDismiss: () -> Unit
 ) {
     val state by playerViewModel.uiState.collectAsState()
+    val amplitude by playerViewModel.amplitude.collectAsState()
     val track = state.currentTrack
     val strings = LocalStrings.current
     val nowPlayingLiquidGlassOn = LocalBlurEnabled.current
@@ -163,22 +163,43 @@ fun NowPlayingSheet(
     val artGridScrollOffset by remember { derivedStateOf { artGridState.firstVisibleItemScrollOffset } }
     val artGridFirstVisibleIndex by remember { derivedStateOf { artGridState.firstVisibleItemIndex } }
 
-    // Kullanıcı bırakıp snap tamamlanınca (scroll durdu, offset==0) hedef indexe göre
-    // gerçek şarkı değişimini tetikle. OuterTune'daki Player.kt ile birebir aynı desen:
-    // key sadece scroll offset'i, scroll-in-progress kontrolü effect içinde.
-    LaunchedEffect(artGridScrollOffset) {
+    // Sheet ilk açıldığında artGridState index=0'da başlar, ama gerçek
+    // artSwipeCurrentIndex genelde 1'dir. Bu fark kullanıcı hiç dokunmadan skip
+    // tetiklememeli; commit yalnızca grid gerçek kullanıcı scroll'u gördükten sonra yapılır.
+    var hasUserScrolledArtGrid by remember { mutableStateOf(false) }
+    var artSkipInFlight by remember { mutableStateOf(false) }
+    LaunchedEffect(artGridState.isScrollInProgress) {
+        if (artGridState.isScrollInProgress) hasUserScrolledArtGrid = true
+    }
+
+    // Snap tamamlanınca hedef indexe göre şarkıyı değiştir. Key'e firstVisibleItemIndex'i
+    // de dahil ediyoruz: bazı Compose sürümlerinde item tam snap noktasındayken offset 0
+    // kalır, sadece index değişir; eski kod offset değişmediği için skip'i kaçırabiliyordu.
+    LaunchedEffect(artGridFirstVisibleIndex, artGridScrollOffset, artGridState.isScrollInProgress) {
+        if (!hasUserScrolledArtGrid || artSkipInFlight) return@LaunchedEffect
         if (artGridState.isScrollInProgress || artGridScrollOffset != 0) return@LaunchedEffect
-        if (artGridFirstVisibleIndex > artSwipeCurrentIndex) {
-            playerViewModel.skipToNext()
-        } else if (artGridFirstVisibleIndex < artSwipeCurrentIndex) {
-            playerViewModel.skipToPrevious()
+        when {
+            artGridFirstVisibleIndex > artSwipeCurrentIndex -> {
+                artSkipInFlight = true
+                hasUserScrolledArtGrid = false
+                playerViewModel.skipToNext()
+            }
+            artGridFirstVisibleIndex < artSwipeCurrentIndex -> {
+                artSkipInFlight = true
+                hasUserScrolledArtGrid = false
+                playerViewModel.skipToPrevious()
+            }
         }
     }
 
-    // Şarkı değiştiğinde (dışarıdan ya da swipe sonucu) grid'i doğru öğeye ortala.
+    // Track/queue değişince her zaman yeni "önceki/mevcut/sonraki" penceresinin mevcut
+    // öğesine oturt. Bu programatik scroll skip tetiklemez çünkü hasUserScrolledArtGrid=false.
     LaunchedEffect(track?.id, state.queue) {
-        val index = artSwipeCurrentIndex
-        artGridState.scrollToItem(index)
+        hasUserScrolledArtGrid = false
+        artSkipInFlight = false
+        if (artSwipeItems.isNotEmpty()) {
+            artGridState.scrollToItem(artSwipeCurrentIndex)
+        }
     }
 
     val glow = Color(state.glowColorArgb)
@@ -196,12 +217,12 @@ fun NowPlayingSheet(
     // pulse artık gradient radius'unu değil sadece graphicsLayer scale'ini etkiliyor
     // → Brush her frame yeniden oluşturulmuyor, sadece transform matrix değişiyor
     val pulse by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = 0.85f + state.amplitude * 0.15f,
+        targetValue = 0.85f + amplitude * 0.15f,
         animationSpec = androidx.compose.animation.core.tween(180),
         label = "glowPulse"
     )
     val glowAlpha by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (track == null) 0f else 0.55f + state.amplitude * 0.2f,
+        targetValue = if (track == null) 0f else 0.55f + amplitude * 0.2f,
         animationSpec = androidx.compose.animation.core.tween(300),
         label = "glowAlpha"
     )
@@ -419,6 +440,7 @@ fun NowPlayingSheet(
                             rows = GridCells.Fixed(1),
                             flingBehavior = rememberSnapFlingBehavior(artSnapLayoutInfoProvider),
                             userScrollEnabled = true,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 24.dp)
@@ -544,14 +566,14 @@ fun NowPlayingSheet(
 
                 // State'ler if dışında — Compose composition kuralı
                 val queueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-                val queueSheetScope = rememberCoroutineScope()
                 val lyricsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-                val lyricsSheetScope = rememberCoroutineScope()
                 val trackId = track?.id ?: -1L
                 val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
 
                 BouncyIconButton(
-                    onClick = { showQueue = true },
+                    onClick = {
+                        showQueue = true
+                    },
                     icon = Icons.AutoMirrored.Filled.QueueMusic,
                     contentDescription = strings.queue,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -559,7 +581,9 @@ fun NowPlayingSheet(
                     backgroundColor = if (nowPlayingLiquidGlassOn) Color.Transparent else null
                 )
                 BouncyIconButton(
-                    onClick = { showLyrics = true },
+                    onClick = {
+                        showLyrics = true
+                    },
                     icon = Icons.Filled.Lyrics,
                     contentDescription = strings.lyrics,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -609,8 +633,6 @@ fun NowPlayingSheet(
                         sheetState = queueSheetState,
                         containerColor = if (nowPlayingLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
                         dragHandle = {
-                            var handleDragAmount by remember { mutableStateOf(0f) }
-                            val handleDismissThresholdPx = with(LocalDensity.current) { 60.dp.toPx() }
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -622,28 +644,7 @@ fun NowPlayingSheet(
                                             )
                                         else Modifier
                                     )
-                                    .padding(vertical = 10.dp)
-                                    .pointerInput(Unit) {
-                                        detectDragGestures(
-                                            onDragStart = { handleDragAmount = 0f },
-                                            onDragEnd = {
-                                                // Sadece gerçekten aşağı doğru anlamlı bir mesafe
-                                                // sürüklenmişse kapat (elle tutup çekme). Küçük
-                                                // dokunuş/titremeler artık kapatmıyor.
-                                                if (handleDragAmount > handleDismissThresholdPx) {
-                                                    queueSheetScope.launch {
-                                                        queueSheetState.hide()
-                                                        showQueue = false
-                                                    }
-                                                }
-                                                handleDragAmount = 0f
-                                            },
-                                            onDragCancel = { handleDragAmount = 0f }
-                                        ) { change, dragAmount ->
-                                            change.consume()
-                                            handleDragAmount += dragAmount.y
-                                        }
-                                    },
+                                    .padding(vertical = 10.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Box(
@@ -708,8 +709,6 @@ fun NowPlayingSheet(
                         sheetState = lyricsSheetState,
                         containerColor = if (nowPlayingLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
                         dragHandle = {
-                            var handleDragAmount by remember { mutableStateOf(0f) }
-                            val handleDismissThresholdPx = with(LocalDensity.current) { 60.dp.toPx() }
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -721,25 +720,7 @@ fun NowPlayingSheet(
                                             )
                                         else Modifier
                                     )
-                                    .padding(vertical = 10.dp)
-                                    .pointerInput(Unit) {
-                                        detectDragGestures(
-                                            onDragStart = { handleDragAmount = 0f },
-                                            onDragEnd = {
-                                                if (handleDragAmount > handleDismissThresholdPx) {
-                                                    lyricsSheetScope.launch {
-                                                        lyricsSheetState.hide()
-                                                        showLyrics = false
-                                                    }
-                                                }
-                                                handleDragAmount = 0f
-                                            },
-                                            onDragCancel = { handleDragAmount = 0f }
-                                        ) { change, dragAmount ->
-                                            change.consume()
-                                            handleDragAmount += dragAmount.y
-                                        }
-                                    },
+                                    .padding(vertical = 10.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Box(

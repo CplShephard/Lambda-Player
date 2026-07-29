@@ -37,6 +37,12 @@ sealed class Destination(
     )
 }
 
+object SettingsRoutes {
+    const val Theme = "settings/theme"
+    const val Player = "settings/player"
+    const val About = "settings/about"
+}
+
 val bottomNavDestinations = listOf(
     Destination.Music,
     Destination.Playlists,

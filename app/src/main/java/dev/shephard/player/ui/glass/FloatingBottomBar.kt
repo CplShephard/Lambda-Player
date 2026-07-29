@@ -258,7 +258,7 @@ fun FloatingBottomBar(
         }
     }
 
-    var currentIndex by remember(selectedIndex) { mutableIntStateOf(selectedIndex()) }
+    var currentIndex by remember { mutableIntStateOf(selectedIndex().coerceIn(0, tabsCount - 1)) }
 
     class DampedDragAnimationHolder {
         var instance: DampedDragAnimation? = null
@@ -311,13 +311,30 @@ fun FloatingBottomBar(
         ).also { holder.instance = it }
     }
 
-    LaunchedEffect(selectedIndex) {
-        snapshotFlow { selectedIndex() }.collectLatest { currentIndex = it }
+    // Route/tap senkronizasyonu: selectedIndex bir lambda olduğu için snapshotFlow içinde
+    // okumak güvenilir değil; lambda çoğu çağıranda normal bir Int'i kapatıyor ve snapshot
+    // state okumuyor. Değeri kompozisyon sırasında Int olarak alıp LaunchedEffect'i bu gerçek
+    // değerle key'liyoruz. Böylece sekmeye TAP yapınca sayfa değişir değişmez indicator da
+    // aynı frame'de doğru sekmeye animasyonlanır.
+    var isExternalIndexUpdate by remember { mutableStateOf(false) }
+    val selectedIndexValue = selectedIndex().coerceIn(0, tabsCount - 1)
+
+    LaunchedEffect(selectedIndexValue) {
+        if (selectedIndexValue != currentIndex) {
+            isExternalIndexUpdate = true
+            currentIndex = selectedIndexValue
+        } else {
+            isExternalIndexUpdate = false
+        }
     }
     LaunchedEffect(dampedDragAnimation) {
         snapshotFlow { currentIndex }.drop(1).collectLatest { index ->
             dampedDragAnimation.animateToValue(index.toFloat())
-            onSelected(index)
+            if (isExternalIndexUpdate) {
+                isExternalIndexUpdate = false
+            } else {
+                onSelected(index)
+            }
         }
     }
 

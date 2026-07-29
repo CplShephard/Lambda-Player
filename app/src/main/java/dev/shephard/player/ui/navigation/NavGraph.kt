@@ -13,7 +13,10 @@ import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.ui.screens.MusicScreen
 import dev.shephard.player.ui.screens.PlaylistScreen
+import dev.shephard.player.ui.screens.AboutSettingsScreen
+import dev.shephard.player.ui.screens.PlayerSettingsScreen
 import dev.shephard.player.ui.screens.SettingsScreen
+import dev.shephard.player.ui.screens.ThemeSettingsScreen
 
 // Ekranlar arası animasyon — IntOffset spring ile
 private val springSpec = spring<androidx.compose.ui.unit.IntOffset>(
@@ -96,7 +99,20 @@ fun NavGraph(
             )
         }
         composable(Destination.Settings.route) {
-            SettingsScreen()
+            SettingsScreen(
+                onOpenThemeSettings = { navController.navigate(SettingsRoutes.Theme) },
+                onOpenPlayerSettings = { navController.navigate(SettingsRoutes.Player) },
+                onOpenAbout = { navController.navigate(SettingsRoutes.About) }
+            )
+        }
+        composable(SettingsRoutes.Theme) {
+            ThemeSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(SettingsRoutes.Player) {
+            PlayerSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(SettingsRoutes.About) {
+            AboutSettingsScreen(onBack = { navController.popBackStack() })
         }
     }
 }

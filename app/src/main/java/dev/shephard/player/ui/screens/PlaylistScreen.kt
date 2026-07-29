@@ -81,6 +81,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -102,6 +103,7 @@ import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.glass.blurSurfaceCompact
 import dev.shephard.player.ui.glass.blurSheetSurface
 import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
@@ -878,7 +880,7 @@ private fun PlaylistListCard(
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
-            .clickable { onClick() }
+            .miuixWidgetClick { onClick() }
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -980,7 +982,7 @@ private fun PlaylistGridCard(
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
-            .bounceClick { onClick() }
+            .miuixWidgetClick { onClick() }
             .padding(12.dp)
     ) {
         Box(
@@ -1416,7 +1418,7 @@ private fun PlaylistTrackRow(
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
-            .bounceClick { onClick() }
+            .miuixWidgetClick { onClick() }
             .padding(vertical = 8.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1488,7 +1490,7 @@ private fun DraggablePlaylistTrackRow(
                 if (isDragged) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                 else Color.Transparent
             )
-            .bounceClick { onTrackClick() }
+            .miuixWidgetClick { onTrackClick() }
             .padding(vertical = 6.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
