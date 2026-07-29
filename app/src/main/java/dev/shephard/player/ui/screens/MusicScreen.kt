@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -35,7 +36,6 @@ import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Button
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -289,54 +289,73 @@ fun MusicScreen(
 
     // Delete confirmation
     trackToDelete?.let { track ->
-        androidx.compose.material3.AlertDialog(
+        val deleteLiquidGlassOn = LocalBlurEnabled.current
+        val deleteSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        ModalBottomSheet(
             onDismissRequest = { trackToDelete = null },
-            title = { Text(strings.delete) },
-            text = { Text(strings.deleteTrackConfirm) },
-            confirmButton = {
-                TextButton(onClick = {
-                    val toDelete = track
-                    trackToDelete = null
-                    scope.launch(Dispatchers.IO) {
-                        val resolver = context.contentResolver
-                        val deletedDirectly = try {
-                            resolver.delete(toDelete.uri, null, null)
-                            true
-                        } catch (e: Exception) {
-                            // Files the app does not own can't be deleted silently.
-                            // Request a system consent dialog and let the user confirm.
-                            val intentSender = when {
-                                android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R ->
-                                    runCatching {
-                                        android.provider.MediaStore.createDeleteRequest(
-                                            resolver, listOf(toDelete.uri)
-                                        ).intentSender
-                                    }.getOrNull()
-                                android.os.Build.VERSION.SDK_INT >= 29 ->
-                                    (e as? android.app.RecoverableSecurityException)
-                                        ?.userAction?.actionIntent?.intentSender
-                                else -> null
-                            }
-                            if (intentSender != null) {
-                                val request = androidx.activity.result.IntentSenderRequest
-                                    .Builder(intentSender).build()
-                                withContext(Dispatchers.Main) {
-                                    pendingDeleteUri = toDelete.uri
-                                    deleteConsentLauncher.launch(request)
+            sheetState = deleteSheetState,
+            shape = MiuixSheetDefaults.Shape,
+            containerColor = MiuixSheetDefaults.containerColor(deleteLiquidGlassOn),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            dragHandle = { MiuixSheetHandle(deleteLiquidGlassOn) }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (deleteLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
+                        else Modifier
+                    )
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .heightIn(min = 260.dp)
+            ) {
+                Text(strings.delete, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(12.dp))
+                Text(strings.deleteTrackConfirm, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(22.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { trackToDelete = null }) { Text(strings.cancel) }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = {
+                        val toDelete = track
+                        trackToDelete = null
+                        scope.launch(Dispatchers.IO) {
+                            val resolver = context.contentResolver
+                            val deletedDirectly = try {
+                                resolver.delete(toDelete.uri, null, null)
+                                true
+                            } catch (e: Exception) {
+                                val intentSender = when {
+                                    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R ->
+                                        runCatching {
+                                            android.provider.MediaStore.createDeleteRequest(
+                                                resolver, listOf(toDelete.uri)
+                                            ).intentSender
+                                        }.getOrNull()
+                                    android.os.Build.VERSION.SDK_INT >= 29 ->
+                                        (e as? android.app.RecoverableSecurityException)
+                                            ?.userAction?.actionIntent?.intentSender
+                                    else -> null
                                 }
+                                if (intentSender != null) {
+                                    val request = androidx.activity.result.IntentSenderRequest
+                                        .Builder(intentSender).build()
+                                    withContext(Dispatchers.Main) {
+                                        pendingDeleteUri = toDelete.uri
+                                        deleteConsentLauncher.launch(request)
+                                    }
+                                }
+                                false
                             }
-                            false
+                            if (deletedDirectly) {
+                                withContext(Dispatchers.Main) { libraryViewModel.loadTracks() }
+                            }
                         }
-                        if (deletedDirectly) {
-                            withContext(Dispatchers.Main) { libraryViewModel.loadTracks() }
-                        }
-                    }
-                }) { Text(strings.delete, color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { trackToDelete = null }) { Text(strings.cancel) }
+                    }) { Text(strings.delete, color = MaterialTheme.colorScheme.error) }
+                }
+                Spacer(Modifier.height(24.dp))
             }
-        )
+        }
     }
 
     // Edit music drawer

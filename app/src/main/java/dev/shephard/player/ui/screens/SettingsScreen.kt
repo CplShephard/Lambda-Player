@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
@@ -53,7 +54,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialIconIconTheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -83,7 +84,7 @@ import coil.compose.AsyncImagePainter
 import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
-import dev.shephard.player.player.IconIconThemeModePreference
+import dev.shephard.player.player.ThemeModePreference
 import dev.shephard.player.ui.components.CustomColorPickerDialog
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -102,7 +103,7 @@ private val AccentPalette = listOf(
 @Composable
 fun SettingsScreen(
     playerViewModel: PlayerViewModel = viewModel(),
-    onOpenIconIconThemeSettings: () -> Unit = {},
+    onOpenThemeSettings: () -> Unit = {},
     onOpenPlayerSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
 ) {
@@ -125,7 +126,7 @@ fun SettingsScreen(
             icon = Icons.Filled.ColorLens,
             title = strings.themeSettings,
             summary = "Colors, wallpaper, Liquid Glass, layout and language",
-            onClick = onOpenIconIconThemeSettings
+            onClick = onOpenThemeSettings
         )
         SettingsNavigationCard(
             icon = Icons.Filled.MusicNote,
@@ -145,7 +146,7 @@ fun SettingsScreen(
 }
 
 @Composable
-fun IconIconThemeSettingsScreen(onBack: () -> Unit) {
+fun ThemeSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
@@ -156,7 +157,7 @@ fun IconIconThemeSettingsScreen(onBack: () -> Unit) {
     val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = 0.55f)
     val cardAlpha by prefs.cardAlpha.collectAsState(initial = 0.85f)
     val language by prefs.language.collectAsState(initial = "en")
-    val themeMode by prefs.themeMode.collectAsState(initial = IconIconThemeModePreference.LIGHT)
+    val themeMode by prefs.themeMode.collectAsState(initial = ThemeModePreference.LIGHT)
     val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
     val liquidGlassEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
     val playlistsLayout by prefs.playlistsLayout.collectAsState(initial = LayoutMode.LIST)
@@ -186,20 +187,20 @@ fun IconIconThemeSettingsScreen(onBack: () -> Unit) {
 
     SettingsPageScaffold(title = strings.themeSettings, onBack = onBack) {
         SectionCard {
-            Text(strings.themeSettings, style = MaterialIconIconTheme.typography.titleMedium, color = MaterialIconIconTheme.colorScheme.onBackground)
+            Text(strings.themeSettings, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
             Spacer(Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(strings.darkMode, color = MaterialIconIconTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 16.dp))
-                IconIconThemeModeSegmentedSwitch(
+                Text(strings.darkMode, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 16.dp))
+                ThemeModeSegmentedSwitch(
                     selectedMode = themeMode,
                     lightLabel = strings.lightMode,
                     autoLabel = strings.autoMode,
                     darkLabel = strings.darkMode,
-                    onModeSelected = { mode -> scope.launch { prefs.setIconIconThemeMode(mode) } }
+                    onModeSelected = { mode -> scope.launch { prefs.setThemeMode(mode) } }
                 )
             }
             Spacer(Modifier.height(8.dp))
@@ -212,7 +213,7 @@ fun IconIconThemeSettingsScreen(onBack: () -> Unit) {
             }
 
             Spacer(Modifier.height(12.dp))
-            Text(strings.accentColor, style = MaterialIconIconTheme.typography.bodyMedium, color = MaterialIconIconTheme.colorScheme.onSurfaceVariant)
+            Text(strings.accentColor, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 AccentPalette.forEach { argb ->
@@ -254,7 +255,7 @@ fun IconIconThemeSettingsScreen(onBack: () -> Unit) {
         }
 
         SectionCard {
-            Text(strings.wallpaper, style = MaterialIconIconTheme.typography.titleMedium, color = MaterialIconIconTheme.colorScheme.onBackground)
+            Text(strings.wallpaper, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
             Spacer(Modifier.height(10.dp))
             if (wallpaper.isNotEmpty()) {
                 var previewLoaded by remember(wallpaper) { mutableStateOf(false) }
@@ -263,7 +264,7 @@ fun IconIconThemeSettingsScreen(onBack: () -> Unit) {
                         .fillMaxWidth()
                         .height(150.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialIconIconTheme.colorScheme.background),
+                        .background(MaterialTheme.colorScheme.background),
                     contentAlignment = Alignment.Center
                 ) {
                     AsyncImage(
@@ -273,7 +274,7 @@ fun IconIconThemeSettingsScreen(onBack: () -> Unit) {
                         contentScale = ContentScale.Crop,
                         onState = { previewLoaded = it is AsyncImagePainter.State.Success }
                     )
-                    if (!previewLoaded) Icon(Icons.Filled.BrokenImage, null, tint = MaterialIconIconTheme.colorScheme.onSurfaceVariant)
+                    if (!previewLoaded) Icon(Icons.Filled.BrokenImage, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(Modifier.height(10.dp))
             }
@@ -284,48 +285,48 @@ fun IconIconThemeSettingsScreen(onBack: () -> Unit) {
             )
             if (wallpaper.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
-                Text(strings.wallpaperBrightness, color = MaterialIconIconTheme.colorScheme.onSurfaceVariant)
+                Text(strings.wallpaperBrightness, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Slider(
                     value = wallpaperBrightnessValue,
                     onValueChange = { wallpaperBrightnessValue = it },
                     onValueChangeFinished = { scope.launch { prefs.setWallpaperBrightness(wallpaperBrightnessValue) } },
                     valueRange = 0f..1f,
                     colors = SliderDefaults.colors(
-                        thumbColor = MaterialIconIconTheme.colorScheme.primary,
-                        activeTrackColor = MaterialIconIconTheme.colorScheme.primary,
-                        inactiveTrackColor = MaterialIconIconTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                     )
                 )
-                Text(strings.cardOpacity, color = MaterialIconIconTheme.colorScheme.onSurfaceVariant)
+                Text(strings.cardOpacity, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Slider(
                     value = cardAlphaValue,
                     onValueChange = { cardAlphaValue = it },
                     onValueChangeFinished = { scope.launch { prefs.setCardAlpha(cardAlphaValue) } },
                     valueRange = 0f..1f,
                     colors = SliderDefaults.colors(
-                        thumbColor = MaterialIconIconTheme.colorScheme.primary,
-                        activeTrackColor = MaterialIconIconTheme.colorScheme.primary,
-                        inactiveTrackColor = MaterialIconIconTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                     )
                 )
                 Text(
                     text = strings.removeWallpaper,
-                    color = MaterialIconIconTheme.colorScheme.error,
+                    color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.bounceClick { scope.launch { prefs.setWallpaperUri("") } }.padding(8.dp)
                 )
             }
         }
 
         SectionCard {
-            Text("Layout", style = MaterialIconIconTheme.typography.titleMedium, color = MaterialIconIconTheme.colorScheme.onBackground)
+            Text("Layout", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
             Spacer(Modifier.height(10.dp))
-            Text(strings.musicsLayout, color = MaterialIconIconTheme.colorScheme.onSurfaceVariant)
+            Text(strings.musicsLayout, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 LayoutToggleChip(musicsLayout == LayoutMode.LIST, strings.list, Icons.AutoMirrored.Filled.List) { scope.launch { prefs.setMusicsLayout(LayoutMode.LIST) } }
                 LayoutToggleChip(musicsLayout == LayoutMode.GRID, strings.grid, Icons.Filled.ViewModule) { scope.launch { prefs.setMusicsLayout(LayoutMode.GRID) } }
             }
             Spacer(Modifier.height(12.dp))
-            Text(strings.playlistsLayout, color = MaterialIconIconTheme.colorScheme.onSurfaceVariant)
+            Text(strings.playlistsLayout, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 LayoutToggleChip(playlistsLayout == LayoutMode.LIST, strings.list, Icons.AutoMirrored.Filled.List) { scope.launch { prefs.setPlaylistsLayout(LayoutMode.LIST) } }
                 LayoutToggleChip(playlistsLayout == LayoutMode.GRID, strings.grid, Icons.Filled.ViewModule) { scope.launch { prefs.setPlaylistsLayout(LayoutMode.GRID) } }
@@ -333,7 +334,7 @@ fun IconIconThemeSettingsScreen(onBack: () -> Unit) {
         }
 
         SectionCard {
-            Text(strings.language, style = MaterialIconIconTheme.typography.titleMedium, color = MaterialIconIconTheme.colorScheme.onBackground)
+            Text(strings.language, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
             Spacer(Modifier.height(8.dp))
             Box {
                 SettingsActionRow(
@@ -385,7 +386,7 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
 
     SettingsPageScaffold(title = strings.playbackSettings, onBack = onBack) {
         SectionCard {
-            Text(strings.playbackSettings, style = MaterialIconIconTheme.typography.titleMedium, color = MaterialIconIconTheme.colorScheme.onBackground)
+            Text(strings.playbackSettings, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
             Spacer(Modifier.height(8.dp))
             ToggleRow(label = strings.crossfade, checked = crossfade) { scope.launch { prefs.setCrossfadeEnabled(it) } }
             ToggleRow(label = strings.gapless, checked = gapless) { scope.launch { prefs.setGaplessEnabled(it) } }
@@ -414,9 +415,9 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            MaterialIconIconTheme.colorScheme.primary.copy(alpha = 0.95f),
-                            MaterialIconIconTheme.colorScheme.primary.copy(alpha = 0.32f),
-                            MaterialIconIconTheme.colorScheme.surfaceVariant
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.95f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.32f),
+                            MaterialTheme.colorScheme.surfaceVariant
                         )
                     )
                 )
@@ -427,34 +428,34 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .size(170.dp)
                     .clip(CircleShape)
-                    .background(MaterialIconIconTheme.colorScheme.primary.copy(alpha = 0.18f))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
             )
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
                     modifier = Modifier
                         .size(88.dp)
                         .clip(RoundedCornerShape(24.dp))
-                        .background(MaterialIconIconTheme.colorScheme.surface.copy(alpha = 0.62f)),
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "λ",
-                        style = MaterialIconIconTheme.typography.displayMedium,
+                        style = MaterialTheme.typography.displayMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialIconIconTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
                 Spacer(Modifier.height(14.dp))
                 Text(
                     text = strings.appName,
-                    style = MaterialIconIconTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialIconIconTheme.colorScheme.onBackground
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
                     text = "${strings.version} $versionName",
-                    style = MaterialIconIconTheme.typography.bodyMedium,
-                    color = MaterialIconIconTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -472,8 +473,8 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
             )
             Text(
                 text = "Miuix / InstallerX inspired interface polish for Lambda Player.",
-                style = MaterialIconIconTheme.typography.bodySmall,
-                color = MaterialIconIconTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)
             )
         }
@@ -505,18 +506,18 @@ private fun SettingsPageScaffold(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(MaterialIconIconTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
                     .bounceClick { onBack() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialIconIconTheme.colorScheme.onBackground)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
             }
             Spacer(Modifier.width(14.dp))
             Text(
                 text = title,
-                style = MaterialIconIconTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialIconIconTheme.colorScheme.onBackground
+                color = MaterialTheme.colorScheme.onBackground
             )
         }
         Spacer(Modifier.height(4.dp))
@@ -542,17 +543,22 @@ private fun SettingsNavigationCard(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialIconIconTheme.colorScheme.primary.copy(alpha = 0.16f)),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, contentDescription = null, tint = MaterialIconIconTheme.colorScheme.primary)
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialIconIconTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialIconIconTheme.colorScheme.onBackground)
-                Text(summary, style = MaterialIconIconTheme.typography.bodySmall, color = MaterialIconIconTheme.colorScheme.onSurfaceVariant)
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+                Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = MaterialIconIconTheme.colorScheme.onSurfaceVariant)
+            Icon(
+                imageVector = Icons.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                modifier = Modifier.size(32.dp)
+            )
         }
     }
 }
@@ -567,14 +573,14 @@ private fun SettingsActionRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(MaterialIconIconTheme.colorScheme.background.copy(alpha = 0.72f))
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.72f))
             .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialIconIconTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-        Text(title, color = MaterialIconIconTheme.colorScheme.onBackground, style = MaterialIconIconTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+        Text(title, color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
     }
 }
 
@@ -589,15 +595,15 @@ private fun TotalListeningTimeCard(playerViewModel: PlayerViewModel) {
     SectionCard(modifier = Modifier.miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { }) {
         Text(
             text = strings.totalListeningTime,
-            style = MaterialIconIconTheme.typography.titleMedium,
-            color = MaterialIconIconTheme.colorScheme.onBackground
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(Modifier.height(6.dp))
         Text(
             text = formatListeningTime(totalMs, strings),
-            style = MaterialIconIconTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = MaterialIconIconTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.primary
         )
     }
 }
@@ -611,7 +617,7 @@ private fun SectionCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialIconIconTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
         Column(modifier = Modifier.padding(20.dp)) { content() }
@@ -631,8 +637,8 @@ private fun LayoutToggleChip(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
             .background(
-                if (selected) MaterialIconIconTheme.colorScheme.primary.copy(alpha = 0.18f)
-                else MaterialIconIconTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f)
+                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f)
             )
             .bounceClick { onClick() }
             .padding(horizontal = 14.dp, vertical = 8.dp),
@@ -642,19 +648,19 @@ private fun LayoutToggleChip(
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = if (selected) MaterialIconIconTheme.colorScheme.primary else MaterialIconIconTheme.colorScheme.onSurfaceVariant,
+            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp)
         )
         Text(
             text = label,
-            color = if (selected) MaterialIconIconTheme.colorScheme.primary else MaterialIconIconTheme.colorScheme.onSurfaceVariant,
-            style = MaterialIconIconTheme.typography.bodyMedium
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium
         )
     }
 }
 
 @Composable
-private fun IconIconThemeModeSegmentedSwitch(
+private fun ThemeModeSegmentedSwitch(
     selectedMode: Int,
     lightLabel: String,
     autoLabel: String,
@@ -666,26 +672,26 @@ private fun IconIconThemeModeSegmentedSwitch(
             .width(156.dp)
             .height(54.dp)
             .clip(RoundedCornerShape(28.dp))
-            .background(MaterialIconIconTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f))
             .padding(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconIconThemeModeSegment(
-            mode = IconIconThemeModePreference.LIGHT,
+        ThemeModeSegment(
+            mode = ThemeModePreference.LIGHT,
             selectedMode = selectedMode,
             label = lightLabel,
             icon = Icons.Filled.WbSunny,
             onModeSelected = onModeSelected
         )
-        IconIconThemeModeSegment(
-            mode = IconIconThemeModePreference.AUTO,
+        ThemeModeSegment(
+            mode = ThemeModePreference.AUTO,
             selectedMode = selectedMode,
             label = autoLabel,
             icon = Icons.Filled.BrightnessAuto,
             onModeSelected = onModeSelected
         )
-        IconIconThemeModeSegment(
-            mode = IconIconThemeModePreference.DARK,
+        ThemeModeSegment(
+            mode = ThemeModePreference.DARK,
             selectedMode = selectedMode,
             label = darkLabel,
             icon = Icons.Filled.NightsStay,
@@ -695,7 +701,7 @@ private fun IconIconThemeModeSegmentedSwitch(
 }
 
 @Composable
-private fun RowScope.IconIconThemeModeSegment(
+private fun RowScope.ThemeModeSegment(
     mode: Int,
     selectedMode: Int,
     label: String,
@@ -708,14 +714,14 @@ private fun RowScope.IconIconThemeModeSegment(
             .weight(1f)
             .fillMaxHeight()
             .clip(CircleShape)
-            .background(if (selected) MaterialIconIconTheme.colorScheme.primary else Color.Transparent)
+            .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
             .bounceClick(enabled = !selected) { onModeSelected(mode) },
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = if (selected) MaterialIconIconTheme.colorScheme.onPrimary else MaterialIconIconTheme.colorScheme.onSurfaceVariant,
+            tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(23.dp)
         )
     }
@@ -732,8 +738,8 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
     ) {
         Text(
             text = label,
-            color = MaterialIconIconTheme.colorScheme.onBackground,
-            style = MaterialIconIconTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+            style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(end = 16.dp)
         )
         Switch(checked = checked, onCheckedChange = onChange)

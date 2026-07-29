@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -50,7 +51,6 @@ import androidx.compose.material.icons.filled.PinDrop
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -60,7 +60,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -414,49 +413,85 @@ fun PlaylistScreen(
     }
 
     if (showCreate) {
-        AlertDialog(
+        val createLiquidGlassOn = LocalBlurEnabled.current
+        val createSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        ModalBottomSheet(
             onDismissRequest = { showCreate = false },
-            title = { Text(strings.createPlaylist) },
-            text = {
+            sheetState = createSheetState,
+            shape = MiuixSheetDefaults.Shape,
+            containerColor = MiuixSheetDefaults.containerColor(createLiquidGlassOn),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            dragHandle = { MiuixSheetHandle(createLiquidGlassOn) }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (createLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
+                        else Modifier
+                    )
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .heightIn(min = 260.dp)
+            ) {
+                Text(strings.createPlaylist, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(18.dp))
                 OutlinedTextField(
                     value = newName,
                     onValueChange = { newName = it },
                     label = { Text(strings.playlistName) },
-                    singleLine = true
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val name = newName.trim()
-                    if (name.isNotEmpty()) {
-                        val next = playlists + LocalPlaylist(name, emptyList(), createdAt = System.currentTimeMillis())
-                        scope.launch { prefs.setPlaylistsJson(encodePlaylists(next)) }
-                    }
-                    showCreate = false
-                }) { Text(strings.save) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreate = false }) { Text(strings.cancel) }
+                Spacer(Modifier.height(22.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = { showCreate = false }) { Text(strings.cancel) }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = {
+                        val name = newName.trim()
+                        if (name.isNotEmpty()) {
+                            val next = playlists + LocalPlaylist(name, emptyList(), createdAt = System.currentTimeMillis())
+                            scope.launch { prefs.setPlaylistsJson(encodePlaylists(next)) }
+                        }
+                        showCreate = false
+                    }) { Text(strings.save) }
+                }
+                Spacer(Modifier.height(24.dp))
             }
-        )
+        }
     }
 
     val pickerIdx = trackPickerForIndex
     if (pickerIdx != null) {
         val pickerLiquidGlassOn = LocalBlurEnabled.current
-        AlertDialog(
+        val pickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        ModalBottomSheet(
             onDismissRequest = { trackPickerForIndex = null },
-            containerColor = if (pickerLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(28.dp),
-            modifier = if (pickerLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(28.dp)) else Modifier,
-            title = { Text(strings.addTracks) },
-            text = {
+            sheetState = pickerSheetState,
+            shape = MiuixSheetDefaults.Shape,
+            containerColor = MiuixSheetDefaults.containerColor(pickerLiquidGlassOn),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            dragHandle = { MiuixSheetHandle(pickerLiquidGlassOn) }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.88f)
+                    .then(
+                        if (pickerLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
+                        else Modifier
+                    )
+                    .padding(20.dp)
+            ) {
+                Text(strings.addTracks, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(12.dp))
                 val pickerListState = rememberLazyListState()
                 LazyColumn(
                     state = pickerListState,
-                    modifier = Modifier
-                        .height(400.dp)
-                        .overScrollVertical(),
+                    modifier = Modifier.weight(1f).overScrollVertical(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(tracks) { t ->
@@ -469,65 +504,44 @@ fun PlaylistScreen(
                                     if (checked) Modifier.background(
                                         if (pickerLiquidGlassOn) Color.White.copy(alpha = 0.12f)
                                         else MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                                    )
-                                    else Modifier
+                                    ) else Modifier
                                 )
-                                .clickable {
-                                    pickerSelected = if (checked)
-                                        pickerSelected - t.id
-                                    else
-                                        pickerSelected + t.id
-                                }
-                                .padding(vertical = 4.dp, horizontal = 8.dp),
+                                .clickable { pickerSelected = if (checked) pickerSelected - t.id else pickerSelected + t.id }
+                                .padding(vertical = 8.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Checkbox(
                                 checked = checked,
-                                onCheckedChange = { on ->
-                                    pickerSelected = if (on)
-                                        pickerSelected + t.id
-                                    else
-                                        pickerSelected - t.id
-                                }
+                                onCheckedChange = { on -> pickerSelected = if (on) pickerSelected + t.id else pickerSelected - t.id }
                             )
                             Spacer(Modifier.width(8.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = t.title,
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = t.artist,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Text(t.title, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(t.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val pl = playlists[pickerIdx]
-                    val existingIds = pl.trackIds.toMutableList()
-                    val toAdd = pickerSelected - pl.trackIds.toSet()
-                    val toRemove = pl.trackIds.toSet() - pickerSelected
-                    val newIds = existingIds.filterNot { it in toRemove } + toAdd
-                    val updated = pl.copy(trackIds = newIds)
-                    val all = playlists.toMutableList()
-                    all[pickerIdx] = updated
-                    scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
-                    trackPickerForIndex = null
-                }) { Text(strings.save) }
-            },
-            dismissButton = {
-                TextButton(onClick = { trackPickerForIndex = null }) { Text(strings.cancel) }
+                Spacer(Modifier.height(12.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { trackPickerForIndex = null }) { Text(strings.cancel) }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = {
+                        val pl = playlists[pickerIdx]
+                        val existingIds = pl.trackIds.toMutableList()
+                        val toAdd = pickerSelected - pl.trackIds.toSet()
+                        val toRemove = pl.trackIds.toSet() - pickerSelected
+                        val newIds = existingIds.filterNot { it in toRemove } + toAdd
+                        val updated = pl.copy(trackIds = newIds)
+                        val all = playlists.toMutableList()
+                        all[pickerIdx] = updated
+                        scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                        trackPickerForIndex = null
+                    }) { Text(strings.save) }
+                }
+                Spacer(Modifier.height(20.dp))
             }
-        )
+        }
     }
 
     // Playlist menu drawer
@@ -650,33 +664,53 @@ fun PlaylistScreen(
     // Edit playlist name
     val editIdx = editPlaylistIndex
     if (editIdx != null) {
-        AlertDialog(
+        val editLiquidGlassOn = LocalBlurEnabled.current
+        val editSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        ModalBottomSheet(
             onDismissRequest = { editPlaylistIndex = null },
-            title = { Text(strings.editPlaylist) },
-            text = {
+            sheetState = editSheetState,
+            shape = MiuixSheetDefaults.Shape,
+            containerColor = MiuixSheetDefaults.containerColor(editLiquidGlassOn),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            dragHandle = { MiuixSheetHandle(editLiquidGlassOn) }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (editLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
+                        else Modifier
+                    )
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .heightIn(min = 260.dp)
+            ) {
+                Text(strings.editPlaylist, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(18.dp))
                 OutlinedTextField(
                     value = editPlaylistName,
                     onValueChange = { editPlaylistName = it },
                     label = { Text(strings.playlistName) },
-                    singleLine = true
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val name = editPlaylistName.trim()
-                    if (name.isNotEmpty() && editIdx in playlists.indices) {
-                        val pl = playlists[editIdx]
-                        val all = playlists.toMutableList()
-                        all[editIdx] = pl.copy(name = name)
-                        scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
-                    }
-                    editPlaylistIndex = null
-                }) { Text(strings.save) }
-            },
-            dismissButton = {
-                TextButton(onClick = { editPlaylistIndex = null }) { Text(strings.cancel) }
+                Spacer(Modifier.height(22.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { editPlaylistIndex = null }) { Text(strings.cancel) }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = {
+                        val name = editPlaylistName.trim()
+                        if (name.isNotEmpty() && editIdx in playlists.indices) {
+                            val pl = playlists[editIdx]
+                            val all = playlists.toMutableList()
+                            all[editIdx] = pl.copy(name = name)
+                            scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                        }
+                        editPlaylistIndex = null
+                    }) { Text(strings.save) }
+                }
+                Spacer(Modifier.height(24.dp))
             }
-        )
+        }
     }
 }
 
@@ -1152,17 +1186,31 @@ fun PlaylistDetailScreen(
 
     if (showTrackPicker) {
         val pickerLiquidGlassOn = LocalBlurEnabled.current
-        AlertDialog(
+        val pickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        ModalBottomSheet(
             onDismissRequest = { showTrackPicker = false },
-            containerColor = if (pickerLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(28.dp),
-            modifier = if (pickerLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(28.dp)) else Modifier,
-            title = { Text(strings.addTracks) },
-            text = {
+            sheetState = pickerSheetState,
+            shape = MiuixSheetDefaults.Shape,
+            containerColor = MiuixSheetDefaults.containerColor(pickerLiquidGlassOn),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            dragHandle = { MiuixSheetHandle(pickerLiquidGlassOn) }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.88f)
+                    .then(
+                        if (pickerLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
+                        else Modifier
+                    )
+                    .padding(20.dp)
+            ) {
+                Text(strings.addTracks, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(12.dp))
                 val pickerListState = rememberLazyListState()
                 LazyColumn(
                     state = pickerListState,
-                    modifier = Modifier.height(400.dp).overScrollVertical(),
+                    modifier = Modifier.weight(1f).overScrollVertical(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(tracks) { t ->
@@ -1173,7 +1221,7 @@ fun PlaylistDetailScreen(
                                 .clip(RoundedCornerShape(14.dp))
                                 .then(if (checked) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)) else Modifier)
                                 .clickable { pickerSelected = if (checked) pickerSelected - t.id else pickerSelected + t.id }
-                                .padding(vertical = 4.dp, horizontal = 8.dp),
+                                .padding(vertical = 8.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Checkbox(
@@ -1188,21 +1236,24 @@ fun PlaylistDetailScreen(
                         }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val existingIds = pl.trackIds.toMutableList()
-                    val toAdd = pickerSelected - pl.trackIds.toSet()
-                    val toRemove = pl.trackIds.toSet() - pickerSelected
-                    val updated = pl.copy(trackIds = existingIds.filterNot { it in toRemove } + toAdd)
-                    val all = playlists.toMutableList()
-                    all[playlistIndex] = updated
-                    scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
-                    showTrackPicker = false
-                }) { Text(strings.save) }
-            },
-            dismissButton = { TextButton(onClick = { showTrackPicker = false }) { Text(strings.cancel) } }
-        )
+                Spacer(Modifier.height(12.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { showTrackPicker = false }) { Text(strings.cancel) }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = {
+                        val existingIds = pl.trackIds.toMutableList()
+                        val toAdd = pickerSelected - pl.trackIds.toSet()
+                        val toRemove = pl.trackIds.toSet() - pickerSelected
+                        val updated = pl.copy(trackIds = existingIds.filterNot { it in toRemove } + toAdd)
+                        val all = playlists.toMutableList()
+                        all[playlistIndex] = updated
+                        scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                        showTrackPicker = false
+                    }) { Text(strings.save) }
+                }
+                Spacer(Modifier.height(20.dp))
+            }
+        }
     }
 }
 

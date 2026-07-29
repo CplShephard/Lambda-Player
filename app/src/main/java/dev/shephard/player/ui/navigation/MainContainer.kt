@@ -64,8 +64,8 @@ import dev.shephard.player.ui.glass.FloatingBottomBarMode
 import dev.shephard.player.ui.glass.LocalAppBackdrop
 import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.LocalBlurEnabled
-import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.glass.isLiquidGlassSupported
+import dev.shephard.player.ui.glass.miuixBlurSurface
 import dev.shephard.player.ui.glass.rememberAppBlurBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
@@ -321,16 +321,24 @@ private fun BrandHeader(currentRoute: String?) {
     }
 
     val blurOn = LocalBlurEnabled.current
+    val headerBackdrop = LocalAppBackdrop.current
     val headerShape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(headerShape)
             .then(
-                if (blurOn) {
-                    Modifier.blurSurface(enabled = true, shape = headerShape)
+                if (blurOn && headerBackdrop != null) {
+                    // Subtle title-card blur: lighter than MiniPlayer/dock, just enough to lift it.
+                    Modifier.miuixBlurSurface(
+                        backdrop = headerBackdrop,
+                        shape = headerShape,
+                        blurRadius = 14f,
+                        tintAlpha = 0.46f,
+                        fallbackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+                    )
                 } else {
-                    Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
+                    Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f), headerShape)
                 }
             )
     ) {
