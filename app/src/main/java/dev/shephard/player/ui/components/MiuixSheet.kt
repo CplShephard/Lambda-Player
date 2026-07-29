@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
+import dev.shephard.player.ui.miuix.MiuixAppTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,7 +46,7 @@ fun MiuixSheetHandle(
                 .width(84.dp)
                 .height(4.dp)
                 .clip(RoundedCornerShape(999.dp))
-                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.42f))
+                .background(MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.42f))
         )
     }
 }
@@ -56,5 +56,5 @@ object MiuixSheetDefaults {
 
     @Composable
     fun containerColor(liquidGlassOn: Boolean): Color =
-        if (liquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh
+        if (liquidGlassOn) Color.Transparent else MiuixAppTheme.colorScheme.surfaceContainerHigh
 }

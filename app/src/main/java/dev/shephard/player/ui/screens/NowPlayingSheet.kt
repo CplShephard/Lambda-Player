@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalAnimationApi::class)
+@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMiuixApi::class, androidx.compose.animation.ExperimentalAnimationApi::class)
 
 package dev.shephard.player.ui.screens
 
@@ -43,30 +43,13 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Lyrics
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.RepeatOne
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import dev.shephard.player.ui.miuix.ExperimentalMiuixApi
+import dev.shephard.player.ui.miuix.Icon
+import dev.shephard.player.ui.miuix.IconButton
+import dev.shephard.player.ui.miuix.MiuixAppTheme
+import dev.shephard.player.ui.miuix.ModalBottomSheet
+import dev.shephard.player.ui.miuix.Text
+import dev.shephard.player.ui.miuix.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -127,6 +110,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import kotlin.math.absoluteValue
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.*
 
 @Composable
 fun NowPlayingSheet(
@@ -336,7 +321,7 @@ fun NowPlayingSheet(
             .onSizeChanged { measuredHeightPx = it.height.toFloat() }
             .graphicsLayer { translationY = dragOffset.value.coerceAtLeast(0f) }
             .clip(sheetShape)
-            .background(MaterialTheme.colorScheme.background)
+            .background(MiuixAppTheme.colorScheme.background)
             .draggable(
                 orientation = Orientation.Vertical,
                 state = rememberDraggableState { delta ->
@@ -419,14 +404,14 @@ fun NowPlayingSheet(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = strings.nowPlaying,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MiuixAppTheme.typography.labelLarge,
+                        color = MiuixAppTheme.colorScheme.onSurfaceVariant
                     )
                     if (state.currentPlaylistName != null) {
                         Text(
                             text = state.currentPlaylistName!!,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            style = MiuixAppTheme.typography.labelSmall,
+                            color = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                     }
                 }
@@ -459,13 +444,13 @@ fun NowPlayingSheet(
                                 .aspectRatio(1f)
                                 .heightIn(max = maxArtHeight)
                                 .clip(RoundedCornerShape(28.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                                .background(MiuixAppTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.MusicNote,
+                                imageVector = MiuixIcons.Music,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = MiuixAppTheme.colorScheme.primary,
                                 modifier = Modifier.size(72.dp)
                             )
                         }
@@ -491,7 +476,7 @@ fun NowPlayingSheet(
                                         .width(artItemWidth)
                                         .fillMaxHeight()
                                         .clip(RoundedCornerShape(28.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                        .background(MiuixAppTheme.colorScheme.surfaceVariant),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     var artLoaded by remember(itemTrack.id) { mutableStateOf(false) }
@@ -504,9 +489,9 @@ fun NowPlayingSheet(
                                     )
                                     if (!artLoaded) {
                                         Icon(
-                                            imageVector = Icons.Filled.MusicNote,
+                                            imageVector = MiuixIcons.Music,
                                             contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
+                                            tint = MiuixAppTheme.colorScheme.primary,
                                             modifier = Modifier.size(72.dp)
                                         )
                                     }
@@ -542,14 +527,14 @@ fun NowPlayingSheet(
                     ) {
                         Text(
                             text = displayTrack?.title ?: strings.nothingPlaying,
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MiuixAppTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
+                            color = MiuixAppTheme.colorScheme.onBackground
                         )
                         Text(
                             text = displayTrack?.artist ?: strings.pickASong,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MiuixAppTheme.typography.bodyMedium,
+                            color = MiuixAppTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -576,13 +561,13 @@ fun NowPlayingSheet(
                 ) {
                     Text(
                         formatMillis(state.positionMs),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MiuixAppTheme.typography.labelMedium,
+                        color = MiuixAppTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         formatMillis(state.durationMs),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MiuixAppTheme.typography.labelMedium,
+                        color = MiuixAppTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -610,9 +595,9 @@ fun NowPlayingSheet(
                     onClick = {
                         showQueue = true
                     },
-                    icon = Icons.AutoMirrored.Filled.QueueMusic,
+                    icon = MiuixIcons.Playlist,
                     contentDescription = strings.queue,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
                     iconSize = 28.dp,
                     backgroundColor = if (nowPlayingLiquidGlassOn) Color.Transparent else null
                 )
@@ -620,9 +605,9 @@ fun NowPlayingSheet(
                     onClick = {
                         showLyrics = true
                     },
-                    icon = Icons.Filled.Lyrics,
+                    icon = MiuixIcons.Notes,
                     contentDescription = strings.lyrics,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
                     iconSize = 28.dp,
                     backgroundColor = if (nowPlayingLiquidGlassOn) Color.Transparent else null
                 )
@@ -639,8 +624,8 @@ fun NowPlayingSheet(
                                 )
                             } else {
                                 Modifier.background(
-                                    if (isLiked) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                                    else MaterialTheme.colorScheme.surfaceVariant
+                                    if (isLiked) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                    else MiuixAppTheme.colorScheme.surfaceVariant
                                 )
                             }
                         )
@@ -656,9 +641,9 @@ fun NowPlayingSheet(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (isLiked) Icons.Filled.Check else Icons.Filled.Add,
+                        imageVector = if (isLiked) MiuixIcons.Ok else MiuixIcons.Add,
                         contentDescription = if (isLiked) "Added" else "Add",
-                        tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (isLiked) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -669,7 +654,7 @@ fun NowPlayingSheet(
                         sheetState = queueSheetState,
                         shape = MiuixSheetDefaults.Shape,
                         containerColor = MiuixSheetDefaults.containerColor(nowPlayingLiquidGlassOn),
-                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        contentColor = MiuixAppTheme.colorScheme.onSurface,
                         dragHandle = { MiuixSheetHandle(nowPlayingLiquidGlassOn) }
                     ) {
                         QueueList(
@@ -724,7 +709,7 @@ fun NowPlayingSheet(
                         sheetState = lyricsSheetState,
                         shape = MiuixSheetDefaults.Shape,
                         containerColor = MiuixSheetDefaults.containerColor(nowPlayingLiquidGlassOn),
-                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        contentColor = MiuixAppTheme.colorScheme.onSurface,
                         dragHandle = { MiuixSheetHandle(nowPlayingLiquidGlassOn) }
                     ) {
                         Column(
@@ -738,24 +723,24 @@ fun NowPlayingSheet(
                                 .fillMaxHeight(0.88f)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                Text(strings.lyrics, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                Text(strings.lyrics, style = MiuixAppTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                                 if (state.lyrics.isEmpty()) {
                                     // File picker button
-                                    androidx.compose.material3.IconButton(onClick = { lyricsFilePicker.launch(arrayOf("text/*", "application/octet-stream")) }) {
-                                        Icon(Icons.Filled.FolderOpen, contentDescription = strings.addLyricsFromFile, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    dev.shephard.player.ui.miuix.IconButton(onClick = { lyricsFilePicker.launch(arrayOf("text/*", "application/octet-stream")) }) {
+                                        Icon(MiuixIcons.Folder, contentDescription = strings.addLyricsFromFile, tint = MiuixAppTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
                             }
                             Spacer(Modifier.height(12.dp))
                             if (state.lyrics.isEmpty()) {
-                                Text(strings.noLyricsFound, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(strings.noLyricsFound, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(16.dp))
                                 val currentTrack = state.currentTrack
                                 if (currentTrack != null) {
                                     if (isDownloading) {
-                                        androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(28.dp), color = MaterialTheme.colorScheme.primary)
+                                        dev.shephard.player.ui.miuix.CircularProgressIndicator(modifier = Modifier.size(28.dp), color = MiuixAppTheme.colorScheme.primary)
                                     } else {
-                                        androidx.compose.material3.FilledTonalButton(
+                                        dev.shephard.player.ui.miuix.FilledTonalButton(
                                             onClick = {
                                                 isDownloading = true
                                                 downloadError = null
@@ -769,14 +754,14 @@ fun NowPlayingSheet(
                                                 }
                                             }
                                         ) {
-                                            Icon(Icons.Filled.Lyrics, null, modifier = Modifier.size(18.dp))
+                                            Icon(MiuixIcons.Notes, null, modifier = Modifier.size(18.dp))
                                             Spacer(Modifier.width(6.dp))
                                             Text(strings.downloadLyrics)
                                         }
                                     }
                                     downloadError?.let {
                                         Spacer(Modifier.height(8.dp))
-                                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                        Text(it, color = MiuixAppTheme.colorScheme.error, style = MiuixAppTheme.typography.bodySmall)
                                     }
                                 }
                             } else {
@@ -796,9 +781,9 @@ fun NowPlayingSheet(
                                                     } else Modifier
                                                 )
                                                 .padding(vertical = 6.dp),
-                                            style = MaterialTheme.typography.bodyMedium,
+                                            style = MiuixAppTheme.typography.bodyMedium,
                                             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                            color = if (isActive) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurface
                                         )
                                     }
                                 }
@@ -831,16 +816,16 @@ fun NowPlayingSheet(
                 val isRemixed by playerViewModel.isRemixed.collectAsState()
                 BouncyIconButton(
                     onClick = { playerViewModel.remixQueue() },
-                    icon = Icons.Filled.Shuffle,
+                    icon = MiuixIcons.Sort,
                     contentDescription = strings.remix,
-                    tint = if (isRemixed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (isRemixed) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
                     iconSize = 28.dp
                 )
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToPrevious() },
-                    icon = Icons.Filled.SkipPrevious,
+                    icon = MiuixIcons.Back,
                     contentDescription = strings.previous,
-                    tint = MaterialTheme.colorScheme.onBackground,
+                    tint = MiuixAppTheme.colorScheme.onBackground,
                     iconSize = 36.dp
                 )
                 Box(
@@ -855,7 +840,7 @@ fun NowPlayingSheet(
                                     tint = GlassTint.ACCENT
                                 )
                             } else {
-                                Modifier.background(MaterialTheme.colorScheme.primary)
+                                Modifier.background(MiuixAppTheme.colorScheme.primary)
                             }
                         )
                         .bounceClick {
@@ -883,26 +868,26 @@ fun NowPlayingSheet(
                         label = "playPauseIcon"
                     ) { isPlaying ->
                         Icon(
-                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            imageVector = if (isPlaying) MiuixIcons.Pause else MiuixIcons.Play,
                             contentDescription = if (isPlaying) strings.pause else strings.play,
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = MiuixAppTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(36.dp)
                         )
                     }
                 }
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToNext() },
-                    icon = Icons.Filled.SkipNext,
+                    icon = MiuixIcons.Forward,
                     contentDescription = strings.next,
-                    tint = MaterialTheme.colorScheme.onBackground,
+                    tint = MiuixAppTheme.colorScheme.onBackground,
                     iconSize = 36.dp
                 )
                 BouncyIconButton(
                     onClick = { playerViewModel.cycleRepeatMode() },
-                    icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                    icon = if (state.repeatMode == RepeatMode.ONE) MiuixIcons.Refresh else MiuixIcons.Refresh,
                     contentDescription = strings.repeat,
-                    tint = if (state.repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (state.repeatMode != RepeatMode.OFF) MiuixAppTheme.colorScheme.primary
+                    else MiuixAppTheme.colorScheme.onSurfaceVariant,
                     iconSize = 28.dp
                 )
             }
@@ -937,7 +922,7 @@ private fun AddToPlaylistDrawer(
         sheetState = sheetState,
         shape = MiuixSheetDefaults.Shape,
         containerColor = MiuixSheetDefaults.containerColor(addToPlaylistLiquidGlassOn),
-        contentColor = MaterialTheme.colorScheme.onSurface,
+        contentColor = MiuixAppTheme.colorScheme.onSurface,
         dragHandle = { MiuixSheetHandle(addToPlaylistLiquidGlassOn) }
     ) {
         Column(
@@ -950,7 +935,7 @@ private fun AddToPlaylistDrawer(
                 .padding(16.dp)
                 .fillMaxHeight(0.88f)
         ) {
-            Text(strings.addToPlaylist, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(strings.addToPlaylist, style = MiuixAppTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
             LazyColumn(
                 modifier = Modifier
@@ -975,25 +960,25 @@ private fun AddToPlaylistDrawer(
                     ) {
                         Box(
                             modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Filled.Favorite, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                            Icon(MiuixIcons.FavoritesFill, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(strings.likedSongs, fontWeight = FontWeight.SemiBold)
-                            Text("${likedIds.size} ${strings.trackCount}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${likedIds.size} ${strings.trackCount}", style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
                         }
                         Box(
                             modifier = Modifier.size(32.dp).clip(CircleShape)
-                                .background(if (isLiked) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant),
+                                .background(if (isLiked) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f) else MiuixAppTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = if (isLiked) Icons.Filled.Check else Icons.Filled.Add,
+                                imageVector = if (isLiked) MiuixIcons.Ok else MiuixIcons.Add,
                                 contentDescription = null,
-                                tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = if (isLiked) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -1025,17 +1010,17 @@ private fun AddToPlaylistDrawer(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(pl.name, fontWeight = FontWeight.SemiBold)
-                            Text("${pl.trackIds.size} ${strings.trackCount}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${pl.trackIds.size} ${strings.trackCount}", style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
                         }
                         Box(
                             modifier = Modifier.size(32.dp).clip(CircleShape)
-                                .background(if (containsTrack) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant),
+                                .background(if (containsTrack) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f) else MiuixAppTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = if (containsTrack) Icons.Filled.Check else Icons.Filled.Add,
+                                imageVector = if (containsTrack) MiuixIcons.Ok else MiuixIcons.Add,
                                 contentDescription = null,
-                                tint = if (containsTrack) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = if (containsTrack) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -1112,8 +1097,8 @@ private fun QueueList(
     ) {
         Text(
             text = strings.queue,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground,
+            style = MiuixAppTheme.typography.titleMedium,
+            color = MiuixAppTheme.colorScheme.onBackground,
             modifier = Modifier.padding(bottom = 8.dp)
         )
         LazyColumn(
@@ -1173,8 +1158,8 @@ private fun QueueTrackItem(
             .clip(RoundedCornerShape(12.dp))
             .background(
                 when {
-                    isDragged -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                    isPlaying -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    isDragged -> MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
+                    isPlaying -> MiuixAppTheme.colorScheme.primary.copy(alpha = 0.08f)
                     else -> Color.Transparent
                 }
             )
@@ -1200,7 +1185,7 @@ private fun QueueTrackItem(
             modifier = Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MiuixAppTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             var loaded by remember { mutableStateOf(false) }
@@ -1212,38 +1197,38 @@ private fun QueueTrackItem(
                 onSuccess = { loaded = true }
             )
             if (!loaded) {
-                Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                Icon(MiuixIcons.Music, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             }
         }
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 track.title,
-                color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
-                style = MaterialTheme.typography.bodyLarge,
+                color = if (isPlaying) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onBackground,
+                style = MiuixAppTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 track.artist,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
+                color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                style = MiuixAppTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
         Text(
             duration,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MiuixAppTheme.typography.labelSmall,
+            color = MiuixAppTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.width(4.dp))
         if (!isPlaying) {
             Icon(
-                imageVector = Icons.Filled.DragHandle,
+                imageVector = MiuixIcons.More,
                 contentDescription = "Reorder",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .size(28.dp)
                     .then(dragHandleModifier)

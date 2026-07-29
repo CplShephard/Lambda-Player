@@ -6,7 +6,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.MaterialTheme
+import dev.shephard.player.ui.miuix.MiuixAppTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -38,8 +38,8 @@ fun MinimalSeekBar(
     modifier: Modifier = Modifier,
     trackHeight: Dp = 3.dp,
     thumbRadius: Dp = 7.dp,
-    activeColor: Color = MaterialTheme.colorScheme.primary,
-    inactiveColor: Color = MaterialTheme.colorScheme.surfaceVariant
+    activeColor: Color = MiuixAppTheme.colorScheme.primary,
+    inactiveColor: Color = MiuixAppTheme.colorScheme.surfaceVariant
 ) {
     var dragging by remember { mutableStateOf(false) }
     var dragFraction by remember { mutableFloatStateOf(0f) }

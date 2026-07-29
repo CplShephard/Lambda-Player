@@ -10,20 +10,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import dev.shephard.player.ui.miuix.ExperimentalMiuixApi
+import dev.shephard.player.ui.miuix.Icon
+import dev.shephard.player.ui.miuix.MiuixAppTheme
+import dev.shephard.player.ui.miuix.ModalBottomSheet
+import dev.shephard.player.ui.miuix.OutlinedTextField
+import dev.shephard.player.ui.miuix.rememberModalBottomSheetState
+import dev.shephard.player.ui.miuix.Text
+import dev.shephard.player.ui.miuix.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,10 +45,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import kotlin.math.max
+import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.blurSheetSurface
 import kotlin.math.min
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.*
 
 /**
  * Modal popup that lets the user pick a custom accent color via:
@@ -57,6 +60,7 @@ import kotlin.math.min
  *
  * The selected color is committed via [onColorPicked] as an ARGB int.
  */
+@OptIn(ExperimentalMiuixApi::class)
 @Composable
 fun CustomColorPickerDialog(
     onDismiss: () -> Unit,
@@ -84,31 +88,40 @@ fun CustomColorPickerDialog(
         }
     }
 
-    Dialog(
+    val liquidGlassOn = LocalBlurEnabled.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        sheetState = sheetState,
+        shape = MiuixSheetDefaults.Shape,
+        containerColor = MiuixSheetDefaults.containerColor(liquidGlassOn),
+        contentColor = MiuixAppTheme.colorScheme.onSurface,
+        dragHandle = { MiuixSheetHandle(liquidGlassOn) }
     ) {
-        Surface(
+        Column(
             modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .clip(RoundedCornerShape(24.dp)),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp
+                .fillMaxWidth()
+                .fillMaxHeight(0.88f)
+                .then(
+                    if (liquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
+                    else Modifier
+                )
+                .padding(20.dp)
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MiuixAppTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = MiuixAppTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f)
                     )
                     BouncyIconButton(
                         onClick = onDismiss,
-                        icon = Icons.Filled.Close,
+                        icon = MiuixIcons.Close,
                         contentDescription = "Close",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
                         iconSize = 22.dp
                     )
                 }
@@ -127,8 +140,8 @@ fun CustomColorPickerDialog(
 
                 Text(
                     text = "Palette",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MiuixAppTheme.typography.labelMedium,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(6.dp))
                 SaturationValueGrid(
@@ -146,8 +159,8 @@ fun CustomColorPickerDialog(
 
                 Text(
                     text = "Hue",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MiuixAppTheme.typography.labelMedium,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(6.dp))
                 HueSlider(
@@ -162,8 +175,8 @@ fun CustomColorPickerDialog(
 
                 Text(
                     text = "Hex",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MiuixAppTheme.typography.labelMedium,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
@@ -191,8 +204,8 @@ fun CustomColorPickerDialog(
                 if (hexError) {
                     Text(
                         text = "Enter a valid hex like #1DB954",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+                        style = MiuixAppTheme.typography.bodySmall,
+                        color = MiuixAppTheme.colorScheme.error,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
@@ -221,7 +234,6 @@ fun CustomColorPickerDialog(
                 }
             }
         }
-    }
 }
 
 @Composable

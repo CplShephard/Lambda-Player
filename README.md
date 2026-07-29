@@ -1,46 +1,55 @@
-# 🎵 Lamba Player - A Local Music Player
+# 🎵 Lambda Player
 
-Lamba Player is a modern, lightweight audio player built 100% with Kotlin. It is designed to play your local MP3 files with a fully customizable user interface, advanced queue management, and high-quality audio mixing—completely free and offline.
+Lambda Player is a modern, lightweight, offline-first local music player built with Kotlin. It focuses on fast local playback, a polished Miuix/ComposeX interface, advanced queue controls, playlists, lyrics, and a highly customizable visual experience.
 
 ---
 
 ## ✨ Features
 
-* **🎨 Simple & Customizable UI:** A clean, distraction-free interface. You can modify themes, accent colors, and component styles to perfectly match your taste.
-* **📂 100% Free & Local-First:** No subscriptions, no ads, and no internet required. Automatically scans and organizes all `.mp3` and local audio files on your device.
-* **🔀 Premium Queue Management:** Easily add tracks to your queue, reorder them via intuitive drag-and-drop actions, or remove them on the fly.
-* **🎛️ High-Quality Mixing & Transitions:** Features advanced audio mixing algorithms for seamless crossfades, gapless playback, and crystal-clear sound quality.
+* **🎨 Full Miuix / ComposeX Interface:** The app UI is based on Miuix styling and components, including Miuix theme colors, Miuix icons, springy overscroll, drawer-style sheets, and Liquid Glass-inspired surfaces.
+* **📂 100% Free & Local-First:** No subscriptions, no ads, and no internet required for playback. The app scans and organizes local audio files on your device.
+* **🔀 Advanced Queue Management:** Add tracks to the queue, reorder them with drag-and-drop, play next, remove items, and manage playback flow smoothly.
+* **🎧 High-Quality Playback:** Powered by Media3 ExoPlayer with support for crossfade, gapless playback, repeat, shuffle, and local audio controls.
+* **📝 Lyrics Support:** View lyrics, load lyric files, and download lyrics when available.
+* **🎛️ Customization:** Accent color, wallpaper, blur/Liquid Glass mode, layout choices, language, and playback options are configurable from Settings.
+* **📱 Miuix Drawers Instead of Popups:** App actions use Miuix-style bottom drawers and overscrolling panels for a consistent mobile UI experience.
 
 ---
 
 ## 🛠️ Built With
 
 * **Language:** 100% [Kotlin](https://kotlinlang.org/)
-* **UI Framework:** Jetpack Compose / Material Design 3
+* **UI Framework:** Miuix / ComposeX (`top.yukonga.miuix.kmp`)
+* **Icons:** Miuix Icons
 * **Audio Engine:** Media3 ExoPlayer
+* **Storage:** Android MediaStore + DataStore Preferences
+
+> Note: Lambda Player’s app UI is built around Miuix/ComposeX components, Miuix icons, Miuix drawers, and Miuix styling.
 
 ---
 
 ## 🚀 Getting Started
 
-Follow these steps to set up and run Lamba Player locally or open it in your development environment:
-
 ### Prerequisites
 
-* Android Studio (Ladybug or newer recommended)
+* Android Studio or a compatible Android/Kotlin development environment
 * JDK 17+
-* An Android Device or Emulator (API 21+)
+* Android device or emulator matching the project SDK requirements
 
-### Installation
+### Build
 
-1. **Clone the Repository:**
+1. Clone the repository:
    ```bash
-   git clone [https://github.com/yourusername/lamba-player.git](https://github.com/yourusername/lamba-player.git)
-2. **Open in Android Studio:**
-Launch Android Studio, select Open, and navigate to the cloned lamba-player directory.
-3. **Sync and Build:**
-Let Gradle sync finish and click the Run button (Shift + F10) to deploy the app to your device.
+   git clone https://github.com/CplShephard/Lambda-Player.git
+   ```
+2. Open the project in Android Studio.
+3. Let Gradle sync finish.
+4. Build and run the app on your device.
 
-### 📄 License
-This project is licensed under the GNU General Public License v3.0 - see the LICENSE file for details.
-Permissions of this strong copyleft license are conditioned on making available complete source code of licensed works and modifications, which include larger works using a licensed work, under the same license. Copyright and license notices must be preserved.
+---
+
+## 📄 License
+
+This project is licensed under the GNU General Public License v3.0. See the `LICENSE` file for details.
+
+Permissions of this strong copyleft license are conditioned on making available complete source code of licensed works and modifications, including larger works using a licensed work, under the same license. Copyright and license notices must be preserved.

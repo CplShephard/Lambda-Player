@@ -4,13 +4,13 @@
 // fill layer) with the real Miuix backdrop pipeline: content behind a surface is captured
 // into a GraphicsLayer and genuinely blurred/refracted through AGSL shaders.
 //
-// Mirrors InstallerX Revived's `ui/theme/Backdrop.kt` approach, adapted to Material 3.
+// Mirrors InstallerX Revived's `ui/theme/Backdrop.kt` approach, adapted to Miuix.
 package dev.shephard.player.ui.glass
 
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
+import dev.shephard.player.ui.miuix.MiuixAppTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -73,7 +73,7 @@ fun rememberAppBlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
     // classes load but the shader entry points blow up at draw time. Gate on API 33 as well
     // as on RenderEffect support so those devices simply get the opaque fallback.
     if (!enableBlur || !isLiquidGlassSupported || !isRenderEffectSupported()) return null
-    val surfaceColor = MaterialTheme.colorScheme.surface
+    val surfaceColor = MiuixAppTheme.colorScheme.surface
     return rememberLayerBackdrop {
         drawRect(surfaceColor)
         drawContent()
@@ -97,11 +97,11 @@ fun Modifier.miuixBlurSurface(
     shape: Shape = RoundedCornerShape(20.dp),
     blurRadius: Float = 25f,
     tintAlpha: Float = 0.8f,
-    fallbackColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    fallbackColor: Color = MiuixAppTheme.colorScheme.surfaceVariant,
 ): Modifier {
     if (backdrop == null) return this.background(fallbackColor, shape)
 
-    val blendColor = MaterialTheme.colorScheme.surface.copy(alpha = tintAlpha)
+    val blendColor = MiuixAppTheme.colorScheme.surface.copy(alpha = tintAlpha)
     return this.then(
         Modifier.textureBlur(
             backdrop = backdrop,
@@ -124,11 +124,11 @@ fun Modifier.miuixBlurAccent(
     shape: Shape = RoundedCornerShape(16.dp),
     blurRadius: Float = 20f,
     tintAlpha: Float = 0.55f,
-    fallbackColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+    fallbackColor: Color = MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f),
 ): Modifier {
     if (backdrop == null) return this.background(fallbackColor, shape)
 
-    val blendColor = MaterialTheme.colorScheme.primary.copy(alpha = tintAlpha)
+    val blendColor = MiuixAppTheme.colorScheme.primary.copy(alpha = tintAlpha)
     return this.then(
         Modifier.textureBlur(
             backdrop = backdrop,
@@ -151,7 +151,7 @@ fun Modifier.miuixBlurSheet(
     shape: Shape = RectangleShape,
     blurRadius: Float = 30f,
     tintAlpha: Float = 0.85f,
-    fallbackColor: Color = MaterialTheme.colorScheme.surface,
+    fallbackColor: Color = MiuixAppTheme.colorScheme.surface,
 ): Modifier = miuixBlurSurface(
     backdrop = backdrop,
     shape = shape,
@@ -163,4 +163,4 @@ fun Modifier.miuixBlurSheet(
 /** Background colour for bars/headers: transparent when a backdrop paints them, else solid. */
 @Composable
 fun LayerBackdrop?.appBarColor(): Color =
-    this?.let { Color.Transparent } ?: MaterialTheme.colorScheme.surface
+    this?.let { Color.Transparent } ?: MiuixAppTheme.colorScheme.surface

@@ -9,16 +9,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Headphones
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
+import dev.shephard.player.ui.miuix.HorizontalDivider
+import dev.shephard.player.ui.miuix.Icon
+import dev.shephard.player.ui.miuix.IconButton
+import dev.shephard.player.ui.miuix.MiuixAppTheme
+import dev.shephard.player.ui.miuix.Switch
+import dev.shephard.player.ui.miuix.SwitchDefaults
+import dev.shephard.player.ui.miuix.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -30,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.ui.i18n.LocalStrings
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.*
 
 @Composable
 fun PlaybackSettingsSheet(
@@ -42,7 +41,7 @@ fun PlaybackSettingsSheet(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MiuixAppTheme.colorScheme.background)
             .statusBarsPadding()
             .padding(horizontal = 20.dp)
     ) {
@@ -54,16 +53,16 @@ fun PlaybackSettingsSheet(
         ) {
             IconButton(onClick = onBack) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    imageVector = MiuixIcons.Back,
                     contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.onBackground
+                    tint = MiuixAppTheme.colorScheme.onBackground
                 )
             }
             Text(
                 text = strings.playbackSettings,
-                style = MaterialTheme.typography.titleLarge,
+                style = MiuixAppTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = MiuixAppTheme.colorScheme.onBackground,
                 modifier = Modifier.padding(start = 8.dp)
             )
         }
@@ -75,7 +74,7 @@ fun PlaybackSettingsSheet(
             onCheckedChange = { playerViewModel.setCrossfadeEnabled(it) }
         )
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+        HorizontalDivider(color = MiuixAppTheme.colorScheme.surfaceVariant)
 
         SettingToggleRow(
             title = strings.gapless,
@@ -84,7 +83,7 @@ fun PlaybackSettingsSheet(
             onCheckedChange = { playerViewModel.setGaplessEnabled(it) }
         )
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+        HorizontalDivider(color = MiuixAppTheme.colorScheme.surfaceVariant)
 
         SettingToggleRow(
             title = strings.playWithOthers,
@@ -93,7 +92,7 @@ fun PlaybackSettingsSheet(
             onCheckedChange = { playerViewModel.setPlayWithOthers(it) }
         )
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+        HorizontalDivider(color = MiuixAppTheme.colorScheme.surfaceVariant)
 
         ListeningStatsCard(totalListeningMs = state.totalListeningMs)
     }
@@ -120,23 +119,23 @@ private fun SettingToggleRow(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onBackground
+                style = MiuixAppTheme.typography.bodyLarge,
+                color = MiuixAppTheme.colorScheme.onBackground
             )
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MiuixAppTheme.typography.bodyMedium,
+                color = MiuixAppTheme.colorScheme.onSurfaceVariant
             )
         }
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.background,
-                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                checkedThumbColor = MiuixAppTheme.colorScheme.background,
+                checkedTrackColor = MiuixAppTheme.colorScheme.primary,
+                uncheckedThumbColor = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                uncheckedTrackColor = MiuixAppTheme.colorScheme.surfaceVariant
             )
         )
     }
@@ -160,35 +159,35 @@ private fun ListeningStatsCard(totalListeningMs: Long) {
             .fillMaxWidth()
             .padding(vertical = 20.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(MiuixAppTheme.colorScheme.surfaceVariant)
             .padding(20.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                imageVector = Icons.Filled.Headphones,
+                imageVector = MiuixIcons.Music,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
+                tint = MiuixAppTheme.colorScheme.primary
             )
             Text(
                 text = strings.totalListeningTime,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onBackground,
+                style = MiuixAppTheme.typography.bodyLarge,
+                color = MiuixAppTheme.colorScheme.onBackground,
                 modifier = Modifier.padding(start = 12.dp)
             )
         }
 
         Text(
             text = formatted,
-            style = MaterialTheme.typography.headlineMedium,
+            style = MiuixAppTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
+            color = MiuixAppTheme.colorScheme.primary,
             modifier = Modifier.padding(top = 12.dp)
         )
 
         Text(
             text = strings.totalListeningDescription,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MiuixAppTheme.typography.bodyMedium,
+            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp)
         )
     }

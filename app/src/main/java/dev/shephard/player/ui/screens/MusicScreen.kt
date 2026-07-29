@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMiuixApi::class)
 
 package dev.shephard.player.ui.screens
 
@@ -29,26 +29,20 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.FolderOff
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import dev.shephard.player.ui.miuix.Button
+import dev.shephard.player.ui.miuix.CircularProgressIndicator
+import dev.shephard.player.ui.miuix.ExperimentalMiuixApi
+import dev.shephard.player.ui.miuix.HorizontalDivider
+import dev.shephard.player.ui.miuix.Icon
+import dev.shephard.player.ui.miuix.IconButton
+import dev.shephard.player.ui.miuix.MiuixAppTheme
+import dev.shephard.player.ui.miuix.ModalBottomSheet
+import dev.shephard.player.ui.miuix.OutlinedTextField
+import dev.shephard.player.ui.miuix.Text
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
+import dev.shephard.player.ui.miuix.TextButton
+import dev.shephard.player.ui.miuix.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -88,6 +82,8 @@ import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.*
 
 @Composable
 fun MusicScreen(
@@ -215,7 +211,7 @@ fun MusicScreen(
             sheetState = sheetState,
             shape = MiuixSheetDefaults.Shape,
             containerColor = MiuixSheetDefaults.containerColor(menuLiquidGlassOn),
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            contentColor = MiuixAppTheme.colorScheme.onSurface,
             dragHandle = { MiuixSheetHandle(menuLiquidGlassOn) }
         ) {
             Column(
@@ -233,7 +229,7 @@ fun MusicScreen(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                            .background(MiuixAppTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
                         var loaded by remember { mutableStateOf(false) }
@@ -245,14 +241,14 @@ fun MusicScreen(
                             onState = { loaded = it is AsyncImagePainter.State.Success }
                         )
                         if (!loaded) {
-                            Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.primary)
+                            Icon(MiuixIcons.Music, null, tint = MiuixAppTheme.colorScheme.primary)
                         }
                     }
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Text(track.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(track.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(track.album, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(track.artist, style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
+                        Text(track.album, style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Spacer(Modifier.height(16.dp))
@@ -266,9 +262,9 @@ fun MusicScreen(
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Filled.Edit, null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(MiuixIcons.Edit, null, tint = MiuixAppTheme.colorScheme.primary)
                     Spacer(Modifier.width(12.dp))
-                    Text(strings.editMusic, color = MaterialTheme.colorScheme.onBackground)
+                    Text(strings.editMusic, color = MiuixAppTheme.colorScheme.onBackground)
                 }
                 Row(
                     modifier = Modifier
@@ -278,9 +274,9 @@ fun MusicScreen(
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error)
+                    Icon(MiuixIcons.Delete, null, tint = MiuixAppTheme.colorScheme.error)
                     Spacer(Modifier.width(12.dp))
-                    Text(strings.delete, color = MaterialTheme.colorScheme.error)
+                    Text(strings.delete, color = MiuixAppTheme.colorScheme.error)
                 }
                 Spacer(Modifier.height(16.dp))
             }
@@ -296,7 +292,7 @@ fun MusicScreen(
             sheetState = deleteSheetState,
             shape = MiuixSheetDefaults.Shape,
             containerColor = MiuixSheetDefaults.containerColor(deleteLiquidGlassOn),
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            contentColor = MiuixAppTheme.colorScheme.onSurface,
             dragHandle = { MiuixSheetHandle(deleteLiquidGlassOn) }
         ) {
             Column(
@@ -309,9 +305,9 @@ fun MusicScreen(
                     .padding(horizontal = 24.dp, vertical = 16.dp)
                     .heightIn(min = 260.dp)
             ) {
-                Text(strings.delete, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(strings.delete, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
-                Text(strings.deleteTrackConfirm, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(strings.deleteTrackConfirm, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(22.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = { trackToDelete = null }) { Text(strings.cancel) }
@@ -351,7 +347,7 @@ fun MusicScreen(
                                 withContext(Dispatchers.Main) { libraryViewModel.loadTracks() }
                             }
                         }
-                    }) { Text(strings.delete, color = MaterialTheme.colorScheme.error) }
+                    }) { Text(strings.delete, color = MiuixAppTheme.colorScheme.error) }
                 }
                 Spacer(Modifier.height(24.dp))
             }
@@ -383,7 +379,7 @@ private fun GridTrackCard(
             .clip(RoundedCornerShape(20.dp))
             .then(
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
-                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                else Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
             .padding(8.dp)
     ) {
@@ -392,7 +388,7 @@ private fun GridTrackCard(
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MiuixAppTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             var artLoaded by remember(track.id) { mutableStateOf(false) }
@@ -405,9 +401,9 @@ private fun GridTrackCard(
             )
             if (!artLoaded) {
                 Icon(
-                    imageVector = Icons.Filled.MusicNote,
+                    imageVector = MiuixIcons.Music,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MiuixAppTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp)
                 )
             }
@@ -420,21 +416,21 @@ private fun GridTrackCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = track.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    style = MiuixAppTheme.typography.bodyMedium,
+                    color = MiuixAppTheme.colorScheme.onBackground,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = track.artist,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixAppTheme.typography.bodySmall,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
             IconButton(onClick = onMenuClick, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Filled.MoreVert, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Icon(MiuixIcons.More, null, tint = MiuixAppTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -450,7 +446,7 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
             .clip(RoundedCornerShape(20.dp))
             .then(
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
-                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                else Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -459,7 +455,7 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
             modifier = Modifier
                 .size(48.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MiuixAppTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             var artLoaded by remember(track.id) { mutableStateOf(false) }
@@ -474,9 +470,9 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
             )
             if (!artLoaded) {
                 Icon(
-                    imageVector = Icons.Filled.MusicNote,
+                    imageVector = MiuixIcons.Music,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MiuixAppTheme.colorScheme.primary
                 )
             }
         }
@@ -488,15 +484,15 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
         ) {
             Text(
                 text = track.title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onBackground,
+                style = MiuixAppTheme.typography.bodyLarge,
+                color = MiuixAppTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = track.artist,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixAppTheme.typography.bodyMedium,
+                color = MiuixAppTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -504,12 +500,12 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
 
         Text(
             text = track.formattedDuration(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MiuixAppTheme.typography.labelMedium,
+            color = MiuixAppTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.width(4.dp))
         IconButton(onClick = onMenuClick, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Filled.MoreVert, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            Icon(MiuixIcons.More, null, tint = MiuixAppTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -610,7 +606,7 @@ private fun EditMusicDrawer(
         sheetState = sheetState,
         shape = MiuixSheetDefaults.Shape,
         containerColor = MiuixSheetDefaults.containerColor(editMusicLiquidGlassOn),
-        contentColor = MaterialTheme.colorScheme.onSurface,
+        contentColor = MiuixAppTheme.colorScheme.onSurface,
         dragHandle = { MiuixSheetHandle(editMusicLiquidGlassOn) }
     ) {
         Column(
@@ -655,7 +651,7 @@ private fun EditMusicDrawer(
                     .fillMaxWidth()
                     .height(160.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(MiuixAppTheme.colorScheme.surfaceVariant)
                     .bounceClick { coverPicker.launch(arrayOf("image/*")) },
                 contentAlignment = Alignment.Center
             ) {
@@ -669,7 +665,7 @@ private fun EditMusicDrawer(
                     onState = { loaded = it is AsyncImagePainter.State.Success }
                 )
                 if (!loaded) {
-                    Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+                    Icon(MiuixIcons.Music, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
                 }
                 Box(
                     modifier = Modifier
@@ -677,10 +673,10 @@ private fun EditMusicDrawer(
                         .padding(8.dp)
                         .size(28.dp)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)),
+                        .background(MiuixAppTheme.colorScheme.surface.copy(alpha = 0.7f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Filled.Edit, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
+                    Icon(MiuixIcons.Edit, null, tint = MiuixAppTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
                 }
             }
 
@@ -690,7 +686,7 @@ private fun EditMusicDrawer(
                     onClick = { coverUri = null },
                     modifier = Modifier.align(Alignment.End)
                 ) {
-                    Text(strings.removeCover, color = MaterialTheme.colorScheme.error)
+                    Text(strings.removeCover, color = MiuixAppTheme.colorScheme.error)
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -730,21 +726,21 @@ private fun PermissionRequest(onRequest: () -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = Icons.Filled.MusicNote,
+            imageVector = MiuixIcons.Music,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MiuixAppTheme.colorScheme.primary,
             modifier = Modifier.size(56.dp)
         )
         Text(
             text = "Access your music",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onBackground,
+            style = MiuixAppTheme.typography.titleLarge,
+            color = MiuixAppTheme.colorScheme.onBackground,
             modifier = Modifier.padding(top = 16.dp)
         )
         Text(
             text = "Lambda Player needs permission to read audio files stored on this device.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MiuixAppTheme.typography.bodyMedium,
+            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp)
         )
         Button(
@@ -762,7 +758,7 @@ private fun LoadingState() {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        CircularProgressIndicator(color = MiuixAppTheme.colorScheme.primary)
     }
 }
 
@@ -776,21 +772,21 @@ private fun EmptyState() {
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = Icons.Filled.FolderOff,
+            imageVector = MiuixIcons.Folder,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(56.dp)
         )
         Text(
             text = "No music found",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onBackground,
+            style = MiuixAppTheme.typography.titleLarge,
+            color = MiuixAppTheme.colorScheme.onBackground,
             modifier = Modifier.padding(top = 16.dp)
         )
         Text(
             text = "Add audio files to your device storage to see them here.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MiuixAppTheme.typography.bodyMedium,
+            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp)
         )
     }

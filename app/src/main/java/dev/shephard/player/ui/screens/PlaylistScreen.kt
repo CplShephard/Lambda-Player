@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalAnimationApi::class)
+@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMiuixApi::class, androidx.compose.animation.ExperimentalAnimationApi::class)
 
 package dev.shephard.player.ui.screens
 
@@ -35,36 +35,21 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.PinDrop
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
+import dev.shephard.player.ui.miuix.Card
+import dev.shephard.player.ui.miuix.CardDefaults
+import dev.shephard.player.ui.miuix.Checkbox
+
+import dev.shephard.player.ui.miuix.ExperimentalMiuixApi
+import dev.shephard.player.ui.miuix.FloatingActionButton
+import dev.shephard.player.ui.miuix.HorizontalDivider
+import dev.shephard.player.ui.miuix.Icon
+import dev.shephard.player.ui.miuix.IconButton
+import dev.shephard.player.ui.miuix.MiuixAppTheme
+import dev.shephard.player.ui.miuix.ModalBottomSheet
+import dev.shephard.player.ui.miuix.OutlinedTextField
+import dev.shephard.player.ui.miuix.Text
+import dev.shephard.player.ui.miuix.TextButton
+import dev.shephard.player.ui.miuix.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -116,6 +101,8 @@ import java.text.Collator
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.*
 
 internal data class LocalPlaylist(
     val name: String,
@@ -420,7 +407,7 @@ fun PlaylistScreen(
             sheetState = createSheetState,
             shape = MiuixSheetDefaults.Shape,
             containerColor = MiuixSheetDefaults.containerColor(createLiquidGlassOn),
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            contentColor = MiuixAppTheme.colorScheme.onSurface,
             dragHandle = { MiuixSheetHandle(createLiquidGlassOn) }
         ) {
             Column(
@@ -433,7 +420,7 @@ fun PlaylistScreen(
                     .padding(horizontal = 24.dp, vertical = 16.dp)
                     .heightIn(min = 260.dp)
             ) {
-                Text(strings.createPlaylist, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(strings.createPlaylist, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(18.dp))
                 OutlinedTextField(
                     value = newName,
@@ -473,7 +460,7 @@ fun PlaylistScreen(
             sheetState = pickerSheetState,
             shape = MiuixSheetDefaults.Shape,
             containerColor = MiuixSheetDefaults.containerColor(pickerLiquidGlassOn),
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            contentColor = MiuixAppTheme.colorScheme.onSurface,
             dragHandle = { MiuixSheetHandle(pickerLiquidGlassOn) }
         ) {
             Column(
@@ -486,7 +473,7 @@ fun PlaylistScreen(
                     )
                     .padding(20.dp)
             ) {
-                Text(strings.addTracks, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(strings.addTracks, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
                 val pickerListState = rememberLazyListState()
                 LazyColumn(
@@ -503,7 +490,7 @@ fun PlaylistScreen(
                                 .then(
                                     if (checked) Modifier.background(
                                         if (pickerLiquidGlassOn) Color.White.copy(alpha = 0.12f)
-                                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                                        else MiuixAppTheme.colorScheme.primary.copy(alpha = 0.10f)
                                     ) else Modifier
                                 )
                                 .clickable { pickerSelected = if (checked) pickerSelected - t.id else pickerSelected + t.id }
@@ -516,8 +503,8 @@ fun PlaylistScreen(
                             )
                             Spacer(Modifier.width(8.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(t.title, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(t.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(t.title, color = MiuixAppTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(t.artist, style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
@@ -556,7 +543,7 @@ fun PlaylistScreen(
             sheetState = sheetState,
             shape = MiuixSheetDefaults.Shape,
             containerColor = MiuixSheetDefaults.containerColor(menuLiquidGlassOn),
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            contentColor = MiuixAppTheme.colorScheme.onSurface,
             dragHandle = { MiuixSheetHandle(menuLiquidGlassOn) }
         ) {
             Column(
@@ -577,7 +564,7 @@ fun PlaylistScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = if (pl.isSystem) strings.likedSongs else pl.name,
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MiuixAppTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         val dateStr = remember(pl.createdAt) {
@@ -586,15 +573,15 @@ fun PlaylistScreen(
                         if (dateStr.isNotEmpty()) {
                             Text(
                                 text = "${strings.createdAt}: $dateStr",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = MiuixAppTheme.typography.bodySmall,
+                                color = MiuixAppTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                     Text(
                         text = "${plTracks.size} ${strings.trackCount}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MiuixAppTheme.typography.bodySmall,
+                        color = MiuixAppTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Spacer(Modifier.height(16.dp))
@@ -612,9 +599,9 @@ fun PlaylistScreen(
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Filled.Edit, null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(MiuixIcons.Edit, null, tint = MiuixAppTheme.colorScheme.primary)
                     Spacer(Modifier.width(12.dp))
-                    Text(strings.editPlaylist, color = MaterialTheme.colorScheme.onBackground)
+                    Text(strings.editPlaylist, color = MiuixAppTheme.colorScheme.onBackground)
                 }
                 Row(
                     modifier = Modifier
@@ -634,9 +621,9 @@ fun PlaylistScreen(
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(if (pl.pinned) Icons.Filled.PinDrop else Icons.Filled.PushPin, null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(if (pl.pinned) MiuixIcons.Pin else MiuixIcons.Pin, null, tint = MiuixAppTheme.colorScheme.primary)
                     Spacer(Modifier.width(12.dp))
-                    Text(if (pl.pinned) strings.unpinPlaylist else strings.pinPlaylist, color = MaterialTheme.colorScheme.onBackground)
+                    Text(if (pl.pinned) strings.unpinPlaylist else strings.pinPlaylist, color = MiuixAppTheme.colorScheme.onBackground)
                 }
                 if (!pl.isSystem) {
                     Row(
@@ -651,9 +638,9 @@ fun PlaylistScreen(
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error)
+                        Icon(MiuixIcons.Delete, null, tint = MiuixAppTheme.colorScheme.error)
                         Spacer(Modifier.width(12.dp))
-                        Text(strings.delete, color = MaterialTheme.colorScheme.error)
+                        Text(strings.delete, color = MiuixAppTheme.colorScheme.error)
                     }
                 }
                 Spacer(Modifier.height(16.dp))
@@ -671,7 +658,7 @@ fun PlaylistScreen(
             sheetState = editSheetState,
             shape = MiuixSheetDefaults.Shape,
             containerColor = MiuixSheetDefaults.containerColor(editLiquidGlassOn),
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            contentColor = MiuixAppTheme.colorScheme.onSurface,
             dragHandle = { MiuixSheetHandle(editLiquidGlassOn) }
         ) {
             Column(
@@ -684,7 +671,7 @@ fun PlaylistScreen(
                     .padding(horizontal = 24.dp, vertical = 16.dp)
                     .heightIn(min = 260.dp)
             ) {
-                Text(strings.editPlaylist, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(strings.editPlaylist, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(18.dp))
                 OutlinedTextField(
                     value = editPlaylistName,
@@ -763,16 +750,16 @@ private fun PlaylistListView(
                 verticalArrangement = Arrangement.Center
             ) {
                 Icon(
-                    imageVector = Icons.Filled.LibraryMusic,
+                    imageVector = MiuixIcons.Playlist,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(56.dp)
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = strings.noPlaylistsYet,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MiuixAppTheme.typography.bodyLarge,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
                 )
             }
         } else {
@@ -795,8 +782,8 @@ private fun PlaylistListView(
                         item(span = { GridItemSpan(2) }) {
                             Text(
                                 text = strings.pinnedPlaylists,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
+                                style = MiuixAppTheme.typography.labelMedium,
+                                color = MiuixAppTheme.colorScheme.primary,
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
                         }
@@ -834,8 +821,8 @@ private fun PlaylistListView(
                         item {
                             Text(
                                 text = strings.pinnedPlaylists,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
+                                style = MiuixAppTheme.typography.labelMedium,
+                                color = MiuixAppTheme.colorScheme.primary,
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
                         }
@@ -866,9 +853,9 @@ private fun PlaylistListView(
                 .padding(bottom = 180.dp, end = 24.dp)
                 .bounceClick(onClick = onCreate),
             shape = RoundedCornerShape(20.dp),
-            containerColor = MaterialTheme.colorScheme.primary
+            containerColor = MiuixAppTheme.colorScheme.primary
         ) {
-            Icon(Icons.Filled.Add, contentDescription = strings.createPlaylist)
+            Icon(MiuixIcons.Add, contentDescription = strings.createPlaylist)
         }
     }
 }
@@ -894,7 +881,7 @@ private fun PlaylistListCard(
             .clip(RoundedCornerShape(20.dp))
             .then(
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
-                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                else Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
     ) {
         Row(
@@ -905,7 +892,7 @@ private fun PlaylistListCard(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.background),
+                    .background(MiuixAppTheme.colorScheme.background),
                 contentAlignment = Alignment.Center
             ) {
                 val coverUri = playlist.coverUri?.let { Uri.parse(it) }
@@ -917,13 +904,13 @@ private fun PlaylistListCard(
                         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp))
                             .background(Brush.linearGradient(
                                 colors = listOf(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
+                                    MiuixAppTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                    MiuixAppTheme.colorScheme.tertiary.copy(alpha = 0.6f)
                                 )
                             )),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Filled.Favorite, null, tint = Color.White, modifier = Modifier.size(26.dp))
+                        Icon(MiuixIcons.FavoritesFill, null, tint = Color.White, modifier = Modifier.size(26.dp))
                     }
                 } else {
                 if (firstArt != null) {
@@ -937,9 +924,9 @@ private fun PlaylistListCard(
                 }
                 if (!artLoaded) {
                     Icon(
-                        imageVector = Icons.Filled.MusicNote,
+                        imageVector = MiuixIcons.Music,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MiuixAppTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -951,29 +938,29 @@ private fun PlaylistListCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = if (playlist.isSystem) strings.likedSongs else playlist.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MiuixAppTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    color = MiuixAppTheme.colorScheme.onBackground,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "${plTracks.size} ${strings.trackCount}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MiuixAppTheme.typography.bodySmall,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
                 )
             }
             BouncyIconButton(
                 onClick = onPlay,
-                icon = Icons.Filled.PlayArrow,
+                icon = MiuixIcons.Play,
                 contentDescription = strings.play,
-                tint = MaterialTheme.colorScheme.primary
+                tint = MiuixAppTheme.colorScheme.primary
             )
             BouncyIconButton(
                 onClick = onMenu,
-                icon = Icons.Filled.MoreVert,
+                icon = MiuixIcons.More,
                 contentDescription = "Menu",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MiuixAppTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -996,7 +983,7 @@ private fun PlaylistGridCard(
             .clip(RoundedCornerShape(20.dp))
             .then(
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
-                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                else Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
             .padding(12.dp)
     ) {
@@ -1005,7 +992,7 @@ private fun PlaylistGridCard(
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MiuixAppTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             val coverUri = playlist.coverUri?.let { Uri.parse(it) }
@@ -1016,13 +1003,13 @@ private fun PlaylistGridCard(
                     modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))
                         .background(Brush.linearGradient(
                             colors = listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
+                                MiuixAppTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                MiuixAppTheme.colorScheme.tertiary.copy(alpha = 0.6f)
                             )
                         )),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Filled.Favorite, null, tint = Color.White, modifier = Modifier.size(48.dp))
+                    Icon(MiuixIcons.FavoritesFill, null, tint = Color.White, modifier = Modifier.size(48.dp))
                 }
             } else {
             if (firstArt != null) {
@@ -1036,18 +1023,18 @@ private fun PlaylistGridCard(
             }
             if (!artLoaded) {
                 Icon(
-                    imageVector = Icons.Filled.MusicNote,
+                    imageVector = MiuixIcons.Music,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MiuixAppTheme.colorScheme.primary,
                     modifier = Modifier.size(48.dp)
                 )
             }
             }
             BouncyIconButton(
                 onClick = onMenu,
-                icon = Icons.Filled.MoreVert,
+                icon = MiuixIcons.More,
                 contentDescription = "Menu",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(4.dp)
@@ -1060,15 +1047,15 @@ private fun PlaylistGridCard(
                     .clip(CircleShape)
                     .then(
                         if (liquidGlassOn) Modifier.blurSurfaceCompact(enabled = true, shape = CircleShape, tint = GlassTint.ACCENT)
-                        else Modifier.background(MaterialTheme.colorScheme.primary)
+                        else Modifier.background(MiuixAppTheme.colorScheme.primary)
                     )
                     .bounceClick { onPlay() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Filled.PlayArrow,
+                    imageVector = MiuixIcons.Play,
                     contentDescription = strings.play,
-                    tint = if (liquidGlassOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary,
+                    tint = if (liquidGlassOn) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -1076,15 +1063,15 @@ private fun PlaylistGridCard(
         Spacer(Modifier.height(8.dp))
         Text(
             text = if (playlist.isSystem) strings.likedSongs else playlist.name,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MiuixAppTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Text(
             text = "${plTracks.size} ${strings.trackCount}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MiuixAppTheme.typography.bodySmall,
+            color = MiuixAppTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -1192,7 +1179,7 @@ fun PlaylistDetailScreen(
             sheetState = pickerSheetState,
             shape = MiuixSheetDefaults.Shape,
             containerColor = MiuixSheetDefaults.containerColor(pickerLiquidGlassOn),
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            contentColor = MiuixAppTheme.colorScheme.onSurface,
             dragHandle = { MiuixSheetHandle(pickerLiquidGlassOn) }
         ) {
             Column(
@@ -1205,7 +1192,7 @@ fun PlaylistDetailScreen(
                     )
                     .padding(20.dp)
             ) {
-                Text(strings.addTracks, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(strings.addTracks, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
                 val pickerListState = rememberLazyListState()
                 LazyColumn(
@@ -1219,7 +1206,7 @@ fun PlaylistDetailScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
-                                .then(if (checked) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)) else Modifier)
+                                .then(if (checked) Modifier.background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.10f)) else Modifier)
                                 .clickable { pickerSelected = if (checked) pickerSelected - t.id else pickerSelected + t.id }
                                 .padding(vertical = 8.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -1230,8 +1217,8 @@ fun PlaylistDetailScreen(
                             )
                             Spacer(Modifier.width(8.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(t.title, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(t.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(t.title, color = MiuixAppTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(t.artist, style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
@@ -1348,24 +1335,24 @@ private fun PlaylistDetailView(
                 ) {
                     BouncyIconButton(
                         onClick = onBack,
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        icon = MiuixIcons.Back,
                         contentDescription = strings.cancel,
-                        tint = MaterialTheme.colorScheme.onBackground
+                        tint = MiuixAppTheme.colorScheme.onBackground
                     )
                     Spacer(Modifier.width(4.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = if (playlist.isSystem) strings.likedSongs else playlist.name,
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MiuixAppTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground,
+                            color = MiuixAppTheme.colorScheme.onBackground,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "${plTracks.size} ${strings.trackCount}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MiuixAppTheme.typography.bodySmall,
+                            color = MiuixAppTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -1378,7 +1365,7 @@ private fun PlaylistDetailView(
                         .padding(vertical = 8.dp)
                         .aspectRatio(1f)
                         .clip(RoundedCornerShape(20.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .background(MiuixAppTheme.colorScheme.surfaceVariant)
                         .then(if (!playlist.isSystem) Modifier.clickable { onPickCover() } else Modifier),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1387,13 +1374,13 @@ private fun PlaylistDetailView(
                             modifier = Modifier.fillMaxSize()
                                 .background(Brush.linearGradient(
                                     colors = listOf(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
+                                        MiuixAppTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                        MiuixAppTheme.colorScheme.tertiary.copy(alpha = 0.6f)
                                     )
                                 )),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Filled.Favorite, null, tint = Color.White, modifier = Modifier.size(80.dp))
+                            Icon(MiuixIcons.FavoritesFill, null, tint = Color.White, modifier = Modifier.size(80.dp))
                         }
                     } else {
                     val coverUri = playlist.coverUri?.let { Uri.parse(it) }
@@ -1407,9 +1394,9 @@ private fun PlaylistDetailView(
                         )
                     } else {
                         Icon(
-                            imageVector = Icons.Filled.LibraryMusic,
+                            imageVector = MiuixIcons.Playlist,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = MiuixAppTheme.colorScheme.primary,
                             modifier = Modifier.size(48.dp)
                         )
                     }
@@ -1420,13 +1407,13 @@ private fun PlaylistDetailView(
                             .padding(12.dp)
                             .size(32.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)),
+                            .background(MiuixAppTheme.colorScheme.surface.copy(alpha = 0.6f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.Edit,
+                            imageVector = MiuixIcons.Edit,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurface,
+                            tint = MiuixAppTheme.colorScheme.onSurface,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -1448,7 +1435,7 @@ private fun PlaylistDetailView(
                                     shape = RoundedCornerShape(14.dp),
                                     tint = GlassTint.ACCENT
                                 )
-                                else Modifier.background(MaterialTheme.colorScheme.primary)
+                                else Modifier.background(MiuixAppTheme.colorScheme.primary)
                             )
                             .clickable(enabled = plTracks.isNotEmpty()) { onPlayAll() }
                             .padding(vertical = 12.dp),
@@ -1456,14 +1443,14 @@ private fun PlaylistDetailView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            Icons.Filled.PlayArrow,
+                            MiuixIcons.Play,
                             contentDescription = strings.play,
-                            tint = if (liquidGlassOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary
+                            tint = if (liquidGlassOn) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onPrimary
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = strings.play,
-                            color = if (liquidGlassOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary,
+                            color = if (liquidGlassOn) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -1473,7 +1460,7 @@ private fun PlaylistDetailView(
                             .clip(RoundedCornerShape(14.dp))
                             .then(
                                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(14.dp))
-                                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                                else Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant)
                             )
                             .clickable(enabled = plTracks.isNotEmpty()) { onPlayRemix() }
                             .padding(vertical = 12.dp),
@@ -1481,14 +1468,14 @@ private fun PlaylistDetailView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            Icons.Filled.Shuffle,
+                            MiuixIcons.Sort,
                             contentDescription = strings.remix,
-                            tint = MaterialTheme.colorScheme.onBackground
+                            tint = MiuixAppTheme.colorScheme.onBackground
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = strings.remix,
-                            color = MaterialTheme.colorScheme.onBackground,
+                            color = MiuixAppTheme.colorScheme.onBackground,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -1498,21 +1485,21 @@ private fun PlaylistDetailView(
                                 .clip(RoundedCornerShape(14.dp))
                                 .then(
                                     if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(14.dp))
-                                    else Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                                    else Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant)
                                 )
                                 .clickable { onAddTracks() }
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                Icons.Filled.Add,
+                                MiuixIcons.Add,
                                 contentDescription = strings.addTracks,
-                                tint = MaterialTheme.colorScheme.onBackground
+                                tint = MiuixAppTheme.colorScheme.onBackground
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 text = strings.addTracks,
-                                color = MaterialTheme.colorScheme.onBackground
+                                color = MiuixAppTheme.colorScheme.onBackground
                             )
                         }
                     }
@@ -1533,11 +1520,11 @@ private fun PlaylistDetailView(
                             val selected = playlist.sortMode == mode
                             Text(
                                 text = label,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MiuixAppTheme.typography.labelMedium,
+                                color = if (selected) MiuixAppTheme.colorScheme.onPrimary else MiuixAppTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(20.dp))
-                                    .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                                    .background(if (selected) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.surfaceVariant)
                                     .clickable { onChangeSort(mode) }
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             )
@@ -1551,8 +1538,8 @@ private fun PlaylistDetailView(
                 item {
                     Text(
                         text = if (playlist.isSystem) "No liked songs yet" else "No tracks yet. Tap \"${strings.addTracks}\".",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MiuixAppTheme.typography.bodyMedium,
+                        color = MiuixAppTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 16.dp)
                     )
                 }
@@ -1600,7 +1587,7 @@ private fun PlaylistTrackRow(
             .clip(RoundedCornerShape(20.dp))
             .then(
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
-                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                else Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
             .padding(vertical = 8.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1609,7 +1596,7 @@ private fun PlaylistTrackRow(
             modifier = Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MiuixAppTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             var loaded by remember(track.id) { mutableStateOf(false) }
@@ -1622,9 +1609,9 @@ private fun PlaylistTrackRow(
             )
             if (!loaded) {
                 Icon(
-                    Icons.Filled.MusicNote,
+                    MiuixIcons.Music,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MiuixAppTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -1633,19 +1620,19 @@ private fun PlaylistTrackRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 track.title,
-                color = MaterialTheme.colorScheme.onBackground,
+                color = MiuixAppTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 track.artist,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
+                color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                style = MiuixAppTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
-        Text(track.formattedDuration(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(track.formattedDuration(), style = MiuixAppTheme.typography.labelSmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(8.dp))
     }
 }
@@ -1671,7 +1658,7 @@ private fun DraggablePlaylistTrackRow(
             .zIndex(if (isDragged) 1f else 0f)
             .clip(RoundedCornerShape(12.dp))
             .background(
-                if (isDragged) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                if (isDragged) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.14f)
                 else Color.Transparent
             )
             .padding(vertical = 6.dp, horizontal = 8.dp),
@@ -1681,7 +1668,7 @@ private fun DraggablePlaylistTrackRow(
             modifier = Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MiuixAppTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             var loaded by remember(track.id) { mutableStateOf(false) }
@@ -1693,20 +1680,20 @@ private fun DraggablePlaylistTrackRow(
                 onState = { loaded = it is AsyncImagePainter.State.Success }
             )
             if (!loaded) {
-                Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                Icon(MiuixIcons.Music, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             }
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(track.title, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(track.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(track.title, color = MiuixAppTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(track.artist, color = MiuixAppTheme.colorScheme.onSurfaceVariant, style = MiuixAppTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Text(track.formattedDuration(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(track.formattedDuration(), style = MiuixAppTheme.typography.labelSmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(4.dp))
         Icon(
-            imageVector = Icons.Filled.DragHandle,
+            imageVector = MiuixIcons.More,
             contentDescription = "Reorder",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
                 .size(28.dp)
                 .then(dragHandleModifier)

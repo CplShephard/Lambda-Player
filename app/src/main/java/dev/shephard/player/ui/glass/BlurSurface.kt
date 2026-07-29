@@ -6,12 +6,12 @@
 // it through Miuix's AGSL blur shaders, so what you see behind a card really is blurred.
 //
 // All of them degrade gracefully: when blur is switched off in Settings, or the device is
-// below API 31, they fall back to an opaque Material 3 surface, so call sites never branch.
+// below API 31, they fall back to an opaque Miuix surface, so call sites never branch.
 package dev.shephard.player.ui.glass
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
+import dev.shephard.player.ui.miuix.MiuixAppTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
@@ -37,8 +37,8 @@ fun Modifier.blurSurface(
     if (!enabled || backdrop == null) {
         return this.background(
             color = when (tint) {
-                GlassTint.SURFACE -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
-                GlassTint.ACCENT -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                GlassTint.SURFACE -> MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                GlassTint.ACCENT -> MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
             },
             shape = shape,
         )
@@ -68,7 +68,7 @@ fun Modifier.blurSheetSurface(
 ): Modifier {
     val backdrop = LocalAppBackdrop.current
     if (!enabled || backdrop == null) {
-        return this.background(MaterialTheme.colorScheme.surface, shape)
+        return this.background(MiuixAppTheme.colorScheme.surface, shape)
     }
     return this.miuixBlurSurface(
         backdrop = backdrop,

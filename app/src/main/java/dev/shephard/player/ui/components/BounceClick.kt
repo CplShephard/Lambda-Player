@@ -7,8 +7,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
+import dev.shephard.player.ui.miuix.Icon
+import dev.shephard.player.ui.miuix.MiuixAppTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -76,23 +76,23 @@ fun Modifier.bounceClick(
 
 /**
  * Convenience composable: a 48dp circular icon button with the bounce-on-tap
- * animation applied. Drop-in replacement for Material3 [androidx.compose.material3.IconButton]
+ * animation applied. Drop-in replacement for Miuix icon button
  * — same accessibility semantics (it's still a Button role), same tap target,
  * plus the spring scale on press.
  *
- * We implement it on top of a Box rather than Material3 IconButton so the
+ * We implement it on top of a Box rather than Miuix IconButton so the
  * bounceClick modifier handles the click event (avoiding the double-fire
- * that would happen if we wrapped Material3 IconButton with bounceClick).
+ * that would happen if we wrapped Miuix IconButton with bounceClick).
  */
 /**
  * Convenience composable: a 48dp circular icon button with the bounce-on-tap
- * animation applied. Drop-in replacement for Material3 [androidx.compose.material3.IconButton]
+ * animation applied. Drop-in replacement for Miuix icon button
  * — same accessibility semantics (it's still a Button role), same tap target,
  * plus the spring scale on press.
  *
- * We implement it on top of a Box rather than Material3 IconButton so the
+ * We implement it on top of a Box rather than Miuix IconButton so the
  * bounceClick modifier handles the click event (avoiding the double-fire
- * that would happen if we wrapped Material3 IconButton with bounceClick).
+ * that would happen if we wrapped Miuix IconButton with bounceClick).
  *
  * Liquid Glass entegrasyonu: [LocalBlurEnabled] açıkken ve çağıran taraf bir
  * `backgroundColor` verdiyse (yani dolu bir daire/buton isteniyorsa), düz renk yerine
@@ -107,7 +107,7 @@ fun BouncyIconButton(
     enabled: Boolean = true,
     icon: ImageVector,
     contentDescription: String? = null,
-    tint: Color = MaterialTheme.colorScheme.onSurface,
+    tint: Color = MiuixAppTheme.colorScheme.onSurface,
     iconSize: Dp = 24.dp,
     backgroundColor: Color? = null,
     glassTint: GlassTint = GlassTint.SURFACE

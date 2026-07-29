@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalFoundationApi::class)
+@file:OptIn(ExperimentalFoundationApi::class, dev.shephard.player.ui.miuix.ExperimentalMiuixApi::class)
 
 package dev.shephard.player.ui.screens
 
@@ -26,39 +26,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.BrightnessAuto
-import androidx.compose.material.icons.filled.BrokenImage
-import androidx.compose.material.icons.filled.ColorLens
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.ViewModule
-import androidx.compose.material.icons.filled.NightsStay
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
+import dev.shephard.player.ui.miuix.Card
+import dev.shephard.player.ui.miuix.CardDefaults
+import dev.shephard.player.ui.miuix.Icon
+import dev.shephard.player.ui.miuix.MiuixAppTheme
+import dev.shephard.player.ui.miuix.ModalBottomSheet
+import dev.shephard.player.ui.miuix.Slider
+import dev.shephard.player.ui.miuix.SliderDefaults
+import dev.shephard.player.ui.miuix.Switch
+import dev.shephard.player.ui.miuix.Text
+import dev.shephard.player.ui.miuix.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -86,9 +72,15 @@ import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
 import dev.shephard.player.ui.components.CustomColorPickerDialog
+import dev.shephard.player.ui.components.MiuixSheetDefaults
+import dev.shephard.player.ui.components.MiuixSheetHandle
+import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.blurSheetSurface
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.*
 
 /** Preset accent colors. The 7th slot is "Custom" — handled separately. */
 private val AccentPalette = listOf(
@@ -123,19 +115,19 @@ fun SettingsScreen(
         TotalListeningTimeCard(playerViewModel = playerViewModel)
 
         SettingsNavigationCard(
-            icon = Icons.Filled.ColorLens,
+            icon = MiuixIcons.Theme,
             title = strings.themeSettings,
             summary = "Colors, wallpaper, Liquid Glass, layout and language",
             onClick = onOpenThemeSettings
         )
         SettingsNavigationCard(
-            icon = Icons.Filled.MusicNote,
+            icon = MiuixIcons.Music,
             title = strings.playbackSettings,
             summary = "Crossfade, gapless playback and audio focus",
             onClick = onOpenPlayerSettings
         )
         SettingsNavigationCard(
-            icon = Icons.Filled.Info,
+            icon = MiuixIcons.Info,
             title = "About Lambda Player",
             summary = "Version, project links and credits",
             onClick = onOpenAbout
@@ -187,14 +179,14 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
 
     SettingsPageScaffold(title = strings.themeSettings, onBack = onBack) {
         SectionCard {
-            Text(strings.themeSettings, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+            Text(strings.themeSettings, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
             Spacer(Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(strings.darkMode, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 16.dp))
+                Text(strings.darkMode, color = MiuixAppTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 16.dp))
                 ThemeModeSegmentedSwitch(
                     selectedMode = themeMode,
                     lightLabel = strings.lightMode,
@@ -213,7 +205,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             }
 
             Spacer(Modifier.height(12.dp))
-            Text(strings.accentColor, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(strings.accentColor, style = MiuixAppTheme.typography.bodyMedium, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 AccentPalette.forEach { argb ->
@@ -255,7 +247,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         }
 
         SectionCard {
-            Text(strings.wallpaper, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+            Text(strings.wallpaper, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
             Spacer(Modifier.height(10.dp))
             if (wallpaper.isNotEmpty()) {
                 var previewLoaded by remember(wallpaper) { mutableStateOf(false) }
@@ -264,7 +256,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                         .fillMaxWidth()
                         .height(150.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.background),
+                        .background(MiuixAppTheme.colorScheme.background),
                     contentAlignment = Alignment.Center
                 ) {
                     AsyncImage(
@@ -274,89 +266,138 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                         contentScale = ContentScale.Crop,
                         onState = { previewLoaded = it is AsyncImagePainter.State.Success }
                     )
-                    if (!previewLoaded) Icon(Icons.Filled.BrokenImage, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!previewLoaded) Icon(MiuixIcons.Image, null, tint = MiuixAppTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(Modifier.height(10.dp))
             }
             SettingsActionRow(
-                icon = Icons.Filled.Image,
+                icon = MiuixIcons.Image,
                 title = if (wallpaper.isEmpty()) strings.chooseFromGallery else strings.changeWallpaper,
                 onClick = { wallpaperPicker.launch(arrayOf("image/*")) }
             )
             if (wallpaper.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
-                Text(strings.wallpaperBrightness, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(strings.wallpaperBrightness, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
                 Slider(
                     value = wallpaperBrightnessValue,
                     onValueChange = { wallpaperBrightnessValue = it },
                     onValueChangeFinished = { scope.launch { prefs.setWallpaperBrightness(wallpaperBrightnessValue) } },
                     valueRange = 0f..1f,
                     colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        thumbColor = MiuixAppTheme.colorScheme.primary,
+                        activeTrackColor = MiuixAppTheme.colorScheme.primary,
+                        inactiveTrackColor = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                     )
                 )
-                Text(strings.cardOpacity, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(strings.cardOpacity, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
                 Slider(
                     value = cardAlphaValue,
                     onValueChange = { cardAlphaValue = it },
                     onValueChangeFinished = { scope.launch { prefs.setCardAlpha(cardAlphaValue) } },
                     valueRange = 0f..1f,
                     colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        thumbColor = MiuixAppTheme.colorScheme.primary,
+                        activeTrackColor = MiuixAppTheme.colorScheme.primary,
+                        inactiveTrackColor = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                     )
                 )
                 Text(
                     text = strings.removeWallpaper,
-                    color = MaterialTheme.colorScheme.error,
+                    color = MiuixAppTheme.colorScheme.error,
                     modifier = Modifier.bounceClick { scope.launch { prefs.setWallpaperUri("") } }.padding(8.dp)
                 )
             }
         }
 
         SectionCard {
-            Text("Layout", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+            Text("Layout", style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
             Spacer(Modifier.height(10.dp))
-            Text(strings.musicsLayout, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(strings.musicsLayout, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LayoutToggleChip(musicsLayout == LayoutMode.LIST, strings.list, Icons.AutoMirrored.Filled.List) { scope.launch { prefs.setMusicsLayout(LayoutMode.LIST) } }
-                LayoutToggleChip(musicsLayout == LayoutMode.GRID, strings.grid, Icons.Filled.ViewModule) { scope.launch { prefs.setMusicsLayout(LayoutMode.GRID) } }
+                LayoutToggleChip(musicsLayout == LayoutMode.LIST, strings.list, MiuixIcons.ListView) { scope.launch { prefs.setMusicsLayout(LayoutMode.LIST) } }
+                LayoutToggleChip(musicsLayout == LayoutMode.GRID, strings.grid, MiuixIcons.GridView) { scope.launch { prefs.setMusicsLayout(LayoutMode.GRID) } }
             }
             Spacer(Modifier.height(12.dp))
-            Text(strings.playlistsLayout, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(strings.playlistsLayout, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LayoutToggleChip(playlistsLayout == LayoutMode.LIST, strings.list, Icons.AutoMirrored.Filled.List) { scope.launch { prefs.setPlaylistsLayout(LayoutMode.LIST) } }
-                LayoutToggleChip(playlistsLayout == LayoutMode.GRID, strings.grid, Icons.Filled.ViewModule) { scope.launch { prefs.setPlaylistsLayout(LayoutMode.GRID) } }
+                LayoutToggleChip(playlistsLayout == LayoutMode.LIST, strings.list, MiuixIcons.ListView) { scope.launch { prefs.setPlaylistsLayout(LayoutMode.LIST) } }
+                LayoutToggleChip(playlistsLayout == LayoutMode.GRID, strings.grid, MiuixIcons.GridView) { scope.launch { prefs.setPlaylistsLayout(LayoutMode.GRID) } }
             }
         }
 
         SectionCard {
-            Text(strings.language, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+            Text(strings.language, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
             Spacer(Modifier.height(8.dp))
-            Box {
-                SettingsActionRow(
-                    icon = Icons.Filled.ArrowDropDown,
-                    title = AllLanguages.firstOrNull { it.code == language }?.displayName ?: language,
-                    onClick = { langMenuOpen = true }
-                )
-                DropdownMenu(expanded = langMenuOpen, onDismissRequest = { langMenuOpen = false }) {
-                    AllLanguages.forEach { lang ->
-                        DropdownMenuItem(
-                            text = { Text(lang.displayName) },
-                            onClick = {
-                                scope.launch { prefs.setLanguage(lang.code) }
-                                langMenuOpen = false
-                            }
-                        )
-                    }
-                }
-            }
+            SettingsActionRow(
+                icon = MiuixIcons.ExpandMore,
+                title = AllLanguages.firstOrNull { it.code == language }?.displayName ?: language,
+                onClick = { langMenuOpen = true }
+            )
         }
 
         Spacer(Modifier.height(110.dp))
+    }
+
+    if (langMenuOpen) {
+        val languageLiquidGlassOn = LocalBlurEnabled.current
+        val languageSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        ModalBottomSheet(
+            onDismissRequest = { langMenuOpen = false },
+            sheetState = languageSheetState,
+            shape = MiuixSheetDefaults.Shape,
+            containerColor = MiuixSheetDefaults.containerColor(languageLiquidGlassOn),
+            contentColor = MiuixAppTheme.colorScheme.onSurface,
+            dragHandle = { MiuixSheetHandle(languageLiquidGlassOn) }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.72f)
+                    .then(
+                        if (languageLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
+                        else Modifier
+                    )
+                    .padding(20.dp)
+            ) {
+                Text(strings.language, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(12.dp))
+                LazyColumn(
+                    modifier = Modifier.weight(1f).overScrollVertical(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(AllLanguages) { lang ->
+                        val selected = lang.code == language
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    if (selected) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                    else MiuixAppTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.58f)
+                                )
+                                .miuixWidgetClick(pressScale = 0.97f, maxTiltDegrees = 3f) {
+                                    scope.launch { prefs.setLanguage(lang.code) }
+                                    langMenuOpen = false
+                                }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = lang.displayName,
+                                color = if (selected) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onBackground,
+                                style = MiuixAppTheme.typography.bodyLarge,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                            )
+                            if (selected) {
+                                Icon(MiuixIcons.ChevronForward, contentDescription = null, tint = MiuixAppTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+        }
     }
 
     if (customPickerOpen && !dynamicColor) {
@@ -386,7 +427,7 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
 
     SettingsPageScaffold(title = strings.playbackSettings, onBack = onBack) {
         SectionCard {
-            Text(strings.playbackSettings, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+            Text(strings.playbackSettings, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
             Spacer(Modifier.height(8.dp))
             ToggleRow(label = strings.crossfade, checked = crossfade) { scope.launch { prefs.setCrossfadeEnabled(it) } }
             ToggleRow(label = strings.gapless, checked = gapless) { scope.launch { prefs.setGaplessEnabled(it) } }
@@ -415,9 +456,9 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.95f),
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.32f),
-                            MaterialTheme.colorScheme.surfaceVariant
+                            MiuixAppTheme.colorScheme.primary.copy(alpha = 0.95f),
+                            MiuixAppTheme.colorScheme.primary.copy(alpha = 0.32f),
+                            MiuixAppTheme.colorScheme.surfaceVariant
                         )
                     )
                 )
@@ -428,53 +469,53 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .size(170.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
+                    .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f))
             )
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
                     modifier = Modifier
                         .size(88.dp)
                         .clip(RoundedCornerShape(24.dp))
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)),
+                        .background(MiuixAppTheme.colorScheme.surface.copy(alpha = 0.62f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "λ",
-                        style = MaterialTheme.typography.displayMedium,
+                        style = MiuixAppTheme.typography.displayMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MiuixAppTheme.colorScheme.primary
                     )
                 }
                 Spacer(Modifier.height(14.dp))
                 Text(
                     text = strings.appName,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MiuixAppTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = MiuixAppTheme.colorScheme.onBackground
                 )
                 Text(
                     text = "${strings.version} $versionName",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MiuixAppTheme.typography.bodyMedium,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
         SectionCard {
             SettingsActionRow(
-                icon = Icons.AutoMirrored.Filled.OpenInNew,
+                icon = MiuixIcons.Forward,
                 title = "GitHub / CplShephard",
                 onClick = { uriHandler.openUri("https://github.com/CplShephard") }
             )
             SettingsActionRow(
-                icon = Icons.AutoMirrored.Filled.OpenInNew,
+                icon = MiuixIcons.Forward,
                 title = "InstallerX Revived",
                 onClick = { uriHandler.openUri("https://github.com/InstallerX-Revived/InstallerX") }
             )
             Text(
                 text = "Miuix / InstallerX inspired interface polish for Lambda Player.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixAppTheme.typography.bodySmall,
+                color = MiuixAppTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)
             )
         }
@@ -506,18 +547,18 @@ private fun SettingsPageScaffold(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
+                    .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
                     .bounceClick { onBack() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
+                Icon(MiuixIcons.Back, contentDescription = "Back", tint = MiuixAppTheme.colorScheme.onBackground)
             }
             Spacer(Modifier.width(14.dp))
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineSmall,
+                style = MiuixAppTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
+                color = MiuixAppTheme.colorScheme.onBackground
             )
         }
         Spacer(Modifier.height(4.dp))
@@ -543,20 +584,20 @@ private fun SettingsNavigationCard(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+                    .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(icon, contentDescription = null, tint = MiuixAppTheme.colorScheme.primary)
             }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
-                Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(title, style = MiuixAppTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MiuixAppTheme.colorScheme.onBackground)
+                Text(summary, style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
             }
             Icon(
-                imageVector = Icons.Filled.KeyboardArrowRight,
+                imageVector = MiuixIcons.ChevronForward,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                tint = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                 modifier = Modifier.size(32.dp)
             )
         }
@@ -573,14 +614,14 @@ private fun SettingsActionRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.72f))
+            .background(MiuixAppTheme.colorScheme.background.copy(alpha = 0.72f))
             .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-        Text(title, color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Icon(icon, contentDescription = null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+        Text(title, color = MiuixAppTheme.colorScheme.onBackground, style = MiuixAppTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
     }
 }
 
@@ -595,15 +636,15 @@ private fun TotalListeningTimeCard(playerViewModel: PlayerViewModel) {
     SectionCard(modifier = Modifier.miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { }) {
         Text(
             text = strings.totalListeningTime,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground
+            style = MiuixAppTheme.typography.titleMedium,
+            color = MiuixAppTheme.colorScheme.onBackground
         )
         Spacer(Modifier.height(6.dp))
         Text(
             text = formatListeningTime(totalMs, strings),
-            style = MaterialTheme.typography.headlineSmall,
+            style = MiuixAppTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
+            color = MiuixAppTheme.colorScheme.primary
         )
     }
 }
@@ -617,7 +658,7 @@ private fun SectionCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MiuixAppTheme.colorScheme.surfaceVariant
         )
     ) {
         Column(modifier = Modifier.padding(20.dp)) { content() }
@@ -637,8 +678,8 @@ private fun LayoutToggleChip(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
             .background(
-                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f)
+                if (selected) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
+                else MiuixAppTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f)
             )
             .bounceClick { onClick() }
             .padding(horizontal = 14.dp, vertical = 8.dp),
@@ -648,13 +689,13 @@ private fun LayoutToggleChip(
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = if (selected) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp)
         )
         Text(
             text = label,
-            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium
+            color = if (selected) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
+            style = MiuixAppTheme.typography.bodyMedium
         )
     }
 }
@@ -672,7 +713,7 @@ private fun ThemeModeSegmentedSwitch(
             .width(156.dp)
             .height(54.dp)
             .clip(RoundedCornerShape(28.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f))
+            .background(MiuixAppTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f))
             .padding(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -680,21 +721,21 @@ private fun ThemeModeSegmentedSwitch(
             mode = ThemeModePreference.LIGHT,
             selectedMode = selectedMode,
             label = lightLabel,
-            icon = Icons.Filled.WbSunny,
+            icon = MiuixIcons.Theme,
             onModeSelected = onModeSelected
         )
         ThemeModeSegment(
             mode = ThemeModePreference.AUTO,
             selectedMode = selectedMode,
             label = autoLabel,
-            icon = Icons.Filled.BrightnessAuto,
+            icon = MiuixIcons.Theme,
             onModeSelected = onModeSelected
         )
         ThemeModeSegment(
             mode = ThemeModePreference.DARK,
             selectedMode = selectedMode,
             label = darkLabel,
-            icon = Icons.Filled.NightsStay,
+            icon = MiuixIcons.Theme,
             onModeSelected = onModeSelected
         )
     }
@@ -714,14 +755,14 @@ private fun RowScope.ThemeModeSegment(
             .weight(1f)
             .fillMaxHeight()
             .clip(CircleShape)
-            .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            .background(if (selected) MiuixAppTheme.colorScheme.primary else Color.Transparent)
             .bounceClick(enabled = !selected) { onModeSelected(mode) },
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = if (selected) MiuixAppTheme.colorScheme.onPrimary else MiuixAppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(23.dp)
         )
     }
@@ -738,8 +779,8 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
     ) {
         Text(
             text = label,
-            color = MaterialTheme.colorScheme.onBackground,
-            style = MaterialTheme.typography.bodyLarge,
+            color = MiuixAppTheme.colorScheme.onBackground,
+            style = MiuixAppTheme.typography.bodyLarge,
             modifier = Modifier.padding(end = 16.dp)
         )
         Switch(checked = checked, onCheckedChange = onChange)

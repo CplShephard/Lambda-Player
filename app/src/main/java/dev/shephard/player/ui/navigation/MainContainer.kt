@@ -25,10 +25,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.unit.sp
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
+import dev.shephard.player.ui.miuix.Icon
+import dev.shephard.player.ui.miuix.MiuixAppTheme
+import dev.shephard.player.ui.miuix.Scaffold
+import dev.shephard.player.ui.miuix.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -61,8 +62,10 @@ import dev.shephard.player.ui.glass.FloatingBottomBar
 import dev.shephard.player.ui.glass.FloatingBottomBarItem
 import dev.shephard.player.ui.glass.FloatingBottomBarMode
 import dev.shephard.player.ui.glass.LocalAppBackdrop
+import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.isLiquidGlassSupported
+import dev.shephard.player.ui.glass.miuixBlurSurface
 import dev.shephard.player.ui.glass.rememberAppBlurBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
@@ -107,17 +110,13 @@ fun MainContainer(
     // Previously there was a single backdrop that wrapped the page content while surfaces
     // inside that very content sampled it — a layer reading itself. That recursion is what
     // crashed the app as soon as the Liquid Glass switch was turned on.
-    // `backgroundBackdrop` sadece sabit wallpaper katmanını kaydeder (ucuz, statik) — hem
-    // header hem de dock artık bunu sample ediyor. Eskiden ayrıca bir `contentBackdrop` de
-    // vardı ve NavGraph'ın (yani aktif sayfanın TÜM içeriğinin — LazyColumn'lar, animasyonlar)
-    // her frame bir GraphicsLayer'a kaydedilmesine sebep oluyordu; bu da Liquid Glass açıkken
-    // ciddi bir performans maliyetiydi. InstallerX'te de dock'un arkasında sayfa içeriği değil
-    // sabit zemin göründüğü için, bu katmana artık hiç ihtiyaç yok — kaldırıldı.
     val backgroundBackdrop = rememberAppBlurBackdrop(blurEnabled)
+    val contentBackdrop = rememberAppBlurBackdrop(blurEnabled)
 
     CompositionLocalProvider(
         LocalStrings provides strings,
         LocalAppBackdrop provides backgroundBackdrop,
+        LocalContentBackdrop provides contentBackdrop,
     ) {
         val navController = rememberNavController()
         var showNowPlaying by remember { mutableStateOf(false) }
@@ -155,7 +154,7 @@ fun MainContainer(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(MiuixAppTheme.colorScheme.background)
         ) {
             // Wallpaper background — her iki ekranın arkasında sabit.
             // This whole background block is recorded into `backgroundBackdrop`, which is
@@ -172,7 +171,7 @@ fun MainContainer(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background)
+                        .background(MiuixAppTheme.colorScheme.background)
                 )
                 if (wallpaper.isNotEmpty()) {
                     AsyncImage(
@@ -184,7 +183,7 @@ fun MainContainer(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.background.copy(alpha = wallpaperBrightness))
+                            .background(MiuixAppTheme.colorScheme.background.copy(alpha = wallpaperBrightness))
                     )
                 }
             }
@@ -197,7 +196,7 @@ fun MainContainer(
                         // the backdrop layer above, so an opaque Scaffold here would hide it
                         // and leave every glass surface sampling a flat colour.
                         containerColor = Color.Transparent,
-                        contentColor = MaterialTheme.colorScheme.onBackground,
+                        contentColor = MiuixAppTheme.colorScheme.onBackground,
                         topBar = {
                             if (isBottomRoute) BrandHeader(currentRoute = currentRoute)
                         }
@@ -206,7 +205,17 @@ fun MainContainer(
                             NavGraph(
                                 navController = navController,
                                 playerViewModel = playerViewModel,
-                                modifier = Modifier.fillMaxSize(),
+                                // Capture the page content into the CONTENT backdrop so the
+                                // dock blurs what scrolls underneath it. The dock is drawn
+                                // outside this layer, so there is no feedback loop. Glass
+                                // surfaces inside the page sample the background backdrop
+                                // instead — never this one.
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .then(
+                                        if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop)
+                                        else Modifier
+                                    ),
                                 hasMiniPlayer = hasMiniPlayer,
                                 onTrackClick = { tracks, index, playlistName ->
                                     playerViewModel.setQueueAndPlay(tracks, index, playlistName)
@@ -299,7 +308,7 @@ private fun BrandHeader(currentRoute: String?) {
         Destination.Music.route -> strings.music
         Destination.Playlists.route -> strings.playlists
         Destination.Settings.route -> strings.settings
-        else -> strings.appName
+        else -> null
     }
 
     val context = LocalContext.current
@@ -311,29 +320,66 @@ private fun BrandHeader(currentRoute: String?) {
         }
     }
 
-    // InstallerX header tarzı: kartsız, blursuz, büyük sol-hizalı sayfa başlığı — sayfanın
-    // en üstünde, arka planla aynı zeminde durur. Marka adı + versiyon ("Lambda Player X.X")
-    // ana başlığın altında küçük bir alt-satır olarak duruyor, düzeni bozmadan.
-    Column(
+    val blurOn = LocalBlurEnabled.current
+    val headerBackdrop = LocalAppBackdrop.current
+    val headerShape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 12.dp)
+            .clip(headerShape)
+            .then(
+                if (blurOn && headerBackdrop != null) {
+                    // Subtle title-card blur: lighter than MiniPlayer/dock, just enough to lift it.
+                    Modifier.miuixBlurSurface(
+                        backdrop = headerBackdrop,
+                        shape = headerShape,
+                        blurRadius = 14f,
+                        tintAlpha = 0.46f,
+                        fallbackColor = MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+                    )
+                } else {
+                    Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f), headerShape)
+                }
+            )
     ) {
-        Text(
-            text = sectionTitle,
-            style = MaterialTheme.typography.displaySmall.copy(
-                fontFamily = dev.shephard.player.ui.theme.BrandFontFamily,
-                fontWeight = FontWeight.Bold
-            ),
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = if (versionName.isNotEmpty()) "${strings.appName} $versionName" else strings.appName,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 20.dp)
+        ) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = strings.appName.uppercase(),
+                    style = MiuixAppTheme.typography.titleLarge.copy(
+                        fontFamily = dev.shephard.player.ui.theme.BrandFontFamily,
+                        letterSpacing = 2.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = MiuixAppTheme.colorScheme.onBackground
+                )
+                if (versionName.isNotEmpty()) {
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = versionName,
+                        style = MiuixAppTheme.typography.titleLarge.copy(
+                            fontFamily = dev.shephard.player.ui.theme.BrandFontFamily,
+                            letterSpacing = 2.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = MiuixAppTheme.colorScheme.primary
+                    )
+                }
+            }
+            if (sectionTitle != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = sectionTitle,
+                    style = MiuixAppTheme.typography.titleMedium,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 
@@ -343,16 +389,9 @@ private fun FloatingDock(
     onNavigate: (Destination) -> Unit
 ) {
     val blurOn = LocalBlurEnabled.current
-    // PERFORMANS FIX: Daha önce dock, `LocalContentBackdrop`'ı (aktif sayfanın TAMAMININ —
-    // LazyColumn'lar, animasyonlar, her recompose — her frame bir GraphicsLayer'a kaydedildiği
-    // pahalı katman) sample ediyordu. Bu, "Liquid Glass'ı açınca uygulama çok kasıyor"
-    // şikayetinin doğrudan kaynağıydı. InstallerX'te dock'un blur'u sayfa İÇERİĞİNİ değil,
-    // SABİT arka planı (wallpaper) yansıtır — dock'un arkasında kayan liste değil, duran zemin
-    // görünür. `LocalAppBackdrop` zaten bunun için var (sadece wallpaper Box'ını kaydeder,
-    // statik, ucuz) ve header zaten bunu kullanıyordu. Dock'u da aynı ucuz katmana geçirdik;
-    // artık `contentBackdrop` hiçbir yerde sample edilmiyor, MainContainer'daki NavGraph'a
-    // uygulanan `layerBackdrop(contentBackdrop)` da kaldırıldı (bkz. aşağıda).
-    val backdrop = LocalAppBackdrop.current
+    // The dock lives outside the page content, so it is the one component allowed to
+    // sample the content backdrop.
+    val backdrop = LocalContentBackdrop.current
 
     // Same three-way mode selection InstallerX uses:
     //  - LiquidGlass: full AGSL pipeline (lens refraction, chromatic aberration, bloom) on API 33+
@@ -412,7 +451,7 @@ private fun FloatingDock(
                     )
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MiuixAppTheme.typography.labelSmall,
                         maxLines = 1
                     )
                 }

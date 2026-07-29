@@ -22,15 +22,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import dev.shephard.player.ui.miuix.Icon
+import dev.shephard.player.ui.miuix.MiuixAppTheme
+import dev.shephard.player.ui.miuix.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,8 +46,10 @@ import dev.shephard.player.data.slideForwardInQueue
 import dev.shephard.player.data.trackById
 import dev.shephard.player.player.PlayerUiState
 import dev.shephard.player.ui.glass.LocalBlurEnabled
-import dev.shephard.player.ui.glass.LocalAppBackdrop
+import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.miuixBlurSurface
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.*
 
 @Composable
 fun MiniPlayer(
@@ -84,9 +80,7 @@ fun MiniPlayer(
     )
 
     val liquidGlassOn = LocalBlurEnabled.current
-    // Dock ile aynı sebepten: pahalı contentBackdrop yerine ucuz, statik backgroundBackdrop
-    // (sadece wallpaper) sample ediliyor — bkz. MainContainer.kt'deki performans notu.
-    val contentBackdrop = LocalAppBackdrop.current
+    val contentBackdrop = LocalContentBackdrop.current
     val miniPlayerShape = RoundedCornerShape(14.dp)
 
     Column(
@@ -106,7 +100,7 @@ fun MiniPlayer(
                                 shape = miniPlayerShape,
                                 blurRadius = 28f,
                                 tintAlpha = 0.58f,
-                                fallbackColor = MaterialTheme.colorScheme.surfaceVariant
+                                fallbackColor = MiuixAppTheme.colorScheme.surfaceVariant
                             )
                             .background(
                                 Brush.linearGradient(
@@ -123,7 +117,7 @@ fun MiniPlayer(
                             Brush.linearGradient(
                                 colors = listOf(
                                     animatedGlow.copy(alpha = 0.34f),
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+                                    MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
                                     animatedGlow.copy(alpha = 0.18f)
                                 )
                             )
@@ -156,7 +150,7 @@ fun MiniPlayer(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.background),
+                        .background(MiuixAppTheme.colorScheme.background),
                     contentAlignment = Alignment.Center
                 ) {
                     var artLoaded by remember(trackId) { mutableStateOf(false) }
@@ -173,9 +167,9 @@ fun MiniPlayer(
                     )
                     if (!artLoaded) {
                         Icon(
-                            imageVector = Icons.Filled.MusicNote,
+                            imageVector = MiuixIcons.Music,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = MiuixAppTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -202,16 +196,16 @@ fun MiniPlayer(
                 Column {
                     Text(
                         text = displayTrack.title,
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MiuixAppTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = MiuixAppTheme.colorScheme.onBackground,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = displayTrack.artist,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MiuixAppTheme.typography.bodyMedium,
+                        color = MiuixAppTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -227,9 +221,9 @@ fun MiniPlayer(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Filled.SkipPrevious,
+                    imageVector = MiuixIcons.Back,
                     contentDescription = "Previous",
-                    tint = MaterialTheme.colorScheme.onBackground
+                    tint = MiuixAppTheme.colorScheme.onBackground
                 )
             }
 
@@ -250,9 +244,9 @@ fun MiniPlayer(
                     label = "miniPlayPauseIcon"
                 ) { isPlaying ->
                     Icon(
-                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        imageVector = if (isPlaying) MiuixIcons.Pause else MiuixIcons.Play,
                         contentDescription = if (isPlaying) "Pause" else "Play",
-                        tint = MaterialTheme.colorScheme.onBackground
+                        tint = MiuixAppTheme.colorScheme.onBackground
                     )
                 }
             }
@@ -266,9 +260,9 @@ fun MiniPlayer(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Filled.SkipNext,
+                    imageVector = MiuixIcons.Forward,
                     contentDescription = "Next",
-                    tint = MaterialTheme.colorScheme.onBackground
+                    tint = MiuixAppTheme.colorScheme.onBackground
                 )
             }
         }
@@ -291,8 +285,8 @@ fun BoldProgressBar(
     fraction: Float,
     modifier: Modifier = Modifier,
     height: androidx.compose.ui.unit.Dp = 4.dp,
-    activeColor: Color = MaterialTheme.colorScheme.primary,
-    inactiveColor: Color = MaterialTheme.colorScheme.surfaceVariant
+    activeColor: Color = MiuixAppTheme.colorScheme.primary,
+    inactiveColor: Color = MiuixAppTheme.colorScheme.surfaceVariant
 ) {
     Box(
         modifier = modifier

@@ -1,13 +1,8 @@
 package dev.shephard.player.ui.navigation
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.LibraryMusic
-import androidx.compose.material.icons.outlined.MusicNote
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.*
 
 sealed class Destination(
     val route: String,
@@ -18,22 +13,22 @@ sealed class Destination(
     data object Music : Destination(
         route = "music",
         label = "Music",
-        selectedIcon = Icons.Filled.MusicNote,
-        unselectedIcon = Icons.Outlined.MusicNote
+        selectedIcon = MiuixIcons.Music,
+        unselectedIcon = MiuixIcons.Music
     )
 
     data object Playlists : Destination(
         route = "playlists",
         label = "Playlists",
-        selectedIcon = Icons.Filled.LibraryMusic,
-        unselectedIcon = Icons.Outlined.LibraryMusic
+        selectedIcon = MiuixIcons.Playlist,
+        unselectedIcon = MiuixIcons.Playlist
     )
 
     data object Settings : Destination(
         route = "settings",
         label = "Settings",
-        selectedIcon = Icons.Filled.Settings,
-        unselectedIcon = Icons.Outlined.Settings
+        selectedIcon = MiuixIcons.Settings,
+        unselectedIcon = MiuixIcons.Settings
     )
 }
 

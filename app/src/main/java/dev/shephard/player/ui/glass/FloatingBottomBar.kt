@@ -6,7 +6,7 @@
 //
 // Port notes for Lambda Player: the physics, gesture handling, backdrop pipeline, shader
 // effects and layer structure are kept byte-for-byte identical to InstallerX. Only the
-// theming source was swapped from Miuix's own `MiuixTheme`/`InstallerTheme` to Material 3,
+// theming source was swapped from Miuix's own `MiuixTheme`/`InstallerTheme` to Miuix,
 // because Lambda Player has no Miuix theme tree. Everything visual/behavioural is 1:1.
 package dev.shephard.player.ui.glass
 
@@ -31,7 +31,7 @@ import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
+import dev.shephard.player.ui.miuix.MiuixAppTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -85,7 +85,7 @@ import kotlin.math.cos
 import kotlin.math.sign
 import kotlin.math.sin
 import kotlin.math.sqrt
-import androidx.compose.material3.LocalContentColor as M3LocalContentColor
+import top.yukonga.miuix.kmp.theme.LocalContentColor as MiuixLocalContentColor
 
 val LocalFloatingBottomBarContentColor = staticCompositionLocalOf { Color.Unspecified }
 val LocalFloatingBottomBarTabScale = staticCompositionLocalOf { { 1f } }
@@ -103,9 +103,9 @@ class FloatingBottomBarColors(
 object FloatingBottomBarDefaults {
     @Composable
     fun colors(
-        containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
-        indicatorColor: Color = MaterialTheme.colorScheme.primary,
-        contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+        containerColor: Color = MiuixAppTheme.colorScheme.surfaceContainer,
+        indicatorColor: Color = MiuixAppTheme.colorScheme.primary,
+        contentColor: Color = MiuixAppTheme.colorScheme.onSurfaceVariant,
         activeContentColor: Color = indicatorColor
     ): FloatingBottomBarColors = FloatingBottomBarColors(
         containerColor = containerColor,
@@ -213,7 +213,7 @@ fun RowScope.FloatingBottomBarItem(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         CompositionLocalProvider(
-            M3LocalContentColor provides contentColor
+            MiuixLocalContentColor provides contentColor
         ) {
             content()
         }
@@ -231,7 +231,7 @@ fun FloatingBottomBar(
     colors: FloatingBottomBarColors = FloatingBottomBarDefaults.colors(),
     content: @Composable RowScope.() -> Unit
 ) {
-    val isInDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val isInDark = MiuixAppTheme.colorScheme.surface.luminance() < 0.5f
     val pillShape = remember { CircleShape }
     val isLiquidGlassMode = mode == FloatingBottomBarMode.LiquidGlass
     val isBlurMode = mode == FloatingBottomBarMode.Blur
