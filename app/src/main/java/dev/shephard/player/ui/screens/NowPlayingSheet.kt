@@ -567,6 +567,7 @@ fun NowPlayingSheet(
                 // State'ler if dışında — Compose composition kuralı
                 val queueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
                 val lyricsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                val lyricsSheetScope = rememberCoroutineScope()
                 val trackId = track?.id ?: -1L
                 val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
 
