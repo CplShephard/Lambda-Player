@@ -78,6 +78,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _amplitude = MutableStateFlow(0f)
     val amplitude: StateFlow<Float> = _amplitude.asStateFlow()
 
+    // Live listening time for the Settings widget. It updates in memory every tick so the
+    // counter moves second-by-second, while DataStore writes remain batched for performance.
+    private val _totalListeningMsLive = MutableStateFlow(0L)
+    val totalListeningMsLive: StateFlow<Long> = _totalListeningMsLive.asStateFlow()
+
     // -1 = backward, 1 = forward, 0 = unknown
     private val _navigationDirection = MutableStateFlow(1)
     val navigationDirection: StateFlow<Int> = _navigationDirection.asStateFlow()
@@ -214,12 +219,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             while (true) {
                 val c = controller
                 if (c != null && !isUserSeeking) {
+                    if (c.isPlaying) {
+                        accrueListeningTime()
+                    }
                     _uiState.value = _uiState.value.copy(
                         positionMs = c.currentPosition.coerceAtLeast(0L),
-                        durationMs = c.duration.coerceAtLeast(0L)
+                        durationMs = c.duration.coerceAtLeast(0L),
+                        totalListeningMs = _totalListeningMsLive.value
                     )
-                }
-                if (c?.isPlaying == true) {
+                } else if (c?.isPlaying == true) {
                     accrueListeningTime()
                 }
                 delay(500)
@@ -246,7 +254,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
         viewModelScope.launch {
             prefs.totalListeningMs.collect { total ->
-                _uiState.value = _uiState.value.copy(totalListeningMs = total)
+                val liveTotal = maxOf(_totalListeningMsLive.value, total)
+                _totalListeningMsLive.value = liveTotal
+                _uiState.value = _uiState.value.copy(totalListeningMs = liveTotal)
             }
         }
     }
@@ -280,7 +290,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val last = lastPlaybackTickMs
         if (last != null) {
             val delta = (now - last).coerceIn(0L, 2000L)
-            if (delta > 0) pendingListeningDeltaMs += delta
+            if (delta > 0) addListeningDeltaInMemory(delta, updateUiState = false)
         }
         lastPlaybackTickMs = now
 
@@ -297,10 +307,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (last != null) {
             val now = System.currentTimeMillis()
             val delta = (now - last).coerceIn(0L, 2000L)
-            if (delta > 0) pendingListeningDeltaMs += delta
+            if (delta > 0) addListeningDeltaInMemory(delta)
         }
         lastPlaybackTickMs = null
         flushPendingListeningTime()
+    }
+
+    private fun addListeningDeltaInMemory(delta: Long, updateUiState: Boolean = true) {
+        pendingListeningDeltaMs += delta
+        val nextTotal = _totalListeningMsLive.value + delta
+        _totalListeningMsLive.value = nextTotal
+        if (updateUiState) {
+            _uiState.value = _uiState.value.copy(totalListeningMs = nextTotal)
+        }
     }
 
     private fun flushPendingListeningTime() {
@@ -580,6 +599,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val currentStart = queueTracks.indexOfFirst { it.id == _uiState.value.currentTrack?.id }.coerceAtLeast(0)
         val actualIndex = currentStart + index
         if (actualIndex in queueTracks.indices) {
+            _navigationDirection.value = actualIndex.compareTo(currentStart).let { if (it < 0) -1 else 1 }
             c.seekTo(actualIndex, 0L)
             c.play()
         }

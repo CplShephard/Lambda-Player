@@ -26,8 +26,8 @@ import androidx.compose.ui.unit.IntSize
  */
 fun Modifier.miuixWidgetClick(
     enabled: Boolean = true,
-    pressScale: Float = 0.965f,
-    maxTiltDegrees: Float = 2.8f,
+    pressScale: Float = 0.94f,
+    maxTiltDegrees: Float = 7f,
     onClick: () -> Unit
 ): Modifier = composed {
     var pressed by remember { mutableStateOf(false) }

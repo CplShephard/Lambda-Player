@@ -43,6 +43,12 @@ object SettingsRoutes {
     const val About = "settings/about"
 }
 
+object PlaylistRoutes {
+    const val DetailBase = "playlist/detail"
+    const val DetailPattern = "playlist/detail/{index}"
+    fun detail(index: Int) = "$DetailBase/$index"
+}
+
 val bottomNavDestinations = listOf(
     Destination.Music,
     Destination.Playlists,

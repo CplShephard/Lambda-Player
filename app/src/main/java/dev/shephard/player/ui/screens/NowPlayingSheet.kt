@@ -111,6 +111,7 @@ import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.components.BouncyIconButton
+import dev.shephard.player.ui.components.ControlledSheetDragHandle
 import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
@@ -133,6 +134,7 @@ fun NowPlayingSheet(
 ) {
     val state by playerViewModel.uiState.collectAsState()
     val amplitude by playerViewModel.amplitude.collectAsState()
+    val navigationDirection by playerViewModel.navigationDirection.collectAsState()
     val track = state.currentTrack
     val strings = LocalStrings.current
     val nowPlayingLiquidGlassOn = LocalBlurEnabled.current
@@ -168,6 +170,7 @@ fun NowPlayingSheet(
     // tetiklememeli; commit yalnızca grid gerçek kullanıcı scroll'u gördükten sonra yapılır.
     var hasUserScrolledArtGrid by remember { mutableStateOf(false) }
     var artSkipInFlight by remember { mutableStateOf(false) }
+    var hasPlacedInitialArt by remember { mutableStateOf(false) }
     LaunchedEffect(artGridState.isScrollInProgress) {
         if (artGridState.isScrollInProgress) hasUserScrolledArtGrid = true
     }
@@ -192,13 +195,37 @@ fun NowPlayingSheet(
         }
     }
 
-    // Track/queue değişince her zaman yeni "önceki/mevcut/sonraki" penceresinin mevcut
-    // öğesine oturt. Bu programatik scroll skip tetiklemez çünkü hasUserScrolledArtGrid=false.
+    // Track/queue değişince yeni "önceki/mevcut/sonraki" penceresinin mevcut öğesine oturt.
+    // Dışarıdan next/previous tuşuyla gelen değişimde eski kapak yeni pencerede komşu index'te
+    // durur; önce o komşuya snap edip sonra merkeze animate ediyoruz. Böylece next: sağdan
+    // ortaya, previous: soldan ortaya gelen eski NowPlaying animasyonu geri gelir. Swipe ile
+    // tetiklenen değişimde ise kullanıcı zaten fiziksel scroll animasyonunu gördüğü için sadece
+    // sessizce merkeze sabitliyoruz.
     LaunchedEffect(track?.id, state.queue) {
         hasUserScrolledArtGrid = false
-        artSkipInFlight = false
         if (artSwipeItems.isNotEmpty()) {
-            artGridState.scrollToItem(artSwipeCurrentIndex)
+            val target = artSwipeCurrentIndex
+            if (!hasPlacedInitialArt) {
+                artGridState.scrollToItem(target)
+                hasPlacedInitialArt = true
+            } else if (artSkipInFlight) {
+                artGridState.scrollToItem(target)
+                artSkipInFlight = false
+            } else {
+                val start = when {
+                    navigationDirection > 0 && target > 0 -> target - 1
+                    navigationDirection < 0 && target < artSwipeItems.lastIndex -> target + 1
+                    else -> target
+                }
+                if (start != target) {
+                    artGridState.scrollToItem(start)
+                    artGridState.animateScrollToItem(target)
+                } else {
+                    artGridState.scrollToItem(target)
+                }
+            }
+        } else {
+            artSkipInFlight = false
         }
     }
 
@@ -250,6 +277,21 @@ fun NowPlayingSheet(
             center = Offset(0f, 320f),
             radius = 680f
         )
+    }
+
+    val verticalGlowRenderEffect = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            android.graphics.RenderEffect
+                .createBlurEffect(96f, 96f, android.graphics.Shader.TileMode.CLAMP)
+                .asComposeRenderEffect()
+        } else null
+    }
+    val radialGlowRenderEffect = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            android.graphics.RenderEffect
+                .createBlurEffect(128f, 128f, android.graphics.Shader.TileMode.CLAMP)
+                .asComposeRenderEffect()
+        } else null
     }
 
     val playButtonScale = remember { androidx.compose.animation.core.Animatable(1f) }
@@ -342,11 +384,7 @@ fun NowPlayingSheet(
                     alpha = glowAlpha
                     scaleX = pulse
                     scaleY = pulse
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        renderEffect = android.graphics.RenderEffect
-                            .createBlurEffect(180f, 180f, android.graphics.Shader.TileMode.CLAMP)
-                            .asComposeRenderEffect()
-                    }
+                    renderEffect = verticalGlowRenderEffect
                 }
                 .background(verticalGlowBrush)
         )
@@ -355,11 +393,7 @@ fun NowPlayingSheet(
                 .fillMaxSize()
                 .graphicsLayer {
                     alpha = glowAlpha * 0.85f
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        renderEffect = android.graphics.RenderEffect
-                            .createBlurEffect(220f, 220f, android.graphics.Shader.TileMode.CLAMP)
-                            .asComposeRenderEffect()
-                    }
+                    renderEffect = radialGlowRenderEffect
                 }
                 .background(radialGlowBrush)
         )
@@ -564,15 +598,30 @@ fun NowPlayingSheet(
                 var showPlaylists by remember { mutableStateOf(false) }
                 var showLyrics by remember { mutableStateOf(false) }
 
-                // State'ler if dışında — Compose composition kuralı
-                val queueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-                val lyricsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                var allowQueueDismiss by remember { mutableStateOf(false) }
+                var allowLyricsDismiss by remember { mutableStateOf(false) }
+
+                // State'ler if dışında — Compose composition kuralı. Native swipe-to-dismiss
+                // kilitli; sadece custom handle 64dp+ aşağı sürüklenince Hidden'a izin veriyoruz.
+                val queueSheetState = rememberModalBottomSheetState(
+                    skipPartiallyExpanded = true,
+                    confirmValueChange = { target ->
+                        target != androidx.compose.material3.SheetValue.Hidden || allowQueueDismiss
+                    }
+                )
+                val lyricsSheetState = rememberModalBottomSheetState(
+                    skipPartiallyExpanded = true,
+                    confirmValueChange = { target ->
+                        target != androidx.compose.material3.SheetValue.Hidden || allowLyricsDismiss
+                    }
+                )
                 val lyricsSheetScope = rememberCoroutineScope()
                 val trackId = track?.id ?: -1L
                 val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
 
                 BouncyIconButton(
                     onClick = {
+                        allowQueueDismiss = false
                         showQueue = true
                     },
                     icon = Icons.AutoMirrored.Filled.QueueMusic,
@@ -583,6 +632,7 @@ fun NowPlayingSheet(
                 )
                 BouncyIconButton(
                     onClick = {
+                        allowLyricsDismiss = false
                         showLyrics = true
                     },
                     icon = Icons.Filled.Lyrics,
@@ -633,29 +683,14 @@ fun NowPlayingSheet(
                         onDismissRequest = { showQueue = false },
                         sheetState = queueSheetState,
                         containerColor = if (nowPlayingLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
                         dragHandle = {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .then(
-                                        if (nowPlayingLiquidGlassOn)
-                                            Modifier.blurSheetSurface(
-                                                enabled = true,
-                                                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-                                            )
-                                        else Modifier
-                                    )
-                                    .padding(vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(32.dp)
-                                        .height(4.dp)
-                                        .clip(RoundedCornerShape(2.dp))
-                                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                                )
-                            }
+                            ControlledSheetDragHandle(
+                                sheetState = queueSheetState,
+                                liquidGlassOn = nowPlayingLiquidGlassOn,
+                                onAllowDismiss = { allowQueueDismiss = true },
+                                onDismiss = { showQueue = false }
+                            )
                         }
                     ) {
                         QueueList(
@@ -709,29 +744,14 @@ fun NowPlayingSheet(
                         onDismissRequest = { showLyrics = false },
                         sheetState = lyricsSheetState,
                         containerColor = if (nowPlayingLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
                         dragHandle = {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .then(
-                                        if (nowPlayingLiquidGlassOn)
-                                            Modifier.blurSheetSurface(
-                                                enabled = true,
-                                                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-                                            )
-                                        else Modifier
-                                    )
-                                    .padding(vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(32.dp)
-                                        .height(4.dp)
-                                        .clip(RoundedCornerShape(2.dp))
-                                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                                )
-                            }
+                            ControlledSheetDragHandle(
+                                sheetState = lyricsSheetState,
+                                liquidGlassOn = nowPlayingLiquidGlassOn,
+                                onAllowDismiss = { allowLyricsDismiss = true },
+                                onDismiss = { showLyrics = false }
+                            )
                         }
                     ) {
                         Column(
@@ -892,7 +912,7 @@ fun NowPlayingSheet(
                         Icon(
                             imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (isPlaying) strings.pause else strings.play,
-                            tint = if (nowPlayingLiquidGlassOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary,
+                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(36.dp)
                         )
                     }
@@ -936,36 +956,27 @@ private fun AddToPlaylistDrawer(
         catch (_: Exception) { emptyList() }
     }
     val isLiked = likedIds.contains(trackId)
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var allowAddToPlaylistDismiss by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { target ->
+            target != androidx.compose.material3.SheetValue.Hidden || allowAddToPlaylistDismiss
+        }
+    )
     val addToPlaylistLiquidGlassOn = LocalBlurEnabled.current
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = if (addToPlaylistLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         dragHandle = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (addToPlaylistLiquidGlassOn)
-                            Modifier.blurSheetSurface(
-                                enabled = true,
-                                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-                            )
-                        else Modifier
-                    )
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(32.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                )
-            }
+            ControlledSheetDragHandle(
+                sheetState = sheetState,
+                liquidGlassOn = addToPlaylistLiquidGlassOn,
+                onAllowDismiss = { allowAddToPlaylistDismiss = true },
+                onDismiss = onDismiss
+            )
         }
     ) {
         Column(
@@ -1105,13 +1116,19 @@ private fun QueueList(
     val reorderableState = rememberReorderableLazyListState(
         lazyListState = listState
     ) { from, to ->
+        // The currently playing item is locked at the top of this relative queue.
+        // Other items may be dragged only as high as directly under it (index 1).
+        if (from.index == 0) return@rememberReorderableLazyListState
+        val safeToIndex = to.index.coerceAtLeast(1).coerceAtMost(items.lastIndex)
         val currentDragInfo = dragInfo
         dragInfo = if (currentDragInfo == null) {
-            from.index to to.index
+            from.index to safeToIndex
         } else {
-            currentDragInfo.first to to.index
+            currentDragInfo.first to safeToIndex
         }
-        items.add(to.index, items.removeAt(from.index))
+        if (from.index != safeToIndex) {
+            items.add(safeToIndex, items.removeAt(from.index))
+        }
     }
     LaunchedEffect(reorderableState.isAnyItemDragging) {
         if (!reorderableState.isAnyItemDragging) {
@@ -1160,7 +1177,7 @@ private fun QueueList(
                         onPlay = { onPlay(index) },
                         onPlayNext = { onPlayNext(index) },
                         onRemove = { onRemove(index) },
-                        dragHandleModifier = Modifier.draggableHandle()
+                        dragHandleModifier = if (index == 0) Modifier else Modifier.draggableHandle()
                     )
                 }
             }

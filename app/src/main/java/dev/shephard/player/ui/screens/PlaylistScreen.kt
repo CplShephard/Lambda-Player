@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -58,7 +59,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -97,6 +97,7 @@ import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.BouncyIconButton
+import dev.shephard.player.ui.components.ControlledSheetDragHandle
 import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
@@ -173,7 +174,8 @@ fun PlaylistScreen(
     libraryViewModel: LibraryViewModel = viewModel(),
     hasMiniPlayer: Boolean = false,
     onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
-    onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> }
+    onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> },
+    onOpenPlaylist: (Int) -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
@@ -348,7 +350,7 @@ fun PlaylistScreen(
             strings = strings,
             layout = playlistsLayout,
             likedIds = likedIds,
-            onOpen = { openIndex = it },
+            onOpen = onOpenPlaylist,
             onPlay = { pl ->
                 val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
                 if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name)
@@ -530,39 +532,26 @@ fun PlaylistScreen(
     if (menuIdx != null) {
         val pl = playlists[menuIdx]
         val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        var allowMenuDismiss by remember { mutableStateOf(false) }
+        val sheetState = rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+            confirmValueChange = { target ->
+                target != androidx.compose.material3.SheetValue.Hidden || allowMenuDismiss
+            }
+        )
         val menuLiquidGlassOn = LocalBlurEnabled.current
         ModalBottomSheet(
             onDismissRequest = { playlistMenuIndex = null },
             sheetState = sheetState,
             containerColor = if (menuLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             dragHandle = {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .then(
-                            if (menuLiquidGlassOn)
-                                Modifier.blurSheetSurface(
-                                    enabled = true,
-                                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-                                )
-                            else Modifier
-                        )
-                        .padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (menuLiquidGlassOn) {
-                        Box(
-                            modifier = Modifier
-                                .width(32.dp)
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                        )
-                    } else {
-                        BottomSheetDefaults.DragHandle()
-                    }
-                }
+                ControlledSheetDragHandle(
+                    sheetState = sheetState,
+                    liquidGlassOn = menuLiquidGlassOn,
+                    onAllowDismiss = { allowMenuDismiss = true },
+                    onDismiss = { playlistMenuIndex = null }
+                )
             }
         ) {
             Column(
@@ -875,12 +864,12 @@ private fun PlaylistListCard(
         ),
         modifier = Modifier
             .fillMaxWidth()
+            .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
             .then(
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
-            .miuixWidgetClick { onClick() }
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -977,12 +966,12 @@ private fun PlaylistGridCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
             .then(
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
-            .miuixWidgetClick { onClick() }
             .padding(12.dp)
     ) {
         Box(
@@ -1075,6 +1064,157 @@ private fun PlaylistGridCard(
 }
 
 @Composable
+fun PlaylistDetailScreen(
+    playlistIndex: Int,
+    libraryViewModel: LibraryViewModel = viewModel(),
+    onBack: () -> Unit,
+    onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
+    onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> }
+) {
+    val context = LocalContext.current
+    val prefs = remember { PreferencesManager(context) }
+    val scope = rememberCoroutineScope()
+    val strings = LocalStrings.current
+    val tracks by libraryViewModel.tracks.collectAsState()
+    LaunchedEffect(Unit) { if (tracks.isEmpty()) libraryViewModel.loadTracks() }
+
+    val json by prefs.playlistsJson.collectAsState(initial = "[]")
+    val likedSongIdsJson by prefs.likedSongIds.collectAsState(initial = "[]")
+    val likedIds = remember(likedSongIdsJson) {
+        try { JSONArray(likedSongIdsJson).let { arr -> (0 until arr.length()).map { arr.getLong(it) } } }
+        catch (_: Exception) { emptyList() }
+    }
+    val rawPlaylists = remember(json) { parsePlaylists(json) }
+    val playlists = remember(rawPlaylists, strings) { ensureLikedSongsPlaylist(rawPlaylists, strings) }
+    val pl = playlists.getOrNull(playlistIndex)
+
+    var showTrackPicker by remember { mutableStateOf(false) }
+    var pickerSelected by remember(pl?.trackIds) { mutableStateOf(pl?.trackIds?.toSet() ?: emptySet()) }
+
+    val coverPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null && pl != null && playlistIndex in playlists.indices) {
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: SecurityException) { }
+            scope.launch {
+                val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, uri)
+                val updated = pl.copy(coverUri = (persisted ?: uri).toString())
+                val all = playlists.toMutableList()
+                all[playlistIndex] = updated
+                prefs.setPlaylistsJson(encodePlaylists(all))
+            }
+        }
+    }
+
+    androidx.activity.compose.BackHandler { onBack() }
+
+    if (pl == null) {
+        LaunchedEffect(Unit) { onBack() }
+        return
+    }
+
+    val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+    Box(Modifier.fillMaxSize().statusBarsPadding()) {
+        PlaylistDetailView(
+            playlist = pl,
+            allTracks = tracks,
+            plTracks = plTracks,
+            strings = strings,
+            onBack = onBack,
+            onTrackClick = { list, i -> onTrackClick(list, i, if (pl.isSystem) strings.likedSongs else pl.name) },
+            onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name) },
+            onPlayRemix = { if (plTracks.isNotEmpty()) onPlaylistRemixClick(plTracks, if (pl.isSystem) strings.likedSongs else pl.name) },
+            onRemoveTrack = { trackId ->
+                if (pl.isSystem) {
+                    val newLiked = likedIds - trackId
+                    val likedJson = JSONArray().apply { newLiked.forEach { put(it) } }.toString()
+                    scope.launch { prefs.setLikedSongIds(likedJson) }
+                } else {
+                    val updated = pl.copy(trackIds = pl.trackIds.filterNot { it == trackId })
+                    val all = playlists.toMutableList()
+                    all[playlistIndex] = updated
+                    scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                }
+            },
+            onAddTracks = {
+                pickerSelected = pl.trackIds.toSet()
+                showTrackPicker = true
+            },
+            onPickCover = { if (!pl.isSystem) coverPicker.launch(arrayOf("image/*")) },
+            onReorder = { newOrder ->
+                val updated = pl.copy(trackIds = newOrder.map { it.id }, sortMode = "custom")
+                val all = playlists.toMutableList()
+                all[playlistIndex] = updated
+                scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+            },
+            onChangeSort = { mode ->
+                val updated = pl.copy(sortMode = mode)
+                val all = playlists.toMutableList()
+                all[playlistIndex] = updated
+                scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+            }
+        )
+    }
+
+    if (showTrackPicker) {
+        val pickerLiquidGlassOn = LocalBlurEnabled.current
+        AlertDialog(
+            onDismissRequest = { showTrackPicker = false },
+            containerColor = if (pickerLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(28.dp),
+            modifier = if (pickerLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(28.dp)) else Modifier,
+            title = { Text(strings.addTracks) },
+            text = {
+                val pickerListState = rememberLazyListState()
+                LazyColumn(
+                    state = pickerListState,
+                    modifier = Modifier.height(400.dp).overScrollVertical(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(tracks) { t ->
+                        val checked = t.id in pickerSelected
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .then(if (checked) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)) else Modifier)
+                                .clickable { pickerSelected = if (checked) pickerSelected - t.id else pickerSelected + t.id }
+                                .padding(vertical = 4.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = checked,
+                                onCheckedChange = { on -> pickerSelected = if (on) pickerSelected + t.id else pickerSelected - t.id }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(t.title, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(t.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val existingIds = pl.trackIds.toMutableList()
+                    val toAdd = pickerSelected - pl.trackIds.toSet()
+                    val toRemove = pl.trackIds.toSet() - pickerSelected
+                    val updated = pl.copy(trackIds = existingIds.filterNot { it in toRemove } + toAdd)
+                    val all = playlists.toMutableList()
+                    all[playlistIndex] = updated
+                    scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                    showTrackPicker = false
+                }) { Text(strings.save) }
+            },
+            dismissButton = { TextButton(onClick = { showTrackPicker = false }) { Text(strings.cancel) } }
+        )
+    }
+}
+
+@Composable
 private fun PlaylistDetailView(
     playlist: LocalPlaylist,
     allTracks: List<AudioTrack>,
@@ -1156,7 +1296,8 @@ private fun PlaylistDetailView(
             modifier = Modifier
                 .fillMaxSize()
                 .overScrollVertical(),
-            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp)
+            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
                 Row(
@@ -1413,12 +1554,12 @@ private fun PlaylistTrackRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
             .then(
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
-            .miuixWidgetClick { onClick() }
             .padding(vertical = 8.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1475,6 +1616,8 @@ private fun DraggablePlaylistTrackRow(
     onRemove: () -> Unit,
     dragHandleModifier: Modifier
 ) {
+    val liquidGlassOn = LocalBlurEnabled.current
+    val rowShape = RoundedCornerShape(20.dp)
     val elevation by androidx.compose.animation.core.animateDpAsState(
         targetValue = if (isDragged) 6.dp else 0.dp,
         label = "playlistItemElevation"
@@ -1483,14 +1626,18 @@ private fun DraggablePlaylistTrackRow(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
-            .shadow(elevation, RoundedCornerShape(12.dp))
+            .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onTrackClick() }
+            .shadow(elevation, rowShape)
             .zIndex(if (isDragged) 1f else 0f)
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (isDragged) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                else Color.Transparent
+            .clip(rowShape)
+            .then(
+                if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = rowShape)
+                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
-            .miuixWidgetClick { onTrackClick() }
+            .then(
+                if (isDragged) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f), rowShape)
+                else Modifier
+            )
             .padding(vertical = 6.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -7,16 +7,27 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.ui.screens.MusicScreen
+import dev.shephard.player.ui.screens.PlaylistDetailScreen
 import dev.shephard.player.ui.screens.PlaylistScreen
 import dev.shephard.player.ui.screens.AboutSettingsScreen
 import dev.shephard.player.ui.screens.PlayerSettingsScreen
 import dev.shephard.player.ui.screens.SettingsScreen
 import dev.shephard.player.ui.screens.ThemeSettingsScreen
+
+private fun routeOrder(route: String?): Int = when (route) {
+    Destination.Music.route -> 0
+    Destination.Playlists.route -> 1
+    Destination.Settings.route -> 2
+    SettingsRoutes.Theme, SettingsRoutes.Player, SettingsRoutes.About -> 3
+    else -> if (route?.startsWith(PlaylistRoutes.DetailBase) == true) 2 else 0
+}
 
 // Ekranlar arası animasyon — IntOffset spring ile
 private val springSpec = spring<androidx.compose.ui.unit.IntOffset>(
@@ -44,13 +55,8 @@ fun NavGraph(
         modifier = modifier,
         // Music→Playlist→Settings: soldan sağa sıralama → ileri = sola kayar
         enterTransition = {
-            val destinations = listOf(
-                Destination.Music.route,
-                Destination.Playlists.route,
-                Destination.Settings.route
-            )
-            val fromIdx = destinations.indexOf(initialState.destination.route)
-            val toIdx   = destinations.indexOf(targetState.destination.route)
+            val fromIdx = routeOrder(initialState.destination.route)
+            val toIdx = routeOrder(targetState.destination.route)
             val dir = if (toIdx >= fromIdx)
                 AnimatedContentTransitionScope.SlideDirection.Left
             else
@@ -58,13 +64,8 @@ fun NavGraph(
             slideIntoContainer(dir, springSpec) + fadeIn(fadeSpring)
         },
         exitTransition = {
-            val destinations = listOf(
-                Destination.Music.route,
-                Destination.Playlists.route,
-                Destination.Settings.route
-            )
-            val fromIdx = destinations.indexOf(initialState.destination.route)
-            val toIdx   = destinations.indexOf(targetState.destination.route)
+            val fromIdx = routeOrder(initialState.destination.route)
+            val toIdx = routeOrder(targetState.destination.route)
             val dir = if (toIdx >= fromIdx)
                 AnimatedContentTransitionScope.SlideDirection.Left
             else
@@ -95,11 +96,25 @@ fun NavGraph(
             PlaylistScreen(
                 onTrackClick = onTrackClick,
                 onPlaylistRemixClick = onPlaylistRemixClick,
+                onOpenPlaylist = { index -> navController.navigate(PlaylistRoutes.detail(index)) },
                 hasMiniPlayer = hasMiniPlayer
+            )
+        }
+        composable(
+            route = PlaylistRoutes.DetailPattern,
+            arguments = listOf(navArgument("index") { type = NavType.IntType })
+        ) { entry ->
+            val index = entry.arguments?.getInt("index") ?: 0
+            PlaylistDetailScreen(
+                playlistIndex = index,
+                onBack = { navController.popBackStack() },
+                onTrackClick = onTrackClick,
+                onPlaylistRemixClick = onPlaylistRemixClick
             )
         }
         composable(Destination.Settings.route) {
             SettingsScreen(
+                playerViewModel = playerViewModel,
                 onOpenThemeSettings = { navController.navigate(SettingsRoutes.Theme) },
                 onOpenPlayerSettings = { navController.navigate(SettingsRoutes.Player) },
                 onOpenAbout = { navController.navigate(SettingsRoutes.About) }

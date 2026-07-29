@@ -216,7 +216,7 @@ fun MainContainer(
                                         if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop)
                                         else Modifier
                                     ),
-                                hasMiniPlayer = hasMiniPlayer && isBottomRoute,
+                                hasMiniPlayer = hasMiniPlayer,
                                 onTrackClick = { tracks, index, playlistName ->
                                     playerViewModel.setQueueAndPlay(tracks, index, playlistName)
                                     showNowPlaying = true
@@ -235,7 +235,7 @@ fun MainContainer(
                             ) {
                                 MiniPlayerHost(
                                     playerViewModel = playerViewModel,
-                                    visible = hasMiniPlayer && isBottomRoute,
+                                    visible = hasMiniPlayer,
                                     onOpenNowPlaying = { showNowPlaying = true }
                                 )
 

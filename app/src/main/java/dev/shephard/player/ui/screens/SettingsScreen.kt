@@ -69,6 +69,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -76,14 +77,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import dev.shephard.player.player.LayoutMode
+import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
 import dev.shephard.player.ui.components.CustomColorPickerDialog
-import dev.shephard.player.ui.glass.LocalBlurEnabled
-import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
@@ -100,6 +101,7 @@ private val AccentPalette = listOf(
 
 @Composable
 fun SettingsScreen(
+    playerViewModel: PlayerViewModel = viewModel(),
     onOpenThemeSettings: () -> Unit = {},
     onOpenPlayerSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
@@ -111,13 +113,13 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .overScrollVertical()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // InstallerX tarzı ana Settings: üstte widget kart, altında üç büyük yönlendirme.
-        TotalListeningTimeCard(prefs = prefs)
+        TotalListeningTimeCard(playerViewModel = playerViewModel)
 
         SettingsNavigationCard(
             icon = Icons.Filled.ColorLens,
@@ -404,11 +406,59 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
     }
 
     SettingsPageScaffold(title = "About", onBack = onBack) {
-        SectionCard {
-            Text(strings.appName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-            Spacer(Modifier.height(6.dp))
-            Text("${strings.version} $versionName", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(260.dp)
+                .clip(RoundedCornerShape(32.dp))
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.95f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.32f),
+                            MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    )
+                )
+                .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { },
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(170.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
+            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    modifier = Modifier
+                        .size(88.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "λ",
+                        style = MaterialTheme.typography.displayMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = strings.appName,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "${strings.version} $versionName",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
+
         SectionCard {
             SettingsActionRow(
                 icon = Icons.AutoMirrored.Filled.OpenInNew,
@@ -442,8 +492,8 @@ private fun SettingsPageScaffold(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
-            .verticalScroll(rememberScrollState())
             .overScrollVertical()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -482,7 +532,7 @@ private fun SettingsNavigationCard(
     onClick: () -> Unit
 ) {
     SectionCard(
-        modifier = Modifier.miuixWidgetClick { onClick() }
+        modifier = Modifier.miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -518,7 +568,7 @@ private fun SettingsActionRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.background.copy(alpha = 0.72f))
-            .miuixWidgetClick { onClick() }
+            .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -533,10 +583,10 @@ private fun SettingsActionRow(
 // recompose sadece bu küçük composable ile sınırlı kalıyor — SettingsScreen'in geri kalanı
 // (toggle'lar, slider'lar) her tick'te yeniden çizilmiyor.
 @Composable
-private fun TotalListeningTimeCard(prefs: PreferencesManager) {
+private fun TotalListeningTimeCard(playerViewModel: PlayerViewModel) {
     val strings = LocalStrings.current
-    val totalMs by prefs.totalListeningMs.collectAsState(initial = 0L)
-    SectionCard(modifier = Modifier.miuixWidgetClick { }) {
+    val totalMs by playerViewModel.totalListeningMsLive.collectAsState()
+    SectionCard(modifier = Modifier.miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { }) {
         Text(
             text = strings.totalListeningTime,
             style = MaterialTheme.typography.titleMedium,
@@ -557,17 +607,11 @@ private fun SectionCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val liquidGlassOn = LocalBlurEnabled.current
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .then(
-                if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
-                else Modifier
-            ),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (liquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
         Column(modifier = Modifier.padding(20.dp)) { content() }

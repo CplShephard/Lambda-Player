@@ -34,7 +34,6 @@ import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Button
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -78,6 +77,7 @@ import dev.shephard.player.player.rememberAudioPermissionState
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.glass.blurSheetSurface
+import dev.shephard.player.ui.components.ControlledSheetDragHandle
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
@@ -205,39 +205,26 @@ fun MusicScreen(
 
     // Track menu bottom sheet
     selectedTrackForMenu?.let { track ->
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        var allowTrackMenuDismiss by remember { mutableStateOf(false) }
+        val sheetState = rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+            confirmValueChange = { target ->
+                target != androidx.compose.material3.SheetValue.Hidden || allowTrackMenuDismiss
+            }
+        )
         val menuLiquidGlassOn = LocalBlurEnabled.current
         ModalBottomSheet(
             onDismissRequest = { selectedTrackForMenu = null },
             sheetState = sheetState,
             containerColor = if (menuLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             dragHandle = {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .then(
-                            if (menuLiquidGlassOn)
-                                Modifier.blurSheetSurface(
-                                    enabled = true,
-                                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-                                )
-                            else Modifier
-                        )
-                        .padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (menuLiquidGlassOn) {
-                        Box(
-                            modifier = Modifier
-                                .width(32.dp)
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                        )
-                    } else {
-                        BottomSheetDefaults.DragHandle()
-                    }
-                }
+                ControlledSheetDragHandle(
+                    sheetState = sheetState,
+                    liquidGlassOn = menuLiquidGlassOn,
+                    onAllowDismiss = { allowTrackMenuDismiss = true },
+                    onDismiss = { selectedTrackForMenu = null }
+                )
             }
         ) {
             Column(
@@ -381,12 +368,12 @@ private fun GridTrackCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
             .then(
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
-            .miuixWidgetClick { onClick() }
             .padding(8.dp)
     ) {
         Box(
@@ -448,12 +435,12 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
             .then(
                 if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
                 else Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             )
-            .miuixWidgetClick { onClick() }
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -525,7 +512,13 @@ private fun EditMusicDrawer(
 ) {
     val strings = LocalStrings.current
     val context = LocalContext.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var allowEditMusicDismiss by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { target ->
+            target != androidx.compose.material3.SheetValue.Hidden || allowEditMusicDismiss
+        }
+    )
 
     val existing = remember(track.id) { libraryViewModel.getOverride(track.id) }
 
@@ -611,33 +604,14 @@ private fun EditMusicDrawer(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = if (editMusicLiquidGlassOn) Color.Transparent else MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         dragHandle = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (editMusicLiquidGlassOn)
-                            Modifier.blurSheetSurface(
-                                enabled = true,
-                                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-                            )
-                        else Modifier
-                    )
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                if (editMusicLiquidGlassOn) {
-                    Box(
-                        modifier = Modifier
-                            .width(32.dp)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                    )
-                } else {
-                    BottomSheetDefaults.DragHandle()
-                }
-            }
+            ControlledSheetDragHandle(
+                sheetState = sheetState,
+                liquidGlassOn = editMusicLiquidGlassOn,
+                onAllowDismiss = { allowEditMusicDismiss = true },
+                onDismiss = onDismiss
+            )
         }
     ) {
         Column(

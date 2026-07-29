@@ -51,10 +51,9 @@ import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.slideForwardInQueue
 import dev.shephard.player.data.trackById
 import dev.shephard.player.player.PlayerUiState
-import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
-import dev.shephard.player.ui.glass.blurSurface
-import dev.shephard.player.ui.glass.blurSurfaceCompact
+import dev.shephard.player.ui.glass.LocalContentBackdrop
+import dev.shephard.player.ui.glass.miuixBlurSurface
 
 @Composable
 fun MiniPlayer(
@@ -85,6 +84,7 @@ fun MiniPlayer(
     )
 
     val liquidGlassOn = LocalBlurEnabled.current
+    val contentBackdrop = LocalContentBackdrop.current
     val miniPlayerShape = RoundedCornerShape(14.dp)
 
     Column(
@@ -97,9 +97,15 @@ fun MiniPlayer(
                 .fillMaxWidth()
                 .clip(miniPlayerShape)
                 .then(
-                    if (liquidGlassOn) {
+                    if (liquidGlassOn && contentBackdrop != null) {
                         Modifier
-                            .blurSurface(enabled = true, shape = miniPlayerShape)
+                            .miuixBlurSurface(
+                                backdrop = contentBackdrop,
+                                shape = miniPlayerShape,
+                                blurRadius = 28f,
+                                tintAlpha = 0.58f,
+                                fallbackColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
                             .background(
                                 Brush.linearGradient(
                                     colors = listOf(
@@ -215,10 +221,6 @@ fun MiniPlayer(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .then(
-                        if (liquidGlassOn) Modifier.blurSurfaceCompact(enabled = true, shape = RoundedCornerShape(8.dp))
-                        else Modifier
-                    )
                     .bounceClick(pressScale = 0.92f) { onPreviousClick() },
                 contentAlignment = Alignment.Center
             ) {
@@ -234,14 +236,6 @@ fun MiniPlayer(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .then(
-                        if (liquidGlassOn) Modifier.blurSurfaceCompact(
-                            enabled = true,
-                            shape = RoundedCornerShape(8.dp),
-                            tint = GlassTint.ACCENT
-                        )
-                        else Modifier
-                    )
                     .bounceClick(pressScale = 0.92f) { onPlayPauseClick() },
                 contentAlignment = Alignment.Center
             ) {
@@ -266,10 +260,6 @@ fun MiniPlayer(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .then(
-                        if (liquidGlassOn) Modifier.blurSurfaceCompact(enabled = true, shape = RoundedCornerShape(8.dp))
-                        else Modifier
-                    )
                     .bounceClick(pressScale = 0.92f) { onNextClick() },
                 contentAlignment = Alignment.Center
             ) {
