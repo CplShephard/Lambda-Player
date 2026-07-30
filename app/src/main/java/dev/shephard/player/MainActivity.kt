@@ -15,11 +15,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import dev.shephard.player.ui.miuix.ExperimentalMaterial3Api
 import dev.shephard.player.ui.miuix.MiuixAppTheme
-import dev.shephard.player.ui.miuix.ModalBottomSheet
+import dev.shephard.player.ui.components.MiuixDrawer
+import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.miuix.Text
 import androidx.activity.enableEdgeToEdge
 import dev.shephard.player.ui.miuix.TextButton
-import dev.shephard.player.ui.miuix.rememberModalBottomSheetState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -34,8 +34,6 @@ import androidx.compose.ui.unit.dp
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.UpdateChecker
 import dev.shephard.player.player.GithubReleaseInfo
-import dev.shephard.player.ui.components.MiuixSheetDefaults
-import dev.shephard.player.ui.components.MiuixSheetHandle
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.i18n.stringsFor
 import dev.shephard.player.ui.navigation.MainContainer
@@ -77,15 +75,10 @@ class MainActivity : ComponentActivity() {
 
                 val release = availableRelease
                 if (release != null) {
-                    val updateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-                    ModalBottomSheet(
+                    MiuixDrawer(
                         onDismissRequest = { availableRelease = null },
-                        sheetState = updateSheetState,
-                        shape = MiuixSheetDefaults.Shape,
-                        containerColor = MiuixSheetDefaults.containerColor(blurEnabled),
-                        contentColor = MiuixAppTheme.colorScheme.onSurface,
-                        dragHandle = { MiuixSheetHandle(blurEnabled) }
                     ) {
+                        val dismissDrawer = rememberDrawerDismiss()
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -106,10 +99,10 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.End
                             ) {
-                                TextButton(onClick = { availableRelease = null }) { Text(strings.later) }
+                                TextButton(onClick = { dismissDrawer() }) { Text(strings.later) }
                                 TextButton(onClick = {
                                     UpdateChecker.openRelease(this@MainActivity, release.htmlUrl)
-                                    availableRelease = null
+                                    dismissDrawer()
                                 }) { Text(strings.update) }
                             }
                             Spacer(Modifier.height(24.dp))

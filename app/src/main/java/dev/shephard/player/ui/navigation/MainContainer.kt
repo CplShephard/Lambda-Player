@@ -216,13 +216,14 @@ fun MainContainer(
                                         else Modifier
                                     ),
                                 hasMiniPlayer = hasMiniPlayer,
+                                // Bir müziğe basınca NowPlayingSheet AÇILMAZ — sadece çalma
+                                // başlar ve altta mini player belirir. NowPlayingSheet'e
+                                // mini player'a basarak ulaşılır.
                                 onTrackClick = { tracks, index, playlistName ->
                                     playerViewModel.setQueueAndPlay(tracks, index, playlistName)
-                                    showNowPlaying = true
                                 },
                                 onPlaylistRemixClick = { tracks, playlistName ->
                                     playerViewModel.setQueueAndPlayRemixed(tracks, playlistName)
-                                    showNowPlaying = true
                                 }
                             )
 
@@ -292,6 +293,7 @@ private fun MiniPlayerHost(
         val playerState by playerViewModel.uiState.collectAsState()
         MiniPlayer(
             state = playerState,
+            progressFlow = playerViewModel.progress,
             onClick = onOpenNowPlaying,
             onPlayPauseClick = { playerViewModel.togglePlayPause() },
             onNextClick = { playerViewModel.skipToNext() },

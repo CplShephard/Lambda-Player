@@ -10,6 +10,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.FileProvider
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,8 +27,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,15 +60,17 @@ import dev.shephard.player.ui.miuix.Card
 import dev.shephard.player.ui.miuix.CardDefaults
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
-import dev.shephard.player.ui.miuix.ModalBottomSheet
+import dev.shephard.player.ui.components.MiuixDrawer
+import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.miuix.Slider
 import dev.shephard.player.ui.miuix.SliderDefaults
 import dev.shephard.player.ui.miuix.Switch
 import dev.shephard.player.ui.miuix.Text
-import dev.shephard.player.ui.miuix.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -74,12 +81,25 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import dev.shephard.player.R
+import top.yukonga.miuix.kmp.basic.Card as MiuixNativeCard
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
@@ -88,10 +108,7 @@ import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
 import dev.shephard.player.ui.components.CustomColorPickerDialog
-import dev.shephard.player.ui.components.MiuixSheetDefaults
-import dev.shephard.player.ui.components.MiuixSheetHandle
 import dev.shephard.player.ui.glass.LocalBlurEnabled
-import dev.shephard.player.ui.glass.blurSheetSurface
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
@@ -353,24 +370,16 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     }
 
     if (langMenuOpen) {
-        val languageLiquidGlassOn = LocalBlurEnabled.current
-        val languageSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-        ModalBottomSheet(
+        MiuixDrawer(
             onDismissRequest = { langMenuOpen = false },
-            sheetState = languageSheetState,
-            shape = MiuixSheetDefaults.Shape,
-            containerColor = MiuixSheetDefaults.containerColor(languageLiquidGlassOn),
-            contentColor = MiuixAppTheme.colorScheme.onSurface,
-            dragHandle = { MiuixSheetHandle(languageLiquidGlassOn) }
         ) {
+            // Bir dil seçildiğinde bayrağı doğrudan false yapmak yerine drawer'ın kendi
+            // kapanma akışını tetikliyoruz; böylece çıkış animasyonu kesilmiyor.
+            val dismissDrawer = rememberDrawerDismiss()
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(0.72f)
-                    .then(
-                        if (languageLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
-                        else Modifier
-                    )
                     .padding(20.dp)
             ) {
                 Text(strings.language, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -391,7 +400,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                                 )
                                 .miuixWidgetClick(pressScale = 0.97f, maxTiltDegrees = 3f) {
                                     scope.launch { prefs.setLanguage(lang.code) }
-                                    langMenuOpen = false
+                                    dismissDrawer()
                                 }
                                 .padding(horizontal = 16.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -451,6 +460,18 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
     }
 }
 
+/**
+ * InstallerX Revived'ın MiuixAboutPage'i ile birebir aynı yapı:
+ *
+ * - Sabit (sticky) header: uygulama ikonu (Lambda Player'ın ORİJİNAL launcher ikonu,
+ *   30dp corner radius ile), 35sp uygulama adı ve sürüm bilgisi. Liste kaydırıldıkça
+ *   header InstallerX'teki eşiklerle (icon 0.35→0.50, ad 0.20→0.35, sürüm 0.05→0.20)
+ *   sırayla küçülüp kaybolur.
+ * - Üstte `SmallTopAppBar`: "About" başlığı, kaydırma ilerledikçe action bar'ın
+ *   ORTASINDA küçük şekilde belirir (Miuix davranışı).
+ * - İçerik: `SmallTitle` + Miuix `Card` içinde `ArrowPreference` satırları
+ *   (GitHub / CplShephard ve Miuix — InstallerX bağlantısı kaldırıldı).
+ */
 @Composable
 fun AboutSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -461,122 +482,231 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
         catch (_: PackageManager.NameNotFoundException) { "" }
     }
 
-    SettingsPageScaffold(title = "About", onBack = onBack) {
-        Box(
+    val density = LocalDensity.current
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val appBarHeight = 56.dp
+    val headerTopPadding = statusBarPadding + appBarHeight + 40.dp
+
+    val lazyListState = rememberLazyListState()
+    val topAppBarScrollBehavior = MiuixScrollBehavior()
+    var logoHeightPx by remember { mutableIntStateOf(0) }
+    var headerHeightDp by remember { mutableStateOf(190.dp) }
+
+    // InstallerX MiuixAboutPage'teki scrollProgress hesabının birebir aynısı.
+    val scrollProgress by remember {
+        derivedStateOf {
+            if (logoHeightPx <= 0) {
+                0f
+            } else {
+                val index = lazyListState.firstVisibleItemIndex
+                val offset = lazyListState.firstVisibleItemScrollOffset
+                if (index > 0) 1f else (offset.toFloat() / logoHeightPx).coerceIn(0f, 1f)
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Sticky animated header (liste bunun ÜZERİNDEN kayar)
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(260.dp)
-                .clip(RoundedCornerShape(32.dp))
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            MiuixAppTheme.colorScheme.primary.copy(alpha = 0.95f),
-                            MiuixAppTheme.colorScheme.primary.copy(alpha = 0.32f),
-                            MiuixAppTheme.colorScheme.surfaceVariant
-                        )
-                    )
-                )
-                .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { },
-            contentAlignment = Alignment.Center
+                .padding(top = headerTopPadding)
+                .onSizeChanged { size ->
+                    with(density) { headerHeightDp = size.height.toDp() }
+                },
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(170.dp)
-                    .clip(CircleShape)
-                    .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f))
+                    .size(88.dp)
+                    .graphicsLayer {
+                        val iconProgress = ((scrollProgress - 0.35f) / 0.15f).coerceIn(0f, 1f)
+                        alpha = 1 - iconProgress
+                        scaleX = 1 - (iconProgress * 0.05f)
+                        scaleY = 1 - (iconProgress * 0.05f)
+                    }
+                    .clip(RoundedCornerShape(30.dp))
+            ) {
+                Image(
+                    painter = painterResource(id = R.mipmap.ic_launcher),
+                    contentDescription = strings.appName,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            Text(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 5.dp)
+                    .graphicsLayer {
+                        val projectNameProgress = ((scrollProgress - 0.20f) / 0.15f).coerceIn(0f, 1f)
+                        alpha = 1 - projectNameProgress
+                        scaleX = 1 - (projectNameProgress * 0.05f)
+                        scaleY = 1 - (projectNameProgress * 0.05f)
+                    },
+                text = strings.appName,
+                fontWeight = FontWeight.Bold,
+                fontSize = 35.sp,
+                color = MiuixAppTheme.colorScheme.onBackground
             )
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        val versionProgress = ((scrollProgress - 0.05f) / 0.15f).coerceIn(0f, 1f)
+                        alpha = 1 - versionProgress
+                        scaleX = 1 - (versionProgress * 0.05f)
+                        scaleY = 1 - (versionProgress * 0.05f)
+                    },
+                text = "${strings.version} $versionName",
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                color = MiuixAppTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // Kaydırılabilir içerik
+        LazyColumn(
+            state = lazyListState,
+            modifier = Modifier
+                .fillMaxSize()
+                .overScrollVertical()
+                .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection)
+        ) {
+            // Header yüksekliğinde şeffaf boşluk (InstallerX'teki "logoSpacer")
+            item(key = "logoSpacer") {
+                // LazyColumn ekranın en üstünden başladığı için spacer, header'ın
+                // kapladığı tüm alanı (status bar + app bar + 40dp + header + 48dp) doldurur.
                 Box(
-                    modifier = Modifier
-                        .size(88.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(MiuixAppTheme.colorScheme.surface.copy(alpha = 0.62f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "λ",
-                        style = MiuixAppTheme.typography.displayMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MiuixAppTheme.colorScheme.primary
-                    )
+                    Modifier
+                        .fillMaxWidth()
+                        .height(headerTopPadding + headerHeightDp + 48.dp)
+                        .onSizeChanged { size -> logoHeightPx = size.height }
+                )
+            }
+            item(key = "about_content") {
+                Column(modifier = Modifier.fillParentMaxHeight()) {
+                    SmallTitle("About")
+                    MiuixNativeCard(
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp)
+                            .padding(bottom = 12.dp)
+                    ) {
+                        ArrowPreference(
+                            title = "GitHub",
+                            summary = "CplShephard",
+                            onClick = { uriHandler.openUri("https://github.com/CplShephard") }
+                        )
+                        ArrowPreference(
+                            title = "Miuix",
+                            summary = "A UI library for Compose MultiPlatform",
+                            onClick = { uriHandler.openUri("https://github.com/miuix-project/miuix") }
+                        )
+                    }
+                    Spacer(Modifier.height(110.dp))
                 }
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    text = strings.appName,
-                    style = MiuixAppTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MiuixAppTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = "${strings.version} $versionName",
-                    style = MiuixAppTheme.typography.bodyMedium,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
 
-        SectionCard {
-            SettingsActionRow(
-                icon = Icons.AutoMirrored.Filled.OpenInNew,
-                title = "GitHub / CplShephard",
-                onClick = { uriHandler.openUri("https://github.com/CplShephard") }
-            )
-            SettingsActionRow(
-                icon = Icons.AutoMirrored.Filled.OpenInNew,
-                title = "InstallerX Revived",
-                onClick = { uriHandler.openUri("https://github.com/InstallerX-Revived/InstallerX") }
-            )
-            Text(
-                text = "Miuix / InstallerX inspired interface polish for Lambda Player.",
-                style = MiuixAppTheme.typography.bodySmall,
-                color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-        }
-        Spacer(Modifier.height(110.dp))
+        // Üstte sabit app bar: "About" başlığı kaydırdıkça ORTADA belirir
+        SmallTopAppBar(
+            title = "About",
+            modifier = Modifier.align(Alignment.TopCenter),
+            color = MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
+            titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
+            scrollBehavior = topAppBarScrollBehavior,
+            defaultWindowInsetsPadding = false,
+            navigationIcon = {
+                Box(
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .bounceClick { onBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MiuixAppTheme.colorScheme.onBackground
+                    )
+                }
+            }
+        )
     }
 }
 
 
+/**
+ * Ayar alt sayfaları için Miuix/InstallerX tarzı iskelet:
+ * içerikteki büyük başlık kaydırıldıkça kaybolur ve `SmallTopAppBar`'ın ORTASINDA
+ * küçük şekilde belirmeye devam eder (Miuix'in daralan başlık davranışı).
+ */
 @Composable
 private fun SettingsPageScaffold(
     title: String,
     onBack: () -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .overScrollVertical()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
-                    .bounceClick { onBack() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MiuixAppTheme.colorScheme.onBackground)
+    val density = LocalDensity.current
+    val scrollState = rememberScrollState()
+    val topAppBarScrollBehavior = MiuixScrollBehavior()
+
+    // Büyük başlık ~44dp'lik kaydırma aralığında kaybolur; aynı aralıkta app bar'daki
+    // ortalanmış küçük başlık belirir.
+    val collapseRangePx = with(density) { 44.dp.toPx() }
+    val scrollProgress by remember {
+        derivedStateOf { (scrollState.value / collapseRangePx).coerceIn(0f, 1f) }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        SmallTopAppBar(
+            title = title,
+            color = Color.Transparent,
+            titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
+            scrollBehavior = topAppBarScrollBehavior,
+            defaultWindowInsetsPadding = false,
+            navigationIcon = {
+                Box(
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
+                        .bounceClick { onBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MiuixAppTheme.colorScheme.onBackground)
+                }
             }
-            Spacer(Modifier.width(14.dp))
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection)
+                .overScrollVertical()
+                .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Büyük sayfa başlığı — kaydırdıkça küçülüp solar, yerini üstteki
+            // ortalanmış küçük başlığa bırakır.
             Text(
                 text = title,
                 style = MiuixAppTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = MiuixAppTheme.colorScheme.onBackground
+                color = MiuixAppTheme.colorScheme.onBackground,
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .graphicsLayer {
+                        alpha = 1f - scrollProgress
+                        scaleX = 1f - scrollProgress * 0.05f
+                        scaleY = 1f - scrollProgress * 0.05f
+                    }
             )
+            content()
+            Spacer(Modifier.height(24.dp))
         }
-        Spacer(Modifier.height(4.dp))
-        content()
     }
 }
 
@@ -788,14 +918,17 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        // weight(1f): uzun (örn. Türkçe) etiketler Switch'i sıkıştırıp deforme etmesin.
+        // Etiket gerekirse birden fazla satıra sarar, toggle her zaman sabit boyutta kalır.
         Text(
             text = label,
             color = MiuixAppTheme.colorScheme.onBackground,
             style = MiuixAppTheme.typography.bodyLarge,
-            modifier = Modifier.padding(end = 16.dp)
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 16.dp)
         )
         Switch(checked = checked, onCheckedChange = onChange)
     }

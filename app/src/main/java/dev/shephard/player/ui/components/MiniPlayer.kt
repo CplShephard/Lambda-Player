@@ -50,7 +50,10 @@ import coil.compose.AsyncImagePainter
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.slideForwardInQueue
 import dev.shephard.player.data.trackById
+import dev.shephard.player.player.PlaybackProgress
 import dev.shephard.player.player.PlayerUiState
+import kotlinx.coroutines.flow.StateFlow
+import androidx.compose.runtime.collectAsState
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.miuixBlurSurface
@@ -58,6 +61,7 @@ import dev.shephard.player.ui.glass.miuixBlurSurface
 @Composable
 fun MiniPlayer(
     state: PlayerUiState,
+    progressFlow: StateFlow<PlaybackProgress>,
     onClick: () -> Unit,
     onPlayPauseClick: () -> Unit,
     onNextClick: () -> Unit,
@@ -68,14 +72,6 @@ fun MiniPlayer(
 
     // Geçiş yönü AnimatedContent içinde kuyruk konumuna göre belirlenir.
 
-    val fraction = if (state.durationMs > 0L)
-        (state.positionMs.toFloat() / state.durationMs.toFloat()).coerceIn(0f, 1f)
-    else 0f
-    val animatedFraction by animateFloatAsState(
-        targetValue = fraction,
-        animationSpec = tween(durationMillis = 250),
-        label = "miniProgress"
-    )
     val glow = Color(state.glowColorArgb)
     val animatedGlow by animateColorAsState(
         targetValue = glow,
@@ -260,17 +256,43 @@ fun MiniPlayer(
             }
         }
 
-            BoldProgressBar(
-                fraction = animatedFraction,
+            // 500ms'lik konum tiklerini yalnızca bu küçük composable dinler; MiniPlayer'ın
+            // geri kalanı (kapak, başlık, butonlar, blur yüzeyi) her tikte recompose OLMAZ.
+            MiniPlayerProgressBar(
+                progressFlow = progressFlow,
                 activeColor = animatedGlow,
                 inactiveColor = animatedGlow.copy(alpha = 0.18f),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .fillMaxWidth(),
-                height = 3.dp
+                    .fillMaxWidth()
             )
         }
     }
+}
+
+@Composable
+private fun MiniPlayerProgressBar(
+    progressFlow: StateFlow<PlaybackProgress>,
+    activeColor: Color,
+    inactiveColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val progress by progressFlow.collectAsState()
+    val fraction = if (progress.durationMs > 0L)
+        (progress.positionMs.toFloat() / progress.durationMs.toFloat()).coerceIn(0f, 1f)
+    else 0f
+    val animatedFraction by animateFloatAsState(
+        targetValue = fraction,
+        animationSpec = tween(durationMillis = 250),
+        label = "miniProgress"
+    )
+    BoldProgressBar(
+        fraction = animatedFraction,
+        activeColor = activeColor,
+        inactiveColor = inactiveColor,
+        modifier = modifier,
+        height = 3.dp
+    )
 }
 
 @Composable

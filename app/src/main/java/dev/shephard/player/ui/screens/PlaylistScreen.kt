@@ -61,11 +61,11 @@ import dev.shephard.player.ui.miuix.HorizontalDivider
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.IconButton
 import dev.shephard.player.ui.miuix.MiuixAppTheme
-import dev.shephard.player.ui.miuix.ModalBottomSheet
+import dev.shephard.player.ui.components.MiuixDrawer
+import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.miuix.OutlinedTextField
 import dev.shephard.player.ui.miuix.Text
 import dev.shephard.player.ui.miuix.TextButton
-import dev.shephard.player.ui.miuix.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -99,13 +99,10 @@ import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.BouncyIconButton
-import dev.shephard.player.ui.components.MiuixSheetDefaults
-import dev.shephard.player.ui.components.MiuixSheetHandle
 import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.glass.blurSurfaceCompact
-import dev.shephard.player.ui.glass.blurSheetSurface
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
@@ -414,22 +411,12 @@ fun PlaylistScreen(
 
     if (showCreate) {
         val createLiquidGlassOn = LocalBlurEnabled.current
-        val createSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-        ModalBottomSheet(
+        MiuixDrawer(
             onDismissRequest = { showCreate = false },
-            sheetState = createSheetState,
-            shape = MiuixSheetDefaults.Shape,
-            containerColor = MiuixSheetDefaults.containerColor(createLiquidGlassOn),
-            contentColor = MiuixAppTheme.colorScheme.onSurface,
-            dragHandle = { MiuixSheetHandle(createLiquidGlassOn) }
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(
-                        if (createLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
-                        else Modifier
-                    )
                     .padding(horizontal = 24.dp, vertical = 16.dp)
                     .heightIn(min = 260.dp)
             ) {
@@ -467,23 +454,13 @@ fun PlaylistScreen(
     val pickerIdx = trackPickerForIndex
     if (pickerIdx != null) {
         val pickerLiquidGlassOn = LocalBlurEnabled.current
-        val pickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-        ModalBottomSheet(
+        MiuixDrawer(
             onDismissRequest = { trackPickerForIndex = null },
-            sheetState = pickerSheetState,
-            shape = MiuixSheetDefaults.Shape,
-            containerColor = MiuixSheetDefaults.containerColor(pickerLiquidGlassOn),
-            contentColor = MiuixAppTheme.colorScheme.onSurface,
-            dragHandle = { MiuixSheetHandle(pickerLiquidGlassOn) }
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(0.88f)
-                    .then(
-                        if (pickerLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
-                        else Modifier
-                    )
                     .padding(20.dp)
             ) {
                 Text(strings.addTracks, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -549,24 +526,14 @@ fun PlaylistScreen(
     if (menuIdx != null) {
         val pl = playlists[menuIdx]
         val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
         val menuLiquidGlassOn = LocalBlurEnabled.current
-        ModalBottomSheet(
+        MiuixDrawer(
             onDismissRequest = { playlistMenuIndex = null },
-            sheetState = sheetState,
-            shape = MiuixSheetDefaults.Shape,
-            containerColor = MiuixSheetDefaults.containerColor(menuLiquidGlassOn),
-            contentColor = MiuixAppTheme.colorScheme.onSurface,
-            dragHandle = { MiuixSheetHandle(menuLiquidGlassOn) }
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(0.88f)
-                    .then(
-                        if (menuLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
-                        else Modifier
-                    )
                     .padding(16.dp)
             ) {
                 Row(
@@ -665,22 +632,12 @@ fun PlaylistScreen(
     val editIdx = editPlaylistIndex
     if (editIdx != null) {
         val editLiquidGlassOn = LocalBlurEnabled.current
-        val editSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-        ModalBottomSheet(
+        MiuixDrawer(
             onDismissRequest = { editPlaylistIndex = null },
-            sheetState = editSheetState,
-            shape = MiuixSheetDefaults.Shape,
-            containerColor = MiuixSheetDefaults.containerColor(editLiquidGlassOn),
-            contentColor = MiuixAppTheme.colorScheme.onSurface,
-            dragHandle = { MiuixSheetHandle(editLiquidGlassOn) }
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(
-                        if (editLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
-                        else Modifier
-                    )
                     .padding(horizontal = 24.dp, vertical = 16.dp)
                     .heightIn(min = 260.dp)
             ) {

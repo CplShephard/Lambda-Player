@@ -2,8 +2,6 @@
 
 package dev.shephard.player.ui.screens
 
-import android.os.Build
-
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -11,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
@@ -64,9 +63,9 @@ import dev.shephard.player.ui.miuix.ExperimentalMaterial3Api
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.IconButton
 import dev.shephard.player.ui.miuix.MiuixAppTheme
-import dev.shephard.player.ui.miuix.ModalBottomSheet
+import dev.shephard.player.ui.components.MiuixDrawer
+import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.miuix.Text
-import dev.shephard.player.ui.miuix.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -83,7 +82,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -113,10 +111,7 @@ import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.glass.blurSurfaceCompact
-import dev.shephard.player.ui.glass.blurSheetSurface
 import dev.shephard.player.ui.components.MinimalSeekBar
-import dev.shephard.player.ui.components.MiuixSheetDefaults
-import dev.shephard.player.ui.components.MiuixSheetHandle
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -132,7 +127,6 @@ fun NowPlayingSheet(
     onDismiss: () -> Unit
 ) {
     val state by playerViewModel.uiState.collectAsState()
-    val amplitude by playerViewModel.amplitude.collectAsState()
     val navigationDirection by playerViewModel.navigationDirection.collectAsState()
     val track = state.currentTrack
     val strings = LocalStrings.current
@@ -200,8 +194,16 @@ fun NowPlayingSheet(
     // ortaya, previous: soldan ortaya gelen eski NowPlaying animasyonu geri gelir. Swipe ile
     // tetiklenen değişimde ise kullanıcı zaten fiziksel scroll animasyonunu gördüğü için sadece
     // sessizce merkeze sabitliyoruz.
+    //
+    // ÖNEMLİ: Kayma animasyonu YALNIZCA çalan şarkı gerçekten değiştiğinde oynar.
+    // Queue yalnızca yeniden sıralandığında (remix, sürükle-bırak, play next...) çalan
+    // şarkı aynı kaldığı için sessizce merkeze snap edilir — remix tuşuna art arda
+    // basınca "çalan şarkı sonrakiyle yer değiştiriyor" gibi görünen görsel hata buydu.
+    var lastArtTrackId by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(track?.id, state.queue) {
         hasUserScrolledArtGrid = false
+        val trackChanged = track?.id != lastArtTrackId
+        lastArtTrackId = track?.id
         if (artSwipeItems.isNotEmpty()) {
             val target = artSwipeCurrentIndex
             if (!hasPlacedInitialArt) {
@@ -210,6 +212,9 @@ fun NowPlayingSheet(
             } else if (artSkipInFlight) {
                 artGridState.scrollToItem(target)
                 artSkipInFlight = false
+            } else if (!trackChanged) {
+                // Sadece queue sırası değişti (örn. remix): animasyonsuz merkeze otur.
+                artGridState.scrollToItem(target)
             } else {
                 val start = when {
                     navigationDirection > 0 && target > 0 -> target - 1
@@ -217,8 +222,27 @@ fun NowPlayingSheet(
                     else -> target
                 }
                 if (start != target) {
+                    // Stride'ı (bir kapak + aradaki 16dp boşluk) scroll'dan ÖNCE, mevcut
+                    // layout bilgisinden hesapla — scrollToItem sonrası layoutInfo bir frame
+                    // geride kalabiliyor.
+                    val itemWidthPx = artGridState.layoutInfo.visibleItemsInfo.firstOrNull()?.size?.width ?: 0
+                    val stridePx = itemWidthPx + with(density) { 16.dp.toPx() }
                     artGridState.scrollToItem(start)
-                    artGridState.animateScrollToItem(target)
+                    if (itemWidthPx > 0) {
+                        // animateScrollToItem'ın sabit (çok hızlı) animasyonu yerine daha
+                        // yavaş, yumuşak bir tween — şarkıdan şarkıya geçiş artık akıcı görünür.
+                        artGridState.animateScrollBy(
+                            value = stridePx * (target - start),
+                            animationSpec = androidx.compose.animation.core.tween(
+                                durationMillis = 500,
+                                easing = androidx.compose.animation.core.FastOutSlowInEasing
+                            )
+                        )
+                        // Olası yuvarlama sapmasını düzelt (görsel sıçrama yaratmaz, fark < 1px)
+                        artGridState.scrollToItem(target)
+                    } else {
+                        artGridState.animateScrollToItem(target)
+                    }
                 } else {
                     artGridState.scrollToItem(target)
                 }
@@ -239,59 +263,6 @@ fun NowPlayingSheet(
     val configuration = LocalConfiguration.current
     var measuredHeightPx by remember { mutableFloatStateOf(with(density) { configuration.screenHeightDp.dp.toPx() }) }
     val screenHeightPx = measuredHeightPx
-
-    // pulse artık gradient radius'unu değil sadece graphicsLayer scale'ini etkiliyor
-    // → Brush her frame yeniden oluşturulmuyor, sadece transform matrix değişiyor
-    val pulse by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = 0.85f + amplitude * 0.15f,
-        animationSpec = androidx.compose.animation.core.tween(180),
-        label = "glowPulse"
-    )
-    val glowAlpha by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (track == null) 0f else 0.55f + amplitude * 0.2f,
-        animationSpec = androidx.compose.animation.core.tween(300),
-        label = "glowAlpha"
-    )
-
-    // Glow brush'ları remember ile stabilize et — glow rengi değişince yeniden oluşturulsun,
-    // ama pulse/amplitude her değiştiğinde Brush allocation olmasın
-    val verticalGlowBrush = remember(glow) {
-        Brush.verticalGradient(
-            colorStops = arrayOf(
-                0.00f to glow.copy(alpha = 0.90f),
-                0.40f to glow.copy(alpha = 0.55f),
-                0.70f to glow.copy(alpha = 0.12f),
-                0.80f to Color.Transparent,
-                1.00f to Color.Transparent
-            )
-        )
-    }
-    val radialGlowBrush = remember(glow) {
-        Brush.radialGradient(
-            colors = listOf(
-                glow.copy(alpha = 0.55f),
-                glow.copy(alpha = 0.15f),
-                Color.Transparent
-            ),
-            center = Offset(0f, 320f),
-            radius = 680f
-        )
-    }
-
-    val verticalGlowRenderEffect = remember {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            android.graphics.RenderEffect
-                .createBlurEffect(96f, 96f, android.graphics.Shader.TileMode.CLAMP)
-                .asComposeRenderEffect()
-        } else null
-    }
-    val radialGlowRenderEffect = remember {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            android.graphics.RenderEffect
-                .createBlurEffect(128f, 128f, android.graphics.Shader.TileMode.CLAMP)
-                .asComposeRenderEffect()
-        } else null
-    }
 
     val playButtonScale = remember { androidx.compose.animation.core.Animatable(1f) }
     val playButtonScope = rememberCoroutineScope()
@@ -374,27 +345,12 @@ fun NowPlayingSheet(
                 }
             )
     ) {
-        // Ambient glow background — blur artık graphicsLayer renderEffect ile (API 31+)
-        // veya daha küçük dp değeriyle yapılıyor; Brush sabit, scale animasyonu ucuz
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    alpha = glowAlpha
-                    scaleX = pulse
-                    scaleY = pulse
-                    renderEffect = verticalGlowRenderEffect
-                }
-                .background(verticalGlowBrush)
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    alpha = glowAlpha * 0.85f
-                    renderEffect = radialGlowRenderEffect
-                }
-                .background(radialGlowBrush)
+        // Ambient glow background — amplitude flow'unu (≈80ms'de bir) SADECE bu küçük
+        // composable dinler; sheet'in geri kalanı amplitude tiklerinden etkilenmez.
+        AmbientGlowBackground(
+            playerViewModel = playerViewModel,
+            glow = glow,
+            hasTrack = track != null
         )
 
         Column(
@@ -556,35 +512,10 @@ fun NowPlayingSheet(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Seek bar
-            Column(modifier = Modifier.fillMaxWidth()) {
-                MinimalSeekBar(
-                    progress = if (state.durationMs > 0)
-                        state.positionMs.toFloat() / state.durationMs.toFloat() else 0f,
-                    onSeekPreview = { fraction ->
-                        playerViewModel.onSeekPreview((fraction * state.durationMs).toLong())
-                    },
-                    onSeekFinished = { fraction ->
-                        playerViewModel.onSeekCommit((fraction * state.durationMs).toLong())
-                    },
-                    modifier = Modifier.padding(horizontal = 4.dp)
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        formatMillis(state.positionMs),
-                        style = MiuixAppTheme.typography.labelMedium,
-                        color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        formatMillis(state.durationMs),
-                        style = MiuixAppTheme.typography.labelMedium,
-                        color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            // Seek bar — 500ms'lik konum tiklerini SADECE bu satır dinler.
+            // Sheet'in geri kalanı (kapak grid'i, glow, butonlar) artık her tikte
+            // recompose OLMAZ; NowPlaying kasmasının ana çözümü budur.
+            SeekBarRow(playerViewModel = playerViewModel)
 
             // Action buttons row: Queue, Lyrics, +/check
             Row(
@@ -599,8 +530,6 @@ fun NowPlayingSheet(
                 var showLyrics by remember { mutableStateOf(false) }
 
                 // State'ler if dışında — Compose composition kuralı
-                val queueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-                val lyricsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
                 val lyricsSheetScope = rememberCoroutineScope()
                 val trackId = track?.id ?: -1L
                 val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
@@ -663,13 +592,8 @@ fun NowPlayingSheet(
                 }
 
                 if (showQueue) {
-                    ModalBottomSheet(
+                    MiuixDrawer(
                         onDismissRequest = { showQueue = false },
-                        sheetState = queueSheetState,
-                        shape = MiuixSheetDefaults.Shape,
-                        containerColor = MiuixSheetDefaults.containerColor(nowPlayingLiquidGlassOn),
-                        contentColor = MiuixAppTheme.colorScheme.onSurface,
-                        dragHandle = { MiuixSheetHandle(nowPlayingLiquidGlassOn) }
                     ) {
                         QueueList(
                             queue = state.queue,
@@ -689,7 +613,10 @@ fun NowPlayingSheet(
                     var downloadError by remember { mutableStateOf<String?>(null) }
                     val lyricListState = rememberLazyListState()
                     val syncedLyrics = state.syncedLyrics
-                    val currentMs = state.positionMs
+                    // Konum tikleri sadece lyrics drawer açıkken ve sadece bu blokta dinlenir
+                    // (senkronize sözlerde aktif satırın takibi için zaten gerekli).
+                    val lyricsProgress by playerViewModel.progress.collectAsState()
+                    val currentMs = lyricsProgress.positionMs
                     val activeIndex = if (syncedLyrics.isNotEmpty()) {
                         syncedLyrics.indexOfLast { it.timeMs <= currentMs }.coerceAtLeast(0)
                     } else -1
@@ -718,21 +645,12 @@ fun NowPlayingSheet(
                         }
                     }
 
-                    ModalBottomSheet(
+                    MiuixDrawer(
                         onDismissRequest = { showLyrics = false },
-                        sheetState = lyricsSheetState,
-                        shape = MiuixSheetDefaults.Shape,
-                        containerColor = MiuixSheetDefaults.containerColor(nowPlayingLiquidGlassOn),
-                        contentColor = MiuixAppTheme.colorScheme.onSurface,
-                        dragHandle = { MiuixSheetHandle(nowPlayingLiquidGlassOn) }
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .then(
-                                    if (nowPlayingLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
-                                    else Modifier
-                                )
                                 .padding(16.dp)
                                 .fillMaxHeight(0.88f)
                         ) {
@@ -909,6 +827,119 @@ fun NowPlayingSheet(
     }
 }
 
+/**
+ * Ambient glow arka planı — amplitude flow'unu (≈80ms tik) yalnızca bu composable toplar,
+ * böylece NowPlayingSheet'in geri kalanı müzik çalarken sürekli recompose olmaz.
+ *
+ * Siyah şerit düzeltmesi: eski kod pulse'ı `0.85f + amplitude * 0.15f` olarak hesaplıyordu.
+ * Şarkı DURDURULUNCA amplitude 0'a düşüyor, glow katmanı merkezden %85'e küçülüyor ve üstte
+ * (durum çubuğunun olduğu yerde) ekran yüksekliğinin %7.5'i kadar saf siyah arka plan açığa
+ * çıkıyordu — kullanıcının gördüğü "siyah şerit çizgi" buydu. Ölçek artık hiçbir zaman
+ * 1.0'ın altına inmez (1.0f + amplitude * 0.12f), yani glow her zaman ekranı tam kaplar.
+ *
+ * Gradient optimizasyonu: tam ekran iki katmana uygulanan 96px/128px RenderEffect blur'ları
+ * kaldırıldı. Gradient'ler zaten yumuşak geçişli olduğu için blur görsel olarak fark
+ * yaratmıyordu ama her frame'de iki tam ekran blur pass'i GPU'ya mal oluyordu.
+ */
+@Composable
+private fun AmbientGlowBackground(
+    playerViewModel: PlayerViewModel,
+    glow: Color,
+    hasTrack: Boolean
+) {
+    val amplitude by playerViewModel.amplitude.collectAsState()
+
+    // pulse sadece graphicsLayer scale'ini etkiler; Brush sabit kalır (allocation yok).
+    val pulse by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = 1.0f + amplitude * 0.12f,
+        animationSpec = androidx.compose.animation.core.tween(180),
+        label = "glowPulse"
+    )
+    val glowAlpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (!hasTrack) 0f else 0.55f + amplitude * 0.2f,
+        animationSpec = androidx.compose.animation.core.tween(300),
+        label = "glowAlpha"
+    )
+
+    // Brush'lar glow rengine göre memoize — amplitude değişimlerinde yeniden oluşturulmaz.
+    val verticalGlowBrush = remember(glow) {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0.00f to glow.copy(alpha = 0.90f),
+                0.40f to glow.copy(alpha = 0.55f),
+                0.70f to glow.copy(alpha = 0.12f),
+                0.80f to Color.Transparent,
+                1.00f to Color.Transparent
+            )
+        )
+    }
+    val radialGlowBrush = remember(glow) {
+        Brush.radialGradient(
+            colors = listOf(
+                glow.copy(alpha = 0.55f),
+                glow.copy(alpha = 0.15f),
+                Color.Transparent
+            ),
+            center = Offset(0f, 320f),
+            radius = 680f
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                alpha = glowAlpha
+                scaleX = pulse
+                scaleY = pulse
+            }
+            .background(verticalGlowBrush)
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer { alpha = glowAlpha * 0.85f }
+            .background(radialGlowBrush)
+    )
+}
+
+/**
+ * Seek bar + süre etiketleri. [PlayerViewModel.progress] flow'unu (500ms tik) YALNIZCA bu
+ * composable toplar — NowPlayingSheet'in geri kalanı konum güncellemelerinden tamamen izole.
+ */
+@Composable
+private fun SeekBarRow(playerViewModel: PlayerViewModel) {
+    val progress by playerViewModel.progress.collectAsState()
+    Column(modifier = Modifier.fillMaxWidth()) {
+        MinimalSeekBar(
+            progress = if (progress.durationMs > 0)
+                progress.positionMs.toFloat() / progress.durationMs.toFloat() else 0f,
+            onSeekPreview = { fraction ->
+                playerViewModel.onSeekPreview((fraction * progress.durationMs).toLong())
+            },
+            onSeekFinished = { fraction ->
+                playerViewModel.onSeekCommit((fraction * progress.durationMs).toLong())
+            },
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                formatMillis(progress.positionMs),
+                style = MiuixAppTheme.typography.labelMedium,
+                color = MiuixAppTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                formatMillis(progress.durationMs),
+                style = MiuixAppTheme.typography.labelMedium,
+                color = MiuixAppTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
 @Composable
 private fun AddToPlaylistDrawer(
     trackId: Long,
@@ -928,24 +959,14 @@ private fun AddToPlaylistDrawer(
         catch (_: Exception) { emptyList() }
     }
     val isLiked = likedIds.contains(trackId)
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val addToPlaylistLiquidGlassOn = LocalBlurEnabled.current
 
-    ModalBottomSheet(
+    MiuixDrawer(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = MiuixSheetDefaults.Shape,
-        containerColor = MiuixSheetDefaults.containerColor(addToPlaylistLiquidGlassOn),
-        contentColor = MiuixAppTheme.colorScheme.onSurface,
-        dragHandle = { MiuixSheetHandle(addToPlaylistLiquidGlassOn) }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(
-                    if (addToPlaylistLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
-                    else Modifier
-                )
                 .padding(16.dp)
                 .fillMaxHeight(0.88f)
         ) {
@@ -1103,10 +1124,6 @@ private fun QueueList(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight(0.88f)
-            .then(
-                if (queueLiquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
-                else Modifier
-            )
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Text(

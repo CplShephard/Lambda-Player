@@ -22,9 +22,8 @@ import androidx.compose.material.icons.filled.Close
 import dev.shephard.player.ui.miuix.ExperimentalMaterial3Api
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
-import dev.shephard.player.ui.miuix.ModalBottomSheet
+import dev.shephard.player.ui.components.MiuixDrawer
 import dev.shephard.player.ui.miuix.OutlinedTextField
-import dev.shephard.player.ui.miuix.rememberModalBottomSheetState
 import dev.shephard.player.ui.miuix.Text
 import dev.shephard.player.ui.miuix.TextButton
 import androidx.compose.runtime.Composable
@@ -49,7 +48,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlin.math.max
 import dev.shephard.player.ui.glass.LocalBlurEnabled
-import dev.shephard.player.ui.glass.blurSheetSurface
 import kotlin.math.min
 
 /**
@@ -89,24 +87,13 @@ fun CustomColorPickerDialog(
     }
 
     val liquidGlassOn = LocalBlurEnabled.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-
-    ModalBottomSheet(
+    MiuixDrawer(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = MiuixSheetDefaults.Shape,
-        containerColor = MiuixSheetDefaults.containerColor(liquidGlassOn),
-        contentColor = MiuixAppTheme.colorScheme.onSurface,
-        dragHandle = { MiuixSheetHandle(liquidGlassOn) }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.88f)
-                .then(
-                    if (liquidGlassOn) Modifier.blurSheetSurface(enabled = true, shape = RoundedCornerShape(0.dp))
-                    else Modifier
-                )
                 .padding(20.dp)
         ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

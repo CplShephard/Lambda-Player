@@ -30,11 +30,25 @@ import kotlin.math.sin
 
 data class SyncedLyricLine(val timeMs: Long, val text: String)
 
+/**
+ * Çalma konumu, [PlayerUiState]'ten AYRI tutulur.
+ *
+ * Eskiden `positionMs`/`durationMs` doğrudan `PlayerUiState` içindeydi ve 500 ms'de bir
+ * güncelleniyordu. `uiState`'i toplayan HER composable (NowPlayingSheet'in tamamı dahil —
+ * kapak swipe grid'i, gradientler, butonlar, drawer'lar) saniyede iki kez yeniden
+ * besteleniyordu. NowPlaying'deki kasmanın asıl sebebi buydu.
+ *
+ * Artık konum yalnızca [PlayerViewModel.progress] üzerinden yayınlanıyor ve bunu sadece
+ * seek bar / süre etiketleri / lyrics gibi küçük yaprak composable'lar dinliyor.
+ */
+data class PlaybackProgress(
+    val positionMs: Long = 0L,
+    val durationMs: Long = 0L,
+)
+
 data class PlayerUiState(
     val currentTrack: AudioTrack? = null,
     val isPlaying: Boolean = false,
-    val positionMs: Long = 0L,
-    val durationMs: Long = 0L,
     val shuffleEnabled: Boolean = false,
     val repeatMode: RepeatMode = RepeatMode.OFF,
     val queue: List<AudioTrack> = emptyList(),
@@ -60,6 +74,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+
+    // Çalma konumu 500 ms'de bir SADECE bu flow üzerinden yayınlanır.
+    // uiState'e yazılmadığı için NowPlayingSheet'in tamamı artık her tikte recompose olmaz.
+    private val _progress = MutableStateFlow(PlaybackProgress())
+    val progress: StateFlow<PlaybackProgress> = _progress.asStateFlow()
 
     private var queueTracks: List<AudioTrack> = emptyList()
     private var originalQueue: List<AudioTrack> = emptyList()
@@ -102,8 +121,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             flushListeningTime()
             val track = queueTracks.find { it.id.toString() == mediaItem?.mediaId }
-            _uiState.value = _uiState.value.copy(
-                currentTrack = track,
+            _uiState.value = _uiState.value.copy(currentTrack = track)
+            _progress.value = PlaybackProgress(
                 positionMs = 0L,
                 durationMs = controller?.duration?.coerceAtLeast(0L) ?: 0L
             )
@@ -115,7 +134,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            _uiState.value = _uiState.value.copy(
+            _progress.value = _progress.value.copy(
                 durationMs = controller?.duration?.coerceAtLeast(0L) ?: 0L
             )
         }
@@ -186,10 +205,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             queue = restored,
             currentTrack = current,
             isPlaying = c.isPlaying,
-            positionMs = c.currentPosition.coerceAtLeast(0L),
-            durationMs = c.duration.coerceAtLeast(0L),
             shuffleEnabled = c.shuffleModeEnabled,
             repeatMode = mode
+        )
+        _progress.value = PlaybackProgress(
+            positionMs = c.currentPosition.coerceAtLeast(0L),
+            durationMs = c.duration.coerceAtLeast(0L)
         )
         if (c.isPlaying) {
             val now = System.currentTimeMillis()
@@ -222,10 +243,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     if (c.isPlaying) {
                         accrueListeningTime()
                     }
-                    _uiState.value = _uiState.value.copy(
+                    // SADECE _progress güncellenir; _uiState'e dokunulmaz.
+                    // Böylece uiState toplayan hiçbir composable bu tikten etkilenmez.
+                    _progress.value = PlaybackProgress(
                         positionMs = c.currentPosition.coerceAtLeast(0L),
-                        durationMs = c.duration.coerceAtLeast(0L),
-                        totalListeningMs = _totalListeningMsLive.value
+                        durationMs = c.duration.coerceAtLeast(0L)
                     )
                 } else if (c?.isPlaying == true) {
                     accrueListeningTime()
@@ -403,9 +425,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _uiState.value = _uiState.value.copy(
                 queue = listOf(track),
                 currentTrack = track,
-                positionMs = 0L,
                 currentPlaylistName = null
             )
+            _progress.value = PlaybackProgress()
             extractGlowColor(track)
             loadLyrics(track)
         }
@@ -440,9 +462,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.value = _uiState.value.copy(
             queue = tracks,
             currentTrack = tracks.getOrNull(startIndex),
-            positionMs = 0L,
             currentPlaylistName = playlistName
         )
+        _progress.value = PlaybackProgress()
     }
 
     fun togglePlayPause() {
@@ -462,12 +484,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun onSeekPreview(positionMs: Long) {
         isUserSeeking = true
-        _uiState.value = _uiState.value.copy(positionMs = positionMs)
+        _progress.value = _progress.value.copy(positionMs = positionMs)
     }
 
     fun onSeekCommit(positionMs: Long) {
         controller?.seekTo(positionMs)
-        _uiState.value = _uiState.value.copy(positionMs = positionMs)
+        _progress.value = _progress.value.copy(positionMs = positionMs)
         isUserSeeking = false
     }
 
@@ -480,17 +502,33 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         c.shuffleModeEnabled = !c.shuffleModeEnabled
     }
 
+    /**
+     * Remix, SADECE çalan parçadan SONRAKİ parçaları karıştırır/geri alır.
+     *
+     * Eski davranış çalan parçayı da index 0'a taşıyordu; bu yüzden art arda basınca
+     * player'daki `moveMediaItem` çağrıları çalan parçayı oynatıyor ve NowPlayingSheet'teki
+     * kapak grid'i "şu an çalan / sıradaki şarkı yer değiştirdi" gibi görünüyordu.
+     * Artık çalan parça ve öncesindeki parçalar HİÇ dokunulmadan kalır — remix'in tek
+     * görünür etkisi Queue drawer'ındaki sıradaki şarkı listesidir.
+     */
     fun remixQueue() {
         val c = controller ?: return
         val current = _uiState.value.queue
         val currentTrack = _uiState.value.currentTrack
         if (current.size <= 1 || currentTrack == null) return
 
+        val currentIndex = current.indexOfFirst { it.id == currentTrack.id }.coerceAtLeast(0)
+        val head = current.take(currentIndex + 1)            // çalan parça dahil, dokunulmaz
+        val upcoming = current.drop(currentIndex + 1)        // sadece bunlar karışır
+
         if (remixActive) {
-            val restoreQueue = originalQueue
-                .takeIf { it.size == current.size && it.map(AudioTrack::id).toSet() == current.map(AudioTrack::id).toSet() }
-                ?: current
-            if (restoreQueue !== current && restoreQueue != current) {
+            // Geri al: sıradaki parçaları orijinal göreli sıralarına döndür.
+            // Orijinal sıradan yalnızca hâlâ "sıradaki" kümede olan parçalar alınır;
+            // böylece bu arada queue'dan silinen/eklenen parçalar sorun çıkarmaz.
+            val upcomingIds = upcoming.map(AudioTrack::id).toSet()
+            val restoredUpcoming = originalQueue.filter { it.id in upcomingIds }
+            val restoreQueue = if (restoredUpcoming.size == upcoming.size) head + restoredUpcoming else current
+            if (restoreQueue != current) {
                 reorderPlayerPlaylist(c, current, restoreQueue)
             }
             queueTracks = restoreQueue
@@ -501,11 +539,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
+        if (upcoming.size <= 1) {
+            // Karıştırılacak sıradaki parça yoksa remix görsel olarak hiçbir şey yapmasın.
+            return
+        }
+
         originalQueue = current
-        val currentIndex = current.indexOfFirst { it.id == currentTrack.id }.coerceAtLeast(0)
-        val currentTrackItem = current.getOrNull(currentIndex) ?: return
-        val rest = current.filterIndexed { i, _ -> i != currentIndex }.shuffled()
-        val newOrder = listOf(currentTrackItem) + rest
+        val newOrder = head + upcoming.shuffled()
         reorderPlayerPlaylist(c, current, newOrder)
 
         queueTracks = newOrder
@@ -546,10 +586,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.value = _uiState.value.copy(
             queue = newOrder,
             currentTrack = startTrack,
-            positionMs = 0L,
             shuffleEnabled = true,
             currentPlaylistName = playlistName
         )
+        _progress.value = PlaybackProgress()
     }
 
     /**

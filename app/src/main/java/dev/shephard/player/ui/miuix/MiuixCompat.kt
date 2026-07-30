@@ -37,7 +37,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @RequiresOptIn(level = RequiresOptIn.Level.WARNING)
@@ -222,12 +221,21 @@ fun Card(
 class SliderColors
 object SliderDefaults {
     @Composable fun colors(
-        thumbColor: Color = MiuixAppTheme.colorScheme.primary,
+        thumbColor: Color = Color.White,
         activeTrackColor: Color = MiuixAppTheme.colorScheme.primary,
         inactiveTrackColor: Color = MiuixAppTheme.colorScheme.onSurfaceVariant,
     ) = SliderColors()
 }
 
+/**
+ * Miuix Slider.
+ *
+ * Miuix'in kendi varsayılanı `thumbColor = colorScheme.onPrimary`. Lambda'da `onPrimary`,
+ * accent rengin parlaklığına göre siyaha düşebiliyor (ör. varsayılan yeşil accent'te
+ * onPrimary = #111111) — bu yüzden tema ayarlarındaki slider'ların ucundaki yuvarlak
+ * simge SİYAH görünüyordu. Orijinal Miuix'te bu tutamak her zaman beyazdır, o yüzden
+ * burada thumb rengini accent'ten bağımsız olarak sabit beyaza kilitliyoruz.
+ */
 @Composable
 fun Slider(
     value: Float,
@@ -242,6 +250,10 @@ fun Slider(
     modifier = modifier,
     valueRange = valueRange,
     onValueChangeFinished = onValueChangeFinished,
+    colors = top.yukonga.miuix.kmp.basic.SliderDefaults.sliderColors(
+        thumbColor = Color.White,
+        disabledThumbColor = Color.White.copy(alpha = 0.5f),
+    ),
 )
 
 @Composable
@@ -355,30 +367,11 @@ fun FilledTonalButton(
     content: @Composable RowScope.() -> Unit,
 ) = Button(onClick = onClick, modifier = modifier, content = content)
 
-class SheetState
-@Composable fun rememberModalBottomSheetState(skipPartiallyExpanded: Boolean = false) = remember { SheetState() }
-
-@Composable
-fun ModalBottomSheet(
-    onDismissRequest: () -> Unit,
-    sheetState: SheetState,
-    modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-    containerColor: Color = MiuixAppTheme.colorScheme.surface,
-    contentColor: Color = MiuixAppTheme.colorScheme.onSurface,
-    dragHandle: @Composable (() -> Unit)? = null,
-    content: @Composable () -> Unit,
-) {
-    OverlayBottomSheet(
-        show = true,
-        modifier = modifier,
-        backgroundColor = containerColor,
-        cornerRadius = 28.dp,
-        onDismissRequest = onDismissRequest,
-        dragHandleColor = MiuixAppTheme.colorScheme.onSurfaceVariant,
-        content = content,
-    )
-}
+// Eski `ModalBottomSheet` / `SheetState` / `rememberModalBottomSheetState` uyumluluk
+// katmanı TAMAMEN kaldırıldı. `OverlayBottomSheet` tabanlıydı, Scaffold'un popup host'una
+// bağımlıydı ve NowPlaying gibi Scaffold dışı yerlerden açılamıyordu.
+// Yerine: dev.shephard.player.ui.components.MiuixDrawer (WindowBottomSheet tabanlı,
+// InstallerX'in miuix install dialogundaki drawer ile birebir aynı).
 
 
 

@@ -85,9 +85,19 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
-    implementation("androidx.activity:activity-compose:1.9.1")
+    // KRİTİK — Miuix 0.9.3 içindeki her bottom sheet / dialog / popup,
+    // `androidx.navigationevent.compose.NavigationBackHandler` kullanıyor. Bu API
+    // `LocalNavigationEventDispatcherOwner`'ın sağlanmış olmasını ZORUNLU tutar ve o owner'ı
+    // ancak androidx.activity 1.12+ (ComponentActivity) sağlar. Proje daha önce
+    // activity-compose 1.9.1 kullanıyordu; bu yüzden HERHANGİ bir drawer (queue, lyrics,
+    // edit music, edit playlist, dil seçimi...) açılmaya çalışıldığında
+    // `IllegalStateException: No NavigationEventDispatcherOwner was provided` fırlatılıyor
+    // ve uygulama çöküyordu. Miuix'in ve InstallerX'in kendi kullandığı sürümlere
+    // hizalıyoruz.
+    implementation("androidx.core:core-ktx:1.19.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.navigationevent:navigationevent-compose:1.1.2")
 
     implementation(platform("androidx.compose:compose-bom:2026.06.01"))
     implementation("androidx.compose.ui:ui")
@@ -101,15 +111,15 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-shader-android:0.9.3")
 
-    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation("androidx.navigation:navigation-compose:2.9.8")
     implementation("sh.calvin.reorderable:reorderable:3.0.0")
 
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-session:1.4.1")
     implementation("androidx.media3:media3-common:1.4.1")
 
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("com.google.guava:guava:33.2.1-android")
     implementation("io.coil-kt:coil-compose:2.6.0")
