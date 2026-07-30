@@ -108,6 +108,9 @@ dependencies {
     // Miuix / ComposeX stack — UI components + real Liquid Glass backdrop pipeline.
     implementation("top.yukonga.miuix.kmp:miuix-ui:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-preference:0.9.3")
+    // Miuix'in kendi ikon seti — Cover editleme drawer'larındaki ✓ (Ok) ve × (Close)
+    // işaretleri buradan geliyor (InstallerX de aynı artefaktı kullanıyor).
+    implementation("top.yukonga.miuix.kmp:miuix-icons:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-shader-android:0.9.3")
 

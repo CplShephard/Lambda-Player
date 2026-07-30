@@ -26,7 +26,16 @@ private fun routeOrder(route: String?): Int = when (route) {
     else -> 0
 }
 
-// Ekranlar arası animasyon — IntOffset spring ile
+/** Settings altındaki (dock'suz) detay sayfaları. */
+private val settingsSubRoutes = setOf(
+    SettingsRoutes.Theme,
+    SettingsRoutes.Player,
+    SettingsRoutes.About
+)
+
+private fun isSettingsSubRoute(route: String?): Boolean = route in settingsSubRoutes
+
+// Sekmeler arası (Music ↔ Playlists ↔ Settings) yatay kayma — IntOffset spring ile
 private val springSpec = spring<androidx.compose.ui.unit.IntOffset>(
     dampingRatio = 0.8f,
     stiffness = 380f
@@ -50,36 +59,56 @@ fun NavGraph(
         navController = navController,
         startDestination = Destination.Music.route,
         modifier = modifier,
-        // Music→Playlist→Settings: soldan sağa sıralama → ileri = sola kayar
+        // MADDE 8 — Settings alt sayfalarına girerken InstallerX/MIUIX "push" animasyonu:
+        // yeni sayfa TAMAMEN sağdan gelir, alttaki sayfa paralaksla hafifçe sola kayar.
+        // Alt sekmeler arası geçiş (Music/Playlists/Settings) ise eskisi gibi sıralamaya
+        // göre sola/sağa kayan yatay geçiş olarak kalıyor — orada "push" mantığı yok,
+        // sekmeler eşit seviyede.
         enterTransition = {
-            val fromIdx = routeOrder(initialState.destination.route)
-            val toIdx = routeOrder(targetState.destination.route)
-            val dir = if (toIdx >= fromIdx)
-                AnimatedContentTransitionScope.SlideDirection.Left
-            else
-                AnimatedContentTransitionScope.SlideDirection.Right
-            slideIntoContainer(dir, springSpec) + fadeIn(fadeSpring)
+            if (isSettingsSubRoute(targetState.destination.route)) {
+                PageTransitions.enterPush
+            } else {
+                val fromIdx = routeOrder(initialState.destination.route)
+                val toIdx = routeOrder(targetState.destination.route)
+                val dir = if (toIdx >= fromIdx)
+                    AnimatedContentTransitionScope.SlideDirection.Left
+                else
+                    AnimatedContentTransitionScope.SlideDirection.Right
+                slideIntoContainer(dir, springSpec) + fadeIn(fadeSpring)
+            }
         },
         exitTransition = {
-            val fromIdx = routeOrder(initialState.destination.route)
-            val toIdx = routeOrder(targetState.destination.route)
-            val dir = if (toIdx >= fromIdx)
-                AnimatedContentTransitionScope.SlideDirection.Left
-            else
-                AnimatedContentTransitionScope.SlideDirection.Right
-            slideOutOfContainer(dir, springSpec) + fadeOut(fadeSpring)
+            if (isSettingsSubRoute(targetState.destination.route)) {
+                PageTransitions.exitPush
+            } else {
+                val fromIdx = routeOrder(initialState.destination.route)
+                val toIdx = routeOrder(targetState.destination.route)
+                val dir = if (toIdx >= fromIdx)
+                    AnimatedContentTransitionScope.SlideDirection.Left
+                else
+                    AnimatedContentTransitionScope.SlideDirection.Right
+                slideOutOfContainer(dir, springSpec) + fadeOut(fadeSpring)
+            }
         },
         popEnterTransition = {
-            slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.Right,
-                springSpec
-            ) + fadeIn(fadeSpring)
+            if (isSettingsSubRoute(initialState.destination.route)) {
+                PageTransitions.popEnterPush
+            } else {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Right,
+                    springSpec
+                ) + fadeIn(fadeSpring)
+            }
         },
         popExitTransition = {
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Right,
-                springSpec
-            ) + fadeOut(fadeSpring)
+            if (isSettingsSubRoute(initialState.destination.route)) {
+                PageTransitions.popExitPush
+            } else {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Right,
+                    springSpec
+                ) + fadeOut(fadeSpring)
+            }
         }
     ) {
         composable(Destination.Music.route) {

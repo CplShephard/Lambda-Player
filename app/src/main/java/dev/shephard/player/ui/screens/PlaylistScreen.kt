@@ -62,6 +62,8 @@ import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.IconButton
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.components.MiuixDrawer
+import dev.shephard.player.ui.components.MiuixDrawerActionHeader
+import dev.shephard.player.ui.navigation.PageTransitions
 import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.miuix.OutlinedTextField
 import dev.shephard.player.ui.miuix.Text
@@ -323,20 +325,22 @@ fun PlaylistScreen(
 
     androidx.activity.compose.BackHandler(enabled = openIndex != null) { openIndex = null }
 
+    // MADDE 8 — playlist detayına girerken de Settings alt sayfalarındaki ile BİREBİR
+    // aynı InstallerX/MIUIX "push" animasyonu kullanılıyor (ortak `PageTransitions`).
     androidx.compose.animation.AnimatedContent(
         targetState = openIndex,
         transitionSpec = {
             if (targetState != null) {
-                // opening detail: slide in from right
+                // Detaya giriş: yeni sayfa tamamen sağdan gelir, liste paralaksla sola kayar.
                 androidx.compose.animation.ContentTransform(
-                    targetContentEnter = androidx.compose.animation.slideInHorizontally { it } + androidx.compose.animation.fadeIn(),
-                    initialContentExit = androidx.compose.animation.slideOutHorizontally { -it / 3 } + androidx.compose.animation.fadeOut()
+                    targetContentEnter = PageTransitions.enterPush,
+                    initialContentExit = PageTransitions.exitPush
                 )
             } else {
-                // going back: slide in from left
+                // Geri: liste paralaks konumundan yerine döner, detay tamamen sağa çıkar.
                 androidx.compose.animation.ContentTransform(
-                    targetContentEnter = androidx.compose.animation.slideInHorizontally { -it / 3 } + androidx.compose.animation.fadeIn(),
-                    initialContentExit = androidx.compose.animation.slideOutHorizontally { it } + androidx.compose.animation.fadeOut()
+                    targetContentEnter = PageTransitions.popEnterPush,
+                    initialContentExit = PageTransitions.popExitPush
                 )
             }
         },
@@ -457,10 +461,11 @@ fun PlaylistScreen(
         MiuixDrawer(
             onDismissRequest = { trackPickerForIndex = null },
         ) {
+            // MADDE 6 — "add tracks" drawer'ı alçaltıldı.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.88f)
+                    .fillMaxHeight(0.68f)
                     .padding(20.dp)
             ) {
                 Text(strings.addTracks, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -530,10 +535,10 @@ fun PlaylistScreen(
         MiuixDrawer(
             onDismissRequest = { playlistMenuIndex = null },
         ) {
+            // MADDE 6 — playlist menüsünde üç satır var; içerik kadar yer kaplıyor.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.88f)
                     .padding(16.dp)
             ) {
                 Row(
@@ -632,29 +637,23 @@ fun PlaylistScreen(
     val editIdx = editPlaylistIndex
     if (editIdx != null) {
         val editLiquidGlassOn = LocalBlurEnabled.current
+        val editingPlaylist = playlists.getOrNull(editIdx)
         MiuixDrawer(
             onDismissRequest = { editPlaylistIndex = null },
         ) {
+            // MADDE 4 + MADDE 6 — Playlist düzenleme drawer'ı:
+            //  * artık kapak düzenleme alanı da burada ve 1:1 (kare),
+            //  * Cancel/Save yazı butonları yerine Miuix'in × / ✓ ikonları,
+            //  * sabit `heightIn(min = 260.dp)` kaldırıldı; içerik kadar yer kaplıyor.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp)
-                    .heightIn(min = 260.dp)
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
-                Text(strings.editPlaylist, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(18.dp))
-                OutlinedTextField(
-                    value = editPlaylistName,
-                    onValueChange = { editPlaylistName = it },
-                    label = { Text(strings.playlistName) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(22.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { editPlaylistIndex = null }) { Text(strings.cancel) }
-                    Spacer(Modifier.width(8.dp))
-                    TextButton(onClick = {
+                MiuixDrawerActionHeader(
+                    title = strings.editPlaylist,
+                    onCancel = { editPlaylistIndex = null },
+                    onConfirm = {
                         val name = editPlaylistName.trim()
                         if (name.isNotEmpty() && editIdx in playlists.indices) {
                             val pl = playlists[editIdx]
@@ -663,9 +662,70 @@ fun PlaylistScreen(
                             scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
                         }
                         editPlaylistIndex = null
-                    }) { Text(strings.save) }
+                    }
+                )
+                Spacer(Modifier.height(16.dp))
+                if (editingPlaylist != null && !editingPlaylist.isSystem) {
+                    val editCoverTracks = remember(editingPlaylist, tracks, likedIds) {
+                        resolvePlaylistTracks(editingPlaylist, tracks, likedIds)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .size(168.dp)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                            .bounceClick {
+                                showCoverPickerForIndex = editIdx
+                                coverPicker.launch(arrayOf("image/*"))
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val editCover = editingPlaylist.coverUri?.let { Uri.parse(it) }
+                            ?: editCoverTracks.firstOrNull()?.albumArtUri
+                        if (editCover != null) {
+                            AsyncImage(
+                                model = editCover,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.LibraryMusic,
+                                contentDescription = null,
+                                tint = MiuixAppTheme.colorScheme.primary,
+                                modifier = Modifier.size(48.dp)
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(8.dp)
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MiuixAppTheme.colorScheme.surface.copy(alpha = 0.7f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = null,
+                                tint = MiuixAppTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
                 }
-                Spacer(Modifier.height(24.dp))
+                OutlinedTextField(
+                    value = editPlaylistName,
+                    onValueChange = { editPlaylistName = it },
+                    label = { Text(strings.playlistName) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(20.dp))
             }
         }
     }
@@ -1025,7 +1085,11 @@ private fun PlaylistGridCard(
                 Icon(
                     imageVector = Icons.Filled.PlayArrow,
                     contentDescription = strings.play,
-                    tint = if (liquidGlassOn) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onPrimary,
+                    // MADDE 11 — daire accent (primary) renkle dolduruluyor ama ikon,
+                    // Liquid Glass AÇIKKEN yine `primary` ile boyanıyordu: accent üstüne
+                    // accent = görünmez ikon, yani "içi boş daire". Dolgu her iki durumda
+                    // da `primary` olduğuna göre ikon HER ZAMAN `onPrimary` olmalı.
+                    tint = MiuixAppTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -1128,7 +1192,11 @@ private fun PlaylistDetailView(
             modifier = Modifier
                 .fillMaxSize()
                 .overScrollVertical(),
-            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp)
+            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
+            // MADDE 2 — alphabetical / artist / timeAdded sıralamalarında parça kartları
+            // dipdibe duruyor, arka plandaki card'lar iç içe geçmiş gibi görünüyordu.
+            // MusicScreen'in liste görünümündeki ile aynı nefes payını veriyoruz.
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             item {
                 Row(
@@ -1451,17 +1519,27 @@ private fun DraggablePlaylistTrackRow(
         targetValue = if (isDragged) 6.dp else 0.dp,
         label = "playlistItemElevation"
     )
+    // MADDE 3 — custom sıralamada, diğer üç sıralamanın aksine parçaların arkasında hiç
+    // kart yoktu (arka plan `Color.Transparent`'tı). Artık `PlaylistTrackRow` ile BİREBİR
+    // aynı kartı kullanıyor: aynı köşe yarıçapı (20.dp) ve aynı yarı saydam
+    // surfaceVariant dolgusu. Sürükleme sırasında bunun ÜSTÜNE accent tint biniyor,
+    // böylece taşınan öğe hâlâ ayırt edilebiliyor.
+    val rowShape = RoundedCornerShape(20.dp)
+    val cardColor = MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
             .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onTrackClick() }
-            .shadow(elevation, RoundedCornerShape(12.dp))
+            .shadow(elevation, rowShape)
             .zIndex(if (isDragged) 1f else 0f)
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (isDragged) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.14f)
-                else Color.Transparent
+            .clip(rowShape)
+            .background(cardColor, rowShape)
+            .then(
+                if (isDragged) Modifier.background(
+                    MiuixAppTheme.colorScheme.primary.copy(alpha = 0.14f),
+                    rowShape
+                ) else Modifier
             )
             .padding(vertical = 6.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically

@@ -43,6 +43,7 @@ import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.IconButton
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.components.MiuixDrawer
+import dev.shephard.player.ui.components.MiuixDrawerActionHeader
 import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.miuix.OutlinedTextField
 import dev.shephard.player.ui.miuix.Text
@@ -209,10 +210,11 @@ fun MusicScreen(
         MiuixDrawer(
             onDismissRequest = { selectedTrackForMenu = null },
         ) {
+            // MADDE 6 — bu menüde sadece iki satır var; ekranın %88'ini kaplaması
+            // gereksizdi. İçerik kadar yer kaplıyor.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.88f)
                     .padding(16.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -583,20 +585,19 @@ private fun EditMusicDrawer(
     MiuixDrawer(
         onDismissRequest = onDismiss,
     ) {
+        // MADDE 6 — drawer ekranı fazla kaplıyordu (`fillMaxHeight(0.88f)`, yani ekranın
+        // %88'i). Artık içerik kadar yer kaplıyor; kapak 1:1 kare ve sabit boyutlu
+        // olduğu için toplam yükseklik ideal seviyede kalıyor.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.88f)
-                .padding(16.dp)
+                .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onDismiss) { Text(strings.cancel) }
-                Text(strings.editMusic, fontWeight = FontWeight.SemiBold)
-                TextButton(onClick = {
+            // MADDE 4 — Apply/Cancel yazı butonları yerine Miuix'in ✓ / × ikonları.
+            MiuixDrawerActionHeader(
+                title = strings.editMusic,
+                onCancel = onDismiss,
+                onConfirm = {
                     libraryViewModel.saveTrackOverride(
                         trackId = track.id,
                         title = titleText,
@@ -613,14 +614,18 @@ private fun EditMusicDrawer(
                     )
                     playerViewModel.notifyTrackUpdated(updatedTrack)
                     onDismiss()
-                }) { Text(strings.apply, fontWeight = FontWeight.Bold) }
-            }
+                }
+            )
             Spacer(Modifier.height(16.dp))
+            // MADDE 4 — kapak önizlemesi 16:9 (160dp yükseklikte tam genişlik) idi;
+            // oysa kırpma zaten 1:1 yapıyordu, bu yüzden önizleme yanlış oranı
+            // gösteriyordu. Artık ortalanmış gerçek bir 1:1 kare.
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .align(Alignment.CenterHorizontally)
+                    .size(168.dp)
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(16.dp))
                     .background(MiuixAppTheme.colorScheme.surfaceVariant)
                     .bounceClick { coverPicker.launch(arrayOf("image/*")) },
                 contentAlignment = Alignment.Center

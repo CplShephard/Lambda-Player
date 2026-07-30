@@ -93,7 +93,7 @@ fun CustomColorPickerDialog(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.88f)
+                .fillMaxHeight(0.74f)
                 .padding(20.dp)
         ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @RequiresOptIn(level = RequiresOptIn.Level.WARNING)
@@ -146,12 +147,23 @@ fun Text(
     overflow = overflow,
 )
 
+/**
+ * MADDE 1 — Dock'taki ikonlar tema rengini almıyordu.
+ *
+ * Sebep: bu sarmalayıcı `tint` varsayılanını `colorScheme.onSurface` olarak SABİTLİYORDU.
+ * Miuix'in gerçek `Icon`'u ise varsayılan olarak `LocalContentColor`'ı kullanır. Dock
+ * (`FloatingBottomBarItem`) seçili/seçili olmayan sekme rengini tam olarak
+ * `LocalContentColor` üzerinden sağlıyor: `Text` bu yüzden doğru rengi alıyordu, `Icon`
+ * ise sabitlenmiş `onSurface` yüzünden almıyordu. Varsayılanı Miuix ile aynı hale
+ * getiriyoruz — böylece dock, Card, BasicComponent gibi content-color sağlayan her
+ * kapsayıcıda ikonlar da metinle aynı rengi alır.
+ */
 @Composable
 fun Icon(
     imageVector: ImageVector,
     contentDescription: String?,
     modifier: Modifier = Modifier,
-    tint: Color = MiuixAppTheme.colorScheme.onSurface,
+    tint: Color = LocalContentColor.current,
 ) = top.yukonga.miuix.kmp.basic.Icon(
     imageVector = imageVector,
     contentDescription = contentDescription,

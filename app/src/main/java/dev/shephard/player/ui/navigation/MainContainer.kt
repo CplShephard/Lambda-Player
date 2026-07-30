@@ -233,9 +233,15 @@ fun MainContainer(
                                     .fillMaxWidth()
                                     .navigationBarsPadding()
                             ) {
+                                // MADDE 5 — Settings alt sayfalarına (Theme / Player /
+                                // About) girince dock zaten gizleniyordu ama müzik
+                                // çalar pop-up'ı (mini player) orada da görünmeye devam
+                                // ediyordu. Artık mini player da sadece ana sekmelerde
+                                // gösteriliyor; alt sayfalarda ekran tamamen içeriğe
+                                // kalıyor.
                                 MiniPlayerHost(
                                     playerViewModel = playerViewModel,
-                                    visible = hasMiniPlayer,
+                                    visible = hasMiniPlayer && isBottomRoute,
                                     onOpenNowPlaying = { showNowPlaying = true }
                                 )
 

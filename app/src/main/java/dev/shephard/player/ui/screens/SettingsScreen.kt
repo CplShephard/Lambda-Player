@@ -82,6 +82,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
@@ -109,6 +110,7 @@ import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
 import dev.shephard.player.ui.components.CustomColorPickerDialog
 import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.bgeffect.BgEffectBackground
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
@@ -505,7 +507,20 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    // MADDE 9 — About sayfasına özel dinamik ışık (InstallerX'in BgEffect'i).
+    // Renkler morumsu/mavimsi yerine YEŞİLİMSİ / AÇIK MAVİMSİ (bkz. BgEffectConfig).
+    // Sayfa aşağı kaydırıldıkça (header solarken) ışık da yumuşakça sönüyor — InstallerX
+    // About'ta olduğu gibi.
+    val isDarkTheme = MiuixAppTheme.colorScheme.background.luminance() < 0.5f
+    BgEffectBackground(
+        isDarkTheme = isDarkTheme,
+        modifier = Modifier.fillMaxSize(),
+        isFullSize = false,
+        // Lambda'da About sayfasının ARKASINDA duvar kağıdı var; opak bir dolgu onu
+        // gizlerdi. Bu yüzden efekt saydam zeminin üzerine biniyor.
+        surface = Color.Transparent,
+        alpha = { 1f - scrollProgress * 0.85f }
+    ) {
         // Sticky animated header (liste bunun ÜZERİNDEN kayar)
         Column(
             modifier = Modifier
@@ -596,6 +611,13 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                             title = "GitHub",
                             summary = "CplShephard",
                             onClick = { uriHandler.openUri("https://github.com/CplShephard") }
+                        )
+                        // MADDE 9 — InstallerX About'taki "Open Source Licenses" satırının
+                        // yerinde artık Lambda Player'ın kendi kaynak kodu bağlantısı var.
+                        ArrowPreference(
+                            title = "Lambda Player Source Code",
+                            summary = "github.com/CplShephard/Lambda-Player",
+                            onClick = { uriHandler.openUri("https://github.com/CplShephard/Lambda-Player") }
                         )
                         ArrowPreference(
                             title = "Miuix",

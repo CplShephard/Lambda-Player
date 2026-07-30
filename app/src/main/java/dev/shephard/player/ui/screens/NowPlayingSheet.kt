@@ -534,6 +534,10 @@ fun NowPlayingSheet(
                 val trackId = track?.id ?: -1L
                 val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
 
+                // MADDE 10 — bu iki tuş Blur AÇILINCA arkalarında cam bir daire
+                // kazanıyordu (`backgroundColor = Color.Transparent` verilince
+                // BouncyIconButton `blurSurfaceCompact` uyguluyor). Oysa bu tuşların
+                // blur ile bir ilgisi yok; her iki durumda da sade ikon olmalılar.
                 BouncyIconButton(
                     onClick = {
                         showQueue = true
@@ -541,8 +545,7 @@ fun NowPlayingSheet(
                     icon = Icons.AutoMirrored.Filled.QueueMusic,
                     contentDescription = strings.queue,
                     tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                    iconSize = 28.dp,
-                    backgroundColor = if (nowPlayingLiquidGlassOn) Color.Transparent else null
+                    iconSize = 28.dp
                 )
                 BouncyIconButton(
                     onClick = {
@@ -551,26 +554,17 @@ fun NowPlayingSheet(
                     icon = Icons.Filled.Lyrics,
                     contentDescription = strings.lyrics,
                     tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                    iconSize = 28.dp,
-                    backgroundColor = if (nowPlayingLiquidGlassOn) Color.Transparent else null
+                    iconSize = 28.dp
                 )
+                // MADDE 10 — beğen/ekle tuşu da Blur ile birlikte görünüm değiştiriyordu.
+                // Artık her iki durumda da aynı düz dolgulu daire.
                 Box(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .then(
-                            if (nowPlayingLiquidGlassOn) {
-                                Modifier.blurSurfaceCompact(
-                                    enabled = true,
-                                    shape = CircleShape,
-                                    tint = if (isLiked) GlassTint.ACCENT else GlassTint.SURFACE
-                                )
-                            } else {
-                                Modifier.background(
-                                    if (isLiked) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
-                                    else MiuixAppTheme.colorScheme.surfaceVariant
-                                )
-                            }
+                        .background(
+                            if (isLiked) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
+                            else MiuixAppTheme.colorScheme.surfaceVariant
                         )
                         .bounceClick {
                             if (trackId > 0) {
@@ -652,7 +646,7 @@ fun NowPlayingSheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(16.dp)
-                                .fillMaxHeight(0.88f)
+                                .fillMaxHeight(0.72f)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                                 Text(strings.lyrics, style = MiuixAppTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
@@ -760,21 +754,16 @@ fun NowPlayingSheet(
                     tint = MiuixAppTheme.colorScheme.onBackground,
                     iconSize = 36.dp
                 )
+                // MADDE 10 — ÇAL/DURAKLAT tuşu Blur açılınca `blurSurface(GlassTint.ACCENT)`
+                // ile yarı saydam ve KOYU bir daireye dönüşüyordu; üstündeki ikon ise
+                // `onPrimary` (açık yeşil accent'te #111111, yani koyu) olduğu için tuş
+                // neredeyse okunmaz hale geliyordu. Bu tuş çalar arayüzünün ana eylemi;
+                // blur ayarından etkilenmemeli. Artık her zaman düz accent dolgulu.
                 Box(
                     modifier = Modifier
                         .size(72.dp)
                         .clip(CircleShape)
-                        .then(
-                            if (nowPlayingLiquidGlassOn) {
-                                Modifier.blurSurface(
-                                    enabled = true,
-                                    shape = CircleShape,
-                                    tint = GlassTint.ACCENT
-                                )
-                            } else {
-                                Modifier.background(MiuixAppTheme.colorScheme.primary)
-                            }
-                        )
+                        .background(MiuixAppTheme.colorScheme.primary)
                         .bounceClick {
                             playButtonScope.launch {
                                 playButtonScale.animateTo(0.85f, androidx.compose.animation.core.tween(80))
@@ -964,11 +953,12 @@ private fun AddToPlaylistDrawer(
     MiuixDrawer(
         onDismissRequest = onDismiss,
     ) {
+        // MADDE 6 — "add to playlist" drawer'ı da alçaltıldı.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-                .fillMaxHeight(0.88f)
+                .fillMaxHeight(0.62f)
         ) {
             Text(strings.addToPlaylist, style = MiuixAppTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
@@ -1120,10 +1110,13 @@ private fun QueueList(
     }
 
     val queueLiquidGlassOn = LocalBlurEnabled.current
+    // MADDE 6 — sıra (queue) drawer'ı ekranın %88'ini kaplıyordu. Kaydırılabilir bir
+    // liste içerdiği için sınırlı bir yüksekliğe ihtiyacı var; %66 hem listeyi rahat
+    // gösteriyor hem de arkadaki çalar ekranını görünür bırakıyor.
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .fillMaxHeight(0.88f)
+            .fillMaxHeight(0.66f)
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Text(

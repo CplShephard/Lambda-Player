@@ -2,8 +2,10 @@ package dev.shephard.player.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import dev.shephard.player.player.ThemeModePreference
+import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
@@ -55,5 +57,19 @@ fun LambdaPlayerTheme(
         )
     }
 
-    MiuixTheme(colors = colors, content = content)
+    // KRİTİK BUGFIX (madde 1 + madde 10):
+    // Miuix'in `MiuixTheme(colors = ...)` overload'ı — projenin kullandığı sürüm —
+    // `LocalContentColor`'ı SAĞLAMIYOR (sadece `MiuixTheme(controller = ...)` overload'ı
+    // sağlıyor). `LocalContentColor`'ın kütüphane varsayılanı ise `Color.Black`.
+    // Miuix `Text`/`Icon` renk verilmediğinde `LocalContentColor`'a düşüyor; bu yüzden
+    //   * karanlık modda bile bazı drawer yazıları SİYAH çıkıyordu (madde 10),
+    //   * dock'ta metin `LocalContentColor` üzerinden tema rengini alırken ikonlar
+    //     alamıyordu (madde 1).
+    // Temanın onBackground rengini burada sağlayarak her iki sorunu da kökünden çözüyoruz.
+    MiuixTheme(colors = colors) {
+        CompositionLocalProvider(
+            LocalContentColor provides colors.onBackground,
+            content = content
+        )
+    }
 }
