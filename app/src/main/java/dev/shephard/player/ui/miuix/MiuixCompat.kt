@@ -34,8 +34,10 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -126,6 +128,10 @@ fun Text(
     color: Color = Color.Unspecified,
     style: TextStyle = MiuixAppTheme.typography.bodyMedium,
     fontWeight: FontWeight? = null,
+    // Miuix'in gerçek Text'i bu parametreleri zaten destekliyor; About ekranındaki
+    // InstallerX tarzı başlık (35.sp) ve ortalanmış sürüm satırı için geçiriyoruz.
+    fontSize: TextUnit = TextUnit.Unspecified,
+    textAlign: TextAlign? = null,
     maxLines: Int = Int.MAX_VALUE,
     overflow: TextOverflow = TextOverflow.Clip,
 ) = top.yukonga.miuix.kmp.basic.Text(
@@ -134,6 +140,8 @@ fun Text(
     color = color,
     style = style,
     fontWeight = fontWeight,
+    fontSize = fontSize,
+    textAlign = textAlign,
     maxLines = maxLines,
     overflow = overflow,
 )
