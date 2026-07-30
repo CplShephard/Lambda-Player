@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMiuixApi::class, androidx.compose.animation.ExperimentalAnimationApi::class)
+@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalAnimationApi::class)
 
 package dev.shephard.player.ui.screens
 
@@ -43,7 +43,24 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import dev.shephard.player.ui.miuix.ExperimentalMiuixApi
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Lyrics
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import dev.shephard.player.ui.miuix.ExperimentalMaterial3Api
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.IconButton
 import dev.shephard.player.ui.miuix.MiuixAppTheme
@@ -88,8 +105,6 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.formattedDuration
-import dev.shephard.player.data.slideForwardInQueue
-import dev.shephard.player.data.trackById
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.RepeatMode
@@ -110,8 +125,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import kotlin.math.absoluteValue
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.*
 
 @Composable
 fun NowPlayingSheet(
@@ -428,6 +441,12 @@ fun NowPlayingSheet(
                 BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                     val maxArtHeight = maxHeight * 0.42f
                     val artItemWidth = maxWidth
+                    // Kapak (kare, en fazla maxArtHeight) + altındaki başlık/artist bloğu için
+                    // ayrılan sabit yükseklik. LazyHorizontalGrid'in satır yüksekliğini kendisi
+                    // içerikten çıkaramadığı için (rows = Fixed(1) ile dış constraint gerekir)
+                    // burada elle veriyoruz.
+                    val titleBlockHeight = 92.dp
+                    val artRowHeight = minOf(artItemWidth, maxArtHeight) + titleBlockHeight
 
                     val artSnapLayoutInfoProvider = remember(artGridState) {
                         SnapLayoutInfoProvider(
@@ -448,7 +467,7 @@ fun NowPlayingSheet(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = MiuixIcons.Music,
+                                imageVector = Icons.Filled.MusicNote,
                                 contentDescription = null,
                                 tint = MiuixAppTheme.colorScheme.primary,
                                 modifier = Modifier.size(72.dp)
@@ -464,78 +483,73 @@ fun NowPlayingSheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 24.dp)
-                                .aspectRatio(1f)
-                                .heightIn(max = maxArtHeight)
+                                .height(artRowHeight)
                         ) {
                             gridItemsIndexed(
                                 items = artSwipeItems,
                                 key = { _, item -> item.id }
                             ) { _, itemTrack ->
-                                Box(
-                                    modifier = Modifier
-                                        .width(artItemWidth)
-                                        .fillMaxHeight()
-                                        .clip(RoundedCornerShape(28.dp))
-                                        .background(MiuixAppTheme.colorScheme.surfaceVariant),
-                                    contentAlignment = Alignment.Center
+                                // Kapak VE başlık/artist aynı swipe item'ının içinde: parmak
+                                // kapağı kaydırırken ikisi de fiziksel olarak birlikte hareket
+                                // eder — ayrı bir AnimatedContent ile "senkronize" etmeye gerek
+                                // kalmaz, çünkü zaten aynı scroll offsetini paylaşıyorlar.
+                                Column(
+                                    modifier = Modifier.width(artItemWidth),
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    var artLoaded by remember(itemTrack.id) { mutableStateOf(false) }
-                                    AsyncImage(
-                                        model = itemTrack.albumArtUri,
-                                        contentDescription = null,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop,
-                                        onState = { artLoaded = it is AsyncImagePainter.State.Success }
-                                    )
-                                    if (!artLoaded) {
-                                        Icon(
-                                            imageVector = MiuixIcons.Music,
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .aspectRatio(1f)
+                                            .heightIn(max = maxArtHeight)
+                                            .clip(RoundedCornerShape(28.dp))
+                                            .background(MiuixAppTheme.colorScheme.surfaceVariant),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        var artLoaded by remember(itemTrack.id) { mutableStateOf(false) }
+                                        AsyncImage(
+                                            model = itemTrack.albumArtUri,
                                             contentDescription = null,
-                                            tint = MiuixAppTheme.colorScheme.primary,
-                                            modifier = Modifier.size(72.dp)
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop,
+                                            onState = { artLoaded = it is AsyncImagePainter.State.Success }
+                                        )
+                                        if (!artLoaded) {
+                                            Icon(
+                                                imageVector = Icons.Filled.MusicNote,
+                                                contentDescription = null,
+                                                tint = MiuixAppTheme.colorScheme.primary,
+                                                modifier = Modifier.size(72.dp)
+                                            )
+                                        }
+                                    }
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 24.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = itemTrack.title,
+                                            style = MiuixAppTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MiuixAppTheme.colorScheme.onBackground,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(horizontal = 24.dp)
+                                        )
+                                        Text(
+                                            text = itemTrack.artist,
+                                            style = MiuixAppTheme.typography.bodyMedium,
+                                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(horizontal = 24.dp)
                                         )
                                     }
                                 }
                             }
                         }
-                    }
-                }
-
-                // Başlık/artist: şarkı id'sine göre ayrı fade+slide geçişi (kapaktan bağımsız,
-                // yön kuyruktaki konuma göre belirlenir).
-                androidx.compose.animation.AnimatedContent(
-                    targetState = track?.id ?: -1L,
-                    transitionSpec = {
-                        val dir = if (slideForwardInQueue(state.queue, initialState, targetState))
-                            androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Left
-                        else
-                            androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection.Right
-                        androidx.compose.animation.ContentTransform(
-                            targetContentEnter = slideIntoContainer(dir, androidx.compose.animation.core.tween(300)) + androidx.compose.animation.fadeIn(),
-                            initialContentExit = slideOutOfContainer(dir, androidx.compose.animation.core.tween(300)) + androidx.compose.animation.fadeOut()
-                        )
-                    },
-                    label = "titleSwap",
-                    modifier = Modifier.fillMaxWidth()
-                ) { targetId ->
-                    val displayTrack = state.queue.trackById(targetId) ?: track
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = displayTrack?.title ?: strings.nothingPlaying,
-                            style = MiuixAppTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MiuixAppTheme.colorScheme.onBackground
-                        )
-                        Text(
-                            text = displayTrack?.artist ?: strings.pickASong,
-                            style = MiuixAppTheme.typography.bodyMedium,
-                            color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             }
@@ -595,7 +609,7 @@ fun NowPlayingSheet(
                     onClick = {
                         showQueue = true
                     },
-                    icon = MiuixIcons.Playlist,
+                    icon = Icons.AutoMirrored.Filled.QueueMusic,
                     contentDescription = strings.queue,
                     tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
                     iconSize = 28.dp,
@@ -605,7 +619,7 @@ fun NowPlayingSheet(
                     onClick = {
                         showLyrics = true
                     },
-                    icon = MiuixIcons.Notes,
+                    icon = Icons.Filled.Lyrics,
                     contentDescription = strings.lyrics,
                     tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
                     iconSize = 28.dp,
@@ -641,7 +655,7 @@ fun NowPlayingSheet(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (isLiked) MiuixIcons.Ok else MiuixIcons.Add,
+                        imageVector = if (isLiked) Icons.Filled.Check else Icons.Filled.Add,
                         contentDescription = if (isLiked) "Added" else "Add",
                         tint = if (isLiked) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(24.dp)
@@ -727,7 +741,7 @@ fun NowPlayingSheet(
                                 if (state.lyrics.isEmpty()) {
                                     // File picker button
                                     dev.shephard.player.ui.miuix.IconButton(onClick = { lyricsFilePicker.launch(arrayOf("text/*", "application/octet-stream")) }) {
-                                        Icon(MiuixIcons.Folder, contentDescription = strings.addLyricsFromFile, tint = MiuixAppTheme.colorScheme.onSurfaceVariant)
+                                        Icon(Icons.Filled.FolderOpen, contentDescription = strings.addLyricsFromFile, tint = MiuixAppTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
                             }
@@ -754,7 +768,7 @@ fun NowPlayingSheet(
                                                 }
                                             }
                                         ) {
-                                            Icon(MiuixIcons.Notes, null, modifier = Modifier.size(18.dp))
+                                            Icon(Icons.Filled.Lyrics, null, modifier = Modifier.size(18.dp))
                                             Spacer(Modifier.width(6.dp))
                                             Text(strings.downloadLyrics)
                                         }
@@ -816,14 +830,14 @@ fun NowPlayingSheet(
                 val isRemixed by playerViewModel.isRemixed.collectAsState()
                 BouncyIconButton(
                     onClick = { playerViewModel.remixQueue() },
-                    icon = MiuixIcons.Sort,
+                    icon = Icons.Filled.Shuffle,
                     contentDescription = strings.remix,
                     tint = if (isRemixed) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
                     iconSize = 28.dp
                 )
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToPrevious() },
-                    icon = MiuixIcons.Back,
+                    icon = Icons.Filled.SkipPrevious,
                     contentDescription = strings.previous,
                     tint = MiuixAppTheme.colorScheme.onBackground,
                     iconSize = 36.dp
@@ -868,7 +882,7 @@ fun NowPlayingSheet(
                         label = "playPauseIcon"
                     ) { isPlaying ->
                         Icon(
-                            imageVector = if (isPlaying) MiuixIcons.Pause else MiuixIcons.Play,
+                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (isPlaying) strings.pause else strings.play,
                             tint = MiuixAppTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(36.dp)
@@ -877,14 +891,14 @@ fun NowPlayingSheet(
                 }
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToNext() },
-                    icon = MiuixIcons.Forward,
+                    icon = Icons.Filled.SkipNext,
                     contentDescription = strings.next,
                     tint = MiuixAppTheme.colorScheme.onBackground,
                     iconSize = 36.dp
                 )
                 BouncyIconButton(
                     onClick = { playerViewModel.cycleRepeatMode() },
-                    icon = if (state.repeatMode == RepeatMode.ONE) MiuixIcons.Refresh else MiuixIcons.Refresh,
+                    icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                     contentDescription = strings.repeat,
                     tint = if (state.repeatMode != RepeatMode.OFF) MiuixAppTheme.colorScheme.primary
                     else MiuixAppTheme.colorScheme.onSurfaceVariant,
@@ -963,7 +977,7 @@ private fun AddToPlaylistDrawer(
                                 .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(MiuixIcons.FavoritesFill, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                            Icon(Icons.Filled.Favorite, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
@@ -976,7 +990,7 @@ private fun AddToPlaylistDrawer(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = if (isLiked) MiuixIcons.Ok else MiuixIcons.Add,
+                                imageVector = if (isLiked) Icons.Filled.Check else Icons.Filled.Add,
                                 contentDescription = null,
                                 tint = if (isLiked) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
@@ -1018,7 +1032,7 @@ private fun AddToPlaylistDrawer(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = if (containsTrack) MiuixIcons.Ok else MiuixIcons.Add,
+                                imageVector = if (containsTrack) Icons.Filled.Check else Icons.Filled.Add,
                                 contentDescription = null,
                                 tint = if (containsTrack) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
@@ -1197,7 +1211,7 @@ private fun QueueTrackItem(
                 onSuccess = { loaded = true }
             )
             if (!loaded) {
-                Icon(MiuixIcons.Music, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             }
         }
         Spacer(Modifier.width(10.dp))
@@ -1226,7 +1240,7 @@ private fun QueueTrackItem(
         Spacer(Modifier.width(4.dp))
         if (!isPlaying) {
             Icon(
-                imageVector = MiuixIcons.More,
+                imageVector = Icons.Filled.DragHandle,
                 contentDescription = "Reorder",
                 tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier

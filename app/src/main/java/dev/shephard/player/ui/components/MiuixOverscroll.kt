@@ -1,5 +1,5 @@
 // Bu dosya, Miuix (top.yukonga.miuix.kmp) kütüphanesinin overscroll efektinin
-// Lambda Player'a (saf Android/ComposeX) birebir aynı davranışla taşınmış halidir.
+// Lambda Player'a (saf Android/Jetpack Compose) birebir aynı davranışla taşınmış halidir.
 // Orijinal kaynak: miuix-ui/src/commonMain/kotlin/top/yukonga/miuix/kmp/utils/Overscroll.kt
 //                  miuix-ui/src/commonMain/kotlin/top/yukonga/miuix/kmp/utils/SpringUtils.kt
 // Telif: Copyright 2025, compose-miuix-ui contributors — SPDX-License-Identifier: Apache-2.0

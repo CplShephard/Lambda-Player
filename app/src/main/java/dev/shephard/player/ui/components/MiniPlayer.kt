@@ -22,6 +22,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.Text
@@ -48,8 +54,6 @@ import dev.shephard.player.player.PlayerUiState
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.miuixBlurSurface
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.*
 
 @Composable
 fun MiniPlayer(
@@ -132,7 +136,12 @@ fun MiniPlayer(
                     .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-            // Album art
+            // Album art + track info: TEK bir AnimatedContent içinde birlikte animasyonlanır.
+            // Önceden kapak ve metin ayrı AnimatedContent bloklarıydı; aynı transitionSpec'i
+            // kullansalar da Compose bunları bağımsız iki "oyuncu" gibi ele alıyordu, bu da
+            // şarkı değişiminde ikisinin birbirinden kopuk hareket ediyormuş gibi görünmesine
+            // yol açıyordu. Artık tek content bloğu olduğu için ikisi de aynı animasyonun
+            // parçası ve tam senkron kayıyorlar.
             AnimatedContent(
                 targetState = track.id,
                 transitionSpec = {
@@ -143,72 +152,56 @@ fun MiniPlayer(
                     (slideIntoContainer(dir, tween(300)) + fadeIn() + scaleIn(initialScale = 0.90f))
                         .togetherWith(slideOutOfContainer(dir, tween(300)) + fadeOut() + scaleOut(targetScale = 0.90f))
                 },
-                label = "miniArt"
+                label = "miniArtAndInfo",
+                modifier = Modifier.weight(1f)
             ) { trackId ->
                 val displayTrack = state.queue.trackById(trackId) ?: track
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MiuixAppTheme.colorScheme.background),
-                    contentAlignment = Alignment.Center
-                ) {
-                    var artLoaded by remember(trackId) { mutableStateOf(false) }
-                    AsyncImage(
-                        model = displayTrack.albumArtUri,
-                        contentDescription = null,
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop,
-                        onState = { imageState ->
-                            artLoaded = imageState is AsyncImagePainter.State.Success
-                        }
-                    )
-                    if (!artLoaded) {
-                        Icon(
-                            imageVector = MiuixIcons.Music,
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MiuixAppTheme.colorScheme.background),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        var artLoaded by remember(trackId) { mutableStateOf(false) }
+                        AsyncImage(
+                            model = displayTrack.albumArtUri,
                             contentDescription = null,
-                            tint = MiuixAppTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop,
+                            onState = { imageState ->
+                                artLoaded = imageState is AsyncImagePainter.State.Success
+                            }
+                        )
+                        if (!artLoaded) {
+                            Icon(
+                                imageVector = Icons.Filled.MusicNote,
+                                contentDescription = null,
+                                tint = MiuixAppTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+                        Text(
+                            text = displayTrack.title,
+                            style = MiuixAppTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MiuixAppTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = displayTrack.artist,
+                            style = MiuixAppTheme.typography.bodyMedium,
+                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                }
-            }
-
-            // Track info
-            AnimatedContent(
-                targetState = track.id,
-                transitionSpec = {
-                    val dir = if (slideForwardInQueue(state.queue, initialState, targetState))
-                        AnimatedContentTransitionScope.SlideDirection.Left
-                    else
-                        AnimatedContentTransitionScope.SlideDirection.Right
-                    (slideIntoContainer(dir, tween(300)) + fadeIn() + scaleIn(initialScale = 0.90f))
-                        .togetherWith(slideOutOfContainer(dir, tween(300)) + fadeOut() + scaleOut(targetScale = 0.90f))
-                },
-                label = "miniPlayerTrackInfo",
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp)
-            ) { trackId ->
-                val displayTrack = state.queue.trackById(trackId) ?: track
-                Column {
-                    Text(
-                        text = displayTrack.title,
-                        style = MiuixAppTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MiuixAppTheme.colorScheme.onBackground,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = displayTrack.artist,
-                        style = MiuixAppTheme.typography.bodyMedium,
-                        color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
             }
 
@@ -221,7 +214,7 @@ fun MiniPlayer(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = MiuixIcons.Back,
+                    imageVector = Icons.Filled.SkipPrevious,
                     contentDescription = "Previous",
                     tint = MiuixAppTheme.colorScheme.onBackground
                 )
@@ -244,7 +237,7 @@ fun MiniPlayer(
                     label = "miniPlayPauseIcon"
                 ) { isPlaying ->
                     Icon(
-                        imageVector = if (isPlaying) MiuixIcons.Pause else MiuixIcons.Play,
+                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         contentDescription = if (isPlaying) "Pause" else "Play",
                         tint = MiuixAppTheme.colorScheme.onBackground
                     )
@@ -260,7 +253,7 @@ fun MiniPlayer(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = MiuixIcons.Forward,
+                    imageVector = Icons.Filled.SkipNext,
                     contentDescription = "Next",
                     tint = MiuixAppTheme.colorScheme.onBackground
                 )

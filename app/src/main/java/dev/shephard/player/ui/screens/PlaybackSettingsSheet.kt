@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Headphones
 import dev.shephard.player.ui.miuix.HorizontalDivider
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.IconButton
@@ -27,8 +30,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.ui.i18n.LocalStrings
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.*
 
 @Composable
 fun PlaybackSettingsSheet(
@@ -53,7 +54,7 @@ fun PlaybackSettingsSheet(
         ) {
             IconButton(onClick = onBack) {
                 Icon(
-                    imageVector = MiuixIcons.Back,
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
                     tint = MiuixAppTheme.colorScheme.onBackground
                 )
@@ -164,7 +165,7 @@ private fun ListeningStatsCard(totalListeningMs: Long) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                imageVector = MiuixIcons.Music,
+                imageVector = Icons.Filled.Headphones,
                 contentDescription = null,
                 tint = MiuixAppTheme.colorScheme.primary
             )

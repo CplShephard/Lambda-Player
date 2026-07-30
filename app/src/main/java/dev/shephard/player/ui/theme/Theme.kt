@@ -11,7 +11,7 @@ import top.yukonga.miuix.kmp.theme.lightColorScheme
 @Composable
 fun LambdaPlayerTheme(
     accentArgb: Int = 0xFF22C55E.toInt(),
-    darkTheme: Boolean = false,
+    darkTheme: Boolean = true,
     themeMode: Int = if (darkTheme) ThemeModePreference.DARK else ThemeModePreference.LIGHT,
     dynamicColor: Boolean = false,
     cardAlpha: Float = 0.85f,

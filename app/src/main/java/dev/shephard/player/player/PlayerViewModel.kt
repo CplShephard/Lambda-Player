@@ -713,10 +713,26 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val color = withContext(Dispatchers.IO) {
                 runCatching {
                     val resolver = getApplication<Application>().contentResolver
+                    // Palette sadece renk dağılımıyla ilgilendiği için kapak resmini
+                    // düşük çözünürlükte decode etmek yeterli — tam boyutlu (örn. 3000x3000)
+                    // bir bitmap'i decode edip Palette'e vermek hem CPU hem bellek israfı,
+                    // ve şarkı geçişlerindeki lag'in ana kaynaklarından biriydi.
+                    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    resolver.openInputStream(uri)?.use { s -> BitmapFactory.decodeStream(s, null, bounds) }
+                    val (w, h) = bounds.outWidth to bounds.outHeight
+                    val targetSize = 128
+                    var sampleSize = 1
+                    if (w > 0 && h > 0) {
+                        while ((w / (sampleSize * 2)) >= targetSize && (h / (sampleSize * 2)) >= targetSize) {
+                            sampleSize *= 2
+                        }
+                    }
+                    val decodeOptions = android.graphics.BitmapFactory.Options().apply { inSampleSize = sampleSize }
                     resolver.openInputStream(uri)?.use { stream ->
-                        val bmp = BitmapFactory.decodeStream(stream) ?: return@use null
-                        Palette.from(bmp).generate().vibrantSwatch?.rgb
-                            ?: Palette.from(bmp).generate().dominantSwatch?.rgb
+                        val bmp = BitmapFactory.decodeStream(stream, null, decodeOptions) ?: return@use null
+                        val palette = Palette.from(bmp).generate()
+                        val swatch = palette.vibrantSwatch ?: palette.dominantSwatch
+                        swatch?.rgb
                     }
                 }.getOrNull()
             }

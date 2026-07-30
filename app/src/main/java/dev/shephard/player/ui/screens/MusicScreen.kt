@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMiuixApi::class)
+@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 
 package dev.shephard.player.ui.screens
 
@@ -29,9 +29,15 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FolderOff
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.MusicNote
 import dev.shephard.player.ui.miuix.Button
 import dev.shephard.player.ui.miuix.CircularProgressIndicator
-import dev.shephard.player.ui.miuix.ExperimentalMiuixApi
+import dev.shephard.player.ui.miuix.ExperimentalMaterial3Api
 import dev.shephard.player.ui.miuix.HorizontalDivider
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.IconButton
@@ -82,8 +88,6 @@ import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.*
 
 @Composable
 fun MusicScreen(
@@ -241,7 +245,7 @@ fun MusicScreen(
                             onState = { loaded = it is AsyncImagePainter.State.Success }
                         )
                         if (!loaded) {
-                            Icon(MiuixIcons.Music, null, tint = MiuixAppTheme.colorScheme.primary)
+                            Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary)
                         }
                     }
                     Spacer(Modifier.width(12.dp))
@@ -262,7 +266,7 @@ fun MusicScreen(
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(MiuixIcons.Edit, null, tint = MiuixAppTheme.colorScheme.primary)
+                    Icon(Icons.Filled.Edit, null, tint = MiuixAppTheme.colorScheme.primary)
                     Spacer(Modifier.width(12.dp))
                     Text(strings.editMusic, color = MiuixAppTheme.colorScheme.onBackground)
                 }
@@ -274,7 +278,7 @@ fun MusicScreen(
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(MiuixIcons.Delete, null, tint = MiuixAppTheme.colorScheme.error)
+                    Icon(Icons.Filled.Delete, null, tint = MiuixAppTheme.colorScheme.error)
                     Spacer(Modifier.width(12.dp))
                     Text(strings.delete, color = MiuixAppTheme.colorScheme.error)
                 }
@@ -378,8 +382,8 @@ private fun GridTrackCard(
             .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
             .then(
-                if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
-                else Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                // Liste elemanı: pahalı GPU blur yerine ucuz yarı saydam tint (performans)
+                Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
             )
             .padding(8.dp)
     ) {
@@ -401,7 +405,7 @@ private fun GridTrackCard(
             )
             if (!artLoaded) {
                 Icon(
-                    imageVector = MiuixIcons.Music,
+                    imageVector = Icons.Filled.MusicNote,
                     contentDescription = null,
                     tint = MiuixAppTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp)
@@ -430,7 +434,7 @@ private fun GridTrackCard(
                 )
             }
             IconButton(onClick = onMenuClick, modifier = Modifier.size(32.dp)) {
-                Icon(MiuixIcons.More, null, tint = MiuixAppTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.MoreVert, null, tint = MiuixAppTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -445,8 +449,8 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
             .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
             .then(
-                if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(20.dp))
-                else Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                // Liste elemanı: pahalı GPU blur yerine ucuz yarı saydam tint (performans)
+                Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
             )
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -470,7 +474,7 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
             )
             if (!artLoaded) {
                 Icon(
-                    imageVector = MiuixIcons.Music,
+                    imageVector = Icons.Filled.MusicNote,
                     contentDescription = null,
                     tint = MiuixAppTheme.colorScheme.primary
                 )
@@ -505,7 +509,7 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
         )
         Spacer(Modifier.width(4.dp))
         IconButton(onClick = onMenuClick, modifier = Modifier.size(36.dp)) {
-            Icon(MiuixIcons.More, null, tint = MiuixAppTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            Icon(Icons.Filled.MoreVert, null, tint = MiuixAppTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -665,7 +669,7 @@ private fun EditMusicDrawer(
                     onState = { loaded = it is AsyncImagePainter.State.Success }
                 )
                 if (!loaded) {
-                    Icon(MiuixIcons.Music, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+                    Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
                 }
                 Box(
                     modifier = Modifier
@@ -676,7 +680,7 @@ private fun EditMusicDrawer(
                         .background(MiuixAppTheme.colorScheme.surface.copy(alpha = 0.7f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(MiuixIcons.Edit, null, tint = MiuixAppTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Filled.Edit, null, tint = MiuixAppTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
                 }
             }
 
@@ -726,7 +730,7 @@ private fun PermissionRequest(onRequest: () -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = MiuixIcons.Music,
+            imageVector = Icons.Filled.MusicNote,
             contentDescription = null,
             tint = MiuixAppTheme.colorScheme.primary,
             modifier = Modifier.size(56.dp)
@@ -772,7 +776,7 @@ private fun EmptyState() {
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = MiuixIcons.Folder,
+            imageVector = Icons.Filled.FolderOff,
             contentDescription = null,
             tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(56.dp)

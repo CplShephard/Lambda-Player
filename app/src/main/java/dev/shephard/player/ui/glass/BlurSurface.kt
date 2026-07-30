@@ -6,7 +6,7 @@
 // it through Miuix's AGSL blur shaders, so what you see behind a card really is blurred.
 //
 // All of them degrade gracefully: when blur is switched off in Settings, or the device is
-// below API 31, they fall back to an opaque Miuix surface, so call sites never branch.
+// below API 31, they fall back to an opaque Material 3 surface, so call sites never branch.
 package dev.shephard.player.ui.glass
 
 import androidx.compose.foundation.background

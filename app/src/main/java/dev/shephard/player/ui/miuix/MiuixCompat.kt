@@ -41,7 +41,7 @@ import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @RequiresOptIn(level = RequiresOptIn.Level.WARNING)
-annotation class ExperimentalMiuixApi
+annotation class ExperimentalMaterial3Api
 
 @Stable
 class MiuixColorScheme {
@@ -380,18 +380,5 @@ fun ModalBottomSheet(
     )
 }
 
-@Composable
-fun Scaffold(
-    modifier: Modifier = Modifier,
-    containerColor: Color = Color.Transparent,
-    contentColor: Color = MiuixAppTheme.colorScheme.onBackground,
-    topBar: @Composable () -> Unit = {},
-    content: @Composable (PaddingValues) -> Unit,
-) {
-    Box(modifier.background(containerColor)) {
-        Column {
-            topBar()
-            content(PaddingValues(0.dp))
-        }
-    }
-}
+
+

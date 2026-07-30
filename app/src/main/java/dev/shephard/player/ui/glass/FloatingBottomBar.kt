@@ -6,7 +6,7 @@
 //
 // Port notes for Lambda Player: the physics, gesture handling, backdrop pipeline, shader
 // effects and layer structure are kept byte-for-byte identical to InstallerX. Only the
-// theming source was swapped from Miuix's own `MiuixTheme`/`InstallerTheme` to Miuix,
+// theming source was swapped from Miuix's own `MiuixTheme`/`InstallerTheme` to Material 3,
 // because Lambda Player has no Miuix theme tree. Everything visual/behavioural is 1:1.
 package dev.shephard.player.ui.glass
 

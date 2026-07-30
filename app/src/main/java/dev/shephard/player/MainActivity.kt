@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import dev.shephard.player.ui.miuix.ExperimentalMiuixApi
+import dev.shephard.player.ui.miuix.ExperimentalMaterial3Api
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.ModalBottomSheet
 import dev.shephard.player.ui.miuix.Text
@@ -41,7 +41,7 @@ import dev.shephard.player.ui.i18n.stringsFor
 import dev.shephard.player.ui.navigation.MainContainer
 import dev.shephard.player.ui.theme.LambdaPlayerTheme
 
-@OptIn(ExperimentalMiuixApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
     private val externalAudioUriState = mutableStateOf<Uri?>(null)
 
@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
             val context = LocalContext.current
             val prefs = remember { PreferencesManager(context) }
             val accent by prefs.accentColor.collectAsState(initial = 0xFF22C55E.toInt())
-            val themeMode by prefs.themeMode.collectAsState(initial = dev.shephard.player.player.ThemeModePreference.LIGHT)
+            val themeMode by prefs.themeMode.collectAsState(initial = dev.shephard.player.player.ThemeModePreference.DARK)
             val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
             val cardAlpha by prefs.cardAlpha.collectAsState(initial = 0.85f)
             val blurEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)

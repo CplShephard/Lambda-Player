@@ -17,7 +17,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import dev.shephard.player.ui.miuix.ExperimentalMiuixApi
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import dev.shephard.player.ui.miuix.ExperimentalMaterial3Api
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.ModalBottomSheet
@@ -49,8 +51,6 @@ import kotlin.math.max
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSheetSurface
 import kotlin.math.min
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.*
 
 /**
  * Modal popup that lets the user pick a custom accent color via:
@@ -60,7 +60,7 @@ import top.yukonga.miuix.kmp.icon.extended.*
  *
  * The selected color is committed via [onColorPicked] as an ARGB int.
  */
-@OptIn(ExperimentalMiuixApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomColorPickerDialog(
     onDismiss: () -> Unit,
@@ -119,7 +119,7 @@ fun CustomColorPickerDialog(
                     )
                     BouncyIconButton(
                         onClick = onDismiss,
-                        icon = MiuixIcons.Close,
+                        icon = Icons.Filled.Close,
                         contentDescription = "Close",
                         tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
                         iconSize = 22.dp

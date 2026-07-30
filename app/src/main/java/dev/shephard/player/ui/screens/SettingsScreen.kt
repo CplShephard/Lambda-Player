@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalFoundationApi::class, dev.shephard.player.ui.miuix.ExperimentalMiuixApi::class)
+@file:OptIn(ExperimentalFoundationApi::class, dev.shephard.player.ui.miuix.ExperimentalMaterial3Api::class)
 
 package dev.shephard.player.ui.screens
 
@@ -32,9 +32,25 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.ViewModule
+import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.WbSunny
 import dev.shephard.player.ui.miuix.Card
 import dev.shephard.player.ui.miuix.CardDefaults
 import dev.shephard.player.ui.miuix.Icon
@@ -79,8 +95,6 @@ import dev.shephard.player.ui.glass.blurSheetSurface
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.*
 
 /** Preset accent colors. The 7th slot is "Custom" — handled separately. */
 private val AccentPalette = listOf(
@@ -115,19 +129,19 @@ fun SettingsScreen(
         TotalListeningTimeCard(playerViewModel = playerViewModel)
 
         SettingsNavigationCard(
-            icon = MiuixIcons.Theme,
+            icon = Icons.Filled.ColorLens,
             title = strings.themeSettings,
             summary = "Colors, wallpaper, Liquid Glass, layout and language",
             onClick = onOpenThemeSettings
         )
         SettingsNavigationCard(
-            icon = MiuixIcons.Music,
+            icon = Icons.Filled.MusicNote,
             title = strings.playbackSettings,
             summary = "Crossfade, gapless playback and audio focus",
             onClick = onOpenPlayerSettings
         )
         SettingsNavigationCard(
-            icon = MiuixIcons.Info,
+            icon = Icons.Filled.Info,
             title = "About Lambda Player",
             summary = "Version, project links and credits",
             onClick = onOpenAbout
@@ -266,12 +280,12 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                         contentScale = ContentScale.Crop,
                         onState = { previewLoaded = it is AsyncImagePainter.State.Success }
                     )
-                    if (!previewLoaded) Icon(MiuixIcons.Image, null, tint = MiuixAppTheme.colorScheme.onSurfaceVariant)
+                    if (!previewLoaded) Icon(Icons.Filled.BrokenImage, null, tint = MiuixAppTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(Modifier.height(10.dp))
             }
             SettingsActionRow(
-                icon = MiuixIcons.Image,
+                icon = Icons.Filled.Image,
                 title = if (wallpaper.isEmpty()) strings.chooseFromGallery else strings.changeWallpaper,
                 onClick = { wallpaperPicker.launch(arrayOf("image/*")) }
             )
@@ -314,14 +328,14 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(10.dp))
             Text(strings.musicsLayout, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LayoutToggleChip(musicsLayout == LayoutMode.LIST, strings.list, MiuixIcons.ListView) { scope.launch { prefs.setMusicsLayout(LayoutMode.LIST) } }
-                LayoutToggleChip(musicsLayout == LayoutMode.GRID, strings.grid, MiuixIcons.GridView) { scope.launch { prefs.setMusicsLayout(LayoutMode.GRID) } }
+                LayoutToggleChip(musicsLayout == LayoutMode.LIST, strings.list, Icons.AutoMirrored.Filled.List) { scope.launch { prefs.setMusicsLayout(LayoutMode.LIST) } }
+                LayoutToggleChip(musicsLayout == LayoutMode.GRID, strings.grid, Icons.Filled.ViewModule) { scope.launch { prefs.setMusicsLayout(LayoutMode.GRID) } }
             }
             Spacer(Modifier.height(12.dp))
             Text(strings.playlistsLayout, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LayoutToggleChip(playlistsLayout == LayoutMode.LIST, strings.list, MiuixIcons.ListView) { scope.launch { prefs.setPlaylistsLayout(LayoutMode.LIST) } }
-                LayoutToggleChip(playlistsLayout == LayoutMode.GRID, strings.grid, MiuixIcons.GridView) { scope.launch { prefs.setPlaylistsLayout(LayoutMode.GRID) } }
+                LayoutToggleChip(playlistsLayout == LayoutMode.LIST, strings.list, Icons.AutoMirrored.Filled.List) { scope.launch { prefs.setPlaylistsLayout(LayoutMode.LIST) } }
+                LayoutToggleChip(playlistsLayout == LayoutMode.GRID, strings.grid, Icons.Filled.ViewModule) { scope.launch { prefs.setPlaylistsLayout(LayoutMode.GRID) } }
             }
         }
 
@@ -329,7 +343,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             Text(strings.language, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
             Spacer(Modifier.height(8.dp))
             SettingsActionRow(
-                icon = MiuixIcons.ExpandMore,
+                icon = Icons.Filled.ArrowDropDown,
                 title = AllLanguages.firstOrNull { it.code == language }?.displayName ?: language,
                 onClick = { langMenuOpen = true }
             )
@@ -390,7 +404,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                             )
                             if (selected) {
-                                Icon(MiuixIcons.ChevronForward, contentDescription = null, tint = MiuixAppTheme.colorScheme.primary)
+                                Icon(Icons.Filled.KeyboardArrowRight, contentDescription = null, tint = MiuixAppTheme.colorScheme.primary)
                             }
                         }
                     }
@@ -503,12 +517,12 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
 
         SectionCard {
             SettingsActionRow(
-                icon = MiuixIcons.Forward,
+                icon = Icons.AutoMirrored.Filled.OpenInNew,
                 title = "GitHub / CplShephard",
                 onClick = { uriHandler.openUri("https://github.com/CplShephard") }
             )
             SettingsActionRow(
-                icon = MiuixIcons.Forward,
+                icon = Icons.AutoMirrored.Filled.OpenInNew,
                 title = "InstallerX Revived",
                 onClick = { uriHandler.openUri("https://github.com/InstallerX-Revived/InstallerX") }
             )
@@ -551,7 +565,7 @@ private fun SettingsPageScaffold(
                     .bounceClick { onBack() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(MiuixIcons.Back, contentDescription = "Back", tint = MiuixAppTheme.colorScheme.onBackground)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MiuixAppTheme.colorScheme.onBackground)
             }
             Spacer(Modifier.width(14.dp))
             Text(
@@ -595,7 +609,7 @@ private fun SettingsNavigationCard(
                 Text(summary, style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
             }
             Icon(
-                imageVector = MiuixIcons.ChevronForward,
+                imageVector = Icons.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                 modifier = Modifier.size(32.dp)
@@ -721,21 +735,21 @@ private fun ThemeModeSegmentedSwitch(
             mode = ThemeModePreference.LIGHT,
             selectedMode = selectedMode,
             label = lightLabel,
-            icon = MiuixIcons.Theme,
+            icon = Icons.Filled.WbSunny,
             onModeSelected = onModeSelected
         )
         ThemeModeSegment(
             mode = ThemeModePreference.AUTO,
             selectedMode = selectedMode,
             label = autoLabel,
-            icon = MiuixIcons.Theme,
+            icon = Icons.Filled.BrightnessAuto,
             onModeSelected = onModeSelected
         )
         ThemeModeSegment(
             mode = ThemeModePreference.DARK,
             selectedMode = selectedMode,
             label = darkLabel,
-            icon = MiuixIcons.Theme,
+            icon = Icons.Filled.NightsStay,
             onModeSelected = onModeSelected
         )
     }

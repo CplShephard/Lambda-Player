@@ -4,7 +4,7 @@
 // fill layer) with the real Miuix backdrop pipeline: content behind a surface is captured
 // into a GraphicsLayer and genuinely blurred/refracted through AGSL shaders.
 //
-// Mirrors InstallerX Revived's `ui/theme/Backdrop.kt` approach, adapted to Miuix.
+// Mirrors InstallerX Revived's `ui/theme/Backdrop.kt` approach, adapted to Material 3.
 package dev.shephard.player.ui.glass
 
 import android.os.Build

@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
-import dev.shephard.player.ui.miuix.Scaffold
+import top.yukonga.miuix.kmp.basic.Scaffold
 import dev.shephard.player.ui.miuix.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -196,7 +196,6 @@ fun MainContainer(
                         // the backdrop layer above, so an opaque Scaffold here would hide it
                         // and leave every glass surface sampling a flat colour.
                         containerColor = Color.Transparent,
-                        contentColor = MiuixAppTheme.colorScheme.onBackground,
                         topBar = {
                             if (isBottomRoute) BrandHeader(currentRoute = currentRoute)
                         }
