@@ -558,6 +558,19 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
     val topAppBarScrollBehavior = MiuixScrollBehavior()
     var logoHeightPx by remember { mutableIntStateOf(0) }
     var headerHeightDp by remember { mutableStateOf(190.dp) }
+    var appIconBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val sizePx = with(density) { 88.dp.roundToPx() }
+                val shrink = context.applicationInfo.loadIcon(context.packageManager) is android.graphics.drawable.AdaptiveIconDrawable
+                val loader = me.zhanghai.android.appiconloader.AppIconLoader(sizePx, shrink, context)
+                appIconBitmap = loader.loadIcon(context.applicationInfo, false)
+            } catch (e: Exception) {
+                appIconBitmap = null
+            }
+        }
+    }
 
     // InstallerX MiuixAboutPage'teki scrollProgress hesabının birebir aynısı.
     val scrollProgress by remember {
@@ -609,12 +622,22 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                     }
                     .clip(RoundedCornerShape(30.dp))
             ) {
-                Image(
-                    painter = painterResource(id = R.mipmap.ic_launcher),
-                    contentDescription = strings.appName,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
+                val bitmap = appIconBitmap
+                if (bitmap != null) {
+                    Image(
+                        bitmap = androidx.compose.ui.graphics.asImageBitmap(bitmap),
+                        contentDescription = strings.appName,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.mipmap.ic_launcher),
+                        contentDescription = strings.appName,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             }
             Text(
                 modifier = Modifier

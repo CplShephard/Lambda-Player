@@ -3,8 +3,8 @@
 package dev.shephard.player.ui.screens
 
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import rememberLauncherForActivityResult
+import ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -63,7 +63,6 @@ import dev.shephard.player.ui.miuix.IconButton
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.components.MiuixDrawer
 import dev.shephard.player.ui.components.MiuixDrawerActionHeader
-import dev.shephard.player.ui.navigation.PageTransitions
 import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.miuix.OutlinedTextField
 import dev.shephard.player.ui.miuix.Text
@@ -176,7 +175,8 @@ fun PlaylistScreen(
     libraryViewModel: LibraryViewModel = viewModel(),
     hasMiniPlayer: Boolean = false,
     onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
-    onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> }
+    onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> },
+    onOpenDetail: (Int) -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
@@ -212,7 +212,6 @@ fun PlaylistScreen(
 
     var showCreate by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
-    var openIndex by remember { mutableStateOf<Int?>(null) }
     var trackPickerForIndex by remember { mutableStateOf<Int?>(null) }
     var pickerSelected by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var showCoverPickerForIndex by remember { mutableStateOf<Int?>(null) }
@@ -323,95 +322,20 @@ fun PlaylistScreen(
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = openIndex != null) { openIndex = null }
-
-    // MADDE 8 — playlist detayına girerken de Settings alt sayfalarındaki ile BİREBİR
-    // aynı InstallerX/MIUIX "push" animasyonu kullanılıyor (ortak `PageTransitions`).
-    androidx.compose.animation.AnimatedContent(
-        targetState = openIndex,
-        transitionSpec = {
-            if (targetState != null) {
-                // Detaya giriş: yeni sayfa tamamen sağdan gelir, liste paralaksla sola kayar.
-                androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.enterPush,
-                    initialContentExit = PageTransitions.exitPush
-                )
-            } else {
-                // Geri: liste paralaks konumundan yerine döner, detay tamamen sağa çıkar.
-                androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.popEnterPush,
-                    initialContentExit = PageTransitions.popExitPush
-                )
-            }
+    PlaylistListView(
+        playlists = playlists,
+        tracks = tracks,
+        strings = strings,
+        layout = playlistsLayout,
+        likedIds = likedIds,
+        onOpen = { onOpenDetail(it) },
+        onPlay = { pl ->
+            val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
+            if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name)
         },
-        label = "playlistNav"
-    ) { idx ->
-    if (idx == null) {
-        PlaylistListView(
-            playlists = playlists,
-            tracks = tracks,
-            strings = strings,
-            layout = playlistsLayout,
-            likedIds = likedIds,
-            onOpen = { openIndex = it },
-            onPlay = { pl ->
-                val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
-                if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name)
-            },
-            onMenu = { playlistMenuIndex = it },
-            onCreate = { showCreate = true; newName = "" }
-        )
-    } else {
-        val pl = playlists.getOrNull(idx)
-        if (pl == null) {
-            openIndex = null
-        } else {
-            val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-            PlaylistDetailView(
-                playlist = pl,
-                allTracks = tracks,
-                plTracks = plTracks,
-                strings = strings,
-                onBack = { openIndex = null },
-                onTrackClick = { list, i -> onTrackClick(list, i, if (pl.isSystem) strings.likedSongs else pl.name) },
-                onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name) },
-                onPlayRemix = { if (plTracks.isNotEmpty()) onPlaylistRemixClick(plTracks, if (pl.isSystem) strings.likedSongs else pl.name) },
-                onRemoveTrack = { trackId ->
-                    if (pl.isSystem) {
-                        val newLiked = likedIds - trackId
-                        val json = JSONArray().apply { newLiked.forEach { put(it) } }.toString()
-                        scope.launch { prefs.setLikedSongIds(json) }
-                    } else {
-                        val updated = pl.copy(trackIds = pl.trackIds.filterNot { it == trackId })
-                        val all = playlists.toMutableList()
-                        all[idx] = updated
-                        scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
-                    }
-                },
-                onAddTracks = {
-                    pickerSelected = pl.trackIds.toSet()
-                    trackPickerForIndex = idx
-                },
-                onPickCover = {
-                    showCoverPickerForIndex = idx
-                    coverPicker.launch(arrayOf("image/*"))
-                },
-                onReorder = { newOrder ->
-                    val updated = pl.copy(trackIds = newOrder.map { it.id }, sortMode = "custom")
-                    val all = playlists.toMutableList()
-                    all[idx] = updated
-                    scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
-                },
-                onChangeSort = { mode ->
-                    val updated = pl.copy(sortMode = mode)
-                    val all = playlists.toMutableList()
-                    all[idx] = updated
-                    scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
-                }
-            )
-        }
-    }
-    }
+        onMenu = { playlistMenuIndex = it },
+        onCreate = { showCreate = true; newName = "" }
+    )
 
     if (showCreate) {
         val createLiquidGlassOn = LocalBlurEnabled.current
@@ -1583,5 +1507,249 @@ private fun DraggablePlaylistTrackRow(
                 .size(28.dp)
                 .then(dragHandleModifier)
         )
+    }
+}
+
+@Composable
+fun PlaylistDetailScreen(
+    playlistIndex: Int,
+    onBack: () -> Unit,
+    onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
+    onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> },
+    libraryViewModel: LibraryViewModel = viewModel()
+) {
+    val context = LocalContext.current
+    val prefs = remember { PreferencesManager(context) }
+    val scope = rememberCoroutineScope()
+    val strings = LocalStrings.current
+    val tracks by libraryViewModel.tracks.collectAsState()
+    val json by prefs.playlistsJson.collectAsState(initial = "[]")
+    val likedSongIdsJson by prefs.likedSongIds.collectAsState(initial = "[]")
+    val likedIds = remember(likedSongIdsJson) {
+        try {
+            JSONArray(likedSongIdsJson).let { arr -> (0 until arr.length()).map { arr.getLong(it) } }
+        } catch (_: Exception) { emptyList() }
+    }
+    val rawPlaylists = remember(json) { parsePlaylists(json) }
+    val playlists = remember(rawPlaylists, strings) { ensureLikedSongsPlaylist(rawPlaylists, strings) }
+
+    val playlist = playlists.getOrNull(playlistIndex)
+    if (playlist == null) {
+        LaunchedEffect(Unit) { onBack() }
+        return
+    }
+    val plTracks = remember(playlist, tracks, likedIds) { resolvePlaylistTracks(playlist, tracks, likedIds) }
+
+    var trackPickerForIndex by remember { mutableStateOf<Int?>(null) }
+    var pickerSelected by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var showCoverPickerForIndex by remember { mutableStateOf<Int?>(null) }
+    var playlistCoverCropOutputUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var playlistCoverCropForIndex by remember { mutableStateOf<Int?>(null) }
+
+    val playlistCoverCropLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val output = playlistCoverCropOutputUri
+        val idx = playlistCoverCropForIndex
+        if (result.resultCode == android.app.Activity.RESULT_OK && output != null && idx != null && idx in playlists.indices) {
+            val pl = playlists[idx]
+            val updated = pl.copy(coverUri = output.toString())
+            val all = playlists.toMutableList()
+            all[idx] = updated
+            scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+        }
+        playlistCoverCropForIndex = null
+    }
+
+    fun launchPlaylistCoverCrop(sourceUri: Uri, index: Int) {
+        val dir = java.io.File(context.filesDir, "persisted_covers").apply { mkdirs() }
+        val file = java.io.File(dir, "playlist_cover_${System.currentTimeMillis()}.jpg")
+        val outputUri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        playlistCoverCropOutputUri = outputUri
+        playlistCoverCropForIndex = index
+
+        val cropIntent = android.content.Intent("com.android.camera.action.CROP").apply {
+            setDataAndType(sourceUri, "image/*")
+            putExtra("crop", "true")
+            putExtra("scale", true)
+            putExtra("outputX", 512)
+            putExtra("outputY", 512)
+            putExtra("aspectX", 1)
+            putExtra("aspectY", 1)
+            putExtra(android.provider.MediaStore.EXTRA_OUTPUT, outputUri)
+            putExtra("outputFormat", android.graphics.Bitmap.CompressFormat.JPEG.toString())
+            putExtra("return-data", false)
+            putExtra("noFaceDetection", true)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            clipData = android.content.ClipData.newUri(context.contentResolver, "playlist_cover", sourceUri)
+        }
+
+        val resolvedActivities = context.packageManager.queryIntentActivities(cropIntent, 0)
+        for (info in resolvedActivities) {
+            val packageName = info.activityInfo?.packageName ?: continue
+            try {
+                context.grantUriPermission(
+                    packageName,
+                    outputUri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (_: SecurityException) { }
+        }
+
+        if (resolvedActivities.isNotEmpty()) {
+            playlistCoverCropLauncher.launch(cropIntent)
+        } else {
+            scope.launch {
+                val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, sourceUri)
+                if (persisted != null && index in playlists.indices) {
+                    val pl = playlists[index]
+                    val updated = pl.copy(coverUri = persisted.toString())
+                    val all = playlists.toMutableList()
+                    all[index] = updated
+                    prefs.setPlaylistsJson(encodePlaylists(all))
+                }
+            }
+        }
+    }
+
+    val coverPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: SecurityException) { }
+            val idx = showCoverPickerForIndex
+            if (idx != null) {
+                launchPlaylistCoverCrop(uri, idx)
+            }
+            showCoverPickerForIndex = null
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        PlaylistDetailView(
+            playlist = playlist,
+            allTracks = tracks,
+            plTracks = plTracks,
+            strings = strings,
+            onBack = onBack,
+            onTrackClick = { list, i -> onTrackClick(list, i, if (playlist.isSystem) strings.likedSongs else playlist.name) },
+            onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (playlist.isSystem) strings.likedSongs else playlist.name) },
+            onPlayRemix = { if (plTracks.isNotEmpty()) onPlaylistRemixClick(plTracks, if (playlist.isSystem) strings.likedSongs else playlist.name) },
+            onRemoveTrack = { trackId ->
+                if (playlist.isSystem) {
+                    val newLiked = likedIds - trackId
+                    val jsonStr = JSONArray().apply { newLiked.forEach { put(it) } }.toString()
+                    scope.launch { prefs.setLikedSongIds(jsonStr) }
+                } else {
+                    val updated = playlist.copy(trackIds = playlist.trackIds.filterNot { it == trackId })
+                    val all = playlists.toMutableList()
+                    if (playlistIndex in all.indices) {
+                        all[playlistIndex] = updated
+                        scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                    }
+                }
+            },
+            onAddTracks = {
+                pickerSelected = playlist.trackIds.toSet()
+                trackPickerForIndex = playlistIndex
+            },
+            onPickCover = {
+                showCoverPickerForIndex = playlistIndex
+                coverPicker.launch(arrayOf("image/*"))
+            },
+            onReorder = { newOrder ->
+                val updated = playlist.copy(trackIds = newOrder.map { it.id }, sortMode = "custom")
+                val all = playlists.toMutableList()
+                if (playlistIndex in all.indices) {
+                    all[playlistIndex] = updated
+                    scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                }
+            },
+            onChangeSort = { mode ->
+                val updated = playlist.copy(sortMode = mode)
+                val all = playlists.toMutableList()
+                if (playlistIndex in all.indices) {
+                    all[playlistIndex] = updated
+                    scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                }
+            }
+        )
+
+        val pickerIdx = trackPickerForIndex
+        if (pickerIdx != null) {
+            val pickerLiquidGlassOn = LocalBlurEnabled.current
+            MiuixDrawer(
+                onDismissRequest = { trackPickerForIndex = null },
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.68f)
+                        .padding(20.dp)
+                ) {
+                    Text(strings.addTracks, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(12.dp))
+                    val pickerListState = androidx.compose.foundation.lazy.rememberLazyListState()
+                    androidx.compose.foundation.lazy.LazyColumn(
+                        state = pickerListState,
+                        modifier = Modifier.weight(1f).overScrollVertical(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(tracks.size) { i ->
+                            val t = tracks[i]
+                            val checked = t.id in pickerSelected
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .then(
+                                        if (checked) Modifier.background(
+                                            if (pickerLiquidGlassOn) Color.White.copy(alpha = 0.12f)
+                                            else MiuixAppTheme.colorScheme.primary.copy(alpha = 0.10f)
+                                        ) else Modifier
+                                    )
+                                    .clickable { pickerSelected = if (checked) pickerSelected - t.id else pickerSelected + t.id }
+                                    .padding(vertical = 8.dp, horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = checked,
+                                    onCheckedChange = { on -> pickerSelected = if (on) pickerSelected + t.id else pickerSelected - t.id }
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(t.title, color = MiuixAppTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(t.artist, style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { trackPickerForIndex = null }) { Text(strings.cancel) }
+                        Spacer(Modifier.width(8.dp))
+                        TextButton(onClick = {
+                            val existingIds = playlist.trackIds.toMutableList()
+                            val toAdd = pickerSelected - playlist.trackIds.toSet()
+                            val toRemove = playlist.trackIds.toSet() - pickerSelected
+                            val newIds = existingIds.filterNot { it in toRemove } + toAdd
+                            val updated = playlist.copy(trackIds = newIds)
+                            val all = playlists.toMutableList()
+                            if (playlistIndex in all.indices) {
+                                all[playlistIndex] = updated
+                                scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                            }
+                            trackPickerForIndex = null
+                        }) { Text(strings.save) }
+                    }
+                    Spacer(Modifier.height(20.dp))
+                }
+            }
+        }
     }
 }

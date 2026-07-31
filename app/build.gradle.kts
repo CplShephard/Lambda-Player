@@ -113,8 +113,9 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-icons:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-shader-android:0.9.3")
+    implementation("top.yukonga.miuix.kmp:miuix-nav-android:0.9.3")
 
-    implementation("androidx.navigation:navigation-compose:2.9.8")
+    implementation("me.zhanghai.android.appiconloader:appiconloader:1.5.0")
     implementation("sh.calvin.reorderable:reorderable:3.0.0")
 
     implementation("androidx.media3:media3-exoplayer:1.4.1")
