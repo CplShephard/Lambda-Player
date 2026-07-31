@@ -3,8 +3,8 @@
 package dev.shephard.player.ui.screens
 
 import android.net.Uri
-import rememberLauncherForActivityResult
-import ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -306,10 +306,6 @@ fun PlaylistScreen(
             }
             showCoverPickerForIndex = null
         }
-    }
-
-    if (openIndex != null && openIndex !in playlists.indices) {
-        openIndex = null
     }
 
     if (playlistMenuIndex != null && playlistMenuIndex !in playlists.indices) {

@@ -2,6 +2,9 @@
 
 package dev.shephard.player.ui.screens
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.asImageBitmap
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 
 import android.content.Intent
@@ -625,7 +628,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                 val bitmap = appIconBitmap
                 if (bitmap != null) {
                     Image(
-                        bitmap = androidx.compose.ui.graphics.asImageBitmap(bitmap),
+                        bitmap = bitmap.asImageBitmap(),
                         contentDescription = strings.appName,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop

@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 @Composable
-actual fun isInMultiWindowMode(): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+fun isInMultiWindowMode(): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
     val activity = LocalActivity.current
     activity?.isInMultiWindowMode == true
 } else {
@@ -25,7 +25,7 @@ actual fun isInMultiWindowMode(): Boolean = if (Build.VERSION.SDK_INT >= Build.V
 }
 
 @Composable
-actual fun getRoundedCorner(): Dp = getSystemCornerRadius()
+fun getRoundedCorner(): Dp = getSystemCornerRadius()
 
 @SuppressLint("NewApi")
 @Composable
