@@ -20,19 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.NavigationEventState
 
-/**
- * A composable that handles back navigation gestures for a [SceneState], driven by a
- * [NavigationEventState].
- *
- * This is a convenience wrapper around the core
- * [androidx.navigationevent.compose.NavigationBackHandler] that automatically handles the
- * [NavigationEventState] based on the provided [sceneState].
- *
- * @param sceneState the [SceneState] that this handler is associated with.
- * @param state the hoisted [NavigationEventState] (returned from [rememberNavigationEventState]) to
- *   be registered.
- * @param onBack called when a back navigation gesture completes and navigation occurs.
- */
 @Composable
 fun <T : Any> NavigationBackHandler(
     sceneState: SceneState<T>,
@@ -46,18 +33,8 @@ fun <T : Any> NavigationBackHandler(
         }
     }
 
-    val owner = androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner.current
-
-    if (owner != null) {
-        NavigationBackHandler(
-            state = state,
-            isBackEnabled = isBackEnabled,
-            onBackCompleted = onBackCompleted,
-        )
-    } else {
-        androidx.activity.compose.BackHandler(
-            enabled = isBackEnabled,
-            onBack = onBackCompleted
-        )
-    }
+    androidx.activity.compose.BackHandler(
+        enabled = isBackEnabled,
+        onBack = onBackCompleted
+    )
 }

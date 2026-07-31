@@ -139,7 +139,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun audioUriFromIntent(intent: Intent?): Uri? {
-        if (intent?.action != Intent.ACTION_VIEW) return null
-        return intent.data
+        return try {
+            if (intent?.action != Intent.ACTION_VIEW) null else intent.data
+        } catch (_: Exception) { null }
     }
 }
