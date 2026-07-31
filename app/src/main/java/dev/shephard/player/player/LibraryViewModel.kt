@@ -58,52 +58,34 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val json = prefs.trackOverridesJson.first()
             _overrides.value = parseOverrides(json)
-            val cached = withContext(Dispatchers.IO) { loadCachedTracks() }
-            if (cached.isNotEmpty()) {
-                _tracks.value = applyOverridesToList(cached, _overrides.value)
-                _hasScanned.value = true
-                applyFilter()
-            }
-            loadTracks(forceLoading = false)
         }
     }
 
     private fun registerObserver() {
-        try {
-            val uri: Uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-            contentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
-                override fun onChange(selfChange: Boolean) {
-                    super.onChange(selfChange)
-                    loadTracks(forceLoading = false)
-                }
+        val uri: Uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        contentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                super.onChange(selfChange)
+                loadTracks()
             }
-            getApplication<Application>().contentResolver.registerContentObserver(
-                uri, true, contentObserver!!
-            )
-        } catch (_: Exception) { }
+        }
+        getApplication<Application>().contentResolver.registerContentObserver(
+            uri, true, contentObserver!!
+        )
     }
 
-    fun loadTracks(forceLoading: Boolean = false) {
+    fun loadTracks() {
         viewModelScope.launch {
-            val shouldShowLoading = forceLoading || _tracks.value.isEmpty()
-            if (shouldShowLoading) {
+            if (_tracks.value.isEmpty()) {
                 _isLoading.value = true
             }
             val result = withContext(Dispatchers.IO) {
                 MediaStoreScanner.queryAudioTracks(getApplication())
             }
-            val synced = applyOverridesToList(result, _overrides.value)
-            if (synced != _tracks.value) {
-                _tracks.value = synced
-                withContext(Dispatchers.IO) { saveCachedTracks(result) }
-                applyFilter()
-            } else if (shouldShowLoading) {
-                applyFilter()
-            }
-            if (shouldShowLoading) {
-                _isLoading.value = false
-            }
+            _tracks.value = applyOverridesToList(result, _overrides.value)
+            _isLoading.value = false
             _hasScanned.value = true
+            applyFilter()
         }
     }
 
@@ -126,7 +108,6 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 MediaStoreScanner.queryAudioTracks(getApplication())
             }
             _tracks.value = applyOverridesToList(raw, newOverrides)
-            withContext(Dispatchers.IO) { saveCachedTracks(raw) }
             applyFilter()
         }
     }
@@ -175,62 +156,10 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     override fun onCleared() {
-        try {
-            contentObserver?.let {
-                getApplication<Application>().contentResolver.unregisterContentObserver(it)
-            }
-        } catch (_: Exception) { }
-        super.onCleared()
-    }
-
-    private fun saveCachedTracks(tracks: List<AudioTrack>) {
-        try {
-            val file = java.io.File(getApplication<Application>().filesDir, "cached_library.json")
-            val arr = org.json.JSONArray()
-            tracks.forEach { track ->
-                val obj = org.json.JSONObject()
-                obj.put("id", track.id)
-                obj.put("title", track.title)
-                obj.put("artist", track.artist)
-                obj.put("album", track.album)
-                obj.put("durationMs", track.durationMs)
-                obj.put("uri", track.uri.toString())
-                obj.put("albumArtUri", track.albumArtUri?.toString() ?: "")
-                arr.put(obj)
-            }
-            file.writeText(arr.toString())
-        } catch (_: Exception) { }
-    }
-
-    private fun loadCachedTracks(): List<AudioTrack> {
-        return try {
-            val file = java.io.File(getApplication<Application>().filesDir, "cached_library.json")
-            if (!file.exists()) return emptyList()
-            val text = file.readText()
-            val arr = org.json.JSONArray(text)
-            (0 until arr.length()).mapNotNull { i ->
-                val obj = arr.optJSONObject(i) ?: return@mapNotNull null
-                val id = obj.optLong("id")
-                val title = obj.optString("title")
-                val artist = obj.optString("artist")
-                val album = obj.optString("album")
-                val durationMs = obj.optLong("durationMs")
-                val uriStr = obj.optString("uri")
-                if (uriStr.isEmpty()) return@mapNotNull null
-                val artStr = obj.optString("albumArtUri")
-                AudioTrack(
-                    id = id,
-                    title = title,
-                    artist = artist,
-                    album = album,
-                    durationMs = durationMs,
-                    uri = Uri.parse(uriStr),
-                    albumArtUri = if (artStr.isNotEmpty()) Uri.parse(artStr) else null
-                )
-            }
-        } catch (_: Exception) {
-            emptyList()
+        contentObserver?.let {
+            getApplication<Application>().contentResolver.unregisterContentObserver(it)
         }
+        super.onCleared()
     }
 
     companion object {
