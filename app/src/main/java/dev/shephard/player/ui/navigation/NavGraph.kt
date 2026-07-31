@@ -1,9 +1,11 @@
 package dev.shephard.player.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.ui.screens.MusicScreen
@@ -12,64 +14,59 @@ import dev.shephard.player.ui.screens.AboutSettingsScreen
 import dev.shephard.player.ui.screens.PlayerSettingsScreen
 import dev.shephard.player.ui.screens.SettingsScreen
 import dev.shephard.player.ui.screens.ThemeSettingsScreen
-import top.yukonga.miuix.kmp.nav.core.NavController
-import top.yukonga.miuix.kmp.nav.core.NavDisplay
-import top.yukonga.miuix.kmp.nav.core.NavKey
-import top.yukonga.miuix.kmp.nav.core.entry
-
-// Miuix NavDisplay route anahtarları — her biri NavKey.
-// NOT: rememberNavBackStack kullanılmıyor; serileştirme (kotlinx-serialization) gerektiren
-// yolu atlayıp doğrudan mutableStateListOf<NavKey> + NavController ile kuruluyor.
-object MusicRoute : NavKey
-object PlaylistsRoute : NavKey
-object SettingsRoute : NavKey
-object ThemeRoute : NavKey
-object PlayerRoute : NavKey
-object AboutRoute : NavKey
 
 @Composable
 fun NavGraph(
-    navController: NavController,
+    navController: NavHostController,
     playerViewModel: PlayerViewModel = viewModel(),
     modifier: Modifier = Modifier,
     hasMiniPlayer: Boolean = false,
     onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
     onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> }
 ) {
-    // MADDE 1 — Sayfa geçişleri artık Miuix'in kendi NavDisplay'i ile, global geçiş olarak
-    // NavTransitions.MiuixDefault kullanılarak yapılıyor (InstallerX ile birebir). Tüm
-    // sayfalar (Music / Playlists / Settings ve alt sayfalar) bu tek geçişi paylaşıyor.
-    NavDisplay(navController, modifier = modifier.fillMaxSize()) {
-        entry<MusicRoute> {
+    // MADDE 1 — Geçişler InstallerX'in `NavTransitions.MiuixDefault` hissini veren
+    // PageTransitions ile uygulanıyor (alpha 0.9 fade + 0.92↔1.08 ölçek + parallax kayma).
+    // MiuixDefault tek bir global geçiştir; burada da TÜM sayfalara (Music / Playlists /
+    // Settings ve alt sayfalar) aynı geçiş uygulanıyor.
+    NavHost(
+        navController = navController,
+        startDestination = Destination.Music.route,
+        modifier = modifier,
+        enterTransition = { PageTransitions.enterPush },
+        exitTransition = { PageTransitions.exitPush },
+        popEnterTransition = { PageTransitions.popEnterPush },
+        popExitTransition = { PageTransitions.popExitPush }
+    ) {
+        composable(Destination.Music.route) {
             MusicScreen(
                 playerViewModel = playerViewModel,
                 onTrackClick = { tracks, index -> onTrackClick(tracks, index, null) },
                 hasMiniPlayer = hasMiniPlayer
             )
         }
-        entry<PlaylistsRoute> {
+        composable(Destination.Playlists.route) {
             PlaylistScreen(
                 onTrackClick = onTrackClick,
                 onPlaylistRemixClick = onPlaylistRemixClick,
                 hasMiniPlayer = hasMiniPlayer
             )
         }
-        entry<SettingsRoute> {
+        composable(Destination.Settings.route) {
             SettingsScreen(
                 playerViewModel = playerViewModel,
-                onOpenThemeSettings = { navController.push(ThemeRoute) },
-                onOpenPlayerSettings = { navController.push(PlayerRoute) },
-                onOpenAbout = { navController.push(AboutRoute) }
+                onOpenThemeSettings = { navController.navigate(SettingsRoutes.Theme) },
+                onOpenPlayerSettings = { navController.navigate(SettingsRoutes.Player) },
+                onOpenAbout = { navController.navigate(SettingsRoutes.About) }
             )
         }
-        entry<ThemeRoute> {
-            ThemeSettingsScreen(onBack = { navController.pop() })
+        composable(SettingsRoutes.Theme) {
+            ThemeSettingsScreen(onBack = { navController.popBackStack() })
         }
-        entry<PlayerRoute> {
-            PlayerSettingsScreen(onBack = { navController.pop() })
+        composable(SettingsRoutes.Player) {
+            PlayerSettingsScreen(onBack = { navController.popBackStack() })
         }
-        entry<AboutRoute> {
-            AboutSettingsScreen(onBack = { navController.pop() })
+        composable(SettingsRoutes.About) {
+            AboutSettingsScreen(onBack = { navController.popBackStack() })
         }
     }
 }

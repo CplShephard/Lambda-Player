@@ -7,9 +7,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 
 /**
  * MADDE 1 / 8 — InstallerX Revived'ın `NavTransitions.MiuixDefault` geçişi, Lambda'ın
@@ -45,27 +44,38 @@ object PageTransitions {
         stiffness = 400f
     )
 
-    /** Arkada kalan sayfanın ne kadar sola ötelendiği (genişliğe oran). MiuixDefault: 1/4. */
-    private const val PARALLAX = 4
-
-    /** MiuixDefault: örtülen sayfa yalnızca %10 soluklaşır (1.0 → 0.9). */
+    /** MiuixDefault: entering page slides in from 28% of width. */
+    private const val ENTER_OFFSET = 0.28f
+    /** MiuixDefault: covered page slides out 12% (parallax). */
+    private const val EXIT_OFFSET = 0.12f
+    /** MiuixDefault: covered page only dips to 0.9 alpha. */
     private const val COVERED_ALPHA = 0.9f
+    /** MiuixDefault: entering page scales from 0.92. */
+    private const val ENTER_SCALE = 0.92f
+    /** MiuixDefault: covered page scales to 1.08. */
+    private const val EXIT_SCALE = 1.08f
 
-    /** İleri gidiş — yeni sayfa tamamen sağdan gelir. */
+    /** İleri gidiş — yeni sayfa %28 sağdan kayar, %0.9 alfaya yükselir, %0.92'den ölçeklenir. */
     val enterPush: EnterTransition =
-        slideInHorizontally(animationSpec = slideSpec) { fullWidth -> fullWidth }
+        slideInHorizontally(animationSpec = slideSpec) { (it * ENTER_OFFSET).toInt() } +
+            fadeIn(animationSpec = fadeSpec, initialAlpha = COVERED_ALPHA) +
+            scaleIn(animationSpec = fadeSpec, initialScale = ENTER_SCALE)
 
-    /** İleri gidiş — eski sayfa paralaks ile hafifçe sola kayar ve çok az soluklaşır. */
+    /** İleri gidiş — eski sayfa %12 sola paralaks kayar, %0.9'a soluklaşır, %1.08'e ölçeklenir. */
     val exitPush: ExitTransition =
-        slideOutHorizontally(animationSpec = slideSpec) { fullWidth -> -fullWidth / PARALLAX } +
-            fadeOut(animationSpec = fadeSpec, targetAlpha = COVERED_ALPHA)
+        slideOutHorizontally(animationSpec = slideSpec) { (it * -EXIT_OFFSET).toInt() } +
+            fadeOut(animationSpec = fadeSpec, targetAlpha = COVERED_ALPHA) +
+            scaleOut(animationSpec = fadeSpec, targetScale = EXIT_SCALE)
 
-    /** Geri dönüş — alttaki sayfa paralaks konumundan yerine döner (0.9 → 1.0). */
+    /** Geri dönüş — alttaki sayfa %12 sağdan yerine döner (0.9 → 1.0). */
     val popEnterPush: EnterTransition =
-        slideInHorizontally(animationSpec = slideSpec) { fullWidth -> -fullWidth / PARALLAX } +
-            fadeIn(animationSpec = fadeSpec, initialAlpha = COVERED_ALPHA)
+        slideInHorizontally(animationSpec = slideSpec) { (it * -EXIT_OFFSET).toInt() } +
+            fadeIn(animationSpec = fadeSpec, initialAlpha = COVERED_ALPHA) +
+            scaleIn(animationSpec = fadeSpec, initialScale = ENTER_SCALE)
 
-    /** Geri dönüş — üstteki sayfa tamamen sağa çıkar. */
+    /** Geri dönüş — üstteki sayfa %28 sağa çıkar. */
     val popExitPush: ExitTransition =
-        slideOutHorizontally(animationSpec = slideSpec) { fullWidth -> fullWidth }
+        slideOutHorizontally(animationSpec = slideSpec) { (it * ENTER_OFFSET).toInt() } +
+            fadeOut(animationSpec = fadeSpec, targetAlpha = COVERED_ALPHA) +
+            scaleOut(animationSpec = fadeSpec, targetScale = EXIT_SCALE)
 }

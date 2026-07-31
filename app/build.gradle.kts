@@ -105,18 +105,14 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material:material-icons-extended")
 
-    // Miuix / ComposeX stack — InstallerX-Revived ile birebir aynı SNAPSHOT seti.
-    // NOT: NavDisplay yalnızca bu SNAPSHOT'ta var; tüm miuix artefaktları `-android`
-    // SNAPSHOT versiyonunda olmalı, aksi halde nav'ın transitif miuix-ui-android
-    // SNAPSHOT'u ile duplicate-class çakışması olur.
-    implementation("top.yukonga.miuix.kmp:miuix-ui-android:0.9.3-a84c1811-SNAPSHOT")
-    implementation("top.yukonga.miuix.kmp:miuix-preference-android:0.9.3-a84c1811-SNAPSHOT")
+    // Miuix / ComposeX stack — UI components + real Liquid Glass backdrop pipeline.
+    implementation("top.yukonga.miuix.kmp:miuix-ui:0.9.3")
+    implementation("top.yukonga.miuix.kmp:miuix-preference:0.9.3")
     // Miuix'in kendi ikon seti — Cover editleme drawer'larındaki ✓ (Ok) ve × (Close)
     // işaretleri buradan geliyor (InstallerX de aynı artefaktı kullanıyor).
-    implementation("top.yukonga.miuix.kmp:miuix-icons-android:0.9.3-a84c1811-SNAPSHOT")
-    implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.3-a84c1811-SNAPSHOT")
-    implementation("top.yukonga.miuix.kmp:miuix-shader-android:0.9.3-a84c1811-SNAPSHOT")
-    implementation("top.yukonga.miuix.kmp:miuix-nav-android:0.9.3-a84c1811-SNAPSHOT")
+    implementation("top.yukonga.miuix.kmp:miuix-icons:0.9.3")
+    implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.3")
+    implementation("top.yukonga.miuix.kmp:miuix-shader-android:0.9.3")
 
     implementation("androidx.navigation:navigation-compose:2.9.8")
     implementation("sh.calvin.reorderable:reorderable:3.0.0")

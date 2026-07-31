@@ -48,9 +48,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import top.yukonga.miuix.kmp.nav.core.NavController
-import top.yukonga.miuix.kmp.nav.core.NavKey
-import androidx.compose.runtime.mutableStateListOf
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -118,19 +118,11 @@ fun MainContainer(
         LocalAppBackdrop provides backgroundBackdrop,
         LocalContentBackdrop provides contentBackdrop,
     ) {
-        val navController = remember { NavController(mutableStateListOf<NavKey>(MusicRoute)) }
+        val navController = rememberNavController()
         var showNowPlaying by remember { mutableStateOf(false) }
 
-        val currentRouteKey = navController.backStack.last()
-        val currentRoute: String? = when (currentRouteKey) {
-            is MusicRoute -> Destination.Music.route
-            is PlaylistsRoute -> Destination.Playlists.route
-            is SettingsRoute -> Destination.Settings.route
-            is ThemeRoute -> SettingsRoutes.Theme
-            is PlayerRoute -> SettingsRoutes.Player
-            is AboutRoute -> SettingsRoutes.About
-            else -> null
-        }
+        val navBackStackEntry by navController.currentBackStackEntryAsState()
+        val currentRoute = navBackStackEntry?.destination?.route
         val isBottomRoute = bottomNavDestinations.any { it.route == currentRoute } || currentRoute == null
 
         // Do not collect the whole PlayerUiState at the root: position/progress changes
@@ -154,8 +146,8 @@ fun MainContainer(
         BackHandler(enabled = showNowPlaying || currentRoute != Destination.Music.route) {
             when {
                 showNowPlaying -> showNowPlaying = false
-                !isBottomRoute -> navController.pop()
-                else -> navController.popUntil { it is MusicRoute }
+                !isBottomRoute -> navController.popBackStack()
+                else -> navController.popBackStack(Destination.Music.route, false)
             }
         }
 
@@ -257,13 +249,13 @@ fun MainContainer(
                                     FloatingDock(
                                         currentRoute = currentRoute,
                                 onNavigate = { destination ->
-                                    val routeKey = when (destination) {
-                                        Destination.Music -> MusicRoute
-                                        Destination.Playlists -> PlaylistsRoute
-                                        Destination.Settings -> SettingsRoute
-                                        else -> MusicRoute
+                                    navController.navigate(destination.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
                                     }
-                                    navController.push(routeKey)
                                 }
                                     )
                                     Spacer(Modifier.height(8.dp))
