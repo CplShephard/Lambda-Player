@@ -117,6 +117,10 @@ dependencies {
     // squircle köşe kırpma + dim scrim + predictive back). Compose Navigation tamamen kaldırıldı.
     implementation("top.yukonga.miuix.kmp:miuix-squircle:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-navigation3-ui:0.9.3")
+    // miuix-navigation3-ui yalnızca androidx.navigation3.ui/scene/animation'ı kendi içinde
+    // bundle eder; navigation3.runtime (NavKey, entryProvider, entry...) external bağımlılıktır
+    // ve POM versiyonsuz (BOM'a dayalı) olduğu için transitive gelmez. Açıkça ekleniyor.
+    implementation("androidx.navigation3:navigation3-runtime:1.1.4")
 
     // androidx.navigation:navigation-compose (Compose Navigation v2) kaldırıldı; gezinme
     // tamamen Miuix NavDisplay (androidx.navigation3 / miuix-navigation3-ui) üzerinden.
