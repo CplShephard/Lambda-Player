@@ -83,6 +83,7 @@ data class Strings(
     val addToPlaylist: String,
     val noLyricsFound: String,
     val edit: String,
+    val autoscroll: String,
     val remove: String,
     val fromQueue: String,
     val trackCount: String,
@@ -113,6 +114,7 @@ data class Strings(
     val removeCover: String,
     val blurEffect: String,
     val blurEffectDescription: String,
+    val layout: String,
 )
 
 private val EN = Strings(
@@ -170,6 +172,7 @@ private val EN = Strings(
     addToPlaylist = "Add to playlist",
     noLyricsFound = "No lyrics found",
     edit = "Edit",
+    autoscroll = "Auto-scroll",
     remove = "Remove",
     fromQueue = "from queue",
     trackCount = "tracks",
@@ -199,7 +202,8 @@ private val EN = Strings(
     later = "Later",
     removeCover = "Remove cover",
     blurEffect = "Blur Effect",
-    blurEffectDescription = "Real background blur for the dock, cards and sheets. The dock turns into Liquid Glass on Android 13+."
+    blurEffectDescription = "Real background blur for the dock, cards and sheets. The dock turns into Liquid Glass on Android 13+.",
+    layout = "Layout"
 )
 
 private val TR = EN.copy(
@@ -256,6 +260,7 @@ private val TR = EN.copy(
     addToPlaylist = "Çalma listesine ekle",
     noLyricsFound = "Şarkı sözü bulunamadı",
     edit = "Düzenle",
+    autoscroll = "Otomatik kaydır",
     remove = "Kaldır",
     fromQueue = "sıradan",
     trackCount = "parça",
@@ -285,7 +290,8 @@ private val TR = EN.copy(
     later = "Daha sonra",
     removeCover = "Kapağı kaldır",
     blurEffect = "Bulanıklık Efekti",
-    blurEffectDescription = "Dock, kartlar ve sayfalar için gerçek arka plan bulanıklığı. Android 13+ cihazlarda dock Liquid Glass görünümüne geçer."
+    blurEffectDescription = "Dock, kartlar ve sayfalar için gerçek arka plan bulanıklığı. Android 13+ cihazlarda dock Liquid Glass görünümüne geçer.",
+    layout = "Düzen"
 )
 
 private val ZH = EN.copy(
@@ -342,6 +348,7 @@ private val ZH = EN.copy(
     addToPlaylist = "添加到播放列表",
     noLyricsFound = "未找到歌词",
     edit = "编辑",
+    autoscroll = "自动滚动",
     remove = "移除",
     fromQueue = "从队列",
     trackCount = "首歌曲",
@@ -371,7 +378,8 @@ private val ZH = EN.copy(
     later = "稍后",
     removeCover = "移除封面",
     blurEffect = "模糊效果",
-    blurEffectDescription = "为底栏、卡片和面板启用真实的背景模糊。Android 13+ 上底栏将呈现液态玻璃效果。"
+    blurEffectDescription = "为底栏、卡片和面板启用真实的背景模糊。Android 13+ 上底栏将呈现液态玻璃效果。",
+    layout = "布局"
 )
 
 private val ES = EN.copy(
@@ -428,6 +436,7 @@ private val ES = EN.copy(
     addToPlaylist = "Añadir a lista",
     noLyricsFound = "No se encontraron letras",
     edit = "Editar",
+    autoscroll = "Desplazamiento automático",
     remove = "Quitar",
     fromQueue = "de la cola",
     trackCount = "pistas",
@@ -457,7 +466,8 @@ private val ES = EN.copy(
     later = "Más tarde",
     removeCover = "Quitar portada",
     blurEffect = "Efecto de Desenfoque",
-    blurEffectDescription = "Desenfoque real del fondo para el dock, tarjetas y hojas. En Android 13+ el dock se convierte en Liquid Glass."
+    blurEffectDescription = "Desenfoque real del fondo para el dock, tarjetas y hojas. En Android 13+ el dock se convierte en Liquid Glass.",
+    layout = "Diseño"
 )
 
 private val RU = EN.copy(
@@ -514,6 +524,7 @@ private val RU = EN.copy(
     addToPlaylist = "Добавить в плейлист",
     noLyricsFound = "Текст не найден",
     edit = "Редактировать",
+    autoscroll = "Автопрокрутка",
     remove = "Удалить",
     fromQueue = "из очереди",
     trackCount = "треков",
@@ -543,7 +554,8 @@ private val RU = EN.copy(
     later = "Позже",
     removeCover = "Удалить обложку",
     blurEffect = "Эффект размытия",
-    blurEffectDescription = "Настоящее размытие фона для дока, карточек и панелей. На Android 13+ док становится Liquid Glass."
+    blurEffectDescription = "Настоящее размытие фона для дока, карточек и панелей. На Android 13+ док становится Liquid Glass.",
+    layout = "Вид"
 )
 
 private val KA = EN.copy(
@@ -600,6 +612,7 @@ private val KA = EN.copy(
     addToPlaylist = "პლეილისტში დამატება",
     noLyricsFound = "ტექსტი ვერ მოიძებნა",
     edit = "ჩასწორება",
+    autoscroll = "ავტომატური გადახვევა",
     remove = "წაშლა",
     fromQueue = "რიგიდან",
     trackCount = "ტრეკი",
@@ -629,7 +642,8 @@ private val KA = EN.copy(
     later = "მოგვიანებით",
     removeCover = "ყდის წაშლა",
     blurEffect = "დაბინდვის ეფექტი",
-    blurEffectDescription = "ნამდვილი ფონის დაბინდვა დოკის, ბარათებისა და პანელებისთვის. Android 13+-ზე დოკი Liquid Glass ხდება."
+    blurEffectDescription = "ნამდვილი ფონის დაბინდვა დოკის, ბარათებისა და პანელებისთვის. Android 13+-ზე დოკი Liquid Glass ხდება.",
+    layout = "ხედი"
 )
 
 private val AR = EN.copy(
@@ -686,6 +700,7 @@ private val AR = EN.copy(
     addToPlaylist = "إضافة إلى قائمة",
     noLyricsFound = "لم يُعثر على كلمات",
     edit = "تحرير",
+    autoscroll = "تمرير تلقائي",
     remove = "إزالة",
     fromQueue = "من القائمة",
     trackCount = "مقاطع",
@@ -715,7 +730,8 @@ private val AR = EN.copy(
     later = "لاحقًا",
     removeCover = "إزالة الغلاف",
     blurEffect = "تأثير الضبابية",
-    blurEffectDescription = "ضبابية حقيقية للخلفية لشريط التنقل والبطاقات واللوحات. على Android 13+ يتحول الشريط إلى Liquid Glass."
+    blurEffectDescription = "ضبابية حقيقية للخلفية لشريط التنقل والبطاقات واللوحات. على Android 13+ يتحول الشريط إلى Liquid Glass.",
+    layout = "التخطيط"
 )
 
 val AllLanguages: List<Strings> = listOf(EN, TR, ZH, ES, RU, KA, AR)

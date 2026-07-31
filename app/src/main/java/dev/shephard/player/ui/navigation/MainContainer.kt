@@ -266,10 +266,11 @@ fun MainContainer(
 
             AnimatedVisibility(
                 visible = showNowPlaying,
-                enter = slideInVertically(
-                    initialOffsetY = { it },
-                    animationSpec = nowPlayingEnterSpring
-                ) + fadeIn(tween(120)),
+                // MADDE (köşe yarıçapı zamanlaması) — açılış kaydırması (slide) artık
+                // NowPlayingSheet içinde `dragOffset` üzerinden yapılıyor; böylece köşe
+                // yarıçapı sheet TAM oturana kadar 30dp kalıyor, animasyon bitince 0'a
+                // iniyor. Burada sadece yumuşak bir fade kalıyor.
+                enter = fadeIn(tween(160)),
                 exit = fadeOut(tween(0)),
                 modifier = Modifier.fillMaxSize()
             ) {

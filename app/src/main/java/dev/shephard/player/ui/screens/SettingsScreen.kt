@@ -110,6 +110,8 @@ import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
 import dev.shephard.player.ui.components.CustomColorPickerDialog
 import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.LocalAppBackdrop
+import dev.shephard.player.ui.glass.miuixBlurSurface
 import dev.shephard.player.ui.glass.bgeffect.BgEffectBackground
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -193,9 +195,64 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     var wallpaperBrightnessValue by remember(wallpaperBrightness) { mutableStateOf(wallpaperBrightness) }
     var cardAlphaValue by remember(cardAlpha) { mutableStateOf(cardAlpha) }
 
+    // MADDE 4 — duvar kağıdı seçerken de kapak seçimindeki gibi sistem cropper
+    // (com.android.camera.action.CROP) kullanılsın. Önce görsel seçilir, sonra crop
+    // intent'i ile kırpılır; kırpılan çıktı kalıcı depolamaya yazılır.
+    var wallpaperCropOutputUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val wallpaperCropLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val output = wallpaperCropOutputUri
+        if (result.resultCode == android.app.Activity.RESULT_OK && output != null) {
+            scope.launch { prefs.setWallpaperUri(output.toString()) }
+        }
+    }
+
+    fun launchWallpaperCrop(sourceUri: android.net.Uri) {
+        val dir = java.io.File(context.filesDir, "persisted_wallpapers").apply { mkdirs() }
+        val file = java.io.File(dir, "wallpaper_${System.currentTimeMillis()}.jpg")
+        val outputUri = androidx.core.content.FileProvider.getUriForFile(
+            context, "${context.packageName}.fileprovider", file
+        )
+        wallpaperCropOutputUri = outputUri
+        val cropIntent = android.content.Intent("com.android.camera.action.CROP").apply {
+            setDataAndType(sourceUri, "image/*")
+            putExtra("crop", "true")
+            putExtra("scale", "true")
+            // Duvar kağıdı serbest en-boy oranında kırpılır (kapak gibi 1:1 ZORLANMAZ).
+            putExtra("outputX", 1080)
+            putExtra("outputY", 2400)
+            putExtra(android.provider.MediaStore.EXTRA_OUTPUT, outputUri)
+            putExtra("outputFormat", android.graphics.Bitmap.CompressFormat.JPEG.toString())
+            putExtra("return-data", false)
+            putExtra("noFaceDetection", true)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            clipData = android.content.ClipData.newUri(context.contentResolver, "wallpaper", sourceUri)
+        }
+        val resolved = context.packageManager.queryIntentActivities(cropIntent, 0)
+        for (info in resolved) {
+            val pkg = info.activityInfo?.packageName ?: continue
+            try {
+                context.grantUriPermission(
+                    pkg, outputUri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (_: SecurityException) { }
+        }
+        if (resolved.isNotEmpty()) {
+            wallpaperCropLauncher.launch(cropIntent)
+        } else {
+            // Sistem cropper yoksa seçilen görseli olduğu gibi kalıcı depolamaya kopyala.
+            scope.launch {
+                val persisted = dev.shephard.player.player.ImagePersistence.persistWallpaper(context, sourceUri)
+                prefs.setWallpaperUri((persisted ?: sourceUri).toString())
+            }
+        }
+    }
+
     val wallpaperPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
+    ) { uri: android.net.Uri? ->
         if (uri != null) {
             try {
                 context.contentResolver.takePersistableUriPermission(
@@ -203,10 +260,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                     Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             } catch (_: SecurityException) { }
-            scope.launch {
-                val persisted = dev.shephard.player.player.ImagePersistence.persistWallpaper(context, uri)
-                prefs.setWallpaperUri((persisted ?: uri).toString())
-            }
+            launchWallpaperCrop(uri)
         }
     }
 
@@ -343,7 +397,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         }
 
         SectionCard {
-            Text("Layout", style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
+            Text(strings.layout, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
             Spacer(Modifier.height(10.dp))
             Text(strings.musicsLayout, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -516,9 +570,10 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
         isDarkTheme = isDarkTheme,
         modifier = Modifier.fillMaxSize(),
         isFullSize = false,
-        // Lambda'da About sayfasının ARKASINDA duvar kağıdı var; opak bir dolgu onu
-        // gizlerdi. Bu yüzden efekt saydam zeminin üzerine biniyor.
-        surface = Color.Transparent,
+        // MADDE 2 — About arka planı SIMSIYAH olmalı; duvar kağıdı About ekranında
+        // etkili olmamalı. Bu yüzden opak siyah zemin çizilir, dinamik ışık (MADDE 9)
+        // onun ÜZERİNE biniyor.
+        surface = Color.Black,
         alpha = { 1f - scrollProgress * 0.85f }
     ) {
         // Sticky animated header (liste bunun ÜZERİNDEN kayar)
@@ -631,7 +686,25 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
         }
 
         // Üstte sabit app bar: "About" başlığı kaydırdıkça ORTADA belirir
-        SmallTopAppBar(
+        val aboutBarBlurOn = LocalBlurEnabled.current
+        val aboutBarBackdrop = LocalAppBackdrop.current
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .then(
+                    if (aboutBarBlurOn && aboutBarBackdrop != null) {
+                        Modifier.miuixBlurSurface(
+                            backdrop = aboutBarBackdrop,
+                            shape = RoundedCornerShape(0.dp),
+                            blurRadius = 14f,
+                            tintAlpha = 0.46f,
+                            fallbackColor = MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+                        )
+                    } else Modifier
+                )
+        ) {
+            SmallTopAppBar(
             title = "About",
             modifier = Modifier.align(Alignment.TopCenter),
             color = MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
@@ -655,6 +728,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                 }
             }
         )
+        }
     }
 }
 
@@ -682,7 +756,26 @@ private fun SettingsPageScaffold(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        SmallTopAppBar(
+        val appBarBlurOn = LocalBlurEnabled.current
+        val appBarBackdrop = LocalAppBackdrop.current
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(
+                    if (appBarBlurOn && appBarBackdrop != null) {
+                        // MADDE 5 — InstallerX gibi action bar, arkasına içerik
+                        // geldikçe hafifçe bulanık görünsün.
+                        Modifier.miuixBlurSurface(
+                            backdrop = appBarBackdrop,
+                            shape = RoundedCornerShape(0.dp),
+                            blurRadius = 14f,
+                            tintAlpha = 0.46f,
+                            fallbackColor = MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+                        )
+                    } else Modifier
+                )
+        ) {
+            SmallTopAppBar(
             title = title,
             color = Color.Transparent,
             titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
@@ -702,6 +795,7 @@ private fun SettingsPageScaffold(
                 }
             }
         )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()

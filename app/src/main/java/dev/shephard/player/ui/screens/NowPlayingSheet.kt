@@ -59,10 +59,12 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.VerticalAlignCenter
 import dev.shephard.player.ui.miuix.ExperimentalMaterial3Api
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.IconButton
 import dev.shephard.player.ui.miuix.MiuixAppTheme
+import dev.shephard.player.ui.miuix.OutlinedTextField
 import dev.shephard.player.ui.components.MiuixDrawer
 import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.miuix.Text
@@ -134,13 +136,33 @@ fun NowPlayingSheet(
 
     val density = LocalDensity.current
     val dismissThresholdPx = with(density) { 140.dp.toPx() }
-    val dragOffset = remember { androidx.compose.animation.core.Animatable(0f) }
+    // Giriş (açılış) kaydırması artık burada `dragOffset` üzerinden yapılıyor (alttaki
+    // LaunchedEffect). İlk frame'de boşluk/flaş olmaması için başlangıç değeri ekran
+    // yüksekliği olarak veriliyor; sheet böylece ilk frame'de ekranın altında
+    // (görünmez) başlıyor, sonra yukarı kayıyor.
+    val dragOffset = remember {
+        androidx.compose.animation.core.Animatable(
+            with(density) { androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp.toPx() }
+        )
+    }
     val dragScope = rememberCoroutineScope()
 
     // Sheet her ekrana geldiğinde dragOffset'i 0'a al: parmakla kapatıp tekrar açınca
     // eski sürükleme miktarının (translationY) kalıcı gri boşluk bırakmasını engeller.
+    // MADDE (köşe yarıçapı zamanlaması) — açılış kaydırması artık burada `dragOffset`
+    // üzerinden yapılıyor. Sheet ekranın altından yukarı kayar; `dragOffset` 0'a
+    // ulaşınca (yani sheet TAM oturunca) köşe yarıçapı 30dp -> 0dp'ye iner. Böylece
+    // köşeler, açılış animasyonu bitince — değil, TAM bitince — 0'a düşer (sihirli
+    // gecikme yok).
+    var hasEnteredRest by remember { mutableStateOf(false) }
+    val nowPlayingEnterSpring = androidx.compose.animation.core.spring<Float>(
+        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+        stiffness = 180f
+    )
     LaunchedEffect(Unit) {
-        dragOffset.snapTo(0f)
+        hasEnteredRest = false
+        dragOffset.animateTo(0f, animationSpec = nowPlayingEnterSpring)
+        hasEnteredRest = true
     }
 
     // Kapak resmi swipe-to-change-song: OuterTune'daki gibi sürekli aktif (togglesız),
@@ -226,7 +248,7 @@ fun NowPlayingSheet(
                     // layout bilgisinden hesapla — scrollToItem sonrası layoutInfo bir frame
                     // geride kalabiliyor.
                     val itemWidthPx = artGridState.layoutInfo.visibleItemsInfo.firstOrNull()?.size?.width ?: 0
-                    val stridePx = itemWidthPx + with(density) { 16.dp.toPx() }
+                    val stridePx = itemWidthPx + with(density) { 0.dp.toPx() }
                     artGridState.scrollToItem(start)
                     if (itemWidthPx > 0) {
                         // animateScrollToItem'ın sabit (çok hızlı) animasyonu yerine daha
@@ -276,12 +298,6 @@ fun NowPlayingSheet(
     // kalmalı), animasyon bitip sheet dinlenme konumuna oturunca 0dp'ye insin — bu sayede
     // ekran görüntüsü/ekran kaydında köşeler görünmez. hasEnteredRest, sheet ilk açıldığında
     // bir kere gecikmeyle true olur ve girişte 30dp'nin gösterilmesini sağlar.
-    var hasEnteredRest by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        hasEnteredRest = false
-        kotlinx.coroutines.delay(380) // MainContainer'daki spring(stiffness=180) giriş süresine yakın
-        hasEnteredRest = true
-    }
     var isInteractingWithSheet by remember { mutableStateOf(false) }
     val isFullyExpanded by remember {
         androidx.compose.runtime.derivedStateOf { hasEnteredRest && !isInteractingWithSheet && dragOffset.value <= 0.5f }
@@ -358,13 +374,12 @@ fun NowPlayingSheet(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 24.dp)
         ) {
             // Top row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp)
+                    .padding(top = 8.dp, start = 20.dp, end = 20.dp)
                     .pointerInput(Unit) { detectHorizontalDragGestures { _, _ -> } },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -435,7 +450,7 @@ fun NowPlayingSheet(
                             rows = GridCells.Fixed(1),
                             flingBehavior = rememberSnapFlingBehavior(artSnapLayoutInfoProvider),
                             userScrollEnabled = true,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(0.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 24.dp)
@@ -492,7 +507,7 @@ fun NowPlayingSheet(
                                             color = MiuixAppTheme.colorScheme.onBackground,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.padding(horizontal = 24.dp)
+                                            modifier = Modifier.padding(horizontal = 0.dp)
                                         )
                                         Text(
                                             text = itemTrack.artist,
@@ -500,7 +515,7 @@ fun NowPlayingSheet(
                                             color = MiuixAppTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.padding(horizontal = 24.dp)
+                                            modifier = Modifier.padding(horizontal = 0.dp)
                                         )
                                     }
                                 }
@@ -521,7 +536,7 @@ fun NowPlayingSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp, end = 4.dp),
+                    .padding(top = 16.dp, start = 20.dp, end = 20.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -615,9 +630,16 @@ fun NowPlayingSheet(
                         syncedLyrics.indexOfLast { it.timeMs <= currentMs }.coerceAtLeast(0)
                     } else -1
 
-                    // Auto-scroll to active line
-                    LaunchedEffect(activeIndex) {
-                        if (activeIndex >= 0 && syncedLyrics.isNotEmpty()) {
+                    // MADDE 7 — düzenleme ve otomatik kaydırma (autoscroll) durumu.
+                    var isEditing by remember { mutableStateOf(false) }
+                    var isAutoScroll by remember { mutableStateOf(true) }
+                    var editText by remember { mutableStateOf("") }
+                    val isDarkTheme = MiuixAppTheme.colorScheme.background.luminance() < 0.5f
+
+                    // MADDE 7 — autoscroll yalnızca açıkken ve sözler senkronizeyken
+                    // aktif satıra kaydırır.
+                    LaunchedEffect(activeIndex, isAutoScroll) {
+                        if (isAutoScroll && activeIndex >= 0 && syncedLyrics.isNotEmpty()) {
                             lyricListState.animateScrollToItem(activeIndex)
                         }
                     }
@@ -649,16 +671,67 @@ fun NowPlayingSheet(
                                 .fillMaxHeight(0.72f)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                Text(strings.lyrics, style = MiuixAppTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                if (state.lyrics.isEmpty()) {
-                                    // File picker button
-                                    dev.shephard.player.ui.miuix.IconButton(onClick = { lyricsFilePicker.launch(arrayOf("text/*", "application/octet-stream")) }) {
-                                        Icon(Icons.Filled.FolderOpen, contentDescription = strings.addLyricsFromFile, tint = MiuixAppTheme.colorScheme.onSurfaceVariant)
+                                // MADDE 7 — içe aktarma (import) tuşu artık HER ZAMAN solda
+                                // görünür (daha önce sözler içe aktarılınca kayboluyordu).
+                                dev.shephard.player.ui.miuix.IconButton(
+                                    onClick = { lyricsFilePicker.launch(arrayOf("text/*", "application/octet-stream")) }
+                                ) {
+                                    Icon(
+                                        Icons.Filled.FolderOpen,
+                                        contentDescription = strings.addLyricsFromFile,
+                                        tint = MiuixAppTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Text(
+                                    strings.lyrics,
+                                    style = MiuixAppTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f).padding(start = 4.dp)
+                                )
+                                // MADDE 7 — autoscroll tuşu (edit'in hemen solunda).
+                                // Açıkken tema rengi; kapalıyken beyaz (aydınlık modda siyah).
+                                dev.shephard.player.ui.miuix.IconButton(
+                                    onClick = { isAutoScroll = !isAutoScroll }
+                                ) {
+                                    Icon(
+                                        Icons.Filled.VerticalAlignCenter,
+                                        contentDescription = strings.autoscroll,
+                                        tint = if (isAutoScroll) MiuixAppTheme.colorScheme.primary
+                                        else if (isDarkTheme) Color.White else Color.Black
+                                    )
+                                }
+                                // MADDE 7 — düzenleme tuşu (Miuix edit simgesi).
+                                dev.shephard.player.ui.miuix.IconButton(
+                                    onClick = {
+                                        if (!isEditing) {
+                                            editText = state.lyrics.joinToString("\n")
+                                            isEditing = true
+                                        } else {
+                                            val lines = editText.lines()
+                                                .map { it.trimEnd() }
+                                                .filter { it.isNotBlank() }
+                                            playerViewModel.setManualLyrics(lines)
+                                            isEditing = false
+                                        }
                                     }
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Edit,
+                                        contentDescription = strings.edit,
+                                        tint = if (isEditing) MiuixAppTheme.colorScheme.primary
+                                        else MiuixAppTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
                             Spacer(Modifier.height(12.dp))
-                            if (state.lyrics.isEmpty()) {
+                            if (isEditing) {
+                                dev.shephard.player.ui.miuix.OutlinedTextField(
+                                    value = editText,
+                                    onValueChange = { editText = it },
+                                    label = { Text(strings.lyrics) },
+                                    modifier = Modifier.fillMaxWidth().weight(1f)
+                                )
+                            } else if (state.lyrics.isEmpty()) {
                                 Text(strings.noLyricsFound, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(16.dp))
                                 val currentTrack = state.currentTrack
@@ -693,7 +766,7 @@ fun NowPlayingSheet(
                             } else {
                                 LazyColumn(
                                     state = lyricListState,
-                                    modifier = Modifier.overScrollVertical()
+                                    modifier = Modifier.overScrollVertical().weight(1f)
                                 ) {
                                     itemsIndexed(state.lyrics) { idx, line ->
                                         val isActive = idx == activeIndex
@@ -734,7 +807,7 @@ fun NowPlayingSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 32.dp)
+                    .padding(top = 8.dp, bottom = 32.dp, start = 20.dp, end = 20.dp)
                     .pointerInput(Unit) { detectHorizontalDragGestures { _, _ -> } },
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
@@ -909,10 +982,10 @@ private fun SeekBarRow(playerViewModel: PlayerViewModel) {
             onSeekFinished = { fraction ->
                 playerViewModel.onSeekCommit((fraction * progress.durationMs).toLong())
             },
-            modifier = Modifier.padding(horizontal = 4.dp)
+            modifier = Modifier.padding(horizontal = 20.dp)
         )
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, start = 20.dp, end = 20.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
