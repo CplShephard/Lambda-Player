@@ -46,9 +46,7 @@ fun <T : Any> NavigationBackHandler(
         }
     }
 
-    val owner = runCatching {
-        androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner.current
-    }.getOrNull()
+    val owner = androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner.current
 
     if (owner != null) {
         NavigationBackHandler(
