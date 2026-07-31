@@ -110,8 +110,6 @@ import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
 import dev.shephard.player.ui.components.CustomColorPickerDialog
 import dev.shephard.player.ui.glass.LocalBlurEnabled
-import dev.shephard.player.ui.glass.LocalAppBackdrop
-import dev.shephard.player.ui.glass.miuixBlurSurface
 import dev.shephard.player.ui.glass.bgeffect.BgEffectBackground
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -209,7 +207,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     }
 
     fun launchWallpaperCrop(sourceUri: android.net.Uri) {
-        val dir = java.io.File(context.filesDir, "persisted_wallpapers").apply { mkdirs() }
+        val dir = java.io.File(context.filesDir, "persisted_wallpaper").apply { mkdirs() }
         val file = java.io.File(dir, "wallpaper_${System.currentTimeMillis()}.jpg")
         val outputUri = androidx.core.content.FileProvider.getUriForFile(
             context, "${context.packageName}.fileprovider", file
@@ -569,7 +567,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
     BgEffectBackground(
         isDarkTheme = isDarkTheme,
         modifier = Modifier.fillMaxSize(),
-        isFullSize = false,
+        isFullSize = true,
         // MADDE 2 — About arka planı SIMSIYAH olmalı; duvar kağıdı About ekranında
         // etkili olmamalı. Bu yüzden opak siyah zemin çizilir, dinamik ışık (MADDE 9)
         // onun ÜZERİNE biniyor.
@@ -686,25 +684,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
         }
 
         // Üstte sabit app bar: "About" başlığı kaydırdıkça ORTADA belirir
-        val aboutBarBlurOn = LocalBlurEnabled.current
-        val aboutBarBackdrop = LocalAppBackdrop.current
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .then(
-                    if (aboutBarBlurOn && aboutBarBackdrop != null) {
-                        Modifier.miuixBlurSurface(
-                            backdrop = aboutBarBackdrop,
-                            shape = RoundedCornerShape(0.dp),
-                            blurRadius = 14f,
-                            tintAlpha = 0.46f,
-                            fallbackColor = MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
-                        )
-                    } else Modifier
-                )
-        ) {
-            SmallTopAppBar(
+        SmallTopAppBar(
             title = "About",
             modifier = Modifier.align(Alignment.TopCenter),
             color = MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
@@ -728,7 +708,6 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                 }
             }
         )
-        }
     }
 }
 
@@ -756,26 +735,7 @@ private fun SettingsPageScaffold(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        val appBarBlurOn = LocalBlurEnabled.current
-        val appBarBackdrop = LocalAppBackdrop.current
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(
-                    if (appBarBlurOn && appBarBackdrop != null) {
-                        // MADDE 5 — InstallerX gibi action bar, arkasına içerik
-                        // geldikçe hafifçe bulanık görünsün.
-                        Modifier.miuixBlurSurface(
-                            backdrop = appBarBackdrop,
-                            shape = RoundedCornerShape(0.dp),
-                            blurRadius = 14f,
-                            tintAlpha = 0.46f,
-                            fallbackColor = MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
-                        )
-                    } else Modifier
-                )
-        ) {
-            SmallTopAppBar(
+        SmallTopAppBar(
             title = title,
             color = Color.Transparent,
             titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
@@ -795,7 +755,6 @@ private fun SettingsPageScaffold(
                 }
             }
         )
-        }
         Column(
             modifier = Modifier
                 .fillMaxSize()

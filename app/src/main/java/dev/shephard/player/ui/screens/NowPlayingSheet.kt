@@ -405,7 +405,7 @@ fun NowPlayingSheet(
             }
 
             // Album art + title
-            Column {
+            Column(modifier = Modifier.padding(horizontal = 24.dp)) {
                 // Kapak resmi: OuterTune'daki "swipe to change songs" ile birebir aynı mekanizma —
                 // LazyHorizontalGrid + snap fling, togglesız her zaman aktif. Önceki/mevcut/sonraki
                 // kapak yan yana dizilir, snap tamamlanınca gerçek şarkı değişimi tetiklenir.

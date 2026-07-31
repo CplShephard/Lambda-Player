@@ -1,14 +1,9 @@
 package dev.shephard.player.ui.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.ui.screens.MusicScreen
@@ -17,130 +12,64 @@ import dev.shephard.player.ui.screens.AboutSettingsScreen
 import dev.shephard.player.ui.screens.PlayerSettingsScreen
 import dev.shephard.player.ui.screens.SettingsScreen
 import dev.shephard.player.ui.screens.ThemeSettingsScreen
+import top.yukonga.miuix.kmp.nav.core.NavController
+import top.yukonga.miuix.kmp.nav.core.NavDisplay
+import top.yukonga.miuix.kmp.nav.core.NavKey
+import top.yukonga.miuix.kmp.nav.core.entry
 
-private fun routeOrder(route: String?): Int = when (route) {
-    Destination.Music.route -> 0
-    Destination.Playlists.route -> 1
-    Destination.Settings.route -> 2
-    SettingsRoutes.Theme, SettingsRoutes.Player, SettingsRoutes.About -> 3
-    else -> 0
-}
-
-/** Settings altındaki (dock'suz) detay sayfaları. */
-private val settingsSubRoutes = setOf(
-    SettingsRoutes.Theme,
-    SettingsRoutes.Player,
-    SettingsRoutes.About
-)
-
-private fun isSettingsSubRoute(route: String?): Boolean = route in settingsSubRoutes
-
-// Sekmeler arası (Music ↔ Playlists ↔ Settings) yatay kayma — IntOffset spring ile
-private val springSpec = spring<androidx.compose.ui.unit.IntOffset>(
-    dampingRatio = 0.8f,
-    stiffness = 380f
-)
-
-private val fadeSpring = spring<Float>(
-    dampingRatio = 1f,
-    stiffness = 380f
-)
+// Miuix NavDisplay route anahtarları — her biri NavKey.
+// NOT: rememberNavBackStack kullanılmıyor; serileştirme (kotlinx-serialization) gerektiren
+// yolu atlayıp doğrudan mutableStateListOf<NavKey> + NavController ile kuruluyor.
+object MusicRoute : NavKey
+object PlaylistsRoute : NavKey
+object SettingsRoute : NavKey
+object ThemeRoute : NavKey
+object PlayerRoute : NavKey
+object AboutRoute : NavKey
 
 @Composable
 fun NavGraph(
-    navController: NavHostController,
+    navController: NavController,
     playerViewModel: PlayerViewModel = viewModel(),
-    modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
+    modifier: Modifier = Modifier,
     hasMiniPlayer: Boolean = false,
     onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
     onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> }
 ) {
-    NavHost(
-        navController = navController,
-        startDestination = Destination.Music.route,
-        modifier = modifier,
-        // MADDE 8 — Settings alt sayfalarına girerken InstallerX/MIUIX "push" animasyonu:
-        // yeni sayfa TAMAMEN sağdan gelir, alttaki sayfa paralaksla hafifçe sola kayar.
-        // Alt sekmeler arası geçiş (Music/Playlists/Settings) ise eskisi gibi sıralamaya
-        // göre sola/sağa kayan yatay geçiş olarak kalıyor — orada "push" mantığı yok,
-        // sekmeler eşit seviyede.
-        enterTransition = {
-            if (isSettingsSubRoute(targetState.destination.route)) {
-                PageTransitions.enterPush
-            } else {
-                val fromIdx = routeOrder(initialState.destination.route)
-                val toIdx = routeOrder(targetState.destination.route)
-                val dir = if (toIdx >= fromIdx)
-                    AnimatedContentTransitionScope.SlideDirection.Left
-                else
-                    AnimatedContentTransitionScope.SlideDirection.Right
-                slideIntoContainer(dir, springSpec) + fadeIn(fadeSpring)
-            }
-        },
-        exitTransition = {
-            if (isSettingsSubRoute(targetState.destination.route)) {
-                PageTransitions.exitPush
-            } else {
-                val fromIdx = routeOrder(initialState.destination.route)
-                val toIdx = routeOrder(targetState.destination.route)
-                val dir = if (toIdx >= fromIdx)
-                    AnimatedContentTransitionScope.SlideDirection.Left
-                else
-                    AnimatedContentTransitionScope.SlideDirection.Right
-                slideOutOfContainer(dir, springSpec) + fadeOut(fadeSpring)
-            }
-        },
-        popEnterTransition = {
-            if (isSettingsSubRoute(initialState.destination.route)) {
-                PageTransitions.popEnterPush
-            } else {
-                slideIntoContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Right,
-                    springSpec
-                ) + fadeIn(fadeSpring)
-            }
-        },
-        popExitTransition = {
-            if (isSettingsSubRoute(initialState.destination.route)) {
-                PageTransitions.popExitPush
-            } else {
-                slideOutOfContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Right,
-                    springSpec
-                ) + fadeOut(fadeSpring)
-            }
-        }
-    ) {
-        composable(Destination.Music.route) {
+    // MADDE 1 — Sayfa geçişleri artık Miuix'in kendi NavDisplay'i ile, global geçiş olarak
+    // NavTransitions.MiuixDefault kullanılarak yapılıyor (InstallerX ile birebir). Tüm
+    // sayfalar (Music / Playlists / Settings ve alt sayfalar) bu tek geçişi paylaşıyor.
+    NavDisplay(navController, modifier = modifier.fillMaxSize()) {
+        entry<MusicRoute> {
             MusicScreen(
                 playerViewModel = playerViewModel,
                 onTrackClick = { tracks, index -> onTrackClick(tracks, index, null) },
                 hasMiniPlayer = hasMiniPlayer
             )
         }
-        composable(Destination.Playlists.route) {
+        entry<PlaylistsRoute> {
             PlaylistScreen(
                 onTrackClick = onTrackClick,
                 onPlaylistRemixClick = onPlaylistRemixClick,
                 hasMiniPlayer = hasMiniPlayer
             )
         }
-        composable(Destination.Settings.route) {
+        entry<SettingsRoute> {
             SettingsScreen(
                 playerViewModel = playerViewModel,
-                onOpenThemeSettings = { navController.navigate(SettingsRoutes.Theme) },
-                onOpenPlayerSettings = { navController.navigate(SettingsRoutes.Player) },
-                onOpenAbout = { navController.navigate(SettingsRoutes.About) }
+                onOpenThemeSettings = { navController.push(ThemeRoute) },
+                onOpenPlayerSettings = { navController.push(PlayerRoute) },
+                onOpenAbout = { navController.push(AboutRoute) }
             )
         }
-        composable(SettingsRoutes.Theme) {
-            ThemeSettingsScreen(onBack = { navController.popBackStack() })
+        entry<ThemeRoute> {
+            ThemeSettingsScreen(onBack = { navController.pop() })
         }
-        composable(SettingsRoutes.Player) {
-            PlayerSettingsScreen(onBack = { navController.popBackStack() })
+        entry<PlayerRoute> {
+            PlayerSettingsScreen(onBack = { navController.pop() })
         }
-        composable(SettingsRoutes.About) {
-            AboutSettingsScreen(onBack = { navController.popBackStack() })
+        entry<AboutRoute> {
+            AboutSettingsScreen(onBack = { navController.pop() })
         }
     }
 }

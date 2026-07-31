@@ -113,6 +113,9 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-icons:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-shader-android:0.9.3")
+    // Miuix NavDisplay — sayfa geçişleri (InstallerX ile birebir). 0.9.3 release dağıtımında
+    // NavDisplay bulunmadığı için InstallerX'in kullandığı snapshot sürümüne gidiyoruz.
+    implementation("top.yukonga.miuix.kmp:miuix-nav-android:0.9.3-a84c1811-SNAPSHOT")
 
     implementation("androidx.navigation:navigation-compose:2.9.8")
     implementation("sh.calvin.reorderable:reorderable:3.0.0")
