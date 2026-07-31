@@ -1,15 +1,15 @@
 package dev.shephard.player.ui.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideIntoContainer
-import androidx.compose.animation.slideOutOfContainer
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -42,8 +42,15 @@ object AboutRoute : NavKey
 
 // --- ORİJİNAL animasyon (projenin sana ilk verildiği hâli) -------------------
 // İlk sürümde androidx.navigation.compose NavHost ile kullanılan klasik slide:
-// ileri = yöne göre kayma + hafif fade, spring tabanlı (dampingRatio 0.8, stiffness 380).
-// Bu, Music / Playlists / Settings (üst seviye sekmeler) için kullanılır.
+// ileri = soldan/sağa yöne göre tam genişlikte kayma + hafif fade, spring tabanlı
+// (dampingRatio 0.8, stiffness 380). Bu, Music / Playlists / Settings (üst seviye
+// sekmeler) için kullanılır.
+//
+// NOT: Bu Compose sürümünde `slideIntoContainer` / `slideOutOfContainer` sembolleri
+// classpath'te yok; Miuix'in kendisi de `slideInHorizontally` / `slideOutHorizontally`
+// kullanıyor. O yüzden orijinal `slideIntoContainer(SlideDirection.Left)` davranışını
+// birebir veren `slideInHorizontally(initialOffsetX = { it })` (sağdan giriş) +
+// `slideOutHorizontally(targetOffsetX = { -it })` (sola tam çıkış) ile kuruyoruz.
 private val originalSlideSpec = spring<IntOffset>(
     dampingRatio = 0.8f,
     stiffness = 380f,
@@ -54,18 +61,16 @@ private val originalFadeSpec = spring<Float>(
 )
 
 // Üst seviye sekmeler için orijinal klasik slide (sabit yön: ileri = Sol, geri = Sağ).
-// Böylece Scene.key'a bağımlı kırılgan yön hesabından kaçınıyoruz; ilk sürümün baskın
-// akışıyla (Music→Playlists→Settings ileri, geri tersi) birebir aynı hissi verir.
 private val originalTabTransition: Map<String, Any> =
     NavDisplay.transitionSpec {
         ContentTransform(
-            enter = slideIntoContainer(SlideDirection.Left, originalSlideSpec) + fadeIn(originalFadeSpec),
-            exit = slideOutOfContainer(SlideDirection.Left, originalSlideSpec) + fadeOut(originalFadeSpec),
+            slideInHorizontally(initialOffsetX = { it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
+            slideOutHorizontally(targetOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
         )
     } + NavDisplay.popTransitionSpec {
         ContentTransform(
-            enter = slideIntoContainer(SlideDirection.Right, originalSlideSpec) + fadeIn(originalFadeSpec),
-            exit = slideOutOfContainer(SlideDirection.Right, originalSlideSpec) + fadeOut(originalFadeSpec),
+            slideInHorizontally(initialOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
+            slideOutHorizontally(targetOffsetX = { it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
         )
     }
 
