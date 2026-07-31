@@ -2,7 +2,7 @@
 // Copyright (C) 2026 InstallerX Revived contributors
 package dev.shephard.player.ui.navigation
 
-import top.yukonga.miuix.kmp.nav.core.NavKey
+import androidx.navigation3.runtime.NavKey
 
 sealed interface Route : NavKey {
     data object Main : Route
