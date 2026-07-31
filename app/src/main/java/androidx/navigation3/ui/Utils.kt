@@ -1,19 +1,54 @@
 // Copyright 2025, compose-miuix-ui contributors
 // SPDX-License-Identifier: Apache-2.0
+@file:JvmName("NavDisplayUtilsKt")
 
 package androidx.navigation3.ui
 
+import android.annotation.SuppressLint
+import android.content.Context
+import android.os.Build
+import android.view.RoundedCorner
+import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
-/**
- * Returns whether the current device is in multi-window mode.
- */
 @Composable
-expect fun isInMultiWindowMode(): Boolean
+fun isInMultiWindowMode(): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+    val activity = LocalActivity.current
+    activity?.isInMultiWindowMode == true
+} else {
+    false
+}
 
-/**
- * Returns the rounded corner radius of the current device display.
- */
 @Composable
-expect fun getRoundedCorner(): Dp
+fun getRoundedCorner(): Dp = getSystemCornerRadius()
+
+@SuppressLint("NewApi")
+@Composable
+private fun getSystemCornerRadius(): Dp {
+    val context = LocalContext.current
+    val density = LocalDensity.current.density
+    val insets = LocalView.current.rootWindowInsets
+
+    val roundedCornerRadius = remember(context, insets) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            insets?.getRoundedCorner(RoundedCorner.POSITION_BOTTOM_LEFT)?.radius
+                ?.takeIf { it > 0 }
+                ?: getCornerRadiusBottom(context)
+        } else {
+            getCornerRadiusBottom(context)
+        }
+    }
+    return (roundedCornerRadius / density).dp
+}
+
+@SuppressLint("DiscouragedApi")
+private fun getCornerRadiusBottom(context: Context): Int {
+    val resourceId = context.resources.getIdentifier("rounded_corner_radius_bottom", "dimen", "android")
+    return if (resourceId > 0) context.resources.getDimensionPixelSize(resourceId) else 0
+}
