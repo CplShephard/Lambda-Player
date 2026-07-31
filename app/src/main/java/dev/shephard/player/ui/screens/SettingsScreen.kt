@@ -213,13 +213,26 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             context, "${context.packageName}.fileprovider", file
         )
         wallpaperCropOutputUri = outputUri
+
+        // Cihazın GERÇEK ekran çözünürlüğünü al — hem outputX/Y hem de aspectX/Y bundan
+        // türetiliyor, böylece kırpma kutusu ekranın tam en-boy oranına kilitleniyor.
+        val displayMetrics = context.resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+
         val cropIntent = android.content.Intent("com.android.camera.action.CROP").apply {
             setDataAndType(sourceUri, "image/*")
             putExtra("crop", "true")
             putExtra("scale", "true")
-            // Duvar kağıdı serbest en-boy oranında kırpılır (kapak gibi 1:1 ZORLANMAZ).
-            putExtra("outputX", 1080)
-            putExtra("outputY", 2400)
+            // ÖNEMLİ: aspectX/aspectY eklenince kırpma kutusu ekranın en-boy oranına
+            // KİLİTLENİR (serbest/"free scale" değil, "fullscreen scale" davranışı).
+            // Önceden sadece outputX/Y veriliyordu ve "scale":"true" ile birlikte
+            // kullanıcıya serbestçe herhangi bir orana çekilebilen bir kırpma kutusu
+            // sunuluyordu — duvar kağıdı bu yüzden ekranı tam kaplamayabiliyordu.
+            putExtra("aspectX", screenWidth)
+            putExtra("aspectY", screenHeight)
+            putExtra("outputX", screenWidth)
+            putExtra("outputY", screenHeight)
             putExtra(android.provider.MediaStore.EXTRA_OUTPUT, outputUri)
             putExtra("outputFormat", android.graphics.Bitmap.CompressFormat.JPEG.toString())
             putExtra("return-data", false)
@@ -740,6 +753,10 @@ private fun SettingsPageScaffold(
             color = Color.Transparent,
             titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
             scrollBehavior = topAppBarScrollBehavior,
+            // NOT: SmallTopAppBar zaten WindowInsets.systemBars(Top)'u KOŞULSUZ kendi
+            // uyguluyor (defaultWindowInsetsPadding sadece yatay/notch insets'i kontrol
+            // ediyor) — yani status bar padding'i buradan değil, Scaffold'un
+            // contentWindowInsets'inden geliyordu. Asıl düzeltme orada (bkz. MainContainer).
             defaultWindowInsetsPadding = false,
             navigationIcon = {
                 Box(

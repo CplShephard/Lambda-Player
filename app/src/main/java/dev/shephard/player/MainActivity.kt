@@ -19,16 +19,20 @@ import dev.shephard.player.ui.components.MiuixDrawer
 import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.miuix.Text
 import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 import dev.shephard.player.ui.miuix.TextButton
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.shephard.player.player.PreferencesManager
@@ -65,6 +69,18 @@ class MainActivity : ComponentActivity() {
                 dynamicColor = dynamicColor,
                 cardAlpha = cardAlpha
             ) {
+                // Status bar ikon rengini (saat, wifi, batarya simgeleri) uygulamanın GERÇEK
+                // arkaplan koyuluğuna göre ayarla. Önceden hiç ayarlanmıyordu: enableEdgeToEdge()
+                // sadece sistem UI moduna bakıyordu, bu da uygulamanın kendi tema tercihiyle
+                // (themeMode = DARK/LIGHT/SYSTEM) senkron değildi — koyu temada ikonlar koyu
+                // (neredeyse görünmez), açık temada bazen ters kalabiliyordu.
+                val isAppDark = MiuixAppTheme.colorScheme.background.luminance() < 0.5f
+                val view = LocalView.current
+                if (!view.isInEditMode) {
+                    SideEffect {
+                        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isAppDark
+                    }
+                }
                 CompositionLocalProvider(LocalBlurEnabled provides blurEnabled) {
                 var availableRelease by remember { mutableStateOf<GithubReleaseInfo?>(null) }
                 LaunchedEffect(Unit) {

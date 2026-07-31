@@ -641,6 +641,11 @@ fun PlaylistScreen(
         MiuixDrawer(
             onDismissRequest = { editPlaylistIndex = null },
         ) {
+            // ÖNEMLİ: onCancel/onConfirm'de doğrudan `editPlaylistIndex = null` yerine
+            // `rememberDrawerDismiss()` kullanıyoruz — aksi halde MiuixDrawer'ın çıkış
+            // animasyonu (visible=false → WindowBottomSheet exit) hiç oynamadan drawer
+            // aniden composition'dan kalkıyordu.
+            val dismissDrawer = rememberDrawerDismiss()
             // MADDE 4 + MADDE 6 — Playlist düzenleme drawer'ı:
             //  * artık kapak düzenleme alanı da burada ve 1:1 (kare),
             //  * Cancel/Save yazı butonları yerine Miuix'in × / ✓ ikonları,
@@ -652,7 +657,7 @@ fun PlaylistScreen(
             ) {
                 MiuixDrawerActionHeader(
                     title = strings.editPlaylist,
-                    onCancel = { editPlaylistIndex = null },
+                    onCancel = dismissDrawer,
                     onConfirm = {
                         val name = editPlaylistName.trim()
                         if (name.isNotEmpty() && editIdx in playlists.indices) {
@@ -661,7 +666,7 @@ fun PlaylistScreen(
                             all[editIdx] = pl.copy(name = name)
                             scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
                         }
-                        editPlaylistIndex = null
+                        dismissDrawer()
                     }
                 )
                 Spacer(Modifier.height(16.dp))

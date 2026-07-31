@@ -585,6 +585,13 @@ private fun EditMusicDrawer(
     MiuixDrawer(
         onDismissRequest = onDismiss,
     ) {
+        // ÖNEMLİ: doğrudan `onDismiss()` çağırmak yerine `rememberDrawerDismiss()`
+        // kullanıyoruz. MiuixDrawer'ın kendi state'i (`visible`) sadece kapanma isteği
+        // WindowBottomSheet'in `onDismissRequest`'i üzerinden geldiğinde çıkış animasyonu
+        // oynatabiliyor — `onDismiss()`'i burada doğrudan çağırmak bu mekanizmayı atlayıp
+        // drawer'ı animasyonsuz, aniden kaybettiriyordu (Apply/Cancel'a basınca "pat diye"
+        // yok olma sorununun kök nedeni buydu).
+        val dismissDrawer = rememberDrawerDismiss()
         // MADDE 6 — drawer ekranı fazla kaplıyordu (`fillMaxHeight(0.88f)`, yani ekranın
         // %88'i). Artık içerik kadar yer kaplıyor; kapak 1:1 kare ve sabit boyutlu
         // olduğu için toplam yükseklik ideal seviyede kalıyor.
@@ -596,7 +603,7 @@ private fun EditMusicDrawer(
             // MADDE 4 — Apply/Cancel yazı butonları yerine Miuix'in ✓ / × ikonları.
             MiuixDrawerActionHeader(
                 title = strings.editMusic,
-                onCancel = onDismiss,
+                onCancel = dismissDrawer,
                 onConfirm = {
                     libraryViewModel.saveTrackOverride(
                         trackId = track.id,
@@ -613,7 +620,7 @@ private fun EditMusicDrawer(
                         albumArtUri = coverUri ?: track.albumArtUri
                     )
                     playerViewModel.notifyTrackUpdated(updatedTrack)
-                    onDismiss()
+                    dismissDrawer()
                 }
             )
             Spacer(Modifier.height(16.dp))

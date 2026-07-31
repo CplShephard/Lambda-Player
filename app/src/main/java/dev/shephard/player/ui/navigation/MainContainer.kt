@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -196,6 +197,16 @@ fun MainContainer(
                         // the backdrop layer above, so an opaque Scaffold here would hide it
                         // and leave every glass surface sampling a flat colour.
                         containerColor = Color.Transparent,
+                        // ÖNEMLİ: Miuix Scaffold'un varsayılanı
+                        // (WindowInsets.systemBars.union(displayCutout)) content slotuna
+                        // OTOMATİK olarak status bar kadar üst padding ekliyordu — topBar boş
+                        // olsa bile (About gibi topBar'sız sayfalarda). Bu yüzden içerik
+                        // (BgEffect arkaplanı, wallpaper) hiçbir zaman status bar'ın ARKASINA
+                        // uzanamıyordu; o bölge boş/varsayılan renkte kalıp InstallerX'teki gibi
+                        // "arkaplan status bar'ın içinden de görünsün" hissini bozuyordu.
+                        // Insets'i sıfırlıyoruz — her ekran zaten kendi statusBarsPadding()'ini
+                        // (veya BrandHeader gibi kendi insets hesaplamasını) kendisi yönetiyor.
+                        contentWindowInsets = WindowInsets(0, 0, 0, 0),
                         topBar = {
                             if (isBottomRoute) BrandHeader(currentRoute = currentRoute)
                         }
