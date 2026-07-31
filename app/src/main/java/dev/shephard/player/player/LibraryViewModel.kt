@@ -69,16 +69,18 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun registerObserver() {
-        val uri: Uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        contentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
-            override fun onChange(selfChange: Boolean) {
-                super.onChange(selfChange)
-                loadTracks(forceLoading = false)
+        try {
+            val uri: Uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+            contentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+                override fun onChange(selfChange: Boolean) {
+                    super.onChange(selfChange)
+                    loadTracks(forceLoading = false)
+                }
             }
-        }
-        getApplication<Application>().contentResolver.registerContentObserver(
-            uri, true, contentObserver!!
-        )
+            getApplication<Application>().contentResolver.registerContentObserver(
+                uri, true, contentObserver!!
+            )
+        } catch (_: Exception) { }
     }
 
     fun loadTracks(forceLoading: Boolean = false) {
@@ -173,9 +175,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     override fun onCleared() {
-        contentObserver?.let {
-            getApplication<Application>().contentResolver.unregisterContentObserver(it)
-        }
+        try {
+            contentObserver?.let {
+                getApplication<Application>().contentResolver.unregisterContentObserver(it)
+            }
+        } catch (_: Exception) { }
         super.onCleared()
     }
 

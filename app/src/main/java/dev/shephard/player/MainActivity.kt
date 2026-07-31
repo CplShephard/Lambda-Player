@@ -78,7 +78,9 @@ class MainActivity : ComponentActivity() {
                 val view = LocalView.current
                 if (!view.isInEditMode) {
                     SideEffect {
-                        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isAppDark
+                        runCatching {
+                            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isAppDark
+                        }
                     }
                 }
                 CompositionLocalProvider(LocalBlurEnabled provides blurEnabled) {

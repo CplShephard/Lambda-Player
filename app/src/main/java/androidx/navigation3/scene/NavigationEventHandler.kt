@@ -39,17 +39,27 @@ fun <T : Any> NavigationBackHandler(
     state: NavigationEventState<SceneInfo<T>> = rememberNavigationEventState(sceneState),
     onBack: () -> Unit,
 ) {
-    NavigationBackHandler(
-        state = state,
-        isBackEnabled = sceneState.currentScene.previousEntries.isNotEmpty(),
-        onBackCompleted = {
-            // If 'enabled' becomes stale (e.g., it was set to false but a gesture was
-            // dispatched in the same frame), this may result in no entries being popped
-            // due to 'entries.size' being smaller than 'scene.previousEntries.size'
-            // but that's preferable to crashing with an 'IndexOutOfBoundsException'
-            repeat(sceneState.entries.size - sceneState.currentScene.previousEntries.size) {
-                onBack()
-            }
-        },
-    )
+    val isBackEnabled = sceneState.currentScene.previousEntries.isNotEmpty()
+    val onBackCompleted: () -> Unit = {
+        repeat(sceneState.entries.size - sceneState.currentScene.previousEntries.size) {
+            onBack()
+        }
+    }
+
+    val owner = runCatching {
+        androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner.current
+    }.getOrNull()
+
+    if (owner != null) {
+        NavigationBackHandler(
+            state = state,
+            isBackEnabled = isBackEnabled,
+            onBackCompleted = onBackCompleted,
+        )
+    } else {
+        androidx.activity.compose.BackHandler(
+            enabled = isBackEnabled,
+            onBack = onBackCompleted
+        )
+    }
 }

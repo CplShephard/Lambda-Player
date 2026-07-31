@@ -2,13 +2,11 @@
 // Copyright (C) 2026 InstallerX Revived contributors
 package dev.shephard.player.ui.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.navigationevent.NavigationEventInfo
-import androidx.navigationevent.compose.NavigationBackHandler
-import androidx.navigationevent.compose.rememberNavigationEventState
 
 @Composable
 fun MainScreenBackHandler(
@@ -21,12 +19,7 @@ fun MainScreenBackHandler(
         }
     }
 
-    val navEventState = rememberNavigationEventState(NavigationEventInfo.None)
-    val onBackCompleted: () -> Unit = { mainPagerState.animateToPage(0) }
-
-    NavigationBackHandler(
-        state = navEventState,
-        isBackEnabled = isPagerBackHandlerEnabled,
-        onBackCompleted = onBackCompleted
-    )
+    BackHandler(enabled = isPagerBackHandlerEnabled) {
+        mainPagerState.animateToPage(0)
+    }
 }
