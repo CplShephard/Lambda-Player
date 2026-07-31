@@ -10,8 +10,25 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // Miuix NavDisplay snapshot'ı (0.9.3 release'da NavDisplay yok; InstallerX ile aynı SNAPSHOT).
-        maven { url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/") }
+        maven { setUrl("https://jitpack.io") }
+        // GitHub Packages (compose-miuix-ui/miuix) — Miuix NavDisplay SNAPSHOT'ı buradan.
+        // NOT: GitHub Packages anonim erişimi desteklemez; CI'da GITHUB_ACTOR/GITHUB_TOKEN
+        // otomatik olarak mevcut (InstallerX-Revived ile birebir aynı kurulum).
+        val gprUser = providers.gradleProperty("gpr.user")
+            .orElse(providers.environmentVariable("GITHUB_ACTOR"))
+        val gprKey = providers.gradleProperty("gpr.key")
+            .orElse(providers.environmentVariable("GITHUB_TOKEN"))
+        maven {
+            name = "GitHubPackagesMiuix"
+            url = uri("https://maven.pkg.github.com/compose-miuix-ui/miuix")
+            if (gprUser.isPresent && gprKey.isPresent) {
+                credentials {
+                    username = gprUser.get()
+                    password = gprKey.get()
+                }
+            }
+        }
+        mavenLocal()
     }
 }
 rootProject.name = "Lambda Player"
