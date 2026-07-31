@@ -86,8 +86,8 @@ fun NavGraph(
 
     val transitionEffects = remember(Unit) {
         NavDisplayTransitionEffects(
-            enableCornerClip = true,
-            dimAmount = 0.5f,
+            enableCornerClip = false,
+            dimAmount = 0f,
             blockInputDuringTransition = true,
             popDirectionFollowsSwipeEdge = true,
         )

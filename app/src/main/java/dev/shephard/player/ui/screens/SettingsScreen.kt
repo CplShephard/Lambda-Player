@@ -84,6 +84,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -194,7 +195,6 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     var langMenuOpen by remember { mutableStateOf(false) }
     var customPickerOpen by remember { mutableStateOf(false) }
     var wallpaperBrightnessValue by remember(wallpaperBrightness) { mutableStateOf(wallpaperBrightness) }
-    var cardAlphaValue by remember(cardAlpha) { mutableStateOf(cardAlpha) }
 
     // MADDE 4 — duvar kağıdı seçerken de kapak seçimindeki gibi sistem cropper
     // (com.android.camera.action.CROP) kullanılsın. Önce görsel seçilir, sonra crop
@@ -297,10 +297,6 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 )
             }
             Spacer(Modifier.height(8.dp))
-            ToggleRow(label = strings.dynamicColor, checked = dynamicColor) { enabled ->
-                if (enabled) customPickerOpen = false
-                scope.launch { prefs.setDynamicColor(enabled) }
-            }
             ToggleRow(label = strings.blurEffect, checked = liquidGlassEnabled) { enabled ->
                 scope.launch { prefs.setLiquidGlassEnabled(enabled) }
             }
@@ -382,19 +378,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 Slider(
                     value = wallpaperBrightnessValue,
                     onValueChange = { wallpaperBrightnessValue = it },
-                    onValueChangeFinished = { scope.launch { prefs.setWallpaperBrightness(wallpaperBrightnessValue) } },
-                    valueRange = 0f..1f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MiuixAppTheme.colorScheme.primary,
-                        activeTrackColor = MiuixAppTheme.colorScheme.primary,
-                        inactiveTrackColor = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                    )
-                )
-                Text(strings.cardOpacity, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
-                Slider(
-                    value = cardAlphaValue,
-                    onValueChange = { cardAlphaValue = it },
-                    onValueChangeFinished = { scope.launch { prefs.setCardAlpha(cardAlphaValue) } },
+                    onValueChangeFinished = { scope.launch { prefs.setWallpaperBrightness(1f - wallpaperBrightnessValue) } },
                     valueRange = 0f..1f,
                     colors = SliderDefaults.colors(
                         thumbColor = MiuixAppTheme.colorScheme.primary,
@@ -773,7 +757,7 @@ private fun SettingsPageScaffold(
         derivedStateOf { (scrollState.value / collapseRangePx).coerceIn(0f, 1f) }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().background(MiuixAppTheme.colorScheme.background)) {
         SmallTopAppBar(
             title = title,
             color = Color.Transparent,
@@ -1048,7 +1032,16 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
                 .weight(1f)
                 .padding(end = 16.dp)
         )
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                uncheckedThumbColor = Color.White,
+                checkedTrackColor = MiuixAppTheme.colorScheme.primary,
+                uncheckedTrackColor = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            )
+        )
     }
 }
 

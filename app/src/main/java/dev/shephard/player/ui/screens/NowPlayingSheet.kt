@@ -415,7 +415,7 @@ fun NowPlayingSheet(
                 // Elle yazılmış detectHorizontalDragGestures + Animatable yerine native scroll
                 // fiziği (fling velocity, snap animasyonu) kullanıldığı için akıcılık OS seviyesinde.
                 BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                    val maxArtHeight = maxHeight * 0.42f
+                    val maxArtHeight = maxHeight * 0.36f
                     val artItemWidth = maxWidth
                     // Kapak (kare, en fazla maxArtHeight) + altındaki başlık/artist bloğu için
                     // ayrılan sabit yükseklik. LazyHorizontalGrid'in satır yüksekliğini kendisi
@@ -635,36 +635,12 @@ fun NowPlayingSheet(
                         syncedLyrics.indexOfLast { it.timeMs <= currentMs }.coerceAtLeast(0)
                     } else -1
 
-                    // MADDE 7 — düzenleme ve otomatik kaydırma (autoscroll) durumu.
+                    // Düzenleme durumu.
                     var isEditing by remember { mutableStateOf(false) }
-                    var isAutoScroll by remember { mutableStateOf(true) }
                     var editText by remember { mutableStateOf("") }
                     val isDarkTheme = MiuixAppTheme.colorScheme.background.luminance() < 0.5f
 
-                    // MADDE 7 — autoscroll yalnızca açıkken ve sözler senkronizeyken
-                    // aktif satıra kaydırır.
-                    LaunchedEffect(activeIndex, isAutoScroll, syncedLyrics.size) {
-                        if (isAutoScroll && activeIndex >= 0 && syncedLyrics.isNotEmpty()) {
-                            val layoutInfo = lyricListState.layoutInfo
-                            val totalCount = layoutInfo.totalItemsCount
-                            if (totalCount > 0 && activeIndex < totalCount) {
-                                val viewportHeight = layoutInfo.viewportSize.height
-                                val targetOffset = -(viewportHeight / 3)
-                                runCatching {
-                                    lyricListState.animateScrollToItem(
-                                        index = activeIndex,
-                                        scrollOffset = targetOffset
-                                    )
-                                }
-                            } else {
-                                kotlinx.coroutines.delay(100)
-                                runCatching {
-                                    val vHeight = lyricListState.layoutInfo.viewportSize.height
-                                    lyricListState.scrollToItem(activeIndex, -(vHeight / 3))
-                                }
-                            }
-                        }
-                    }
+                    // Autoscroll kaldırıldı (kullanıcı talebi).
 
                     val lyricsFilePicker = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.OpenDocument()
@@ -710,19 +686,7 @@ fun NowPlayingSheet(
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.weight(1f).padding(start = 4.dp)
                                 )
-                                // MADDE 7 — autoscroll tuşu (edit'in hemen solunda).
-                                // Açıkken tema rengi; kapalıyken beyaz (aydınlık modda siyah).
-                                dev.shephard.player.ui.miuix.IconButton(
-                                    onClick = { isAutoScroll = !isAutoScroll }
-                                ) {
-                                    Icon(
-                                        Icons.Filled.VerticalAlignCenter,
-                                        contentDescription = strings.autoscroll,
-                                        tint = if (isAutoScroll) MiuixAppTheme.colorScheme.primary
-                                        else if (isDarkTheme) Color.White else Color.Black
-                                    )
-                                }
-                                // MADDE 7 — düzenleme tuşu (Miuix edit simgesi).
+                                // Düzenleme tuşu (Miuix edit simgesi).
                                 dev.shephard.player.ui.miuix.IconButton(
                                     onClick = {
                                         if (!isEditing) {
@@ -1272,6 +1236,7 @@ private fun QueueTrackItem(
             .fillMaxWidth()
             .height(64.dp)
             .clip(RoundedCornerShape(12.dp))
+            .background(MiuixAppTheme.colorScheme.surfaceContainerHighest)
     ) {
         val absOffset = kotlin.math.abs(offsetX)
         val progress = (absOffset / swipeThresholdPx).coerceIn(0f, 1f)
