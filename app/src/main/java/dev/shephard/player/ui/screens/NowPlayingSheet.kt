@@ -46,6 +46,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MusicNote
@@ -87,6 +88,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -141,8 +143,9 @@ fun NowPlayingSheet(
     // yüksekliği olarak veriliyor; sheet böylece ilk frame'de ekranın altında
     // (görünmez) başlıyor, sonra yukarı kayıyor.
     val dragOffset = remember {
+        val cfg = androidx.compose.ui.platform.LocalConfiguration.current
         androidx.compose.animation.core.Animatable(
-            with(density) { androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp.toPx() }
+            with(density) { cfg.screenHeightDp.dp.toPx() }
         )
     }
     val dragScope = rememberCoroutineScope()
