@@ -142,12 +142,11 @@ fun NowPlayingSheet(
     // LaunchedEffect). İlk frame'de boşluk/flaş olmaması için başlangıç değeri ekran
     // yüksekliği olarak veriliyor; sheet böylece ilk frame'de ekranın altında
     // (görünmez) başlıyor, sonra yukarı kayıyor.
-    val dragOffset = remember {
-        val cfg = androidx.compose.ui.platform.LocalConfiguration.current
-        androidx.compose.animation.core.Animatable(
-            with(density) { cfg.screenHeightDp.dp.toPx() }
-        )
-    }
+    // NOT: LocalConfiguration.current bir @Composable çağrısıdır; remember/with lambda'sı
+    // içinde ÇAĞRILAMAZ, bu yüzden en üst seviyede alınıp değer olarak kullanılıyor.
+    val dragOffsetScreenHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
+    val dragOffsetInitialHeight = with(density) { dragOffsetScreenHeight.dp.toPx() }
+    val dragOffset = remember { androidx.compose.animation.core.Animatable(dragOffsetInitialHeight) }
     val dragScope = rememberCoroutineScope()
 
     // Sheet her ekrana geldiğinde dragOffset'i 0'a al: parmakla kapatıp tekrar açınca
