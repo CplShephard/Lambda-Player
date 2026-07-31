@@ -78,9 +78,7 @@ class MainActivity : ComponentActivity() {
                 val view = LocalView.current
                 if (!view.isInEditMode) {
                     SideEffect {
-                        runCatching {
-                            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isAppDark
-                        }
+                        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isAppDark
                     }
                 }
                 CompositionLocalProvider(LocalBlurEnabled provides blurEnabled) {
@@ -139,8 +137,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun audioUriFromIntent(intent: Intent?): Uri? {
-        return try {
-            if (intent?.action != Intent.ACTION_VIEW) null else intent.data
-        } catch (_: Exception) { null }
+        if (intent?.action != Intent.ACTION_VIEW) return null
+        return intent.data
     }
 }

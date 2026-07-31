@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 InstallerX Revived contributors
 package dev.shephard.player.ui.navigation
 
 import androidx.activity.compose.BackHandler
@@ -51,6 +49,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation3.runtime.NavKey
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -98,6 +99,18 @@ fun MainContainer(
 
     val blurEnabled = LocalBlurEnabled.current
 
+    // TWO separate backdrops, on purpose.
+    //
+    // `backgroundBackdrop` captures ONLY the wallpaper/background layer. Every blurred
+    // surface that lives *inside* the page content (cards, sheets, dialogs, the header,
+    // the mini player) samples this one.
+    //
+    // `contentBackdrop` captures the scrolling page content and is sampled ONLY by the
+    // floating dock, which is drawn outside that content.
+    //
+    // Previously there was a single backdrop that wrapped the page content while surfaces
+    // inside that very content sampled it — a layer reading itself. That recursion is what
+    // crashed the app as soon as the Liquid Glass switch was turned on.
     val backgroundBackdrop = rememberAppBlurBackdrop(blurEnabled)
     val contentBackdrop = rememberAppBlurBackdrop(blurEnabled)
 
@@ -106,8 +119,24 @@ fun MainContainer(
         LocalAppBackdrop provides backgroundBackdrop,
         LocalContentBackdrop provides contentBackdrop,
     ) {
+        val backStack = remember { mutableStateListOf<NavKey>(MusicRoute) }
         var showNowPlaying by remember { mutableStateOf(false) }
 
+        val currentRouteKey = backStack.last()
+        val currentRoute: String? = when (currentRouteKey) {
+            is MusicRoute -> Destination.Music.route
+            is PlaylistsRoute -> Destination.Playlists.route
+            is SettingsRoute -> Destination.Settings.route
+            is ThemeRoute -> SettingsRoutes.Theme
+            is PlayerRoute -> SettingsRoutes.Player
+            is AboutRoute -> SettingsRoutes.About
+            else -> null
+        }
+        val isBottomRoute = bottomNavDestinations.any { it.route == currentRoute } || currentRoute == null
+
+        // Do not collect the whole PlayerUiState at the root: position/progress changes
+        // every 500ms while playing. Only the boolean that affects page bottom padding is
+        // observed here; the MiniPlayer subtree collects the full state by itself.
         val hasMiniPlayer by remember(playerViewModel) {
             playerViewModel.uiState
                 .map { it.currentTrack != null }
@@ -122,8 +151,13 @@ fun MainContainer(
             }
         }
 
-        BackHandler(enabled = showNowPlaying) {
-            showNowPlaying = false
+        // Back: collapse player first, then pop nav stack.
+        BackHandler(enabled = showNowPlaying || currentRoute != Destination.Music.route) {
+            when {
+                showNowPlaying -> showNowPlaying = false
+                !isBottomRoute -> if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+                else -> while (backStack.size > 1 && backStack.last() != MusicRoute) backStack.removeAt(backStack.lastIndex)
+            }
         }
 
         Box(
@@ -131,6 +165,10 @@ fun MainContainer(
                 .fillMaxSize()
                 .background(MiuixAppTheme.colorScheme.background)
         ) {
+            // Wallpaper background — her iki ekranın arkasında sabit.
+            // This whole background block is recorded into `backgroundBackdrop`, which is
+            // what in-content glass surfaces sample. It contains no glass surfaces itself,
+            // so there is no way for it to reference itself.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -159,26 +197,98 @@ fun MainContainer(
                 }
             }
 
-            NavGraph(
-                playerViewModel = playerViewModel,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(
-                        if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop)
-                        else Modifier
-                    ),
-                hasMiniPlayer = hasMiniPlayer,
-                onTrackClick = { tracks, index, playlistName ->
-                    playerViewModel.setQueueAndPlay(tracks, index, playlistName)
-                },
-                onPlaylistRemixClick = { tracks, playlistName ->
-                    playerViewModel.setQueueAndPlayRemixed(tracks, playlistName)
-                },
-                onOpenNowPlaying = { showNowPlaying = true }
-            )
+            // Uygulama ağacını artık NowPlaying açılınca kaldırmıyoruz.
+            // Böylece playlist detail ekranının state'i korunuyor; sheet kapanınca aynı yerde kalır.
+            Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        // Always transparent: the background (and wallpaper) is painted by
+                        // the backdrop layer above, so an opaque Scaffold here would hide it
+                        // and leave every glass surface sampling a flat colour.
+                        containerColor = Color.Transparent,
+                        // ÖNEMLİ: Miuix Scaffold'un varsayılanı
+                        // (WindowInsets.systemBars.union(displayCutout)) content slotuna
+                        // OTOMATİK olarak status bar kadar üst padding ekliyordu — topBar boş
+                        // olsa bile (About gibi topBar'sız sayfalarda). Bu yüzden içerik
+                        // (BgEffect arkaplanı, wallpaper) hiçbir zaman status bar'ın ARKASINA
+                        // uzanamıyordu; o bölge boş/varsayılan renkte kalıp InstallerX'teki gibi
+                        // "arkaplan status bar'ın içinden de görünsün" hissini bozuyordu.
+                        // Insets'i sıfırlıyoruz — her ekran zaten kendi statusBarsPadding()'ini
+                        // (veya BrandHeader gibi kendi insets hesaplamasını) kendisi yönetiyor.
+                        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                        topBar = {
+                            if (isBottomRoute) BrandHeader(currentRoute = currentRoute)
+                        }
+                    ) { innerPadding ->
+                        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                            NavGraph(
+                                backStack = backStack,
+                                playerViewModel = playerViewModel,
+                                // Capture the page content into the CONTENT backdrop so the
+                                // dock blurs what scrolls underneath it. The dock is drawn
+                                // outside this layer, so there is no feedback loop. Glass
+                                // surfaces inside the page sample the background backdrop
+                                // instead — never this one.
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .then(
+                                        if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop)
+                                        else Modifier
+                                    ),
+                                hasMiniPlayer = hasMiniPlayer,
+                                // Bir müziğe basınca NowPlayingSheet AÇILMAZ — sadece çalma
+                                // başlar ve altta mini player belirir. NowPlayingSheet'e
+                                // mini player'a basarak ulaşılır.
+                                onTrackClick = { tracks, index, playlistName ->
+                                    playerViewModel.setQueueAndPlay(tracks, index, playlistName)
+                                },
+                                onPlaylistRemixClick = { tracks, playlistName ->
+                                    playerViewModel.setQueueAndPlayRemixed(tracks, playlistName)
+                                }
+                            )
+
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .navigationBarsPadding()
+                            ) {
+                                // MADDE 5 — Settings alt sayfalarına (Theme / Player /
+                                // About) girince dock zaten gizleniyordu ama müzik
+                                // çalar pop-up'ı (mini player) orada da görünmeye devam
+                                // ediyordu. Artık mini player da sadece ana sekmelerde
+                                // gösteriliyor; alt sayfalarda ekran tamamen içeriğe
+                                // kalıyor.
+                                MiniPlayerHost(
+                                    playerViewModel = playerViewModel,
+                                    visible = hasMiniPlayer && isBottomRoute,
+                                    onOpenNowPlaying = { showNowPlaying = true }
+                                )
+
+                                if (isBottomRoute) {
+                                    FloatingDock(
+                                        currentRoute = currentRoute,
+                                onNavigate = { destination ->
+                                    val key = when (destination) {
+                                        Destination.Music -> MusicRoute
+                                        Destination.Playlists -> PlaylistsRoute
+                                        Destination.Settings -> SettingsRoute
+                                        else -> MusicRoute
+                                    }
+                                    backStack.add(key)
+                                }
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                }
+                            }
+                        }
+                    }
 
             AnimatedVisibility(
                 visible = showNowPlaying,
+                // MADDE (köşe yarıçapı zamanlaması) — açılış kaydırması (slide) artık
+                // NowPlayingSheet içinde `dragOffset` üzerinden yapılıyor; böylece köşe
+                // yarıçapı sheet TAM oturana kadar 30dp kalıyor, animasyon bitince 0'a
+                // iniyor. Burada sadece yumuşak bir fade kalıyor.
                 enter = fadeIn(tween(160)),
                 exit = fadeOut(tween(0)),
                 modifier = Modifier.fillMaxSize()
@@ -193,7 +303,7 @@ fun MainContainer(
 }
 
 @Composable
-fun MiniPlayerHost(
+private fun MiniPlayerHost(
     playerViewModel: PlayerViewModel,
     visible: Boolean,
     onOpenNowPlaying: () -> Unit
@@ -219,12 +329,12 @@ fun MiniPlayerHost(
 }
 
 @Composable
-fun BrandHeader(currentPageIndex: Int) {
+private fun BrandHeader(currentRoute: String?) {
     val strings = LocalStrings.current
-    val sectionTitle = when (currentPageIndex) {
-        0 -> strings.music
-        1 -> strings.playlists
-        2 -> strings.settings
+    val sectionTitle = when (currentRoute) {
+        Destination.Music.route -> strings.music
+        Destination.Playlists.route -> strings.playlists
+        Destination.Settings.route -> strings.settings
         else -> null
     }
 
@@ -246,6 +356,7 @@ fun BrandHeader(currentPageIndex: Int) {
             .clip(headerShape)
             .then(
                 if (blurOn && headerBackdrop != null) {
+                    // Subtle title-card blur: lighter than MiniPlayer/dock, just enough to lift it.
                     Modifier.miuixBlurSurface(
                         backdrop = headerBackdrop,
                         shape = headerShape,
@@ -300,20 +411,40 @@ fun BrandHeader(currentPageIndex: Int) {
 }
 
 @Composable
-fun FloatingDock(
-    selectedIndex: Int,
-    onSelectPage: (Int) -> Unit
+private fun FloatingDock(
+    currentRoute: String?,
+    onNavigate: (Destination) -> Unit
 ) {
     val blurOn = LocalBlurEnabled.current
+    // The dock lives outside the page content, so it is the one component allowed to
+    // sample the content backdrop.
     val backdrop = LocalContentBackdrop.current
 
+    // Same three-way mode selection InstallerX uses:
+    //  - LiquidGlass: full AGSL pipeline (lens refraction, chromatic aberration, bloom) on API 33+
+    //  - Blur:        plain gaussian backdrop blur on API 31–32
+    //  - None:        opaque pill, no backdrop sampling
     val mode = when {
         blurOn && backdrop != null && isLiquidGlassSupported -> FloatingBottomBarMode.LiquidGlass
         blurOn && backdrop != null -> FloatingBottomBarMode.Blur
         else -> FloatingBottomBarMode.None
     }
 
+    val selectedIndex = bottomNavDestinations
+        .indexOfFirst { it.route == currentRoute }
+        .let { if (it < 0) 0 else it }
     val strings = LocalStrings.current
+
+    // KRİTİK: Daha önce backdrop == null (Liquid Glass kapalı ya da desteklenmiyor)
+    // durumunda TAMAMEN AYRI bir composable (NonBlurDock — farklı boyut, etiketsiz,
+    // farklı highlight stili) kullanılıyordu. Bu da "Liquid Glass kapanınca dock eski/
+    // farklı bir docka dönüşüyor" şikayetinin sebebiydi. InstallerX'te dock HER ZAMAN
+    // aynı FloatingBottomBar component'idir, sadece mode (LiquidGlass/Blur/None) değişir
+    // — görsel iskelet (pill şekli, boyut, etiketli sekmeler, drag ile geçiş, seçim
+    // highlight'ı) her modda birebir aynı kalır. Bu yüzden NonBlurDock tamamen kaldırıldı;
+    // backdrop null olduğunda gerçek bir Backdrop tipi gerektiği için (drawBackdrop API'si
+    // non-null ister) boş/no-op bir dummy backdrop veriyoruz — None modda zaten hiç
+    // sample edilmiyor, sadece tip uyumluluğu için var.
     val dummyBackdrop = rememberLayerBackdrop()
     val effectiveBackdrop = backdrop ?: dummyBackdrop
 
@@ -325,7 +456,7 @@ fun FloatingDock(
     ) {
         FloatingBottomBar(
             selectedIndex = { selectedIndex },
-            onSelected = { index -> onSelectPage(index) },
+            onSelected = { index -> onNavigate(bottomNavDestinations[index]) },
             backdrop = effectiveBackdrop,
             tabsCount = bottomNavDestinations.size,
             mode = mode
@@ -338,7 +469,7 @@ fun FloatingDock(
                     Destination.Settings -> strings.settings
                 }
                 FloatingBottomBarItem(
-                    onClick = { onSelectPage(index) },
+                    onClick = { onNavigate(dest) },
                     modifier = Modifier.defaultMinSize(minWidth = 76.dp)
                 ) {
                     Icon(

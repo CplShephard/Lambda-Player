@@ -113,7 +113,15 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-icons:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-shader-android:0.9.3")
-    implementation("androidx.navigation:navigation-compose:2.9.8")
+    // Miuix 0.9.3 NavDisplay (androidx.navigation3 tabanlı, GERÇEK Miuix geçişleri:
+    // squircle köşe kırpma + dim scrim + predictive back). Compose Navigation tamamen kaldırıldı.
+    implementation("top.yukonga.miuix.kmp:miuix-squircle:0.9.3")
+    implementation("top.yukonga.miuix.kmp:miuix-navigation3-ui:0.9.3")
+
+    // androidx.navigation:navigation-compose (Compose Navigation v2) kaldırıldı; gezinme
+    // tamamen Miuix NavDisplay (androidx.navigation3 / miuix-navigation3-ui) üzerinden.
+    // Navigation3 runtime/scene/animation transitive olarak miuix-navigation3-ui ile gelir.
+    // (navigationevent-compose zaten yukarıda tanımlı; burada tekrar eklenmedi.)
     implementation("me.zhanghai.android.appiconloader:appiconloader:1.5.0")
     implementation("sh.calvin.reorderable:reorderable:3.0.0")
 

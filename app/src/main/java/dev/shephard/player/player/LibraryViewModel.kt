@@ -76,9 +76,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     fun loadTracks() {
         viewModelScope.launch {
-            if (_tracks.value.isEmpty()) {
-                _isLoading.value = true
-            }
+            _isLoading.value = true
             val result = withContext(Dispatchers.IO) {
                 MediaStoreScanner.queryAudioTracks(getApplication())
             }

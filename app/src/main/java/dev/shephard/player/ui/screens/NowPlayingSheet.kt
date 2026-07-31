@@ -1273,9 +1273,6 @@ private fun QueueTrackItem(
             .height(64.dp)
             .clip(RoundedCornerShape(12.dp))
     ) {
-        // Spotify tarzı kaydırma zemin simgeleri (Swipe Action Background):
-        // Sola kaydırınca (offsetX < 0): Sağda Queue (şimdiki şarkının altına sabitle) simgesi.
-        // Sağa kaydırınca (offsetX > 0): Solda kırmızı Trash (sıradan sil) simgesi.
         val absOffset = kotlin.math.abs(offsetX)
         val progress = (absOffset / swipeThresholdPx).coerceIn(0f, 1f)
         if (absOffset > 10f) {
@@ -1316,7 +1313,6 @@ private fun QueueTrackItem(
             }
         }
 
-        // Ana şarkı kartı Row
         Row(
             modifier = Modifier
                 .fillMaxSize()

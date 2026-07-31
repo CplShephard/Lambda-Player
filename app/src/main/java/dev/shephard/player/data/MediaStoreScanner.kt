@@ -7,7 +7,6 @@ import android.provider.MediaStore
 object MediaStoreScanner {
 
     fun queryAudioTracks(context: Context): List<AudioTrack> {
-        return try {
         val tracks = mutableListOf<AudioTrack>()
 
         val collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
@@ -68,7 +67,6 @@ object MediaStoreScanner {
             }
         }
 
-        tracks
-        } catch (_: Exception) { emptyList() }
+        return tracks
     }
 }
