@@ -189,35 +189,44 @@ fun MainContainer(
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
+                    // ÖNEMLİ: wallpaperBrightness artık DOĞRUDAN "parlaklık" anlamında
+                    // saklanıyor (0 = en karanlık, 1 = en parlak/en az karartılmış). Karartma
+                    // katmanının kendisi bir "dim overlay" olduğu için opaklığı brightness'ın
+                    // TERSİ olmalı — bu çeviri kasıtlı olarak burada, TEK noktada yapılıyor
+                    // (ayarlar ekranındaki slider state'inde değil), böylece slider'ın kendisi
+                    // hiçbir ters çevirme mantığı taşımıyor ve "her bırakışta zıplama" sorunu
+                    // bir daha oluşamaz.
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(MiuixAppTheme.colorScheme.background.copy(alpha = wallpaperBrightness))
+                            .background(MiuixAppTheme.colorScheme.background.copy(alpha = 1f - wallpaperBrightness))
                     )
                 }
             }
 
             // Uygulama ağacını artık NowPlaying açılınca kaldırmıyoruz.
             // Böylece playlist detail ekranının state'i korunuyor; sheet kapanınca aynı yerde kalır.
+            //
+            // MADDE 4 — eski "LAMBDA PLAYER" marka kartı (BrandHeader) burada `Scaffold`'un
+            // `topBar`'ı olarak SABİT bir yükseklikte render ediliyordu. Theme/Player/About
+            // sayfalarına geçilince bu alan aniden değişiyor (kart kayboluyor/beliriyor), bu da
+            // page transition'ın "kartın altına ışınlanıp kapanma" gibi bozuk görünmesine yol
+            // açıyordu — kart page transition'a kendini bir ekran sınırı gibi dayatıyordu.
+            // Kullanıcı isteğiyle kart TAMAMEN kaldırıldı: artık Music/Playlists/Settings de
+            // Theme/Playback/About ile birebir aynı CollapsingTopBar desenini kendi
+            // içeriklerinde kullanıyor (bkz. MusicScreen/PlaylistScreen/SettingsScreen).
+            // Scaffold'un topBar'ı yok, bu yüzden innerPadding.top hep 0 — her ekran kendi
+            // başlığını ve status bar boşluğunu kendi yönetiyor.
             Scaffold(
                         modifier = Modifier.fillMaxSize(),
                         // Always transparent: the background (and wallpaper) is painted by
                         // the backdrop layer above, so an opaque Scaffold here would hide it
                         // and leave every glass surface sampling a flat colour.
                         containerColor = Color.Transparent,
-                        // ÖNEMLİ: Miuix Scaffold'un varsayılanı
-                        // (WindowInsets.systemBars.union(displayCutout)) content slotuna
-                        // OTOMATİK olarak status bar kadar üst padding ekliyordu — topBar boş
-                        // olsa bile (About gibi topBar'sız sayfalarda). Bu yüzden içerik
-                        // (BgEffect arkaplanı, wallpaper) hiçbir zaman status bar'ın ARKASINA
-                        // uzanamıyordu; o bölge boş/varsayılan renkte kalıp InstallerX'teki gibi
-                        // "arkaplan status bar'ın içinden de görünsün" hissini bozuyordu.
-                        // Insets'i sıfırlıyoruz — her ekran zaten kendi statusBarsPadding()'ini
-                        // (veya BrandHeader gibi kendi insets hesaplamasını) kendisi yönetiyor.
+                        // İçerik (BgEffect arkaplanı, wallpaper) status bar'ın ARKASINA da
+                        // uzanmalı — her ekran zaten kendi status bar boşluğunu SmallTopAppBar
+                        // üzerinden kendi yönetiyor.
                         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                        topBar = {
-                            if (isBottomRoute) BrandHeader(currentRoute = currentRoute)
-                        }
                     ) { innerPadding ->
                         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
                             NavGraph(
@@ -274,7 +283,32 @@ fun MainContainer(
                                         Destination.Settings -> SettingsRoute
                                         else -> MusicRoute
                                     }
-                                    backStack.add(key)
+                                    // ÖNEMLİ: Önceden her tıklamada `backStack.add(key)`
+                                    // çağrılıyordu — bu hem stack'i sonsuz büyütüyordu
+                                    // (Music→Playlists→Settings→Music... her tıklama yeni
+                                    // entry ekliyordu, asla çıkarmıyordu) hem de NavDisplay'in
+                                    // her geçişi "push/ileri" olarak görmesine, gerçek bir
+                                    // "pop" hiç oluşmadığı için popTransitionSpec'in (geri
+                                    // animasyonu) hiçbir zaman tetiklenmemesine yol açıyordu.
+                                    // Sonuç: Settings'ten Music'e dönerken bile animasyon
+                                    // "ileri" yönünde (yanlış) oynuyordu — page transition'ın
+                                    // "berbat" görünmesinin kök nedeni buydu.
+                                    // Artık üç ana sekme arasında geçişte stack, klasik
+                                    // popUpTo(startDestination) davranışına benzer şekilde
+                                    // tek bir ana-sekme entry'sine indiriliyor (alt menüler —
+                                    // Theme/Player/About — zaten ayrı bir mantıkla, kendi
+                                    // BackHandler'ıyla kapatılıyor, burası sadece 3 ana
+                                    // sekmeyi ilgilendiriyor).
+                                    if (backStack.last() != key) {
+                                        // clear() ve add()'i TEK bir snapshot'ta birleştiriyoruz;
+                                        // ayrı ayrı çağrılırsa NavDisplay aradaki boş listeyi
+                                        // geçici bir state olarak görüp garip bir ara-durum
+                                        // animasyonu tetikleyebilirdi.
+                                        androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
+                                            backStack.clear()
+                                            backStack.add(key)
+                                        }
+                                    }
                                 }
                                     )
                                     Spacer(Modifier.height(8.dp))
@@ -325,88 +359,6 @@ private fun MiniPlayerHost(
             onNextClick = { playerViewModel.skipToNext() },
             onPreviousClick = { playerViewModel.skipToPrevious() }
         )
-    }
-}
-
-@Composable
-private fun BrandHeader(currentRoute: String?) {
-    val strings = LocalStrings.current
-    val sectionTitle = when (currentRoute) {
-        Destination.Music.route -> strings.music
-        Destination.Playlists.route -> strings.playlists
-        Destination.Settings.route -> strings.settings
-        else -> null
-    }
-
-    val context = LocalContext.current
-    val versionName = remember {
-        try {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
-        } catch (_: Exception) {
-            ""
-        }
-    }
-
-    val blurOn = LocalBlurEnabled.current
-    val headerBackdrop = LocalAppBackdrop.current
-    val headerShape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(headerShape)
-            .then(
-                if (blurOn && headerBackdrop != null) {
-                    // Subtle title-card blur: lighter than MiniPlayer/dock, just enough to lift it.
-                    Modifier.miuixBlurSurface(
-                        backdrop = headerBackdrop,
-                        shape = headerShape,
-                        blurRadius = 14f,
-                        tintAlpha = 0.46f,
-                        fallbackColor = MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
-                    )
-                } else {
-                    Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f), headerShape)
-                }
-            )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 20.dp)
-        ) {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = strings.appName.uppercase(),
-                    style = MiuixAppTheme.typography.titleLarge.copy(
-                        fontFamily = dev.shephard.player.ui.theme.BrandFontFamily,
-                        letterSpacing = 2.sp,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = MiuixAppTheme.colorScheme.onBackground
-                )
-                if (versionName.isNotEmpty()) {
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        text = versionName,
-                        style = MiuixAppTheme.typography.titleLarge.copy(
-                            fontFamily = dev.shephard.player.ui.theme.BrandFontFamily,
-                            letterSpacing = 2.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = MiuixAppTheme.colorScheme.primary
-                    )
-                }
-            }
-            if (sectionTitle != null) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = sectionTitle,
-                    style = MiuixAppTheme.typography.titleMedium,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
     }
 }
 

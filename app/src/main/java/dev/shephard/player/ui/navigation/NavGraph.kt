@@ -60,18 +60,56 @@ private val originalFadeSpec = spring<Float>(
     stiffness = 380f,
 )
 
-// Üst seviye sekmeler için orijinal klasik slide (sabit yön: ileri = Sol, geri = Sağ).
+// Ana sekmelerin sıralaması — orijinal koddaki `destinations` listesiyle birebir aynı.
+// Yön buna göre hesaplanıyor: hedef index kaynaktan büyükse ileri (Sol), küçükse geri (Sağ).
+private val tabOrder = listOf(MusicRoute, PlaylistsRoute, SettingsRoute)
+
+// ÖNEMLİ: Scene<T>.entries.last().contentKey, navigation3-runtime'ın DEFAULT
+// contentKeyFactory'sine göre `key.toString()` sonucudur — `MusicRoute` gibi bir NavKey
+// objesiyle REFERANS/DATA-CLASS eşitliğiyle (`==`) asla eşleşmez (biri String, diğeri
+// object). Bu yüzden karşılaştırmayı `toString()` üzerinden yapıyoruz — `object MusicRoute`
+// için varsayılan `toString()` sınıfın tam adını döndürür, bu kararlı ve benzersizdir,
+// tıpkı contentKey'in zaten kullandığı değerin kendisi gibi.
+private fun tabIndexOf(contentKey: Any?): Int =
+    tabOrder.indexOfFirst { it.toString() == contentKey?.toString() }
+
+// Üst seviye sekmeler için orijinal klasik slide — ÖNEMLİ: yön artık DİNAMİK.
+// Önceden `originalTabTransition` sabit tek yönlü bir slide tanımlıyordu (her geçiş
+// "ileri" gibi animasyonlanıyordu, Settings'ten Music'e dönerken bile). Orijinal
+// (ilk zip'teki klasik NavHost) kodda `initialState.destination.route` /
+// `targetState.destination.route` karşılaştırılıp yön hesaplanıyordu; burada aynı
+// mantığı `Scene.entries.lastOrNull()?.contentKey` üzerinden kuruyoruz.
 private val originalTabTransition: Map<String, Any> =
     NavDisplay.transitionSpec {
-        ContentTransform(
-            slideInHorizontally(initialOffsetX = { it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
-            slideOutHorizontally(targetOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
-        )
+        val fromIdx = tabIndexOf(initialState.entries.lastOrNull()?.contentKey)
+        val toIdx = tabIndexOf(targetState.entries.lastOrNull()?.contentKey)
+        val forward = toIdx >= fromIdx
+        if (forward) {
+            ContentTransform(
+                slideInHorizontally(initialOffsetX = { it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
+                slideOutHorizontally(targetOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
+            )
+        } else {
+            ContentTransform(
+                slideInHorizontally(initialOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
+                slideOutHorizontally(targetOffsetX = { it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
+            )
+        }
     } + NavDisplay.popTransitionSpec {
-        ContentTransform(
-            slideInHorizontally(initialOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
-            slideOutHorizontally(targetOffsetX = { it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
-        )
+        val fromIdx = tabIndexOf(initialState.entries.lastOrNull()?.contentKey)
+        val toIdx = tabIndexOf(targetState.entries.lastOrNull()?.contentKey)
+        val forward = toIdx >= fromIdx
+        if (forward) {
+            ContentTransform(
+                slideInHorizontally(initialOffsetX = { it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
+                slideOutHorizontally(targetOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
+            )
+        } else {
+            ContentTransform(
+                slideInHorizontally(initialOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
+                slideOutHorizontally(targetOffsetX = { it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
+            )
+        }
     }
 
 private fun isSubmenu(key: NavKey?): Boolean =

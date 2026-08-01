@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -777,10 +778,15 @@ private fun PlaylistListView(
     onMenu: (Int) -> Unit,
     onCreate: () -> Unit
 ) {
+    val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
+
     Box(modifier = Modifier.fillMaxSize()) {
         if (playlists.isEmpty()) {
             Column(
-                modifier = Modifier.fillMaxSize().padding(32.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                    .padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -808,11 +814,19 @@ private fun PlaylistListView(
                     state = playlistGridState,
                     modifier = Modifier
                         .fillMaxSize()
+                        .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                         .overScrollVertical(),
                     contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    item(span = { GridItemSpan(2) }) {
+                        dev.shephard.player.ui.components.CollapsingPageTitle(
+                            title = strings.playlists,
+                            state = topBarState,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                    }
                     if (pinnedPlaylists.size >= 1) {
                         item(span = { GridItemSpan(2) }) {
                             Text(
@@ -848,10 +862,18 @@ private fun PlaylistListView(
                     state = playlistListState,
                     modifier = Modifier
                         .fillMaxSize()
+                        .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                         .overScrollVertical(),
                     contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    item {
+                        dev.shephard.player.ui.components.CollapsingPageTitle(
+                            title = strings.playlists,
+                            state = topBarState,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                    }
                     if (pinnedPlaylists.size >= 1) {
                         item {
                             Text(
@@ -880,6 +902,12 @@ private fun PlaylistListView(
                 }
             }
         }
+
+        // MADDE 4 — Theme/Playback/About ile birebir aynı sabit üst başlık.
+        dev.shephard.player.ui.components.CollapsingTopBar(
+            title = strings.playlists,
+            state = topBarState
+        )
 
         FloatingActionButton(
             onClick = onCreate,
@@ -1191,7 +1219,15 @@ private fun PlaylistDetailView(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    // MADDE 5 — Playlist detayına girerken artık Theme/Playback Settings ile birebir aynı
+    // düz (flat) arkaplan kullanılıyor: temaya göre siyah (koyu mod) ya da beyaz (açık mod).
+    // Önceden hiç arkaplan yoktu, bu yüzden alttaki wallpaper/BgEffect katmanı görünüyordu —
+    // menülerle (Theme/Player/About) tutarsız bir görünüme neden oluyordu.
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MiuixAppTheme.colorScheme.background)
+    ) {
         LazyColumn(
             state = listState,
             modifier = Modifier

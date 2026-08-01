@@ -74,6 +74,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -140,37 +141,55 @@ fun SettingsScreen(
     val prefs = remember { PreferencesManager(context) }
     val strings = LocalStrings.current
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .overScrollVertical()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // InstallerX tarzı ana Settings: üstte widget kart, altında üç büyük yönlendirme.
-        TotalListeningTimeCard(playerViewModel = playerViewModel)
+    val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
 
-        SettingsNavigationCard(
-            icon = Icons.Filled.ColorLens,
-            title = strings.themeSettings,
-            summary = "Colors, wallpaper, Liquid Glass, layout and language",
-            onClick = onOpenThemeSettings
-        )
-        SettingsNavigationCard(
-            icon = Icons.Filled.MusicNote,
-            title = strings.playbackSettings,
-            summary = "Crossfade, gapless playback and audio focus",
-            onClick = onOpenPlayerSettings
-        )
-        SettingsNavigationCard(
-            icon = Icons.Filled.Info,
-            title = "About Lambda Player",
-            summary = "Version, project links and credits",
-            onClick = onOpenAbout
-        )
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                .overScrollVertical()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // MADDE 4 — Theme/Playback/About ile birebir aynı büyük, kaydırdıkça solup
+            // küçülen sayfa başlığı.
+            dev.shephard.player.ui.components.CollapsingPageTitle(
+                title = strings.settings,
+                state = topBarState
+            )
 
-        Spacer(Modifier.height(110.dp))
+            // InstallerX tarzı ana Settings: üstte widget kart, altında üç büyük yönlendirme.
+            TotalListeningTimeCard(playerViewModel = playerViewModel)
+
+            SettingsNavigationCard(
+                icon = Icons.Filled.ColorLens,
+                title = strings.themeSettings,
+                summary = "Colors, wallpaper, Liquid Glass, layout and language",
+                onClick = onOpenThemeSettings
+            )
+            SettingsNavigationCard(
+                icon = Icons.Filled.MusicNote,
+                title = strings.playbackSettings,
+                summary = "Crossfade, gapless playback and audio focus",
+                onClick = onOpenPlayerSettings
+            )
+            SettingsNavigationCard(
+                icon = Icons.Filled.Info,
+                title = "About Lambda Player",
+                summary = "Version, project links and credits",
+                onClick = onOpenAbout
+            )
+
+            Spacer(Modifier.height(110.dp))
+        }
+
+        // MADDE 4 — Theme/Playback/About ile birebir aynı sabit üst başlık.
+        dev.shephard.player.ui.components.CollapsingTopBar(
+            title = strings.settings,
+            state = topBarState
+        )
     }
 }
 
@@ -194,7 +213,18 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
 
     var langMenuOpen by remember { mutableStateOf(false) }
     var customPickerOpen by remember { mutableStateOf(false) }
-    var wallpaperBrightnessValue by remember(wallpaperBrightness) { mutableStateOf(wallpaperBrightness) }
+    // ÖNEMLİ — Wallpaper Brightness slider'ı BAŞTAN yazıldı.
+    // Eski kod: `wallpaperBrightnessValue by remember(wallpaperBrightness) { ... }` ile
+    // DataStore değerinden başlatılıyordu, AMA `onValueChangeFinished` içinde
+    // `prefs.setWallpaperBrightness(1f - wallpaperBrightnessValue)` ile TERSİ kaydediliyordu.
+    // Sonuç: kullanıcı slider'ı bıraktığı anda DataStore değeri değişiyor, `remember(wallpaperBrightness)`
+    // yeniden tetikleniyor ve slider'ın kendisi TERS değere zıplıyordu — slider'ın her
+    // bırakışta konumunun değişmesi ("berbat çalışıyor") sorununun kök nedeni buydu.
+    // Artık: state DataStore'dan sadece BİR KEZ (ilk composition'da) başlatılıyor, slider
+    // hareket ederken kendi state'ini gösteriyor, hiçbir ters çevirme yapılmıyor — slider
+    // ne gösteriyorsa o kaydediliyor. Karartma/parlaklık YÖNÜ (yüksek değer = daha parlak
+    // mı karanlık mı) sorumluluğu tamamen MainContainer'daki tüketim noktasına taşındı.
+    var wallpaperBrightnessValue by remember { mutableFloatStateOf(wallpaperBrightness) }
 
     // MADDE 4 — duvar kağıdı seçerken de kapak seçimindeki gibi sistem cropper
     // (com.android.camera.action.CROP) kullanılsın. Önce görsel seçilir, sonra crop
@@ -282,20 +312,25 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         SectionCard {
             Text(strings.themeSettings, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
             Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(strings.darkMode, color = MiuixAppTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 16.dp))
-                ThemeModeSegmentedSwitch(
-                    selectedMode = themeMode,
-                    lightLabel = strings.lightMode,
-                    autoLabel = strings.autoMode,
-                    darkLabel = strings.darkMode,
-                    onModeSelected = { mode -> scope.launch { prefs.setThemeMode(mode) } }
-                )
-            }
+            // MADDE 7 — eski ThemeModeSegmentedSwitch (Material tarzı üç butonlu segment)
+            // yerine InstallerX Revived'ın kullandığı GERÇEK Miuix bileşeni:
+            // WindowSpinnerPreference. Bu, gerçek Miuix animasyonlu dropdown pop-up'ını
+            // (WindowDropdownPopup) kullanıyor — kullanıcının referans gösterdiği
+            // "Light theme / Dark theme / Follow system theme" popup'ıyla birebir aynı.
+            val themeModeOptions = listOf(
+                ThemeModePreference.LIGHT to strings.lightMode,
+                ThemeModePreference.DARK to strings.darkMode,
+                ThemeModePreference.AUTO to strings.autoMode,
+            )
+            val themeModeSelectedIndex = themeModeOptions.indexOfFirst { it.first == themeMode }.coerceAtLeast(0)
+            top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+                title = strings.darkMode,
+                items = themeModeOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
+                selectedIndex = themeModeSelectedIndex,
+                onSelectedIndexChange = { index ->
+                    scope.launch { prefs.setThemeMode(themeModeOptions[index].first) }
+                }
+            )
             Spacer(Modifier.height(8.dp))
             ToggleRow(label = strings.blurEffect, checked = liquidGlassEnabled) { enabled ->
                 scope.launch { prefs.setLiquidGlassEnabled(enabled) }
@@ -378,7 +413,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 Slider(
                     value = wallpaperBrightnessValue,
                     onValueChange = { wallpaperBrightnessValue = it },
-                    onValueChangeFinished = { scope.launch { prefs.setWallpaperBrightness(1f - wallpaperBrightnessValue) } },
+                    onValueChangeFinished = { scope.launch { prefs.setWallpaperBrightness(wallpaperBrightnessValue) } },
                     valueRange = 0f..1f,
                     colors = SliderDefaults.colors(
                         thumbColor = MiuixAppTheme.colorScheme.primary,
@@ -397,17 +432,32 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         SectionCard {
             Text(strings.layout, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
             Spacer(Modifier.height(10.dp))
-            Text(strings.musicsLayout, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LayoutToggleChip(musicsLayout == LayoutMode.LIST, strings.list, Icons.AutoMirrored.Filled.List) { scope.launch { prefs.setMusicsLayout(LayoutMode.LIST) } }
-                LayoutToggleChip(musicsLayout == LayoutMode.GRID, strings.grid, Icons.Filled.ViewModule) { scope.launch { prefs.setMusicsLayout(LayoutMode.GRID) } }
-            }
-            Spacer(Modifier.height(12.dp))
-            Text(strings.playlistsLayout, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LayoutToggleChip(playlistsLayout == LayoutMode.LIST, strings.list, Icons.AutoMirrored.Filled.List) { scope.launch { prefs.setPlaylistsLayout(LayoutMode.LIST) } }
-                LayoutToggleChip(playlistsLayout == LayoutMode.GRID, strings.grid, Icons.Filled.ViewModule) { scope.launch { prefs.setPlaylistsLayout(LayoutMode.GRID) } }
-            }
+            // MADDE 7 — grid/list geçişi de artık InstallerX'in kullandığı gerçek Miuix
+            // WindowSpinnerPreference (animasyonlu dropdown popup) ile yapılıyor, eski
+            // Material tarzı LayoutToggleChip çiftleri yerine.
+            val layoutModeOptions = listOf(
+                LayoutMode.LIST to strings.list,
+                LayoutMode.GRID to strings.grid,
+            )
+            val musicsLayoutIndex = layoutModeOptions.indexOfFirst { it.first == musicsLayout }.coerceAtLeast(0)
+            top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+                title = strings.musicsLayout,
+                items = layoutModeOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
+                selectedIndex = musicsLayoutIndex,
+                onSelectedIndexChange = { index ->
+                    scope.launch { prefs.setMusicsLayout(layoutModeOptions[index].first) }
+                }
+            )
+            Spacer(Modifier.height(4.dp))
+            val playlistsLayoutIndex = layoutModeOptions.indexOfFirst { it.first == playlistsLayout }.coerceAtLeast(0)
+            top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+                title = strings.playlistsLayout,
+                items = layoutModeOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
+                selectedIndex = playlistsLayoutIndex,
+                onSelectedIndexChange = { index ->
+                    scope.launch { prefs.setPlaylistsLayout(layoutModeOptions[index].first) }
+                }
+            )
         }
 
         SectionCard {
@@ -912,107 +962,6 @@ private fun SectionCard(
 }
 
 private typealias ColumnScope = androidx.compose.foundation.layout.ColumnScope
-
-@Composable
-private fun LayoutToggleChip(
-    selected: Boolean,
-    label: String,
-    icon: ImageVector,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (selected) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
-                else MiuixAppTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f)
-            )
-            .bounceClick { onClick() }
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = if (selected) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp)
-        )
-        Text(
-            text = label,
-            color = if (selected) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
-            style = MiuixAppTheme.typography.bodyMedium
-        )
-    }
-}
-
-@Composable
-private fun ThemeModeSegmentedSwitch(
-    selectedMode: Int,
-    lightLabel: String,
-    autoLabel: String,
-    darkLabel: String,
-    onModeSelected: (Int) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .width(156.dp)
-            .height(54.dp)
-            .clip(RoundedCornerShape(28.dp))
-            .background(MiuixAppTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f))
-            .padding(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        ThemeModeSegment(
-            mode = ThemeModePreference.LIGHT,
-            selectedMode = selectedMode,
-            label = lightLabel,
-            icon = Icons.Filled.WbSunny,
-            onModeSelected = onModeSelected
-        )
-        ThemeModeSegment(
-            mode = ThemeModePreference.AUTO,
-            selectedMode = selectedMode,
-            label = autoLabel,
-            icon = Icons.Filled.BrightnessAuto,
-            onModeSelected = onModeSelected
-        )
-        ThemeModeSegment(
-            mode = ThemeModePreference.DARK,
-            selectedMode = selectedMode,
-            label = darkLabel,
-            icon = Icons.Filled.NightsStay,
-            onModeSelected = onModeSelected
-        )
-    }
-}
-
-@Composable
-private fun RowScope.ThemeModeSegment(
-    mode: Int,
-    selectedMode: Int,
-    label: String,
-    icon: ImageVector,
-    onModeSelected: (Int) -> Unit
-) {
-    val selected = mode == selectedMode
-    Box(
-        modifier = Modifier
-            .weight(1f)
-            .fillMaxHeight()
-            .clip(CircleShape)
-            .background(if (selected) MiuixAppTheme.colorScheme.primary else Color.Transparent)
-            .bounceClick(enabled = !selected) { onModeSelected(mode) },
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = if (selected) MiuixAppTheme.colorScheme.onPrimary else MiuixAppTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(23.dp)
-        )
-    }
-}
 
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {

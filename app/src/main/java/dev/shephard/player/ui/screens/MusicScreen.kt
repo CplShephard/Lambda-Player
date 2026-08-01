@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -140,68 +142,94 @@ fun MusicScreen(
         pendingDeleteUri = null
     }
 
-    when {
-        !permissionState.hasPermission -> {
-            PermissionRequest(onRequest = permissionState.requestPermission)
-        }
-        isLoading -> {
-            LoadingState()
-        }
-        hasScanned && tracks.isEmpty() -> {
-            EmptyState()
-        }
-        else -> {
-            val listState = rememberLazyListState()
-            val gridState = rememberLazyGridState()
+    val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
 
-            if (musicsLayout == LayoutMode.GRID) {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    state = gridState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .overScrollVertical(),
-                    contentPadding = PaddingValues(
-                        start = 12.dp,
-                        end = 12.dp,
-                        top = 8.dp,
-                        bottom = if (hasMiniPlayer) 176.dp else 96.dp
-                    ),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    gridItemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
-                        GridTrackCard(
-                            track = track,
-                            onClick = { onTrackClick(tracks, index) },
-                            onMenuClick = { selectedTrackForMenu = track }
-                        )
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            !permissionState.hasPermission -> {
+                PermissionRequest(onRequest = permissionState.requestPermission)
+            }
+            isLoading -> {
+                LoadingState()
+            }
+            hasScanned && tracks.isEmpty() -> {
+                EmptyState()
+            }
+            else -> {
+                val listState = rememberLazyListState()
+                val gridState = rememberLazyGridState()
+
+                if (musicsLayout == LayoutMode.GRID) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        state = gridState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                            .overScrollVertical(),
+                        contentPadding = PaddingValues(
+                            start = 12.dp,
+                            end = 12.dp,
+                            top = 8.dp,
+                            bottom = if (hasMiniPlayer) 176.dp else 96.dp
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            dev.shephard.player.ui.components.CollapsingPageTitle(
+                                title = strings.music,
+                                state = topBarState,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        }
+                        gridItemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+                            GridTrackCard(
+                                track = track,
+                                onClick = { onTrackClick(tracks, index) },
+                                onMenuClick = { selectedTrackForMenu = track }
+                            )
+                        }
                     }
-                }
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .overScrollVertical(),
-                    contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 8.dp,
-                        bottom = if (hasMiniPlayer) 176.dp else 96.dp
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
-                        TrackRow(
-                            track = track,
-                            onClick = { onTrackClick(tracks, index) },
-                            onMenuClick = { selectedTrackForMenu = track }
-                        )
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                            .overScrollVertical(),
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 8.dp,
+                            bottom = if (hasMiniPlayer) 176.dp else 96.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        item {
+                            dev.shephard.player.ui.components.CollapsingPageTitle(
+                                title = strings.music,
+                                state = topBarState,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        }
+                        itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+                            TrackRow(
+                                track = track,
+                                onClick = { onTrackClick(tracks, index) },
+                                onMenuClick = { selectedTrackForMenu = track }
+                            )
+                        }
                     }
                 }
             }
         }
+
+        // MADDE 4 — Theme/Playback/About ile birebir aynı sabit üst başlık.
+        dev.shephard.player.ui.components.CollapsingTopBar(
+            title = strings.music,
+            state = topBarState
+        )
     }
 
     // Track menu bottom sheet

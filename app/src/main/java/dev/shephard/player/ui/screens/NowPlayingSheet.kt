@@ -253,7 +253,7 @@ fun NowPlayingSheet(
                     // layout bilgisinden hesapla — scrollToItem sonrası layoutInfo bir frame
                     // geride kalabiliyor.
                     val itemWidthPx = artGridState.layoutInfo.visibleItemsInfo.firstOrNull()?.size?.width ?: 0
-                    val stridePx = itemWidthPx + with(density) { 0.dp.toPx() }
+                    val stridePx = itemWidthPx + with(density) { 16.dp.toPx() }
                     artGridState.scrollToItem(start)
                     if (itemWidthPx > 0) {
                         // animateScrollToItem'ın sabit (çok hızlı) animasyonu yerine daha
@@ -415,12 +415,17 @@ fun NowPlayingSheet(
                 // Elle yazılmış detectHorizontalDragGestures + Animatable yerine native scroll
                 // fiziği (fling velocity, snap animasyonu) kullanıldığı için akıcılık OS seviyesinde.
                 BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                    val maxArtHeight = maxHeight * 0.36f
-                    val artItemWidth = maxWidth
-                    // Kapak (kare, en fazla maxArtHeight) + altındaki başlık/artist bloğu için
-                    // ayrılan sabit yükseklik. LazyHorizontalGrid'in satır yüksekliğini kendisi
-                    // içerikten çıkaramadığı için (rows = Fixed(1) ile dış constraint gerekir)
-                    // burada elle veriyoruz.
+                    val maxArtHeight = maxHeight * 0.42f
+                    // ÖNEMLİ: item genişliği tam ekran (maxWidth) OLAMAZ eğer aralarında
+                    // Arrangement.spacedBy ile boşluk varsa — çünkü LazyHorizontalGrid'de
+                    // spacing, her item'dan SONRA eklenir ve toplam genişliği aşar. Sonuç:
+                    // komşu (henüz görünmemesi gereken) kapağın kenarından ince bir dikey
+                    // şerit ekranın sağında/solunda sızıyordu. Item genişliğini spacing kadar
+                    // küçülterek (item + spacing = tam ekran) komşu kapak artık tam olarak
+                    // ekranın dışında kalıyor, swipe sırasında iki kapak arasında görülmek
+                    // istenen boşluk da bu spacing ile sağlanıyor.
+                    val artItemSpacing = 16.dp
+                    val artItemWidth = maxWidth - artItemSpacing
                     val titleBlockHeight = 92.dp
                     val artRowHeight = minOf(artItemWidth, maxArtHeight) + titleBlockHeight
 
@@ -455,7 +460,7 @@ fun NowPlayingSheet(
                             rows = GridCells.Fixed(1),
                             flingBehavior = rememberSnapFlingBehavior(artSnapLayoutInfoProvider),
                             userScrollEnabled = true,
-                            horizontalArrangement = Arrangement.spacedBy(0.dp),
+                            horizontalArrangement = Arrangement.spacedBy(artItemSpacing),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 24.dp)
@@ -512,7 +517,7 @@ fun NowPlayingSheet(
                                             color = MiuixAppTheme.colorScheme.onBackground,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.padding(horizontal = 0.dp)
+                                            modifier = Modifier.padding(horizontal = 24.dp)
                                         )
                                         Text(
                                             text = itemTrack.artist,
@@ -520,7 +525,7 @@ fun NowPlayingSheet(
                                             color = MiuixAppTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.padding(horizontal = 0.dp)
+                                            modifier = Modifier.padding(horizontal = 24.dp)
                                         )
                                     }
                                 }
@@ -1236,7 +1241,7 @@ private fun QueueTrackItem(
             .fillMaxWidth()
             .height(64.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(MiuixAppTheme.colorScheme.surfaceContainerHighest)
+            .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
     ) {
         val absOffset = kotlin.math.abs(offsetX)
         val progress = (absOffset / swipeThresholdPx).coerceIn(0f, 1f)
