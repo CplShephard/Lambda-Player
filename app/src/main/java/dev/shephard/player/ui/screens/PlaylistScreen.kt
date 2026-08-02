@@ -65,6 +65,7 @@ import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.components.MiuixDrawer
 import dev.shephard.player.ui.components.MiuixDrawerActionHeader
 import dev.shephard.player.ui.navigation.PageTransitions
+import dev.shephard.player.ui.navigation.SubmenuNavGuard
 import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.miuix.OutlinedTextField
 import dev.shephard.player.ui.miuix.Text
@@ -214,6 +215,13 @@ fun PlaylistScreen(
     var showCreate by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
     var openIndex by remember { mutableStateOf<Int?>(null) }
+    // Playlist detay ekranı görsel olarak Theme/Player/About ile aynı submenu animasyonunu
+    // paylaşıyor (bkz. aşağıdaki AnimatedContent, PageTransitions.enterSubmenu/exitSubmenu),
+    // ama NavGraph/backStack'in dışında kendi local `openIndex` state'iyle yönetiliyor. Bu
+    // yüzden NavGraph'taki SubmenuNavGuard fix'i buraya otomatik uygulanmıyordu — hızlıca bir
+    // playlist'e girip çıkıp başka birine girmek aynı "animasyon ortasında eski sahne arka
+    // planda takılı kalıyor" sorununu yaratıyordu. Aynı guard'ı burada da kuruyoruz.
+    val playlistDetailGuard = remember { SubmenuNavGuard() }
     var trackPickerForIndex by remember { mutableStateOf<Int?>(null) }
     var pickerSelected by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var showCoverPickerForIndex by remember { mutableStateOf<Int?>(null) }
@@ -324,7 +332,9 @@ fun PlaylistScreen(
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = openIndex != null) { openIndex = null }
+    androidx.activity.compose.BackHandler(enabled = openIndex != null) {
+        playlistDetailGuard.pop { openIndex = null }
+    }
 
     // MADDE 2 (bu tur) — playlist detayına girerken artık Theme/Playback/About sayfalarının
     // kullandığı GERÇEK Miuix NavDisplay varsayılan geçişi kullanılıyor (enterPush/exitPush
@@ -356,7 +366,7 @@ fun PlaylistScreen(
             strings = strings,
             layout = playlistsLayout,
             likedIds = likedIds,
-            onOpen = { openIndex = it },
+            onOpen = { idx -> playlistDetailGuard.push(openIndex, idx) { openIndex = idx } },
             onPlay = { pl ->
                 val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
                 if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name)
@@ -375,7 +385,7 @@ fun PlaylistScreen(
                 allTracks = tracks,
                 plTracks = plTracks,
                 strings = strings,
-                onBack = { openIndex = null },
+                onBack = { playlistDetailGuard.pop { openIndex = null } },
                 onTrackClick = { list, i -> onTrackClick(list, i, if (pl.isSystem) strings.likedSongs else pl.name) },
                 onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name) },
                 onPlayRemix = { if (plTracks.isNotEmpty()) onPlaylistRemixClick(plTracks, if (pl.isSystem) strings.likedSongs else pl.name) },

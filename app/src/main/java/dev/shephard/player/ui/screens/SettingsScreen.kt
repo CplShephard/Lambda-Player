@@ -221,11 +221,20 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     // Sonuç: kullanıcı slider'ı bıraktığı anda DataStore değeri değişiyor, `remember(wallpaperBrightness)`
     // yeniden tetikleniyor ve slider'ın kendisi TERS değere zıplıyordu — slider'ın her
     // bırakışta konumunun değişmesi ("berbat çalışıyor") sorununun kök nedeni buydu.
-    // Artık: state DataStore'dan sadece BİR KEZ (ilk composition'da) başlatılıyor, slider
-    // hareket ederken kendi state'ini gösteriyor, hiçbir ters çevirme yapılmıyor — slider
-    // ne gösteriyorsa o kaydediliyor. Karartma/parlaklık YÖNÜ (yüksek değer = daha parlak
-    // mı karanlık mı) sorumluluğu tamamen MainContainer'daki tüketim noktasına taşındı.
+    // Ters çevirme kaldırıldı, ama key'siz `remember { }` YENİ bir soruna yol açtı: bu
+    // composable'ın composition'ı navigation boyunca KORUNUYOR (route değişince yok
+    // edilmiyor), bu yüzden local state SADECE bu ekran hayatı boyunca ilk kez compose
+    // edildiği anda DataStore'dan bir kez okunuyordu — Theme Settings'ten çıkıp tekrar
+    // girildiğinde her seferinde aynı (ilk) değeri göstermeye devam ediyordu, gerçek
+    // DataStore değeri farklı olsa bile. Çözüm: her girişte (composable'ın recompose
+    // DEĞİL, gerçekten ekrana gelme anı) LaunchedEffect(Unit) ile local state'i DataStore'daki
+    // GÜNCEL değerle bir kez senkronize ediyoruz. Bu, sürüklerken slider'ın DataStore'un ara
+    // emisyonlarıyla "zıplamasını" önler (senkron sadece giriş anında olur, her emit'te değil)
+    // ve her girişte doğru konumu gösterir.
     var wallpaperBrightnessValue by remember { mutableFloatStateOf(wallpaperBrightness) }
+    LaunchedEffect(Unit) {
+        wallpaperBrightnessValue = wallpaperBrightness
+    }
 
     // MADDE 4 — duvar kağıdı seçerken de kapak seçimindeki gibi sistem cropper
     // (com.android.camera.action.CROP) kullanılsın. Önce görsel seçilir, sonra crop

@@ -126,6 +126,10 @@ fun NavGraph(
 ) {
     val currentTop = backStack.last()
 
+    // InstallerX Revived'ın Navigator.push/pop debounce'unun portu — bkz. SubmenuNavGuard.kt.
+    // Sadece Theme/Player/About (submenu) geçişlerine uygulanır.
+    val submenuGuard = remember { SubmenuNavGuard() }
+
     // Bir önceki üst route'u hatırla: transitionEffects'in (corner clip + dim scrim) yalnızca
     // alt menü (Theme / Player / About) geçişlerinde Miuix stiline geçmesi için kullanılır.
     var prevTop by remember { mutableStateOf<NavKey>(currentTop) }
@@ -144,7 +148,16 @@ fun NavGraph(
                 enableCornerClip = true,
                 dimAmount = 0.5f,
                 blockInputDuringTransition = true,
-                popDirectionFollowsSwipeEdge = true,
+                // KAPANIRKEN KÖŞE YUVARLAKLIĞI TUTARSIZLIĞI FIX: Bu bayrak, hangi köşelerin
+                // yuvarlanacağını "son predictive-back swipe'ının hangi kenardan başladığına"
+                // (lastSwipeEdge) göre belirliyor. Ama biz gerçek edge-swipe gesture'ı
+                // KULLANMIYORUZ — geri gitme geri tuşu/onBack() çağrısıyla (programatik)
+                // tetikleniyor. lastSwipeEdge hiçbir zaman kullanıcı girdisinden anlamlı bir
+                // değer almadığı için, kapanış animasyonundaki köşe yuvarlaklığı SS'lerde
+                // görüldüğü gibi tutarsız kalıyordu (bazen açılışla aynı köşeler yuvarlak,
+                // bazen ters/düz). Kapatınca artık her zaman açılışla AYNI köşe kırpma
+                // yönünü kullanıyor.
+                popDirectionFollowsSwipeEdge = false,
             )
         } else {
             NavDisplayTransitionEffects(
@@ -175,21 +188,27 @@ fun NavGraph(
             entry<SettingsRoute>(metadata = originalTabTransition) {
                 SettingsScreen(
                     playerViewModel = playerViewModel,
-                    onOpenThemeSettings = { backStack.add(ThemeRoute) },
-                    onOpenPlayerSettings = { backStack.add(PlayerRoute) },
-                    onOpenAbout = { backStack.add(AboutRoute) }
+                    onOpenThemeSettings = {
+                        submenuGuard.push(currentTop, ThemeRoute) { backStack.add(ThemeRoute) }
+                    },
+                    onOpenPlayerSettings = {
+                        submenuGuard.push(currentTop, PlayerRoute) { backStack.add(PlayerRoute) }
+                    },
+                    onOpenAbout = {
+                        submenuGuard.push(currentTop, AboutRoute) { backStack.add(AboutRoute) }
+                    }
                 )
             }
 
             // --- ALT MENÜLER: metadata YOK → YENİ Miuix animasyonu (corner clip + dim) ---
             entry<ThemeRoute> {
-                ThemeSettingsScreen(onBack = { backStack.removeAt(backStack.lastIndex) })
+                ThemeSettingsScreen(onBack = { submenuGuard.pop { backStack.removeAt(backStack.lastIndex) } })
             }
             entry<PlayerRoute> {
-                PlayerSettingsScreen(onBack = { backStack.removeAt(backStack.lastIndex) })
+                PlayerSettingsScreen(onBack = { submenuGuard.pop { backStack.removeAt(backStack.lastIndex) } })
             }
             entry<AboutRoute> {
-                AboutSettingsScreen(onBack = { backStack.removeAt(backStack.lastIndex) })
+                AboutSettingsScreen(onBack = { submenuGuard.pop { backStack.removeAt(backStack.lastIndex) } })
             }
         }
     }
