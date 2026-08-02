@@ -3,6 +3,7 @@ package dev.shephard.player.ui.components
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.Text
@@ -83,6 +84,11 @@ fun CollapsingPageTitle(
         style = MiuixAppTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
         color = MiuixAppTheme.colorScheme.onBackground,
-        modifier = modifier
+        // ÖNEMLİ: bu satır eksikti. scrollProgress hesaplanıyordu ama hiçbir yerde
+        // kullanılmıyordu, bu yüzden büyük başlık kaydırırken hiç solmuyor/küçülmüyordu —
+        // sürekli tam opak kalıp app bar'daki küçük başlıkla çakışıyordu. SettingsPageScaffold'daki
+        // (Theme/Playback/About) çalışan davranışla birebir aynı: kaydırdıkça solup kayboluyor,
+        // yerini üstteki ortalanmış küçük başlığa bırakıyor.
+        modifier = modifier.graphicsLayer { alpha = 1f - scrollProgress }
     )
 }

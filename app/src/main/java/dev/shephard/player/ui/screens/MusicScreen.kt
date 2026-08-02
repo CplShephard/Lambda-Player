@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -180,7 +181,15 @@ fun MusicScreen(
                             dev.shephard.player.ui.components.CollapsingPageTitle(
                                 title = strings.music,
                                 state = topBarState,
-                                modifier = Modifier.padding(bottom = 4.dp)
+                                // ÖNEMLİ: Scaffold artık content'e status bar padding'i
+                                // uygulamıyor (contentWindowInsets sıfırlandı), bu yüzden
+                                // büyük başlık status bar'ın (saat/pil ikonları) ARKASINDA
+                                // kalıyordu. SettingsPageScaffold'daki SmallTopAppBar zaten
+                                // bunu kendi hallediyordu ama bu büyük başlık LazyColumn'un
+                                // İÇİNDE olduğu için kendi status bar payını almıyordu.
+                                modifier = Modifier
+                                    .statusBarsPadding()
+                                    .padding(top = 4.dp, bottom = 4.dp)
                             )
                         }
                         gridItemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
@@ -210,7 +219,9 @@ fun MusicScreen(
                             dev.shephard.player.ui.components.CollapsingPageTitle(
                                 title = strings.music,
                                 state = topBarState,
-                                modifier = Modifier.padding(bottom = 4.dp)
+                                modifier = Modifier
+                                    .statusBarsPadding()
+                                    .padding(top = 4.dp, bottom = 4.dp)
                             )
                         }
                         itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->

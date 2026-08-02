@@ -326,22 +326,24 @@ fun PlaylistScreen(
 
     androidx.activity.compose.BackHandler(enabled = openIndex != null) { openIndex = null }
 
-    // MADDE 8 — playlist detayına girerken de Settings alt sayfalarındaki ile BİREBİR
-    // aynı InstallerX/MIUIX "push" animasyonu kullanılıyor (ortak `PageTransitions`).
+    // MADDE 2 (bu tur) — playlist detayına girerken artık Theme/Playback/About sayfalarının
+    // kullandığı GERÇEK Miuix NavDisplay varsayılan geçişi kullanılıyor (enterPush/exitPush
+    // DEĞİL — o, InstallerX'in eski NavHost döneminden kalma bir taklitti ve kullanıcı
+    // "saçma sapan" bularak bunun yerine Theme/Playback/About'un animasyonunu istedi).
     androidx.compose.animation.AnimatedContent(
         targetState = openIndex,
         transitionSpec = {
             if (targetState != null) {
-                // Detaya giriş: yeni sayfa tamamen sağdan gelir, liste paralaksla sola kayar.
+                // Detaya giriş: Theme/Playback/About'a girerken kullanılan animasyonun aynısı.
                 androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.enterPush,
-                    initialContentExit = PageTransitions.exitPush
+                    targetContentEnter = PageTransitions.enterSubmenu,
+                    initialContentExit = PageTransitions.exitSubmenu
                 )
             } else {
-                // Geri: liste paralaks konumundan yerine döner, detay tamamen sağa çıkar.
+                // Geri: aynı animasyonun ters yönü.
                 androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.popEnterPush,
-                    initialContentExit = PageTransitions.popExitPush
+                    targetContentEnter = PageTransitions.popEnterSubmenu,
+                    initialContentExit = PageTransitions.popExitSubmenu
                 )
             }
         },
@@ -824,7 +826,9 @@ private fun PlaylistListView(
                         dev.shephard.player.ui.components.CollapsingPageTitle(
                             title = strings.playlists,
                             state = topBarState,
-                            modifier = Modifier.padding(bottom = 4.dp)
+                            modifier = Modifier
+                                .statusBarsPadding()
+                                .padding(top = 4.dp, bottom = 4.dp)
                         )
                     }
                     if (pinnedPlaylists.size >= 1) {
@@ -871,7 +875,9 @@ private fun PlaylistListView(
                         dev.shephard.player.ui.components.CollapsingPageTitle(
                             title = strings.playlists,
                             state = topBarState,
-                            modifier = Modifier.padding(bottom = 4.dp)
+                            modifier = Modifier
+                                .statusBarsPadding()
+                                .padding(top = 4.dp, bottom = 4.dp)
                         )
                     }
                     if (pinnedPlaylists.size >= 1) {

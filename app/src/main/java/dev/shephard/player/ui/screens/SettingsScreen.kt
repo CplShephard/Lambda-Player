@@ -157,7 +157,8 @@ fun SettingsScreen(
             // küçülen sayfa başlığı.
             dev.shephard.player.ui.components.CollapsingPageTitle(
                 title = strings.settings,
-                state = topBarState
+                state = topBarState,
+                modifier = Modifier.statusBarsPadding()
             )
 
             // InstallerX tarzı ana Settings: üstte widget kart, altında üç büyük yönlendirme.
@@ -327,6 +328,12 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 title = strings.darkMode,
                 items = themeModeOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
                 selectedIndex = themeModeSelectedIndex,
+                // ÖNEMLİ: BasicComponent (WindowSpinnerPreference'ın altında kullandığı
+                // bileşen) kendi clickable/basma efektini `modifier` parametresine
+                // doğrudan uyguluyor, kendi başına clip YAPMIYOR — bu yüzden basılı
+                // tutulduğunda ripple/highlight kartın yuvarlak köşelerini yok sayıp
+                // dikdörtgen (corner radius 0) görünüyordu. Burada clip ekliyoruz.
+                modifier = Modifier.clip(RoundedCornerShape(30.dp)),
                 onSelectedIndexChange = { index ->
                     scope.launch { prefs.setThemeMode(themeModeOptions[index].first) }
                 }
@@ -444,6 +451,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 title = strings.musicsLayout,
                 items = layoutModeOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
                 selectedIndex = musicsLayoutIndex,
+                modifier = Modifier.clip(RoundedCornerShape(30.dp)),
                 onSelectedIndexChange = { index ->
                     scope.launch { prefs.setMusicsLayout(layoutModeOptions[index].first) }
                 }
@@ -454,6 +462,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 title = strings.playlistsLayout,
                 items = layoutModeOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
                 selectedIndex = playlistsLayoutIndex,
+                modifier = Modifier.clip(RoundedCornerShape(30.dp)),
                 onSelectedIndexChange = { index ->
                     scope.launch { prefs.setPlaylistsLayout(layoutModeOptions[index].first) }
                 }

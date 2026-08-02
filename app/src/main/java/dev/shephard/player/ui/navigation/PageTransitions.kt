@@ -81,4 +81,36 @@ object PageTransitions {
         slideOutHorizontally(animationSpec = slideSpec) { (it * ENTER_OFFSET).toInt() } +
             fadeOut(animationSpec = fadeSpec, targetAlpha = COVERED_ALPHA) +
             scaleOut(animationSpec = fadeSpec, targetScale = EXIT_SCALE)
+
+    // ---------------------------------------------------------------------------------
+    // MADDE 2 (bu tur) — playlist detayına girme animasyonu artık yukarıdaki (kullanıcının
+    // "saçma sapan" bulduğu) enterPush/exitPush YERİNE, Theme/Playback/About sayfalarının
+    // kullandığı GERÇEK Miuix NavDisplay varsayılan geçişinin (defaultTransitionSpec /
+    // defaultPopTransitionSpec, miuix-navigation3-ui'deki NavDisplay.kt) birebir kopyasını
+    // kullanıyor. Bu, basit bir slide'dır: scale/fade/paralaks YOKTUR, sadece:
+    //  - İleri: giren sayfa tam genişlik kadar sağdan gelir, çıkan sayfa genişliğin 1/4'ü
+    //    kadar sola kayar (paralaks).
+    //  - Geri: simetriğinin tersi.
+    // 500ms, NavAnimationEasing (kritik-sönümlü yay easing'i, response=0.8, damping=0.95).
+    // ---------------------------------------------------------------------------------
+    private val miuixDefaultTween = androidx.compose.animation.core.tween<IntOffset>(
+        durationMillis = 500,
+        easing = NavAnimationEasing
+    )
+
+    /** Theme/Playback/About ile birebir aynı — ileri gidiş, giren sayfa tam sağdan gelir. */
+    val enterSubmenu: EnterTransition =
+        slideInHorizontally(animationSpec = miuixDefaultTween) { it }
+
+    /** Theme/Playback/About ile birebir aynı — ileri gidiş, çıkan sayfa 1/4 sola paralaks kayar. */
+    val exitSubmenu: ExitTransition =
+        slideOutHorizontally(animationSpec = miuixDefaultTween) { -it / 4 }
+
+    /** Theme/Playback/About ile birebir aynı — geri dönüş, alttaki sayfa 1/4'ten yerine döner. */
+    val popEnterSubmenu: EnterTransition =
+        slideInHorizontally(animationSpec = miuixDefaultTween) { -it / 4 }
+
+    /** Theme/Playback/About ile birebir aynı — geri dönüş, üstteki sayfa tam sağa çıkar. */
+    val popExitSubmenu: ExitTransition =
+        slideOutHorizontally(animationSpec = miuixDefaultTween) { it }
 }
