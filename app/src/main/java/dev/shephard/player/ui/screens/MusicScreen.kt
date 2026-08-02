@@ -15,7 +15,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateTopPadding
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -28,7 +29,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -89,6 +89,7 @@ import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.basic.Scaffold
 
 @Composable
 fun MusicScreen(
@@ -145,102 +146,87 @@ fun MusicScreen(
 
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        when {
-            !permissionState.hasPermission -> {
-                PermissionRequest(onRequest = permissionState.requestPermission)
-            }
-            isLoading -> {
-                LoadingState()
-            }
-            hasScanned && tracks.isEmpty() -> {
-                EmptyState()
-            }
-            else -> {
-                val listState = rememberLazyListState()
-                val gridState = rememberLazyGridState()
+    // MADDE 4+ — Music artık Theme/Playback/About gibi Lambda'nın kendi küçük başlığını değil,
+    // InstallerX'in Theme/Installer/Uninstaller ayar sayfalarındaki LARGE header desenini
+    // kullanıyor: başlık SOL ÜSTTE büyük durur, kaydırdıkça küçülüp app bar'ın ortasında belirir.
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            dev.shephard.player.ui.components.InstallerXTopBar(
+                title = strings.music,
+                state = topBarState
+            )
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            when {
+                !permissionState.hasPermission -> {
+                    PermissionRequest(onRequest = permissionState.requestPermission)
+                }
+                isLoading -> {
+                    LoadingState()
+                }
+                hasScanned && tracks.isEmpty() -> {
+                    EmptyState()
+                }
+                else -> {
+                    val listState = rememberLazyListState()
+                    val gridState = rememberLazyGridState()
 
-                if (musicsLayout == LayoutMode.GRID) {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        state = gridState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                            .overScrollVertical(),
-                        contentPadding = PaddingValues(
-                            start = 12.dp,
-                            end = 12.dp,
-                            top = 8.dp,
-                            bottom = if (hasMiniPlayer) 176.dp else 96.dp
-                        ),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            dev.shephard.player.ui.components.CollapsingPageTitle(
-                                title = strings.music,
-                                state = topBarState,
-                                // ÖNEMLİ: Scaffold artık content'e status bar padding'i
-                                // uygulamıyor (contentWindowInsets sıfırlandı), bu yüzden
-                                // büyük başlık status bar'ın (saat/pil ikonları) ARKASINDA
-                                // kalıyordu. SettingsPageScaffold'daki SmallTopAppBar zaten
-                                // bunu kendi hallediyordu ama bu büyük başlık LazyColumn'un
-                                // İÇİNDE olduğu için kendi status bar payını almıyordu.
-                                modifier = Modifier
-                                    .statusBarsPadding()
-                                    .padding(top = 4.dp, bottom = 4.dp)
-                            )
+                    if (musicsLayout == LayoutMode.GRID) {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            state = gridState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                                .overScrollVertical(),
+                            contentPadding = PaddingValues(
+                                start = 12.dp,
+                                end = 12.dp,
+                                top = innerPadding.calculateTopPadding() + 8.dp,
+                                bottom = if (hasMiniPlayer) 176.dp else 96.dp
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            gridItemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+                                GridTrackCard(
+                                    track = track,
+                                    onClick = { onTrackClick(tracks, index) },
+                                    onMenuClick = { selectedTrackForMenu = track }
+                                )
+                            }
                         }
-                        gridItemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
-                            GridTrackCard(
-                                track = track,
-                                onClick = { onTrackClick(tracks, index) },
-                                onMenuClick = { selectedTrackForMenu = track }
-                            )
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                            .overScrollVertical(),
-                        contentPadding = PaddingValues(
-                            start = 16.dp,
-                            end = 16.dp,
-                            top = 8.dp,
-                            bottom = if (hasMiniPlayer) 176.dp else 96.dp
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        item {
-                            dev.shephard.player.ui.components.CollapsingPageTitle(
-                                title = strings.music,
-                                state = topBarState,
-                                modifier = Modifier
-                                    .statusBarsPadding()
-                                    .padding(top = 4.dp, bottom = 4.dp)
-                            )
-                        }
-                        itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
-                            TrackRow(
-                                track = track,
-                                onClick = { onTrackClick(tracks, index) },
-                                onMenuClick = { selectedTrackForMenu = track }
-                            )
+                    } else {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                                .overScrollVertical(),
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = innerPadding.calculateTopPadding() + 8.dp,
+                                bottom = if (hasMiniPlayer) 176.dp else 96.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+                                TrackRow(
+                                    track = track,
+                                    onClick = { onTrackClick(tracks, index) },
+                                    onMenuClick = { selectedTrackForMenu = track }
+                                )
+                            }
                         }
                     }
                 }
             }
         }
-
-        // MADDE 4 — Theme/Playback/About ile birebir aynı sabit üst başlık.
-        dev.shephard.player.ui.components.CollapsingTopBar(
-            title = strings.music,
-            state = topBarState
-        )
     }
 
     // Track menu bottom sheet

@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
@@ -229,6 +230,57 @@ fun MainContainer(
                         contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     ) { innerPadding ->
                         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                            // MADDE 7 (bu tur) — Dock ve mini player, NavGraph'dan ÖNCE (alt katmanda)
+                            // çizilir ve zIndex'i `isBottomRoute`'a göre ayarlanır:
+                            //  - Ana sekmeler (Music/Playlists/Settings) + playlistdetail: isBottomRoute
+                            //    true → zIndex 1 → dock/mini içeriğin ÜZERİNDE görünür (eskisi gibi).
+                            //  - Gerçek submenüler (Theme/Playback/About): isBottomRoute false →
+                            //    zIndex 0 → NavGraph üstte çizilir; opak submenu dock/mini'yi ÖRTER
+                            //    (submenu onların ÜZERİNE gelir, InstallerX'teki gibi). Dock/mini
+                            //    kaybolmaz; sadece opak submenu'nün altında kalır, submenu kapanınca
+                            //    anında geri görünür.
+                            // Sadece NowPlayingSheet (tam ekran) açıkken gizleniyor çünkü o zaten her
+                            // şeyi kaplıyor.
+                            if (!showNowPlaying) {
+                                Column(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .fillMaxWidth()
+                                        .navigationBarsPadding()
+                                        // Playlistdetail ISTİSNAdır: o Playlists ana sekmesinin
+                                        // (isBottomRoute) İÇİNDE render edildiği için dock/mini onun
+                                        // ÜZERİNDE kalmalı. Theme/Playback/About gibi gerçek
+                                        // submenu'lerde (isBottomRoute=false) ise zIndex 0 → NavGraph
+                                        // onların üstünde çizilir, dock/mini opak submenu'nün altında
+                                        // kalır (submenu onların üzerine gelir).
+                                        .zIndex(if (isBottomRoute) 1f else 0f)
+                                ) {
+                                    MiniPlayerHost(
+                                        playerViewModel = playerViewModel,
+                                        visible = hasMiniPlayer,
+                                        onOpenNowPlaying = { showNowPlaying = true }
+                                    )
+                                    FloatingDock(
+                                        currentRoute = currentRoute,
+                                        onNavigate = { destination ->
+                                            val key = when (destination) {
+                                                Destination.Music -> MusicRoute
+                                                Destination.Playlists -> PlaylistsRoute
+                                                Destination.Settings -> SettingsRoute
+                                                else -> MusicRoute
+                                            }
+                                            if (backStack.last() != key) {
+                                                androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
+                                                    backStack.clear()
+                                                    backStack.add(key)
+                                                }
+                                            }
+                                        }
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                }
+                            }
+
                             NavGraph(
                                 backStack = backStack,
                                 playerViewModel = playerViewModel,
@@ -254,66 +306,6 @@ fun MainContainer(
                                     playerViewModel.setQueueAndPlayRemixed(tracks, playlistName)
                                 }
                             )
-
-                            Column(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .fillMaxWidth()
-                                    .navigationBarsPadding()
-                            ) {
-                                // MADDE 5 — Settings alt sayfalarına (Theme / Player /
-                                // About) girince dock zaten gizleniyordu ama müzik
-                                // çalar pop-up'ı (mini player) orada da görünmeye devam
-                                // ediyordu. Artık mini player da sadece ana sekmelerde
-                                // gösteriliyor; alt sayfalarda ekran tamamen içeriğe
-                                // kalıyor.
-                                MiniPlayerHost(
-                                    playerViewModel = playerViewModel,
-                                    visible = hasMiniPlayer && isBottomRoute,
-                                    onOpenNowPlaying = { showNowPlaying = true }
-                                )
-
-                                if (isBottomRoute) {
-                                    FloatingDock(
-                                        currentRoute = currentRoute,
-                                onNavigate = { destination ->
-                                    val key = when (destination) {
-                                        Destination.Music -> MusicRoute
-                                        Destination.Playlists -> PlaylistsRoute
-                                        Destination.Settings -> SettingsRoute
-                                        else -> MusicRoute
-                                    }
-                                    // ÖNEMLİ: Önceden her tıklamada `backStack.add(key)`
-                                    // çağrılıyordu — bu hem stack'i sonsuz büyütüyordu
-                                    // (Music→Playlists→Settings→Music... her tıklama yeni
-                                    // entry ekliyordu, asla çıkarmıyordu) hem de NavDisplay'in
-                                    // her geçişi "push/ileri" olarak görmesine, gerçek bir
-                                    // "pop" hiç oluşmadığı için popTransitionSpec'in (geri
-                                    // animasyonu) hiçbir zaman tetiklenmemesine yol açıyordu.
-                                    // Sonuç: Settings'ten Music'e dönerken bile animasyon
-                                    // "ileri" yönünde (yanlış) oynuyordu — page transition'ın
-                                    // "berbat" görünmesinin kök nedeni buydu.
-                                    // Artık üç ana sekme arasında geçişte stack, klasik
-                                    // popUpTo(startDestination) davranışına benzer şekilde
-                                    // tek bir ana-sekme entry'sine indiriliyor (alt menüler —
-                                    // Theme/Player/About — zaten ayrı bir mantıkla, kendi
-                                    // BackHandler'ıyla kapatılıyor, burası sadece 3 ana
-                                    // sekmeyi ilgilendiriyor).
-                                    if (backStack.last() != key) {
-                                        // clear() ve add()'i TEK bir snapshot'ta birleştiriyoruz;
-                                        // ayrı ayrı çağrılırsa NavDisplay aradaki boş listeyi
-                                        // geçici bir state olarak görüp garip bir ara-durum
-                                        // animasyonu tetikleyebilirdi.
-                                        androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
-                                            backStack.clear()
-                                            backStack.add(key)
-                                        }
-                                    }
-                                }
-                                    )
-                                    Spacer(Modifier.height(8.dp))
-                                }
-                            }
                         }
                     }
 

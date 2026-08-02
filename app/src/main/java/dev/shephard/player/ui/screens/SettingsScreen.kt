@@ -28,9 +28,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateTopPadding
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
@@ -103,6 +103,7 @@ import androidx.compose.ui.unit.sp
 import dev.shephard.player.R
 import top.yukonga.miuix.kmp.basic.Card as MiuixNativeCard
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -143,54 +144,55 @@ fun SettingsScreen(
 
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                .overScrollVertical()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // MADDE 4 — Theme/Playback/About ile birebir aynı büyük, kaydırdıkça solup
-            // küçülen sayfa başlığı.
-            dev.shephard.player.ui.components.CollapsingPageTitle(
+    // MADDE 4+ — Settings artık InstallerX tarzı LARGE header kullanıyor (başlık sol üstte büyük,
+    // kaydırdıkça app bar'ın ortasında küçülüp belirir).
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            dev.shephard.player.ui.components.InstallerXTopBar(
                 title = strings.settings,
-                state = topBarState,
-                modifier = Modifier.statusBarsPadding()
+                state = topBarState
             )
-
-            // InstallerX tarzı ana Settings: üstte widget kart, altında üç büyük yönlendirme.
-            TotalListeningTimeCard(playerViewModel = playerViewModel)
-
-            SettingsNavigationCard(
-                icon = Icons.Filled.ColorLens,
-                title = strings.themeSettings,
-                summary = "Colors, wallpaper, Liquid Glass, layout and language",
-                onClick = onOpenThemeSettings
-            )
-            SettingsNavigationCard(
-                icon = Icons.Filled.MusicNote,
-                title = strings.playbackSettings,
-                summary = "Crossfade, gapless playback and audio focus",
-                onClick = onOpenPlayerSettings
-            )
-            SettingsNavigationCard(
-                icon = Icons.Filled.Info,
-                title = "About Lambda Player",
-                summary = "Version, project links and credits",
-                onClick = onOpenAbout
-            )
-
-            Spacer(Modifier.height(110.dp))
         }
+    ) { innerPadding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                    .overScrollVertical()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp)
+                    .padding(top = innerPadding.calculateTopPadding() + 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // InstallerX tarzı ana Settings: üstte widget kart, altında üç büyük yönlendirme.
+                TotalListeningTimeCard(playerViewModel = playerViewModel)
 
-        // MADDE 4 — Theme/Playback/About ile birebir aynı sabit üst başlık.
-        dev.shephard.player.ui.components.CollapsingTopBar(
-            title = strings.settings,
-            state = topBarState
-        )
+                SettingsNavigationCard(
+                    icon = Icons.Filled.ColorLens,
+                    title = strings.themeSettings,
+                    summary = "Colors, wallpaper, Liquid Glass, layout and language",
+                    onClick = onOpenThemeSettings
+                )
+                SettingsNavigationCard(
+                    icon = Icons.Filled.MusicNote,
+                    title = strings.playbackSettings,
+                    summary = "Crossfade, gapless playback and audio focus",
+                    onClick = onOpenPlayerSettings
+                )
+                SettingsNavigationCard(
+                    icon = Icons.Filled.Info,
+                    title = "About Lambda Player",
+                    summary = "Version, project links and credits",
+                    onClick = onOpenAbout
+                )
+
+                Spacer(Modifier.height(110.dp))
+            }
+        }
     }
 }
 
@@ -232,7 +234,21 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     // emisyonlarıyla "zıplamasını" önler (senkron sadece giriş anında olur, her emit'te değil)
     // ve her girişte doğru konumu gösterir.
     var wallpaperBrightnessValue by remember { mutableFloatStateOf(wallpaperBrightness) }
-    LaunchedEffect(Unit) {
+    // İlk yükleme & DataStore değeri değiştiğinde (ör. başka yerden duvar kağıdı
+    // silindiğinde/ayarlandığında) local slider state'ini senkronize et. DataStore sadece
+    // `onValueChangeFinished`'te (bırakınca) yazıldığı için sürükleme sırasında emisyon olmaz,
+    // dolayısıyla slider buradan "zıplamaz".
+    LaunchedEffect(wallpaperBrightness) {
+        wallpaperBrightnessValue = wallpaperBrightness
+    }
+    // KRİTİK — Theme Settings'ten çıkıp tekrar girildiğinde composable'ın composition'ı
+    // navigation boyunca KORUNUYOR (route değişince yok edilmiyor), bu yüzden `remember` ve
+    // `LaunchedEffect(wallpaperBrightness)` yeniden çalışmıyor (değer değişmediyse). Sonuç:
+    // local slider state'i ESKİ değerde takılı kalıyor, gerçek DataStore değeri farklı olsa bile
+    // ("değer farklı ama hep aynı yerde duruyor" şikayeti). Çözüm: ekran her gerçekten görünür
+    // olduğunda (ON_RESUME) local state'i DataStore'daki GÜNCEL değerle bir kez senkronize et.
+    // Sürükleme sırasında ekran zaten RESUMED olduğu için bu callback sürüklerken tetiklenmez.
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
         wallpaperBrightnessValue = wallpaperBrightness
     }
 

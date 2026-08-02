@@ -1,15 +1,28 @@
 package dev.shephard.player.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.Text
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import top.yukonga.miuix.kmp.basic.TopAppBar
 import androidx.compose.ui.text.font.FontWeight
 
 /**
@@ -90,5 +103,84 @@ fun CollapsingPageTitle(
         // (Theme/Playback/About) çalışan davranışla birebir aynı: kaydırdıkça solup kayboluyor,
         // yerini üstteki ortalanmış küçük başlığa bırakıyor.
         modifier = modifier.graphicsLayer { alpha = 1f - scrollProgress }
+    )
+}
+
+/**
+ * InstallerX'in Theme/Installer/Uninstaller ayar sayfalarındaki "large header" deseninin
+ * Miuix karşılığı.
+ *
+ * InstallerX bu sayfalarda Material3 `LargeFlexibleTopAppBar` + `exitUntilCollapsedScrollBehavior`
+ * kullanıyor: sayfa başlığı SOL ÜSTTE büyük (headline) olarak durur, kaydırdıkça küçülüp app bar'ın
+ * ORTASINDA küçük başlık olarak belirir. Miuix kütüphanesinin `TopAppBar`'ı `largeTitle` parametresiyle
+ * bu davranışı birebir sağlıyor — bu bileşen, ana sekmelerin (Music/Playlists/Settings) başlık desenini
+ * bu InstallerX tarzına taşır.
+ *
+ * Kullanım: içerik bir Miuix `Scaffold`'un `topBar`'ına verilir; içerik `state.scrollBehavior`'ın
+ * `nestedScrollConnection`'ı ile `nestedScroll` edilir.
+ */
+@Composable
+fun InstallerXTopBar(
+    title: String,
+    state: CollapsingTopBarState,
+    modifier: Modifier = Modifier,
+    subtitle: String = "",
+) {
+    val cs = MiuixAppTheme.colorScheme
+    val collapseFraction = state.collapseFraction
+    TopAppBar(
+        title = title,
+        largeTitle = title,
+        largeTitleColor = cs.onBackground,
+        titleColor = cs.onBackground.copy(alpha = collapseFraction),
+        subtitle = subtitle,
+        subtitleColor = cs.onSurfaceVariant,
+        color = Color.Transparent,
+        scrollBehavior = state.scrollBehavior,
+        defaultWindowInsetsPadding = false,
+        modifier = modifier,
+    )
+}
+
+/**
+ * Theme/Playback/About ayar sayfalarının (SettingsPageScaffold) kullandığı header'ın aynısı:
+ * `SmallTopAppBar` + geri tuşu (navigationIcon) + kaydırdıkça ortada beliren küçük başlık.
+ *
+ * playlist detail ekranının (PlaylistDetailView) başlığını bu desene taşımak için kullanılıyor —
+ * böylece submenu olan playlist detail, Theme/Playback/About ile birebir aynı header'a sahip olur.
+ */
+@Composable
+fun SubmenuTopBar(
+    title: String,
+    onBack: () -> Unit,
+    state: CollapsingTopBarState,
+    modifier: Modifier = Modifier,
+) {
+    val cs = MiuixAppTheme.colorScheme
+    val collapseFraction = state.collapseFraction
+    SmallTopAppBar(
+        title = title,
+        modifier = modifier,
+        color = Color.Transparent,
+        titleColor = cs.onBackground.copy(alpha = collapseFraction),
+        scrollBehavior = state.scrollBehavior,
+        defaultWindowInsetsPadding = false,
+        navigationIcon = {
+            Box(
+                modifier = Modifier
+                    .padding(start = 12.dp)
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(cs.surfaceVariant.copy(alpha = 0.75f))
+                    .bounceClick { onBack() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = cs.onBackground
+                )
+            }
+        }
     )
 }

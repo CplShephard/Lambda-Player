@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateTopPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,7 +25,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -38,7 +39,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
@@ -111,7 +111,11 @@ import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.squircle.absoluteSquircleClip
+import top.yukonga.miuix.kmp.utils.getRoundedCorner
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.Collator
@@ -336,6 +340,29 @@ fun PlaylistScreen(
         playlistDetailGuard.pop { openIndex = null }
     }
 
+    // MADDE 4 (bu tur) — Playlist detayı kapanırken "saydamlaşıyor" sorunu: detay düz/opak bir
+    // arkaplan kullanıyor ama kapanış animasyonunda altındaki PlaylistListView şeffaf olduğu için
+    // (duvar kağıdı görünür) ekran boş/saydam gibi görünüyordu. Çözüm: detay AÇIKKEN ve kapanış
+    // animasyonu (500ms) boyunca tüm bu alanı Theme/Playback/About gibi SOLID bir arkaplanla
+    // kaplıyoruz; animasyon bitince ana liste için duvar kağıdına geri dönüyoruz.
+    var detailSolid by remember { mutableStateOf(false) }
+    LaunchedEffect(openIndex) {
+        if (openIndex != null) {
+            detailSolid = true
+        } else {
+            kotlinx.coroutines.delay(550)
+            detailSolid = false
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .then(
+                if (detailSolid) Modifier.background(MiuixAppTheme.colorScheme.background)
+                else Modifier
+            )
+    ) {
     // MADDE 2 (bu tur) — playlist detayına girerken artık Theme/Playback/About sayfalarının
     // kullandığı GERÇEK Miuix NavDisplay varsayılan geçişi kullanılıyor (enterPush/exitPush
     // DEĞİL — o, InstallerX'in eski NavHost döneminden kalma bir taklitti ve kullanıcı
@@ -359,6 +386,20 @@ fun PlaylistScreen(
         },
         label = "playlistNav"
     ) { idx ->
+    // MADDE 3 (bu tur) — playlist detail, Theme/Playback/About submenülerindeki gibi
+    // geçiş sırasında köşeleri yuvarlatılmış (squircle) bir "page" olarak kayar. Geçiş
+    // BİTTİĞİNDE (settled) köşe kırpma kaldırılır — Theme/Playback/About'ta da NavDisplay
+    // tam oturunca clip'i kaldırıyor. Böylece kapanırken de açılırken de köşe dp 0'a düşmüyor.
+    val detailInTransition = transition.currentState != transition.targetState
+    val detailCorner = getRoundedCorner()
+    val detailClipModifier = Modifier.then(
+        if (detailInTransition) Modifier.absoluteSquircleClip(
+            topLeft = detailCorner,
+            topRight = 0.dp,
+            bottomRight = 0.dp,
+            bottomLeft = detailCorner,
+        ) else Modifier
+    )
     if (idx == null) {
         PlaylistListView(
             playlists = playlists,
@@ -386,6 +427,7 @@ fun PlaylistScreen(
                 plTracks = plTracks,
                 strings = strings,
                 onBack = { playlistDetailGuard.pop { openIndex = null } },
+                modifier = detailClipModifier,
                 onTrackClick = { list, i -> onTrackClick(list, i, if (pl.isSystem) strings.likedSongs else pl.name) },
                 onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name) },
                 onPlayRemix = { if (plTracks.isNotEmpty()) onPlaylistRemixClick(plTracks, if (pl.isSystem) strings.likedSongs else pl.name) },
@@ -423,6 +465,7 @@ fun PlaylistScreen(
                 }
             )
         }
+    }
     }
     }
 
@@ -793,149 +836,150 @@ private fun PlaylistListView(
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (playlists.isEmpty()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                    .padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.LibraryMusic,
-                    contentDescription = null,
-                    tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(56.dp)
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = strings.noPlaylistsYet,
-                    style = MiuixAppTheme.typography.bodyLarge,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            val playlistGridState = rememberLazyGridState()
-            val playlistListState = rememberLazyListState()
-            if (layout == LayoutMode.GRID) {
-                val pinnedPlaylists = playlists.filter { it.pinned }
-                val unpinnedPlaylists = playlists.filter { !it.pinned }
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    state = playlistGridState,
+    // MADDE 4+ — Playlists ana sekmeleri de artık InstallerX tarzı LARGE header kullanıyor.
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            dev.shephard.player.ui.components.InstallerXTopBar(
+                title = strings.playlists,
+                state = topBarState
+            )
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (playlists.isEmpty()) {
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                        .overScrollVertical(),
-                    contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    item(span = { GridItemSpan(2) }) {
-                        dev.shephard.player.ui.components.CollapsingPageTitle(
-                            title = strings.playlists,
-                            state = topBarState,
-                            modifier = Modifier
-                                .statusBarsPadding()
-                                .padding(top = 4.dp, bottom = 4.dp)
-                        )
-                    }
-                    if (pinnedPlaylists.size >= 1) {
-                        item(span = { GridItemSpan(2) }) {
-                            Text(
-                                text = strings.pinnedPlaylists,
-                                style = MiuixAppTheme.typography.labelMedium,
-                                color = MiuixAppTheme.colorScheme.primary,
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
+                    Icon(
+                        imageVector = Icons.Filled.LibraryMusic,
+                        contentDescription = null,
+                        tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(56.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = strings.noPlaylistsYet,
+                        style = MiuixAppTheme.typography.bodyLarge,
+                        color = MiuixAppTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                val playlistGridState = rememberLazyGridState()
+                val playlistListState = rememberLazyListState()
+                if (layout == LayoutMode.GRID) {
+                    val pinnedPlaylists = playlists.filter { it.pinned }
+                    val unpinnedPlaylists = playlists.filter { !it.pinned }
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        state = playlistGridState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                            .overScrollVertical(),
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            top = innerPadding.calculateTopPadding() + 8.dp,
+                            end = 16.dp,
+                            bottom = 200.dp
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (pinnedPlaylists.size >= 1) {
+                            item(span = { GridItemSpan(2) }) {
+                                Text(
+                                    text = strings.pinnedPlaylists,
+                                    style = MiuixAppTheme.typography.labelMedium,
+                                    color = MiuixAppTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                            }
+                            items(pinnedPlaylists.size) { i ->
+                                val pl = pinnedPlaylists[i]
+                                val realIdx = playlists.indexOf(pl)
+                                val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+                                PlaylistGridCard(playlist = pl, plTracks = plTracks, strings = strings,
+                                    onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                            }
+                            item(span = { GridItemSpan(2) }) {
+                                Spacer(Modifier.height(4.dp))
+                            }
                         }
-                        items(pinnedPlaylists.size) { i ->
-                            val pl = pinnedPlaylists[i]
+                        items(unpinnedPlaylists.size) { i ->
+                            val pl = unpinnedPlaylists[i]
                             val realIdx = playlists.indexOf(pl)
                             val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
                             PlaylistGridCard(playlist = pl, plTracks = plTracks, strings = strings,
                                 onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
                         }
-                        item(span = { GridItemSpan(2) }) {
-                            Spacer(Modifier.height(4.dp))
+                    }
+                } else {
+                    val pinnedPlaylists = playlists.filter { it.pinned }
+                    val unpinnedPlaylists = playlists.filter { !it.pinned }
+                    LazyColumn(
+                        state = playlistListState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                            .overScrollVertical(),
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            top = innerPadding.calculateTopPadding() + 8.dp,
+                            end = 16.dp,
+                            bottom = 200.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (pinnedPlaylists.size >= 1) {
+                            item {
+                                Text(
+                                    text = strings.pinnedPlaylists,
+                                    style = MiuixAppTheme.typography.labelMedium,
+                                    color = MiuixAppTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                            }
+                            items(pinnedPlaylists.size) { i ->
+                                val pl = pinnedPlaylists[i]
+                                val realIdx = playlists.indexOf(pl)
+                                val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+                                PlaylistListCard(playlist = pl, plTracks = plTracks, strings = strings,
+                                    onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                            }
+                            item { Spacer(Modifier.height(4.dp)) }
                         }
-                    }
-                    items(unpinnedPlaylists.size) { i ->
-                        val pl = unpinnedPlaylists[i]
-                        val realIdx = playlists.indexOf(pl)
-                        val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                        PlaylistGridCard(playlist = pl, plTracks = plTracks, strings = strings,
-                            onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
-                    }
-                }
-            } else {
-                val pinnedPlaylists = playlists.filter { it.pinned }
-                val unpinnedPlaylists = playlists.filter { !it.pinned }
-                LazyColumn(
-                    state = playlistListState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                        .overScrollVertical(),
-                    contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    item {
-                        dev.shephard.player.ui.components.CollapsingPageTitle(
-                            title = strings.playlists,
-                            state = topBarState,
-                            modifier = Modifier
-                                .statusBarsPadding()
-                                .padding(top = 4.dp, bottom = 4.dp)
-                        )
-                    }
-                    if (pinnedPlaylists.size >= 1) {
-                        item {
-                            Text(
-                                text = strings.pinnedPlaylists,
-                                style = MiuixAppTheme.typography.labelMedium,
-                                color = MiuixAppTheme.colorScheme.primary,
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
-                        }
-                        items(pinnedPlaylists.size) { i ->
-                            val pl = pinnedPlaylists[i]
+                        items(unpinnedPlaylists.size) { i ->
+                            val pl = unpinnedPlaylists[i]
                             val realIdx = playlists.indexOf(pl)
                             val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
                             PlaylistListCard(playlist = pl, plTracks = plTracks, strings = strings,
                                 onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
                         }
-                        item { Spacer(Modifier.height(4.dp)) }
-                    }
-                    items(unpinnedPlaylists.size) { i ->
-                        val pl = unpinnedPlaylists[i]
-                        val realIdx = playlists.indexOf(pl)
-                        val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                        PlaylistListCard(playlist = pl, plTracks = plTracks, strings = strings,
-                            onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
                     }
                 }
             }
         }
+    }
 
-        // MADDE 4 — Theme/Playback/About ile birebir aynı sabit üst başlık.
-        dev.shephard.player.ui.components.CollapsingTopBar(
-            title = strings.playlists,
-            state = topBarState
-        )
-
-        FloatingActionButton(
-            onClick = onCreate,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = 180.dp, end = 24.dp)
-                .bounceClick(onClick = onCreate),
-            shape = RoundedCornerShape(20.dp),
-            containerColor = MiuixAppTheme.colorScheme.primary
-        ) {
-            Icon(Icons.Filled.Add, contentDescription = strings.createPlaylist)
-        }
+    FloatingActionButton(
+        onClick = onCreate,
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(bottom = 180.dp, end = 24.dp)
+            .bounceClick(onClick = onCreate),
+        shape = RoundedCornerShape(20.dp),
+        containerColor = MiuixAppTheme.colorScheme.primary
+    ) {
+        Icon(Icons.Filled.Add, contentDescription = strings.createPlaylist)
+    }
     }
 }
 
@@ -1166,6 +1210,7 @@ private fun PlaylistDetailView(
     plTracks: List<AudioTrack>,
     strings: dev.shephard.player.ui.i18n.Strings,
     onBack: () -> Unit,
+    modifier: Modifier = Modifier,
     onTrackClick: (List<AudioTrack>, Int) -> Unit,
     onPlayAll: () -> Unit,
     onPlayRemix: () -> Unit,
@@ -1235,20 +1280,28 @@ private fun PlaylistDetailView(
         }
     }
 
-    // MADDE 5 — Playlist detayına girerken artık Theme/Playback Settings ile birebir aynı
-    // düz (flat) arkaplan kullanılıyor: temaya göre siyah (koyu mod) ya da beyaz (açık mod).
-    // Önceden hiç arkaplan yoktu, bu yüzden alttaki wallpaper/BgEffect katmanı görünüyordu —
-    // menülerle (Theme/Player/About) tutarsız bir görünüme neden oluyordu.
-    Box(
+    // MADDE 5 + 2 (bu tur) — Playlist detayı artık Theme/Playback/About ile birebir aynı
+    // header'ı (SubmenuTopBar: SmallTopAppBar + geri tuşu + kaydırdıkça ortada beliren başlık)
+    // ve aynı düz (flat) opak arkaplanı kullanıyor.
+    val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
+    val detailTitle = if (playlist.isSystem) strings.likedSongs else playlist.name
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MiuixAppTheme.colorScheme.background)
+            .then(modifier)
     ) {
+        dev.shephard.player.ui.components.SubmenuTopBar(
+            title = detailTitle,
+            onBack = onBack,
+            state = topBarState
+        )
         LazyColumn(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .overScrollVertical(),
+                .overScrollVertical()
+                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
             // MADDE 2 — alphabetical / artist / timeAdded sıralamalarında parça kartları
             // dipdibe duruyor, arka plandaki card'lar iç içe geçmiş gibi görünüyordu.
@@ -1256,33 +1309,17 @@ private fun PlaylistDetailView(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    BouncyIconButton(
-                        onClick = onBack,
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = strings.cancel,
-                        tint = MiuixAppTheme.colorScheme.onBackground
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (playlist.isSystem) strings.likedSongs else playlist.name,
-                            style = MiuixAppTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MiuixAppTheme.colorScheme.onBackground,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "${plTracks.size} ${strings.trackCount}",
-                            style = MiuixAppTheme.typography.bodySmall,
-                            color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                dev.shephard.player.ui.components.CollapsingPageTitle(
+                    title = detailTitle,
+                    state = topBarState,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                )
+                Text(
+                    text = "${plTracks.size} ${strings.trackCount}",
+                    style = MiuixAppTheme.typography.bodySmall,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                )
             }
 
             item {
