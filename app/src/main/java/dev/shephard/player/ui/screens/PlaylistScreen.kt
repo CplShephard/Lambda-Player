@@ -437,14 +437,14 @@ fun PlaylistScreen(
                     targetContentZIndex = 1f
                 )
             } else {
-                // MADDE 4 — KAPANIŞ animasyonunda detay (initial) listeye (target) ARKA
-                // düşmemeli. AnimatedContent varsayılan olarak target'ı üste koyduğu için
-                // kapanırken liste detayın önüne geçiyordu. Kapanırken initialContentZIndex=1
-                // yapınca detay (çıkan, initial) üstte kalır, liste altta kayar.
+                // MADDE 4 — KAPANIŞ animasyonunda detay (initial, çıkan) listeye (target) ARKA
+                // düşmemeli. AnimatedContent varsayılan olarak target'ı üste koyuyor; kapanırken
+                // targetContentZIndex=0 yapınca target (liste) altta kalır, initial (detay) üstte
+                // kayar. (Bu Compose sürümünde yalnızca targetContentZIndex parametresi var.)
                 androidx.compose.animation.ContentTransform(
                     targetContentEnter = PageTransitions.popEnterSubmenu,
                     initialContentExit = PageTransitions.popExitSubmenu,
-                    initialContentZIndex = 1f
+                    targetContentZIndex = 0f
                 )
             }
         },
@@ -452,7 +452,7 @@ fun PlaylistScreen(
     ) { idx ->
     // MADDE 4 — KAPANIŞ animasyonunda detay (initial) listeye (target) ARKA düşmemeli.
     // AnimatedContent varsayılan olarak target'ı üste koyduğu için kapanırken liste detayın
-    // önüne geçiyordu. Kapanırken initialContentZIndex=1 yapınca detay (çıkan) üstte kalır.
+    // önüne geçiyordu. transitionSpec'te targetContentZIndex=0 yapınca detay (çıkan) üstte kalır.
     if (idx == null) {
         PlaylistListView(
             playlists = playlists,
