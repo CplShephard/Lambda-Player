@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.nestedScroll

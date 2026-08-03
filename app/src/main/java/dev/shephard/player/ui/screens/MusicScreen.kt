@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import dev.shephard.player.ui.miuix.Button
 import dev.shephard.player.ui.miuix.CircularProgressIndicator
 import dev.shephard.player.ui.miuix.ExperimentalMaterial3Api
@@ -209,6 +210,10 @@ fun MusicScreen(
                             }
                         }
                     } else {
+                        val playerState by playerViewModel.uiState.collectAsState()
+                        val queuedIds = remember(playerState.queue) {
+                            playerState.queue.map { it.id }.toSet()
+                        }
                         LazyColumn(
                             state = listState,
                             modifier = Modifier
@@ -223,10 +228,6 @@ fun MusicScreen(
                             ),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            val playerState by playerViewModel.uiState.collectAsState()
-                            val queuedIds = remember(playerState.queue) {
-                                playerState.queue.map { it.id }.toSet()
-                            }
                             itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
                                 TrackRow(
                                     track = track,
