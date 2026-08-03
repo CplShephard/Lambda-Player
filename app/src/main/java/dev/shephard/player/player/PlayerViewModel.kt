@@ -518,16 +518,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (current.size <= 1 || currentTrack == null) return
 
         val currentIndex = current.indexOfFirst { it.id == currentTrack.id }.coerceAtLeast(0)
-        val head = current.take(currentIndex + 1)            // çalan parça dahil, dokunulmaz
-        val upcoming = current.drop(currentIndex + 1)        // çalan parçadan sonrası
 
         if (remixActive) {
-            // Geri al: sıradaki parçaları orijinal göreli sıralarına döndür.
-            // Orijinal sıradan yalnızca hâlâ "sıradaki" kümede olan parçalar alınır;
-            // böylece bu arada queue'dan silinen/eklenen parçalar sorun çıkarmaz.
-            val upcomingIds = upcoming.map(AudioTrack::id).toSet()
-            val restoredUpcoming = originalQueue.filter { it.id in upcomingIds }
-            val restoreQueue = if (restoredUpcoming.size == upcoming.size) head + restoredUpcoming else current
+            // Geri al: TÜM kuyruğu orijinal sırasına döndür. Orijinal sıradan yalnızca hâlâ
+            // kuyrukta olan parçalar alınır (bu arada silinen/eklenen parçalar korunur).
+            val queueIds = current.map(AudioTrack::id).toSet()
+            val restored = originalQueue.filter { it.id in queueIds }
+            // Orijinalde olmayan (sonradan eklenen) parçaları koru, sonda bırak.
+            val extras = current.filterNot { it.id in restored.map { it.id }.toSet() }
+            val restoreQueue = restored + extras
             if (restoreQueue != current) {
                 reorderPlayerPlaylist(c, current, restoreQueue)
             }
@@ -539,31 +538,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
-        // MADDE 7 — Eğer sırada (çalan parçadan sonra) karıştırılacak parça yoksa ya da tek bir
-        // parça kaldıysa remix yine de çalışmalı: TÜM sırayı yeniden karıştır. Böylece son şarkıya
-        // gelinse bile remix butonu işe yarıyor.
+        // REMIX FIX — TÜM kuyruk yeniden karıştırılır (çalan parçadan sonrası değil, baştan sona).
         //
-        // MADDE 11 (glitch fix) — Çalan parçayı moveMediaItem ile taşımıyoruz (yerinde tutuyoruz);
-        // sadece çalan parça dışındaki parçalar karıştırılıp çalan parçanın ORİJİNAL index'ine geri
-        // konur. Çünkü çalan parçayı taşımak ExoPlayer'ın onMediaItemTransition fırlatıp
-        // currentTrack/progress'i sıfırlamasına ve cover'ın 1 saniye yeniden yüklenmesine (glitch)
-        // yol açıyordu. Çalan parça taşınmadığı için transition tetiklenmez, gerçek remix olur.
-        if (upcoming.size <= 1) {
-            originalQueue = current
-            val currentIndex = current.indexOfFirst { it.id == currentTrack.id }.coerceAtLeast(0)
-            val rest = current.filterNot { it.id == currentTrack.id }.shuffled()
-            // Çalan parçayı orijinal index'ine koy, diğerlerini (karıştırılmış) çevresine diz.
-            val newOrder = rest.toMutableList().apply { add(currentIndex, currentTrack) }
-            reorderPlayerPlaylist(c, current, newOrder)
-            queueTracks = newOrder
-            _uiState.value = _uiState.value.copy(queue = newOrder, shuffleEnabled = true)
-            remixActive = true
-            _isRemixed.value = true
-            return
-        }
-
+        // MADDE 11 (glitch fix) — Çalan parçayı moveMediaItem ile taşımıyoruz; onu ORİJİNAL
+        // index'inde sabit tutuyoruz, geri kalan TÜM parçaları (çalanın öncesi dahil) karıştırıp
+        // çevresine diziyoruz. Böylece queue tamamen yeniden sıralanır ama çalan parça taşınmadığı
+        // için ExoPlayer onMediaItemTransition fırlatmaz → cover glitch olmaz.
         originalQueue = current
-        val newOrder = head + upcoming.shuffled()
+        val rest = current.filterNot { it.id == currentTrack.id }.shuffled()
+        val newOrder = rest.toMutableList().apply { add(currentIndex, currentTrack) }
         reorderPlayerPlaylist(c, current, newOrder)
 
         queueTracks = newOrder
