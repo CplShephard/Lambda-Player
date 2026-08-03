@@ -110,7 +110,6 @@ import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.squircle.absoluteSquircleClip
@@ -231,6 +230,10 @@ fun PlaylistScreen(
     var playlistMenuIndex by remember { mutableStateOf<Int?>(null) }
     var editPlaylistIndex by remember { mutableStateOf<Int?>(null) }
     var editPlaylistName by remember { mutableStateOf("") }
+    // Create playlist drawer'ı artık Edit drawer'ı ile aynı stilde: kapak fotoğrafı da
+    // eklenebiliyor. Aşağıdaki state/launcher'lar create akışına özel.
+    var newCoverUri by remember { mutableStateOf<Uri?>(null) }
+    var newCoverCropOutputUri by remember { mutableStateOf<Uri?>(null) }
 
     // Playlist kapak resmi için kırpma çıktısı KALICI depolamaya (filesDir) yazılır.
     var playlistCoverCropOutputUri by remember { mutableStateOf<Uri?>(null) }
@@ -321,6 +324,75 @@ fun PlaylistScreen(
         }
     }
 
+    // Create playlist için kapak kırpma akışı (Edit drawer'daki ile aynı desen).
+    val newCoverCropLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val output = newCoverCropOutputUri
+        if (result.resultCode == android.app.Activity.RESULT_OK && output != null) {
+            newCoverUri = output
+        }
+    }
+
+    fun launchNewCoverCrop(sourceUri: Uri) {
+        val dir = java.io.File(context.filesDir, "persisted_covers").apply { mkdirs() }
+        val file = java.io.File(dir, "playlist_cover_${System.currentTimeMillis()}.jpg")
+        val outputUri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        newCoverCropOutputUri = outputUri
+
+        val cropIntent = android.content.Intent("com.android.camera.action.CROP").apply {
+            setDataAndType(sourceUri, "image/*")
+            putExtra("crop", "true")
+            putExtra("scale", true)
+            // Playlist kapakları her zaman 1:1 (kare) olmalı.
+            putExtra("outputX", 512)
+            putExtra("outputY", 512)
+            putExtra("aspectX", 1)
+            putExtra("aspectY", 1)
+            putExtra(android.provider.MediaStore.EXTRA_OUTPUT, outputUri)
+            putExtra("outputFormat", android.graphics.Bitmap.CompressFormat.JPEG.toString())
+            putExtra("return-data", false)
+            putExtra("noFaceDetection", true)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            clipData = android.content.ClipData.newUri(context.contentResolver, "playlist_cover", sourceUri)
+        }
+
+        val resolvedActivities = context.packageManager.queryIntentActivities(cropIntent, 0)
+        for (info in resolvedActivities) {
+            val packageName = info.activityInfo?.packageName ?: continue
+            try {
+                context.grantUriPermission(
+                    packageName,
+                    outputUri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (_: SecurityException) { }
+        }
+
+        if (resolvedActivities.isNotEmpty()) {
+            newCoverCropLauncher.launch(cropIntent)
+        } else {
+            scope.launch {
+                val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, sourceUri)
+                if (persisted != null) newCoverUri = persisted
+            }
+        }
+    }
+
+    val newCoverPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: SecurityException) { }
+            launchNewCoverCrop(uri)
+        }
+    }
+
     if (openIndex != null && openIndex !in playlists.indices) {
         openIndex = null
     }
@@ -339,29 +411,12 @@ fun PlaylistScreen(
         playlistDetailGuard.pop { openIndex = null }
     }
 
-    // MADDE 4 (bu tur) — Playlist detayı kapanırken "saydamlaşıyor" sorunu: detay düz/opak bir
-    // arkaplan kullanıyor ama kapanış animasyonunda altındaki PlaylistListView şeffaf olduğu için
-    // (duvar kağıdı görünür) ekran boş/saydam gibi görünüyordu. Çözüm: detay AÇIKKEN ve kapanış
-    // animasyonu (500ms) boyunca tüm bu alanı Theme/Playback/About gibi SOLID bir arkaplanla
-    // kaplıyoruz; animasyon bitince ana liste için duvar kağıdına geri dönüyoruz.
-    var detailSolid by remember { mutableStateOf(false) }
-    LaunchedEffect(openIndex) {
-        if (openIndex != null) {
-            detailSolid = true
-        } else {
-            kotlinx.coroutines.delay(550)
-            detailSolid = false
-        }
-    }
+    // Playlist detayı kendi arkaplanı OPAK (background) olduğu için açıkken solid görünür.
+    // Not: Buraya eskiden detay açıkken tüm alanı siyah kaplayan bir overlay eklenmişti ama
+    // o, ana PlaylistListView'deki duvar kağıdını da karartıyordu ("playlist detail'e girerken
+    // ana ekrandaki duvar kağıdı siyah oluyor" sorunu). Overlay kaldırıldı — detay kendi opak
+    // ekranı; ana liste her zamanki duvar kağıdını göstermeye devam ediyor.
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .then(
-                if (detailSolid) Modifier.background(MiuixAppTheme.colorScheme.background)
-                else Modifier
-            )
-    ) {
     // MADDE 2 (bu tur) — playlist detayına girerken artık Theme/Playback/About sayfalarının
     // kullandığı GERÇEK Miuix NavDisplay varsayılan geçişi kullanılıyor (enterPush/exitPush
     // DEĞİL — o, InstallerX'in eski NavHost döneminden kalma bir taklitti ve kullanıcı
@@ -412,7 +467,7 @@ fun PlaylistScreen(
                 if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name)
             },
             onMenu = { playlistMenuIndex = it },
-            onCreate = { showCreate = true; newName = "" }
+            onCreate = { showCreate = true; newName = ""; newCoverUri = null }
         )
     } else {
         val pl = playlists.getOrNull(idx)
@@ -466,21 +521,83 @@ fun PlaylistScreen(
         }
     }
     }
-    }
 
     if (showCreate) {
         val createLiquidGlassOn = LocalBlurEnabled.current
         MiuixDrawer(
             onDismissRequest = { showCreate = false },
         ) {
+            // MADDE 6 — Create playlist drawer'ı artık Edit playlist drawer'ı ile AYNI stilde:
+            //  * MiuixDrawerActionHeader (✓ / × ikonları),
+            //  * ortalanmış 1:1 (168dp) kapak fotoğrafı — tıklayınca seçilir,
+            //  * sabit `heightIn` yok, içerik kadar yer kaplıyor.
+            val dismissDrawer = rememberDrawerDismiss()
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp)
-                    .heightIn(min = 260.dp)
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
-                Text(strings.createPlaylist, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(18.dp))
+                MiuixDrawerActionHeader(
+                    title = strings.createPlaylist,
+                    onCancel = dismissDrawer,
+                    onConfirm = {
+                        val name = newName.trim()
+                        if (name.isNotEmpty()) {
+                            val next = playlists + LocalPlaylist(
+                                name,
+                                emptyList(),
+                                coverUri = newCoverUri?.toString(),
+                                createdAt = System.currentTimeMillis()
+                            )
+                            scope.launch { prefs.setPlaylistsJson(encodePlaylists(next)) }
+                        }
+                        dismissDrawer()
+                    }
+                )
+                Spacer(Modifier.height(16.dp))
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .size(168.dp)
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                        .bounceClick { newCoverPicker.launch(arrayOf("image/*")) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (newCoverUri != null) {
+                        AsyncImage(
+                            model = newCoverUri,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Filled.LibraryMusic,
+                            contentDescription = null,
+                            tint = MiuixAppTheme.colorScheme.primary,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(8.dp)
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MiuixAppTheme.colorScheme.surface.copy(alpha = 0.7f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Edit,
+                            contentDescription = null,
+                            tint = MiuixAppTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
                 OutlinedTextField(
                     value = newName,
                     onValueChange = { newName = it },
@@ -488,24 +605,7 @@ fun PlaylistScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(22.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = { showCreate = false }) { Text(strings.cancel) }
-                    Spacer(Modifier.width(8.dp))
-                    TextButton(onClick = {
-                        val name = newName.trim()
-                        if (name.isNotEmpty()) {
-                            val next = playlists + LocalPlaylist(name, emptyList(), createdAt = System.currentTimeMillis())
-                            scope.launch { prefs.setPlaylistsJson(encodePlaylists(next)) }
-                        }
-                        showCreate = false
-                    }) { Text(strings.save) }
-                }
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(20.dp))
             }
         }
     }

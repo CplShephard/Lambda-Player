@@ -4,28 +4,23 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import dev.shephard.player.ui.miuix.ExperimentalMaterial3Api
-import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.components.MiuixDrawer
+import dev.shephard.player.ui.components.MiuixDrawerActionHeader
+import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.miuix.OutlinedTextField
 import dev.shephard.player.ui.miuix.Text
-import dev.shephard.player.ui.miuix.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -66,8 +61,6 @@ fun CustomColorPickerDialog(
     initialArgb: Int = 0xFF22C55E.toInt(),
     title: String = "Pick a custom color",
     hexPlaceholder: String = "#RRGGBB",
-    applyLabel: String = "Apply",
-    cancelLabel: String = "Cancel"
 ) {
     val initialHsv = remember(initialArgb) { rgbToHsv(initialArgb) }
     var hue by remember { mutableFloatStateOf(initialHsv[0]) }
@@ -90,29 +83,24 @@ fun CustomColorPickerDialog(
     MiuixDrawer(
         onDismissRequest = onDismiss,
     ) {
+        // MADDE — diğer drawer'lar gibi: sol tarafta × (cancel), sağ tarafta ✓ (apply)
+        // ikonları + dismiss animasyonu. `rememberDrawerDismiss()` kapanma animasyonunu
+        // kesilmeden oynatır. Ayrıca yükseklik 0.74 → 0.82'ye çıkarıldı ki hex alanı
+        // ve buton alttan kesilmesin.
+        val dismissDrawer = rememberDrawerDismiss()
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.74f)
-                .padding(20.dp)
+                .fillMaxHeight(0.82f)
+                .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = title,
-                        style = MiuixAppTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MiuixAppTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f)
-                    )
-                    BouncyIconButton(
-                        onClick = onDismiss,
-                        icon = Icons.Filled.Close,
-                        contentDescription = "Close",
-                        tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                        iconSize = 22.dp
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
+                MiuixDrawerActionHeader(
+                    title = title,
+                    onCancel = dismissDrawer,
+                    onConfirm = { if (!hexError) onColorPicked(pickedColor.toArgb()) },
+                    confirmEnabled = !hexError,
+                )
+                Spacer(Modifier.height(16.dp))
 
                 // Preview swatch
                 Box(
@@ -198,27 +186,6 @@ fun CustomColorPickerDialog(
                 }
 
                 Spacer(Modifier.height(20.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(
-                        onClick = { onDismiss() },
-                        modifier = Modifier.bounceClick { onDismiss() }
-                    ) { Text(cancelLabel) }
-                    Spacer(Modifier.size(8.dp))
-                    TextButton(
-                        onClick = { if (!hexError) onColorPicked(pickedColor.toArgb()) },
-                        enabled = !hexError,
-                        modifier = Modifier.bounceClick(enabled = !hexError) {
-                            onColorPicked(pickedColor.toArgb())
-                        }
-                    ) {
-                        Text(applyLabel, fontWeight = FontWeight.Bold)
-                    }
-                }
             }
         }
 }

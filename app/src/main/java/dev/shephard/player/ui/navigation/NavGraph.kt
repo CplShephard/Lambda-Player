@@ -1,11 +1,6 @@
 package dev.shephard.player.ui.navigation
 
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -15,7 +10,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -40,26 +34,6 @@ object ThemeRoute : NavKey
 object PlayerRoute : NavKey
 object AboutRoute : NavKey
 
-// --- ORİJİNAL animasyon (projenin sana ilk verildiği hâli) -------------------
-// İlk sürümde androidx.navigation.compose NavHost ile kullanılan klasik slide:
-// ileri = soldan/sağa yöne göre tam genişlikte kayma + hafif fade, spring tabanlı
-// (dampingRatio 0.8, stiffness 380). Bu, Music / Playlists / Settings (üst seviye
-// sekmeler) için kullanılır.
-//
-// NOT: Bu Compose sürümünde `slideIntoContainer` / `slideOutOfContainer` sembolleri
-// classpath'te yok; Miuix'in kendisi de `slideInHorizontally` / `slideOutHorizontally`
-// kullanıyor. O yüzden orijinal `slideIntoContainer(SlideDirection.Left)` davranışını
-// birebir veren `slideInHorizontally(initialOffsetX = { it })` (sağdan giriş) +
-// `slideOutHorizontally(targetOffsetX = { -it })` (sola tam çıkış) ile kuruyoruz.
-private val originalSlideSpec = spring<IntOffset>(
-    dampingRatio = 0.8f,
-    stiffness = 380f,
-)
-private val originalFadeSpec = spring<Float>(
-    dampingRatio = 1f,
-    stiffness = 380f,
-)
-
 // Ana sekmelerin sıralaması — orijinal koddaki `destinations` listesiyle birebir aynı.
 // Yön buna göre hesaplanıyor: hedef index kaynaktan büyükse ileri (Sol), küçükse geri (Sağ).
 private val tabOrder = listOf(MusicRoute, PlaylistsRoute, SettingsRoute)
@@ -73,12 +47,12 @@ private val tabOrder = listOf(MusicRoute, PlaylistsRoute, SettingsRoute)
 private fun tabIndexOf(contentKey: Any?): Int =
     tabOrder.indexOfFirst { it.toString() == contentKey?.toString() }
 
-// Üst seviye sekmeler için orijinal klasik slide — ÖNEMLİ: yön artık DİNAMİK.
-// Önceden `originalTabTransition` sabit tek yönlü bir slide tanımlıyordu (her geçiş
-// "ileri" gibi animasyonlanıyordu, Settings'ten Music'e dönerken bile). Orijinal
-// (ilk zip'teki klasik NavHost) kodda `initialState.destination.route` /
-// `targetState.destination.route` karşılaştırılıp yön hesaplanıyordu; burada aynı
-// mantığı `Scene.entries.lastOrNull()?.contentKey` üzerinden kuruyoruz.
+// Üst seviye sekmeler için InstallerX spring animasyonu (PageTransitions.enterPush/exitPush =
+// MIUI spring: damping 1, stiffness 400, %28 sağdan giriş, %12 paralaks, %0.92→1.08 scale).
+// ÖNEMLİ: yön DİNAMİK. Orijinal (ilk zip'teki klasik NavHost) kodda
+// `initialState.destination.route` / `targetState.destination.route` karşılaştırılıp yön
+// hesaplanıyordu; burada aynı mantığı `Scene.entries.lastOrNull()?.contentKey` üzerinden
+// kuruyoruz. İleri gidiş = enterPush/exitPush, geri dönüş = popEnterPush/popExitPush.
 private val originalTabTransition: Map<String, Any> =
     NavDisplay.transitionSpec {
         val fromIdx = tabIndexOf(initialState.entries.lastOrNull()?.contentKey)
@@ -86,13 +60,13 @@ private val originalTabTransition: Map<String, Any> =
         val forward = toIdx >= fromIdx
         if (forward) {
             ContentTransform(
-                slideInHorizontally(initialOffsetX = { it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
-                slideOutHorizontally(targetOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
+                targetContentEnter = PageTransitions.enterPush,
+                initialContentExit = PageTransitions.exitPush,
             )
         } else {
             ContentTransform(
-                slideInHorizontally(initialOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
-                slideOutHorizontally(targetOffsetX = { it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
+                targetContentEnter = PageTransitions.popEnterPush,
+                initialContentExit = PageTransitions.popExitPush,
             )
         }
     } + NavDisplay.popTransitionSpec {
@@ -101,13 +75,13 @@ private val originalTabTransition: Map<String, Any> =
         val forward = toIdx >= fromIdx
         if (forward) {
             ContentTransform(
-                slideInHorizontally(initialOffsetX = { it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
-                slideOutHorizontally(targetOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
+                targetContentEnter = PageTransitions.enterPush,
+                initialContentExit = PageTransitions.exitPush,
             )
         } else {
             ContentTransform(
-                slideInHorizontally(initialOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
-                slideOutHorizontally(targetOffsetX = { it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
+                targetContentEnter = PageTransitions.popEnterPush,
+                initialContentExit = PageTransitions.popExitPush,
             )
         }
     }

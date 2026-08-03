@@ -14,7 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.Color
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
@@ -72,7 +71,9 @@ fun CollapsingTopBar(
     SmallTopAppBar(
         title = title,
         modifier = modifier,
-        color = Color.Transparent,
+        // About bölümündeki gibi: kaydırdıkça (scrollProgress arttıkça) app bar'ın arkaplanı
+        // koyu (temaya göre siyah/beyaz) ve opak hâle gelir; en üstteyken şeffaftır.
+        color = MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
         titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
         scrollBehavior = state.scrollBehavior,
         // SmallTopAppBar zaten WindowInsets.systemBars(Top)'u koşulsuz kendi uyguluyor;
@@ -135,7 +136,9 @@ fun InstallerXTopBar(
         titleColor = cs.onBackground.copy(alpha = collapseFraction),
         subtitle = subtitle,
         subtitleColor = cs.onSurfaceVariant,
-        color = Color.Transparent,
+        // About bölümündeki gibi: kaydırdıkça (collapseFraction arttıkça) arkaplan koyu
+        // (temaya göre siyah/beyaz) ve opak olur; en üstteyken şeffaftır.
+        color = cs.background.copy(alpha = collapseFraction),
         scrollBehavior = state.scrollBehavior,
         defaultWindowInsetsPadding = false,
         modifier = modifier,
@@ -161,7 +164,9 @@ fun SubmenuTopBar(
     SmallTopAppBar(
         title = title,
         modifier = modifier,
-        color = Color.Transparent,
+        // About bölümündeki gibi: kaydırdıkça (collapseFraction arttıkça) arkaplan koyu
+        // (temaya göre siyah/beyaz) ve opak olur; en üstteyken şeffaftır.
+        color = cs.background.copy(alpha = collapseFraction),
         titleColor = cs.onBackground.copy(alpha = collapseFraction),
         scrollBehavior = state.scrollBehavior,
         defaultWindowInsetsPadding = false,

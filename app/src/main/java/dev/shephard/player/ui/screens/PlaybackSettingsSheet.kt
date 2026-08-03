@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -133,10 +134,10 @@ private fun SettingToggleRow(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = MiuixAppTheme.colorScheme.background,
+                checkedThumbColor = Color.White,
                 checkedTrackColor = MiuixAppTheme.colorScheme.primary,
-                uncheckedThumbColor = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                uncheckedTrackColor = MiuixAppTheme.colorScheme.surfaceVariant
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
             )
         )
     }

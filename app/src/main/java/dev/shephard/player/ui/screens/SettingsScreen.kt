@@ -569,8 +569,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             },
             initialArgb = accent,
             title = strings.customColorTitle,
-            hexPlaceholder = strings.hexPlaceholder,
-            applyLabel = strings.apply
+            hexPlaceholder = strings.hexPlaceholder
         )
     }
 }
@@ -843,7 +842,7 @@ private fun SettingsPageScaffold(
     Column(modifier = Modifier.fillMaxSize().background(MiuixAppTheme.colorScheme.background)) {
         SmallTopAppBar(
             title = title,
-            color = Color.Transparent,
+            color = MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
             titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
             scrollBehavior = topAppBarScrollBehavior,
             // NOT: SmallTopAppBar zaten WindowInsets.systemBars(Top)'u KOŞULSUZ kendi

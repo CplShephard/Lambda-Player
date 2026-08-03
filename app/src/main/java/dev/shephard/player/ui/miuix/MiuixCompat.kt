@@ -293,14 +293,27 @@ fun Checkbox(
     if (checked) Box(Modifier.size(12.dp).clip(CircleShape).background(MiuixAppTheme.colorScheme.onPrimary))
 }
 
-class SwitchColors
+// SwitchColors artık GERÇEK miuix SwitchColors'unu sarıyor — çünkü önceki wrapper
+// `colors` parametresini tamamen yok sayıyordu; sonuçta thumb her zaman miuix varsayılanı
+// (`onPrimary`) oluyordu ve kullanıcı "açılınca thumb siyah oluyor" sorunu yaşıyordu.
+class SwitchColors internal constructor(
+    internal val miuixColors: top.yukonga.miuix.kmp.basic.SwitchColors
+)
+
 object SwitchDefaults {
     @Composable fun colors(
         checkedThumbColor: Color = MiuixAppTheme.colorScheme.onPrimary,
         checkedTrackColor: Color = MiuixAppTheme.colorScheme.primary,
         uncheckedThumbColor: Color = MiuixAppTheme.colorScheme.onSurfaceVariant,
         uncheckedTrackColor: Color = MiuixAppTheme.colorScheme.surfaceVariant,
-    ) = SwitchColors()
+    ) = SwitchColors(
+        top.yukonga.miuix.kmp.basic.SwitchDefaults.switchColors(
+            checkedThumbColor = checkedThumbColor,
+            checkedTrackColor = checkedTrackColor,
+            uncheckedThumbColor = uncheckedThumbColor,
+            uncheckedTrackColor = uncheckedTrackColor,
+        )
+    )
 }
 
 @Composable
@@ -314,6 +327,7 @@ fun Switch(
     checked = checked,
     onCheckedChange = onCheckedChange,
     modifier = modifier,
+    colors = colors.miuixColors,
     enabled = enabled,
 )
 
