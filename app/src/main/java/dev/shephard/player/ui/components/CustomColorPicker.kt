@@ -97,7 +97,14 @@ fun CustomColorPickerDialog(
                 MiuixDrawerActionHeader(
                     title = title,
                     onCancel = dismissDrawer,
-                    onConfirm = { if (!hexError) onColorPicked(pickedColor.toArgb()) },
+                    onConfirm = {
+                        if (!hexError) {
+                            // MADDE 5 — Önce rengi kaydet, sonra dismissDrawer() ile kapanma
+                            // ANİMASYONUNU oynat (onDismissRequest üzerinden parent kapanır).
+                            onColorPicked(pickedColor.toArgb())
+                            dismissDrawer()
+                        }
+                    },
                     confirmEnabled = !hexError,
                 )
                 Spacer(Modifier.height(16.dp))

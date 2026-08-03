@@ -519,7 +519,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         val currentIndex = current.indexOfFirst { it.id == currentTrack.id }.coerceAtLeast(0)
         val head = current.take(currentIndex + 1)            // çalan parça dahil, dokunulmaz
-        val upcoming = current.drop(currentIndex + 1)        // sadece bunlar karışır
+        val upcoming = current.drop(currentIndex + 1)        // çalan parçadan sonrası
 
         if (remixActive) {
             // Geri al: sıradaki parçaları orijinal göreli sıralarına döndür.
@@ -539,8 +539,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
+        // MADDE 7 — Eğer sırada (çalan parçadan sonra) karıştırılacak parça yoksa ya da tek bir
+        // parça kaldıysa remix yine de çalışmalı: TÜM sırayı yeniden karıştır, çalan parçayı
+        // başta tut. Böylece son şarkıya gelinse bile remix butonu işe yarıyor.
         if (upcoming.size <= 1) {
-            // Karıştırılacak sıradaki parça yoksa remix görsel olarak hiçbir şey yapmasın.
+            originalQueue = current
+            val rest = current.filterNot { it.id == currentTrack.id }
+            val newOrder = listOf(currentTrack) + rest.shuffled()
+            reorderPlayerPlaylist(c, current, newOrder)
+            queueTracks = newOrder
+            _uiState.value = _uiState.value.copy(queue = newOrder, shuffleEnabled = true)
+            remixActive = true
+            _isRemixed.value = true
             return
         }
 

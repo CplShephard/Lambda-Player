@@ -1,6 +1,11 @@
 package dev.shephard.player.ui.navigation
 
 import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -10,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -47,12 +53,20 @@ private val tabOrder = listOf(MusicRoute, PlaylistsRoute, SettingsRoute)
 private fun tabIndexOf(contentKey: Any?): Int =
     tabOrder.indexOfFirst { it.toString() == contentKey?.toString() }
 
-// Üst seviye sekmeler için InstallerX spring animasyonu (PageTransitions.enterPush/exitPush =
-// MIUI spring: damping 1, stiffness 400, %28 sağdan giriş, %12 paralaks, %0.92→1.08 scale).
-// ÖNEMLİ: yön DİNAMİK. Orijinal (ilk zip'teki klasik NavHost) kodda
-// `initialState.destination.route` / `targetState.destination.route` karşılaştırılıp yön
-// hesaplanıyordu; burada aynı mantığı `Scene.entries.lastOrNull()?.contentKey` üzerinden
-// kuruyoruz. İleri gidiş = enterPush/exitPush, geri dönüş = popEnterPush/popExitPush.
+// MADDE 1 — Musics/Playlists/Settings İÇİN SPRİNG ANİMASYONU İPTAL EDİLDİ.
+// Bir önceki turda InstallerX'ten alınan scale/paralaks spring (PageTransitions.enterPush)
+// kullanılıyordu; kullanıcı isteğiyle eski klasik slide+fade geçişine dönüldü.
+// Yön DİNAMİK: `Scene.entries.lastOrNull()?.contentKey` üzerinden hesaplanır.
+// İleri = sağdan giriş / sola çıkış; geri = tersi.
+private val originalSlideSpec = spring<IntOffset>(
+    dampingRatio = 0.8f,
+    stiffness = 380f,
+)
+private val originalFadeSpec = spring<Float>(
+    dampingRatio = 1f,
+    stiffness = 380f,
+)
+
 private val originalTabTransition: Map<String, Any> =
     NavDisplay.transitionSpec {
         val fromIdx = tabIndexOf(initialState.entries.lastOrNull()?.contentKey)
@@ -60,13 +74,13 @@ private val originalTabTransition: Map<String, Any> =
         val forward = toIdx >= fromIdx
         if (forward) {
             ContentTransform(
-                targetContentEnter = PageTransitions.enterPush,
-                initialContentExit = PageTransitions.exitPush,
+                slideInHorizontally(initialOffsetX = { it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
+                slideOutHorizontally(targetOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
             )
         } else {
             ContentTransform(
-                targetContentEnter = PageTransitions.popEnterPush,
-                initialContentExit = PageTransitions.popExitPush,
+                slideInHorizontally(initialOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
+                slideOutHorizontally(targetOffsetX = { it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
             )
         }
     } + NavDisplay.popTransitionSpec {
@@ -75,13 +89,13 @@ private val originalTabTransition: Map<String, Any> =
         val forward = toIdx >= fromIdx
         if (forward) {
             ContentTransform(
-                targetContentEnter = PageTransitions.enterPush,
-                initialContentExit = PageTransitions.exitPush,
+                slideInHorizontally(initialOffsetX = { it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
+                slideOutHorizontally(targetOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
             )
         } else {
             ContentTransform(
-                targetContentEnter = PageTransitions.popEnterPush,
-                initialContentExit = PageTransitions.popExitPush,
+                slideInHorizontally(initialOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
+                slideOutHorizontally(targetOffsetX = { it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
             )
         }
     }

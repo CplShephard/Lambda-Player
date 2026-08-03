@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,6 +39,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
@@ -84,12 +86,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -431,10 +435,14 @@ fun PlaylistScreen(
                     initialContentExit = PageTransitions.exitSubmenu
                 )
             } else {
-                // Geri: aynı animasyonun ters yönü.
+                // MADDE 4 — KAPANIŞ animasyonunda detay (initial) listeye (target) ARKA
+                // düşmemeli. AnimatedContent varsayılan olarak target'ı üste koyduğu için
+                // kapanırken liste detayın önüne geçiyordu. Kapanırken targetContentZIndex
+                // 0 yapınca initial (detay) üstte kalır, liste altta kayar.
                 androidx.compose.animation.ContentTransform(
                     targetContentEnter = PageTransitions.popEnterSubmenu,
-                    initialContentExit = PageTransitions.popExitSubmenu
+                    initialContentExit = PageTransitions.popExitSubmenu,
+                    targetContentZIndex = 0f
                 )
             }
         },
@@ -616,15 +624,33 @@ fun PlaylistScreen(
         MiuixDrawer(
             onDismissRequest = { trackPickerForIndex = null },
         ) {
-            // MADDE 6 — "add tracks" drawer'ı alçaltıldı.
+            // MADDE 5 — "add tracks" drawer'ı diğer drawer'lar gibi: üstte × (cancel) / ✓ (apply)
+            // ikonları + kapanış animasyonu (rememberDrawerDismiss). Alt kısımdaki yazı
+            // Save/Cancel kaldırıldı, yerine MiuixDrawerActionHeader.
+            val dismissDrawer = rememberDrawerDismiss()
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(0.68f)
-                    .padding(20.dp)
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
-                Text(strings.addTracks, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(12.dp))
+                MiuixDrawerActionHeader(
+                    title = strings.addTracks,
+                    onCancel = dismissDrawer,
+                    onConfirm = {
+                        val pl = playlists[pickerIdx]
+                        val existingIds = pl.trackIds.toMutableList()
+                        val toAdd = pickerSelected - pl.trackIds.toSet()
+                        val toRemove = pl.trackIds.toSet() - pickerSelected
+                        val newIds = existingIds.filterNot { it in toRemove } + toAdd
+                        val updated = pl.copy(trackIds = newIds)
+                        val all = playlists.toMutableList()
+                        all[pickerIdx] = updated
+                        scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                        dismissDrawer()
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
                 val pickerListState = rememberLazyListState()
                 LazyColumn(
                     state = pickerListState,
@@ -658,23 +684,6 @@ fun PlaylistScreen(
                             }
                         }
                     }
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { trackPickerForIndex = null }) { Text(strings.cancel) }
-                    Spacer(Modifier.width(8.dp))
-                    TextButton(onClick = {
-                        val pl = playlists[pickerIdx]
-                        val existingIds = pl.trackIds.toMutableList()
-                        val toAdd = pickerSelected - pl.trackIds.toSet()
-                        val toRemove = pl.trackIds.toSet() - pickerSelected
-                        val newIds = existingIds.filterNot { it in toRemove } + toAdd
-                        val updated = pl.copy(trackIds = newIds)
-                        val all = playlists.toMutableList()
-                        all[pickerIdx] = updated
-                        scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
-                        trackPickerForIndex = null
-                    }) { Text(strings.save) }
                 }
                 Spacer(Modifier.height(20.dp))
             }
@@ -1302,6 +1311,73 @@ private fun PlaylistGridCard(
     }
 }
 
+/**
+ * Playlist detail'e özel başlık: diğer header'lar gibi aşağı kaydırınca isim küçülüp ORTADA
+ * belirir; sadece playlistdetail'de ismin HEMEN SOLUNDA küçük kapak resmi de görünür.
+ * Kaydırdıkça (collapseFraction arttıkça) arkaplan koyulaşır ve başlık+kapak ortada belirir.
+ */
+@Composable
+private fun PlaylistDetailTopBar(
+    title: String,
+    cover: android.net.Uri?,
+    onBack: () -> Unit,
+    state: dev.shephard.player.ui.components.CollapsingTopBarState
+) {
+    val cs = MiuixAppTheme.colorScheme
+    val collapse = state.collapseFraction
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .background(cs.background.copy(alpha = collapse))
+            .height(52.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Geri tuşu (sol)
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 12.dp)
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(cs.surfaceVariant.copy(alpha = 0.75f))
+                .bounceClick { onBack() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = cs.onBackground
+            )
+        }
+        // Ortalanmış küçük başlık + kapak (kaydırınca belirir)
+        Row(
+            modifier = Modifier.graphicsLayer { alpha = collapse },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (cover != null) {
+                AsyncImage(
+                    model = cover,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(7.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(
+                text = title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = FontWeight.Medium,
+                fontSize = 17.sp,
+                color = cs.onBackground
+            )
+        }
+    }
+}
+
 @Composable
 private fun PlaylistDetailView(
     playlist: LocalPlaylist,
@@ -1390,8 +1466,12 @@ private fun PlaylistDetailView(
             .background(MiuixAppTheme.colorScheme.background)
             .then(modifier)
     ) {
-        dev.shephard.player.ui.components.SubmenuTopBar(
+        // MADDE 8 — playlist detail'e özel başlık: kapak resmi ismin solunda küçük görünür,
+        // kaydırınca isim küçülüp ortada belirir.
+        PlaylistDetailTopBar(
             title = detailTitle,
+            cover = playlist.coverUri?.let { Uri.parse(it) }
+                ?: plTracks.firstOrNull()?.albumArtUri,
             onBack = onBack,
             state = topBarState
         )
@@ -1488,18 +1568,14 @@ private fun PlaylistDetailView(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // MADDE 6 — Play / Remix / Add butonları SOLID yapıldı (blurSurface kaldırıldı).
+                    // Play butonu her zaman primary zemin + BEYAZ ikon/yazı (remix/add gibi değil,
+                    // kullanıcı beyaz istedi).
                     Row(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(14.dp))
-                            .then(
-                                if (liquidGlassOn) Modifier.blurSurface(
-                                    enabled = true,
-                                    shape = RoundedCornerShape(14.dp),
-                                    tint = GlassTint.ACCENT
-                                )
-                                else Modifier.background(MiuixAppTheme.colorScheme.primary)
-                            )
+                            .background(MiuixAppTheme.colorScheme.primary)
                             .clickable(enabled = plTracks.isNotEmpty()) { onPlayAll() }
                             .padding(vertical = 12.dp),
                         horizontalArrangement = Arrangement.Center,
@@ -1508,12 +1584,12 @@ private fun PlaylistDetailView(
                         Icon(
                             Icons.Filled.PlayArrow,
                             contentDescription = strings.play,
-                            tint = if (liquidGlassOn) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onPrimary
+                            tint = Color.White
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = strings.play,
-                            color = if (liquidGlassOn) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onPrimary,
+                            color = Color.White,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -1521,10 +1597,7 @@ private fun PlaylistDetailView(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(14.dp))
-                            .then(
-                                if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(14.dp))
-                                else Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant)
-                            )
+                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
                             .clickable(enabled = plTracks.isNotEmpty()) { onPlayRemix() }
                             .padding(vertical = 12.dp),
                         horizontalArrangement = Arrangement.Center,
@@ -1546,10 +1619,7 @@ private fun PlaylistDetailView(
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(14.dp))
-                                .then(
-                                    if (liquidGlassOn) Modifier.blurSurface(enabled = true, shape = RoundedCornerShape(14.dp))
-                                    else Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant)
-                                )
+                                .background(MiuixAppTheme.colorScheme.surfaceVariant)
                                 .clickable { onAddTracks() }
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically

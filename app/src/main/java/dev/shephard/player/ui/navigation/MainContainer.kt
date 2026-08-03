@@ -131,7 +131,28 @@ fun MainContainer(
             is AboutRoute -> SettingsRoutes.About
             else -> null
         }
+        // MADDE 3 — Submenü kapanış (exit) animasyonu boyunca da dock/mini submenu'nün
+        // ALTINDA kalmalı. Route pop edilince currentRoute anında ana sekmeye döner; o sırada
+        // submenu hâlâ ekrandan kayıyor olabilir. Bir önceki route'u hatırlayıp, eğer geçiş
+        // "submenu açıkken" gerçekleşiyorsa dock/mini'yi submenu'nün altında tutuyoruz.
+        var prevRoute by remember { mutableStateOf<String?>(currentRoute) }
+        // Submenu çıkış animasyonu ~500ms sürüyor; o süre boyunca dock/mini submenu'nün
+        // altında kalsın diye prevRoute'u hafifçe gecikmeli güncelliyoruz. Böylece route
+        // pop edilince dock/mini animasyonun ortasında öne fırlamaz.
+        LaunchedEffect(currentRoute) {
+            val leavingSubmenu =
+                (prevRoute == SettingsRoutes.Theme || prevRoute == SettingsRoutes.Player || prevRoute == SettingsRoutes.About) &&
+                (currentRoute != SettingsRoutes.Theme && currentRoute != SettingsRoutes.Player && currentRoute != SettingsRoutes.About)
+            if (leavingSubmenu) {
+                kotlinx.coroutines.delay(550)
+            }
+            prevRoute = currentRoute
+        }
         val isBottomRoute = bottomNavDestinations.any { it.route == currentRoute } || currentRoute == null
+        // Submenu geçişindeysek (açılırken ya da kapanırken) dock/mini alt katmanda kalır.
+        val submenuInvolved =
+            (currentRoute == SettingsRoutes.Theme || currentRoute == SettingsRoutes.Player || currentRoute == SettingsRoutes.About) ||
+            (prevRoute == SettingsRoutes.Theme || prevRoute == SettingsRoutes.Player || prevRoute == SettingsRoutes.About)
 
         // Do not collect the whole PlayerUiState at the root: position/progress changes
         // every 500ms while playing. Only the boolean that affects page bottom padding is
@@ -237,21 +258,21 @@ fun MainContainer(
                             //    (submenu onların ÜZERİNE gelir, InstallerX'teki gibi). Dock/mini
                             //    kaybolmaz; sadece opak submenu'nün altında kalır, submenu kapanınca
                             //    anında geri görünür.
-                            // Sadece NowPlayingSheet (tam ekran) açıkken gizleniyor çünkü o zaten her
-                            // şeyi kaplıyor.
-                            if (!showNowPlaying) {
-                                Column(
+                            // MADDE 10 — Dock ve mini player, NowPlayingSheet açılınca GİZLENMEZ;
+                            // sheet zaten en üstte çizildiği için ikisini örter (altında kalırlar).
+                            // MADDE 3 — Playlistdetail ISTİSNAdır: o Playlists ana sekmesinin
+                            // (isBottomRoute) İÇİNDE render edildiği için dock/mini onun ÜZERİNDE
+                            // kalır. Theme/Playback/About gibi gerçek submenu'lerde (isBottomRoute=false)
+                            // ise zIndex 0 → NavGraph üstte çizilir, dock/mini opak submenu'nün
+                            // altında kalır (submenu onların üzerine gelir).
+                            Column(
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .fillMaxWidth()
                                         .navigationBarsPadding()
-                                        // Playlistdetail ISTİSNAdır: o Playlists ana sekmesinin
-                                        // (isBottomRoute) İÇİNDE render edildiği için dock/mini onun
-                                        // ÜZERİNDE kalmalı. Theme/Playback/About gibi gerçek
-                                        // submenu'lerde (isBottomRoute=false) ise zIndex 0 → NavGraph
-                                        // onların üstünde çizilir, dock/mini opak submenu'nün altında
-                                        // kalır (submenu onların üzerine gelir).
-                                        .zIndex(if (isBottomRoute) 1f else 0f)
+                                        // MADDE 3 — Submenu geçişindeyken (açılış/kapanış) dock/mini
+                                        // alt katmanda kalır ki opak submenu onları örtsün.
+                                        .zIndex(if (isBottomRoute && !submenuInvolved) 1f else 0f)
                                 ) {
                                     MiniPlayerHost(
                                         playerViewModel = playerViewModel,
@@ -277,7 +298,6 @@ fun MainContainer(
                                     )
                                     Spacer(Modifier.height(8.dp))
                                 }
-                            }
 
                             NavGraph(
                                 backStack = backStack,
@@ -372,9 +392,17 @@ private fun FloatingDock(
         else -> FloatingBottomBarMode.None
     }
 
-    val selectedIndex = bottomNavDestinations
-        .indexOfFirst { it.route == currentRoute }
-        .let { if (it < 0) 0 else it }
+    // MADDE 2 — Submenü (Theme/Playback/About) açıkken currentRoute bir alt menü yoludur;
+    // bottomNavDestinations içinde eşleşmezdi ve `.let { if (it < 0) 0 else it }` yüzünden
+    // dock Music sekmesini işaretliyordu. Submenü açıkken dock Settings'i işaretlemeli.
+    val selectedIndex = when {
+        currentRoute == Destination.Music.route ||
+            currentRoute == Destination.Playlists.route ||
+            currentRoute == Destination.Settings.route ->
+            bottomNavDestinations.indexOfFirst { it.route == currentRoute }
+        // Theme/Player/About gibi alt menülerde Settings seçili görünsün.
+        else -> bottomNavDestinations.indexOfFirst { it.route == Destination.Settings.route }
+    }.let { if (it < 0) 0 else it }
     val strings = LocalStrings.current
 
     // KRİTİK: Daha önce backdrop == null (Liquid Glass kapalı ya da desteklenmiyor)

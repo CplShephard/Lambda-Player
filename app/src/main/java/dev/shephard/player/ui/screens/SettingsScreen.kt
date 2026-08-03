@@ -564,8 +564,10 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         CustomColorPickerDialog(
             onDismiss = { customPickerOpen = false },
             onColorPicked = { argb ->
+                // MADDE 5 — Sadece rengi kaydet; drawer kapanışını onDismissRequest üzerinden
+                // (dismissDrawer animasyonu bitince) sağlıyoruz. Böylece Apply'a basınca da
+                // kapanma animasyonu oynar.
                 scope.launch { prefs.setAccentColor(argb) }
-                customPickerOpen = false
             },
             initialArgb = accent,
             title = strings.customColorTitle,
