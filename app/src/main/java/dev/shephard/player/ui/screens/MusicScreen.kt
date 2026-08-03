@@ -113,7 +113,9 @@ fun MusicScreen(
 
     LaunchedEffect(Unit) {
         if (permissionState.hasPermission) {
-            libraryViewModel.loadTracks()
+            // Uygulama açılışında önbellekten anında göster, MediaStore'u cooldown'la tazele
+            // (her açılışta baştan taramaz).
+            libraryViewModel.refreshLibrary(force = false)
         }
     }
 

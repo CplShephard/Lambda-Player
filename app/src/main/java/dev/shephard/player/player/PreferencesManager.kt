@@ -33,6 +33,11 @@ object PrefsKeys {
     val TRACK_OVERRIDES_JSON = stringPreferencesKey("track-overrides_json")
     val LYRICS_JSON = stringPreferencesKey("lyrics_json")
     val LIQUID_GLASS_ENABLED = booleanPreferencesKey("liquid_glass_enabled")
+    // MADDE — Kütüphane önbelleği (OuterTune tarzı cache + cooldown).
+    // Şarkı listesi JSON olarak saklanır; açılışta MediaStore yerine önce buradan okunur.
+    val LIBRARY_CACHE_JSON = stringPreferencesKey("library_cache_json")
+    // Son başarılı MediaStore taramasının zaman damgası (epoch millis) — cooldown için.
+    val LAST_LIBRARY_SCAN_MS = longPreferencesKey("last_library_scan_ms")
 }
 
 object ThemeModePreference {
@@ -119,6 +124,16 @@ class PreferencesManager(private val context: Context) {
     /** JSON object: {"trackId": ["line1","line2", ...], ...} — indirilen/yüklenen lyrics. */
     val lyricsJson: Flow<String> = context.dataStore.data.map {
         it[PrefsKeys.LYRICS_JSON] ?: "{}"
+    }
+
+    /** Önbelleğe alınmış şarkı listesi (JSON). Boşsa henüz tarama/cache yok. */
+    val libraryCacheJson: Flow<String> = context.dataStore.data.map {
+        it[PrefsKeys.LIBRARY_CACHE_JSON] ?: ""
+    }
+
+    /** Son başarılı MediaStore taramasının epoch-millis zamanı (0 = hiç taranmadı). */
+    val lastLibraryScanMs: Flow<Long> = context.dataStore.data.map {
+        it[PrefsKeys.LAST_LIBRARY_SCAN_MS] ?: 0L
     }
 
     /** 0f..1f — applied as a black scrim opacity on top of the wallpaper. */
@@ -219,5 +234,15 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setCardAlpha(value: Float) {
         context.dataStore.edit { it[PrefsKeys.CARD_ALPHA] = value.coerceIn(0f, 1f) }
+    }
+
+    /** Önbelleğe alınmış şarkı listesini kaydet. */
+    suspend fun setLibraryCacheJson(json: String) {
+        context.dataStore.edit { it[PrefsKeys.LIBRARY_CACHE_JSON] = json }
+    }
+
+    /** Son başarılı tarama zamanını kaydet (cooldown hesaplaması için). */
+    suspend fun setLastLibraryScanMs(epochMillis: Long) {
+        context.dataStore.edit { it[PrefsKeys.LAST_LIBRARY_SCAN_MS] = epochMillis }
     }
 }

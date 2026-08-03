@@ -74,6 +74,7 @@ import dev.shephard.player.ui.miuix.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -116,8 +117,6 @@ import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.squircle.absoluteSquircleClip
-import top.yukonga.miuix.kmp.utils.getRoundedCorner
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.Collator
@@ -194,7 +193,7 @@ fun PlaylistScreen(
     val tracks by libraryViewModel.tracks.collectAsState()
 
     LaunchedEffect(Unit) {
-        if (tracks.isEmpty()) libraryViewModel.loadTracks()
+        if (tracks.isEmpty()) libraryViewModel.refreshLibrary(force = false)
     }
 
     val json by prefs.playlistsJson.collectAsState(initial = "[]")
@@ -430,38 +429,30 @@ fun PlaylistScreen(
         transitionSpec = {
             if (targetState != null) {
                 // Detaya giriş: Theme/Playback/About'a girerken kullanılan animasyonun aynısı.
+                // targetContentZIndex=1 → detay (giren, target) HER ZAMAN üstte kalır; liste
+                // (header + create FAB dahil) altta kalır ve detay örter.
                 androidx.compose.animation.ContentTransform(
                     targetContentEnter = PageTransitions.enterSubmenu,
-                    initialContentExit = PageTransitions.exitSubmenu
+                    initialContentExit = PageTransitions.exitSubmenu,
+                    targetContentZIndex = 1f
                 )
             } else {
                 // MADDE 4 — KAPANIŞ animasyonunda detay (initial) listeye (target) ARKA
                 // düşmemeli. AnimatedContent varsayılan olarak target'ı üste koyduğu için
-                // kapanırken liste detayın önüne geçiyordu. Kapanırken targetContentZIndex
-                // 0 yapınca initial (detay) üstte kalır, liste altta kayar.
+                // kapanırken liste detayın önüne geçiyordu. Kapanırken initialContentZIndex=1
+                // yapınca detay (çıkan, initial) üstte kalır, liste altta kayar.
                 androidx.compose.animation.ContentTransform(
                     targetContentEnter = PageTransitions.popEnterSubmenu,
                     initialContentExit = PageTransitions.popExitSubmenu,
-                    targetContentZIndex = 0f
+                    initialContentZIndex = 1f
                 )
             }
         },
         label = "playlistNav"
     ) { idx ->
-    // MADDE 3 (bu tur) — playlist detail, Theme/Playback/About submenülerindeki gibi
-    // geçiş sırasında köşeleri yuvarlatılmış (squircle) bir "page" olarak kayar. Geçiş
-    // BİTTİĞİNDE (settled) köşe kırpma kaldırılır — Theme/Playback/About'ta da NavDisplay
-    // tam oturunca clip'i kaldırıyor. Böylece kapanırken de açılırken de köşe dp 0'a düşmüyor.
-    val detailInTransition = transition.currentState != transition.targetState
-    val detailCorner = getRoundedCorner()
-    val detailClipModifier = Modifier.then(
-        if (detailInTransition) Modifier.absoluteSquircleClip(
-            topLeft = detailCorner,
-            topRight = 0.dp,
-            bottomRight = 0.dp,
-            bottomLeft = detailCorner,
-        ) else Modifier
-    )
+    // MADDE 4 — KAPANIŞ animasyonunda detay (initial) listeye (target) ARKA düşmemeli.
+    // AnimatedContent varsayılan olarak target'ı üste koyduğu için kapanırken liste detayın
+    // önüne geçiyordu. Kapanırken initialContentZIndex=1 yapınca detay (çıkan) üstte kalır.
     if (idx == null) {
         PlaylistListView(
             playlists = playlists,
@@ -489,7 +480,6 @@ fun PlaylistScreen(
                 plTracks = plTracks,
                 strings = strings,
                 onBack = { playlistDetailGuard.pop { openIndex = null } },
-                modifier = detailClipModifier,
                 onTrackClick = { list, i -> onTrackClick(list, i, if (pl.isSystem) strings.likedSongs else pl.name) },
                 onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name) },
                 onPlayRemix = { if (plTracks.isNotEmpty()) onPlaylistRemixClick(plTracks, if (pl.isSystem) strings.likedSongs else pl.name) },
@@ -1321,10 +1311,9 @@ private fun PlaylistDetailTopBar(
     title: String,
     cover: android.net.Uri?,
     onBack: () -> Unit,
-    state: dev.shephard.player.ui.components.CollapsingTopBarState
+    collapse: Float
 ) {
     val cs = MiuixAppTheme.colorScheme
-    val collapse = state.collapseFraction
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1385,7 +1374,6 @@ private fun PlaylistDetailView(
     plTracks: List<AudioTrack>,
     strings: dev.shephard.player.ui.i18n.Strings,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier,
     onTrackClick: (List<AudioTrack>, Int) -> Unit,
     onPlayAll: () -> Unit,
     onPlayRemix: () -> Unit,
@@ -1458,13 +1446,23 @@ private fun PlaylistDetailView(
     // MADDE 5 + 2 (bu tur) — Playlist detayı artık Theme/Playback/About ile birebir aynı
     // header'ı (SubmenuTopBar: SmallTopAppBar + geri tuşu + kaydırdıkça ortada beliren başlık)
     // ve aynı düz (flat) opak arkaplanı kullanıyor.
-    val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
+    //
+    // MADDE 4 — Scroll düzeltmesi: Özel PlaylistDetailTopBar bir Miuix scrollBehavior kullanmıyor;
+    // o yüzden LazyColumn'a nestedScroll eklenmedi (aksi halde scrollBehavior.heightOffsetLimit
+    // -Float.MAX_VALUE kalıp TÜM kaydırmayı yutar ve liste hiç kaymazdı). Bunun yerine collapse
+    // değerini LazyColumn'un KENDİ scroll pozisyonundan hesaplıyoruz.
     val detailTitle = if (playlist.isSystem) strings.likedSongs else playlist.name
+    val detailCollapse by remember {
+        derivedStateOf {
+            val index = listState.firstVisibleItemIndex
+            val offset = listState.firstVisibleItemScrollOffset
+            if (index > 0) 1f else (offset.toFloat() / 120f).coerceIn(0f, 1f)
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MiuixAppTheme.colorScheme.background)
-            .then(modifier)
     ) {
         // MADDE 8 — playlist detail'e özel başlık: kapak resmi ismin solunda küçük görünür,
         // kaydırınca isim küçülüp ortada belirir.
@@ -1473,14 +1471,13 @@ private fun PlaylistDetailView(
             cover = playlist.coverUri?.let { Uri.parse(it) }
                 ?: plTracks.firstOrNull()?.albumArtUri,
             onBack = onBack,
-            state = topBarState
+            collapse = detailCollapse
         )
         LazyColumn(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .overScrollVertical()
-                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection),
+                .overScrollVertical(),
             contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
             // MADDE 2 — alphabetical / artist / timeAdded sıralamalarında parça kartları
             // dipdibe duruyor, arka plandaki card'lar iç içe geçmiş gibi görünüyordu.
@@ -1488,10 +1485,14 @@ private fun PlaylistDetailView(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             item {
-                dev.shephard.player.ui.components.CollapsingPageTitle(
-                    title = detailTitle,
-                    state = topBarState,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                Text(
+                    text = detailTitle,
+                    style = MiuixAppTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixAppTheme.colorScheme.onBackground,
+                    modifier = Modifier
+                        .padding(top = 4.dp, bottom = 4.dp)
+                        .graphicsLayer { alpha = 1f - detailCollapse }
                 )
                 Text(
                     text = "${plTracks.size} ${strings.trackCount}",

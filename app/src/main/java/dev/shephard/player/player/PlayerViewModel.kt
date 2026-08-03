@@ -540,12 +540,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         // MADDE 7 — Eğer sırada (çalan parçadan sonra) karıştırılacak parça yoksa ya da tek bir
-        // parça kaldıysa remix yine de çalışmalı: TÜM sırayı yeniden karıştır, çalan parçayı
-        // başta tut. Böylece son şarkıya gelinse bile remix butonu işe yarıyor.
+        // parça kaldıysa remix yine de çalışmalı: TÜM sırayı yeniden karıştır. Böylece son şarkıya
+        // gelinse bile remix butonu işe yarıyor.
+        //
+        // MADDE 11 (glitch fix) — Çalan parçayı moveMediaItem ile taşımıyoruz (yerinde tutuyoruz);
+        // sadece çalan parça dışındaki parçalar karıştırılıp çalan parçanın ORİJİNAL index'ine geri
+        // konur. Çünkü çalan parçayı taşımak ExoPlayer'ın onMediaItemTransition fırlatıp
+        // currentTrack/progress'i sıfırlamasına ve cover'ın 1 saniye yeniden yüklenmesine (glitch)
+        // yol açıyordu. Çalan parça taşınmadığı için transition tetiklenmez, gerçek remix olur.
         if (upcoming.size <= 1) {
             originalQueue = current
-            val rest = current.filterNot { it.id == currentTrack.id }
-            val newOrder = listOf(currentTrack) + rest.shuffled()
+            val currentIndex = current.indexOfFirst { it.id == currentTrack.id }.coerceAtLeast(0)
+            val rest = current.filterNot { it.id == currentTrack.id }.shuffled()
+            // Çalan parçayı orijinal index'ine koy, diğerlerini (karıştırılmış) çevresine diz.
+            val newOrder = rest.toMutableList().apply { add(currentIndex, currentTrack) }
             reorderPlayerPlaylist(c, current, newOrder)
             queueTracks = newOrder
             _uiState.value = _uiState.value.copy(queue = newOrder, shuffleEnabled = true)

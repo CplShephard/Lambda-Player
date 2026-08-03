@@ -10,6 +10,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.MediaStoreScanner
+import dev.shephard.player.data.parseTrackCacheJson
+import dev.shephard.player.data.toCacheJson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,11 +55,20 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     private var contentObserver: ContentObserver? = null
 
+    // OuterTune tarzı cooldown: son başarılı MediaStore taramasından sonra bu süre (ms)
+    // geçmeden tekrar MediaStore sorgulanmaz. Böylece her uygulama açılışında şarkılar
+    // baştan taranmaz — önbellekten gelir, tarama yalnızca cooldown dolunca ya da medya
+    // gerçekten değişince yapılır.
+    private val scanCooldownMs: Long = 6 * 60 * 60 * 1000L // 6 saat (OuterTune AUTO_SCAN_COOLDOWN'a benzer)
+
     init {
         registerObserver()
         viewModelScope.launch {
             val json = prefs.trackOverridesJson.first()
             _overrides.value = parseOverrides(json)
+            // Önbelleği hemen yükle (anında gösterim) — asıl MediaStore taraması aşağıda,
+            // cooldown'a tabi.
+            refreshLibrary(force = false)
         }
     }
 
@@ -66,7 +77,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         contentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
                 super.onChange(selfChange)
-                loadTracks()
+                // Medya gerçekten değişti (şarkı eklendi/silindi) → cooldown'u beklemeden tazele.
+                refreshLibrary(force = true)
             }
         }
         getApplication<Application>().contentResolver.registerContentObserver(
@@ -74,13 +86,45 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         )
     }
 
+    /** Eski loadTracks arayüzü — init ve ContentObserver üzerinden gelen çağrılar için. */
     fun loadTracks() {
+        refreshLibrary(force = true)
+    }
+
+    /**
+     * Kütüphaneyi yükler.
+     *
+     *  - Önce önbellek (DataStore) boş değilse onu gösterir → anında açılır, tarama beklemez.
+     *  - Sonra MediaStore'u tarar; ama `force=false` iken ve cooldown dolmamışsa MediaStore'u
+     *    ATLAR (önbellekteki liste kullanılır). `force=true` ise (medya gerçekten değiştiyse
+     *    ya da ilk açılışta cache yoksa) her zaman taze tarar.
+     */
+    fun refreshLibrary(force: Boolean = false) {
         viewModelScope.launch {
+            // 1) Önbelleği hemen göster (varsa)
+            val cacheJson = prefs.libraryCacheJson.first()
+            val cached = parseTrackCacheJson(cacheJson)
+            if (cached.isNotEmpty() && _tracks.value.isEmpty()) {
+                _tracks.value = applyOverridesToList(cached, _overrides.value)
+                _hasScanned.value = true
+                applyFilter()
+            }
+
+            // 2) Cooldown kontrolü — force değilse ve son taramadan çok geçmediyse atla.
+            val lastScan = prefs.lastLibraryScanMs.first()
+            if (!force && lastScan > 0 && System.currentTimeMillis() - lastScan < scanCooldownMs) {
+                _isLoading.value = false
+                return@launch
+            }
+
+            // 3) MediaStore'u tara + önbelleği güncelle.
             _isLoading.value = true
             val result = withContext(Dispatchers.IO) {
                 MediaStoreScanner.queryAudioTracks(getApplication())
             }
             _tracks.value = applyOverridesToList(result, _overrides.value)
+            runCatching { prefs.setLibraryCacheJson(result.toCacheJson()) }
+            runCatching { prefs.setLastLibraryScanMs(System.currentTimeMillis()) }
             _isLoading.value = false
             _hasScanned.value = true
             applyFilter()
@@ -99,13 +143,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             _overrides.value = current
             val json = encodeOverrides(current)
             prefs.setTrackOverridesJson(json)
-            // Re-apply overrides to current raw track list
-            val rawJson = prefs.trackOverridesJson.first()
-            val newOverrides = parseOverrides(rawJson)
-            val raw = withContext(Dispatchers.IO) {
-                MediaStoreScanner.queryAudioTracks(getApplication())
-            }
-            _tracks.value = applyOverridesToList(raw, newOverrides)
+            // Re-apply overrides to current raw track list (önbellekten de okunabilir).
+            val newOverrides = parseOverrides(prefs.trackOverridesJson.first())
+            _tracks.value = applyOverridesToList(_tracks.value, newOverrides)
             applyFilter()
         }
     }
