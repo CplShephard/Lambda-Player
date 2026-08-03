@@ -1398,9 +1398,16 @@ private fun PlaylistDetailView(
     val reorderItems = remember { mutableStateListOf<AudioTrack>() }
     var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var isReordering by remember { mutableStateOf(false) }
+    // DRAG FIX: onReorder'ın tetiklediği plTracks değişimini (async DB yazımı sonrası gelen
+    // yeni sıra) "kendi commit'imiz" olarak tanıyıp resetlemeyi atlarız. Aksi halde drag bitince
+    // plTracks henüz eski sıradayken reorderItems eski sıraya resetlenir (şarkı ilk yere gider),
+    // sonra yeni sıra gelince tekrar değişir (son yere) → "ışınlanma". lastCommittedOrder,
+    // en son onReorder ile kaydettiğimiz sırayı tutar; plTracks o sıraya ulaşınca resetleme yok.
+    var lastCommittedOrder by remember { mutableStateOf<List<Long>>(emptyList()) }
 
     LaunchedEffect(plTracks, isReordering) {
-        if (!isReordering && reorderItems.map { it.id } != plTracks.map { it.id }) {
+        val plIds = plTracks.map { it.id }
+        if (!isReordering && reorderItems.map { it.id } != plIds && lastCommittedOrder != plIds) {
             reorderItems.clear()
             reorderItems.addAll(plTracks)
         }
@@ -1437,6 +1444,8 @@ private fun PlaylistDetailView(
             dragInfo?.let { (from, to) ->
                 dragInfo = null
                 if (from != to && reorderItems.map { it.id } != plTracks.map { it.id }) {
+                    // DRAG FIX: bu commit'in tetikleyeceği plTracks değişimini işaretle.
+                    lastCommittedOrder = reorderItems.map { it.id }
                     onReorder(reorderItems.toList())
                 }
             }
