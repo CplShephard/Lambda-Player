@@ -503,21 +503,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
-     * Remix, SADECE çalan parçadan SONRAKİ parçaları karıştırır/geri alır.
+     * Remix, çalan parçayı queue'nun EN BAŞINA (index 0) sabitler, geri kalan TÜM parçaları
+     * (eskiden "öncesi" sayılanlar dahil) karıştırır. Çalan parça fiziksel olarak ÇALMAYA
+     * DEVAM EDER (moveMediaItem tabanlı reorder kullanıldığı için ExoPlayer yeniden
+     * prepare/seek yapmaz, ses kesilmez) — sadece queue listesindeki konumu değişebilir.
      *
-     * Eski davranış çalan parçayı da index 0'a taşıyordu; bu yüzden art arda basınca
-     * player'daki `moveMediaItem` çağrıları çalan parçayı oynatıyor ve NowPlayingSheet'teki
-     * kapak grid'i "şu an çalan / sıradaki şarkı yer değiştirdi" gibi görünüyordu.
-     * Artık çalan parça ve öncesindeki parçalar HİÇ dokunulmadan kalır — remix'in tek
-     * görünür etkisi Queue drawer'ındaki sıradaki şarkı listesidir.
+     * ÖNEMLİ DÜZELTME: Önceki implementasyon çalan parçayı ORİJİNAL index'inde sabit
+     * tutuyordu. Matematiksel olarak geri kalan TÜM parçalar (öncesi dahil) karıştırılsa
+     * da, kullanıcı deneyiminde bunun görünür etkisi yoktu — zaten geçmişe (çalan parçadan
+     * önceki sıraya) geri gidilmediği için, kullanıcı sadece "queue'da ÖNÜMDEKİ" şarkıların
+     * değiştiğini görüyordu; çalan parça queue'nun son elemanıysa "sonrası" boş olduğundan
+     * gözle görülür HİÇBİR değişiklik olmuyordu. Artık çalan parça her zaman index 0'da —
+     * "öncesi" kavramı ortadan kalktığı için remix'in etkisi her zaman görünür.
      */
     fun remixQueue() {
         val c = controller ?: return
         val current = _uiState.value.queue
         val currentTrack = _uiState.value.currentTrack
         if (current.size <= 1 || currentTrack == null) return
-
-        val currentIndex = current.indexOfFirst { it.id == currentTrack.id }.coerceAtLeast(0)
 
         if (remixActive) {
             // Geri al: TÜM kuyruğu orijinal sırasına döndür. Orijinal sıradan yalnızca hâlâ
@@ -538,15 +541,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
-        // REMIX FIX — TÜM kuyruk yeniden karıştırılır (çalan parçadan sonrası değil, baştan sona).
-        //
-        // MADDE 11 (glitch fix) — Çalan parçayı moveMediaItem ile taşımıyoruz; onu ORİJİNAL
-        // index'inde sabit tutuyoruz, geri kalan TÜM parçaları (çalanın öncesi dahil) karıştırıp
-        // çevresine diziyoruz. Böylece queue tamamen yeniden sıralanır ama çalan parça taşınmadığı
-        // için ExoPlayer onMediaItemTransition fırlatmaz → cover glitch olmaz.
+        // Çalan parça HARİÇ tüm queue karıştırılır, sonra çalan parça EN BAŞA (index 0)
+        // sabitlenir. reorderPlayerPlaylist moveMediaItem tabanlı olduğu için çalan
+        // parçanın queue içindeki index'i değişse bile fiziksel olarak çalmaya devam
+        // eder (yeniden prepare/seek edilmez, ses kesilmez, cover glitch olmaz).
         originalQueue = current
         val rest = current.filterNot { it.id == currentTrack.id }.shuffled()
-        val newOrder = rest.toMutableList().apply { add(currentIndex, currentTrack) }
+        val newOrder = listOf(currentTrack) + rest
         reorderPlayerPlaylist(c, current, newOrder)
 
         queueTracks = newOrder
@@ -672,6 +673,53 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _uiState.value = _uiState.value.copy(queue = newList)
             c.moveMediaItem(actualIndex, currentStart + 1)
         }
+    }
+
+    /**
+     * Music / Playlist Detail listelerindeki "sola kaydır → sıradaki şarkıdan sonraya ekle"
+     * (Spotify tarzı) hareketi için. `playNext(queueIndex)`'ten farkı: o fonksiyon queue'da
+     * ZATEN BULUNAN bir track'i taşır (index tabanlı); bu fonksiyon ise queue'da hiç
+     * olmayabilecek keyfi bir [track]'i kabul edip, çalan parçadan hemen sonraki sıraya
+     * YENİ bir MediaItem olarak EKLER — `addMediaItem`, mevcut playback'i etkilemez (yeniden
+     * prepare/seek yapılmaz, ses kesilmez).
+     *
+     * Kullanıcı isteği: AYNI şarkı queue'ya istenildiği kadar art arda eklenebilsin (Queue
+     * drawer'daki playNext(queueIndex) davranışının aksine — o zaten queue'daki tek bir
+     * kopyayı taşır, kopyalamaz). Bu yüzden burada "zaten queue'da var mı" kontrolü YAPILMAZ,
+     * her çağrı yeni bir ekleme oluşturur.
+     */
+    fun insertNextInQueue(track: AudioTrack) {
+        val c = controller ?: return
+        val current = _uiState.value.queue
+        val currentTrackId = _uiState.value.currentTrack?.id
+
+        if (current.isEmpty() || currentTrackId == null) {
+            // Hiçbir şey çalmıyorsa, bu track'i tek başına başlat.
+            setQueueAndPlay(listOf(track), 0, null)
+            return
+        }
+
+        val currentStart = current.indexOfFirst { it.id == currentTrackId }.coerceAtLeast(0)
+        val insertPos = currentStart + 1
+
+        val mediaItem = MediaItem.Builder()
+            .setMediaId(track.id.toString())
+            .setUri(track.uri)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(track.title)
+                    .setArtist(track.artist)
+                    .setAlbumTitle(track.album)
+                    .setArtworkUri(track.albumArtUri)
+                    .build()
+            )
+            .build()
+
+        c.addMediaItem(insertPos, mediaItem)
+
+        val newList = current.toMutableList().apply { add(insertPos, track) }
+        queueTracks = newList
+        _uiState.value = _uiState.value.copy(queue = newList)
     }
 
     override fun onCleared() {

@@ -8,6 +8,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -57,6 +63,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -216,11 +223,17 @@ fun MusicScreen(
                             ),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
+                            val playerState by playerViewModel.uiState.collectAsState()
+                            val queuedIds = remember(playerState.queue) {
+                                playerState.queue.map { it.id }.toSet()
+                            }
                             itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
                                 TrackRow(
                                     track = track,
+                                    isInQueue = track.id in queuedIds,
                                     onClick = { onTrackClick(tracks, index) },
-                                    onMenuClick = { selectedTrackForMenu = track }
+                                    onMenuClick = { selectedTrackForMenu = track },
+                                    onAddNext = { playerViewModel.insertNextInQueue(track) }
                                 )
                             }
                         }
@@ -446,75 +459,157 @@ private fun GridTrackCard(
 }
 
 @Composable
-private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> Unit) {
+private fun TrackRow(
+    track: AudioTrack,
+    isInQueue: Boolean,
+    onClick: () -> Unit,
+    onMenuClick: () -> Unit,
+    onAddNext: () -> Unit
+) {
     val liquidGlassOn = LocalBlurEnabled.current
-    Row(
+    val density = LocalDensity.current
+    // Queue drawer'daki QueueTrackItem'daki (NowPlayingSheet.kt) swipe-reveal mantığının
+    // birebir aynısı, ama tek yönlü (sadece sola — "add next", sağa/remove yok; Music
+    // listesinden şarkı silinmiyor). Kullanıcı isteği: aynı şarkı queue'ya istenildiği kadar
+    // art arda eklenebilsin, bu yüzden burada "zaten eklendi mi" diye engelleme YAPILMIYOR —
+    // her sola swipe yeni bir ekleme oluşturur (bkz. PlayerViewModel.insertNextInQueue).
+    val swipeThresholdPx = with(density) { 120.dp.toPx() }
+    var offsetX by remember(track.id) { mutableFloatStateOf(0f) }
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
-            .then(
-                // Liste elemanı: pahalı GPU blur yerine ucuz yarı saydam tint (performans)
-                Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
-            )
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MiuixAppTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
-        ) {
-            var artLoaded by remember(track.id) { mutableStateOf(false) }
-            AsyncImage(
-                model = track.albumArtUri,
-                contentDescription = null,
+        val absOffset = kotlin.math.abs(offsetX.coerceAtMost(0f))
+        val progress = (absOffset / swipeThresholdPx).coerceIn(0f, 1f)
+        if (absOffset > 10f) {
+            val isThresholdReached = absOffset >= swipeThresholdPx
+            Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop,
-                onState = { state -> artLoaded = state is AsyncImagePainter.State.Success }
-            )
-            if (!artLoaded) {
+                    .fillMaxSize()
+                    .background(
+                        MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f * progress),
+                        RoundedCornerShape(20.dp)
+                    )
+                    .padding(horizontal = 20.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                val iconScale by animateFloatAsState(
+                    targetValue = if (isThresholdReached) 1.25f else (0.8f + 0.2f * progress),
+                    label = "trackSwipeIconScale"
+                )
                 Icon(
-                    imageVector = Icons.Filled.MusicNote,
-                    contentDescription = null,
-                    tint = MiuixAppTheme.colorScheme.primary
+                    imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                    contentDescription = "Play next",
+                    tint = MiuixAppTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .size(26.dp)
+                        .graphicsLayer {
+                            scaleX = iconScale
+                            scaleY = iconScale
+                            alpha = progress
+                        }
                 )
             }
         }
 
-        Column(
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 12.dp)
+                .fillMaxWidth()
+                .offset(x = with(density) { offsetX.coerceAtMost(0f).toDp() })
+                .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
+                .clip(RoundedCornerShape(20.dp))
+                .then(
+                    // Liste elemanı: pahalı GPU blur yerine ucuz yarı saydam tint (performans)
+                    Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
+                )
+                .pointerInput(track.id) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (offsetX <= -swipeThresholdPx) onAddNext()
+                            offsetX = 0f
+                        },
+                        onDragCancel = { offsetX = 0f }
+                    ) { change, dragAmount ->
+                        // Sadece sola sürüklemeye izin ver — sağa hareket yok sayılır.
+                        change.consume()
+                        offsetX = (offsetX + dragAmount).coerceAtMost(0f)
+                    }
+                }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = track.title,
-                style = MiuixAppTheme.typography.bodyLarge,
-                color = MiuixAppTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = track.artist,
-                style = MiuixAppTheme.typography.bodyMedium,
-                color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MiuixAppTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                var artLoaded by remember(track.id) { mutableStateOf(false) }
+                AsyncImage(
+                    model = track.albumArtUri,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop,
+                    onState = { state -> artLoaded = state is AsyncImagePainter.State.Success }
+                )
+                if (!artLoaded) {
+                    Icon(
+                        imageVector = Icons.Filled.MusicNote,
+                        contentDescription = null,
+                        tint = MiuixAppTheme.colorScheme.primary
+                    )
+                }
+            }
 
-        Text(
-            text = track.formattedDuration(),
-            style = MiuixAppTheme.typography.labelMedium,
-            color = MiuixAppTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.width(4.dp))
-        IconButton(onClick = onMenuClick, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Filled.MoreVert, null, tint = MiuixAppTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = track.title,
+                        style = MiuixAppTheme.typography.bodyLarge,
+                        color = MiuixAppTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    // Queue'ya eklendiğini belirten simge — Spotify tarzı, isminin hemen
+                    // sağında, tema accent rengine bağlı (primary).
+                    if (isInQueue) {
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                            contentDescription = "In queue",
+                            tint = MiuixAppTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                Text(
+                    text = track.artist,
+                    style = MiuixAppTheme.typography.bodyMedium,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Text(
+                text = track.formattedDuration(),
+                style = MiuixAppTheme.typography.labelMedium,
+                color = MiuixAppTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(4.dp))
+            IconButton(onClick = onMenuClick, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Filled.MoreVert, null, tint = MiuixAppTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            }
         }
     }
 }

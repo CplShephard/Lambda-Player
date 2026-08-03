@@ -7,6 +7,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +24,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -77,6 +81,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -90,6 +95,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -181,6 +187,7 @@ internal fun ensureLikedSongsPlaylist(playlists: List<LocalPlaylist>, strings: d
 @Composable
 fun PlaylistScreen(
     libraryViewModel: LibraryViewModel = viewModel(),
+    playerViewModel: dev.shephard.player.player.PlayerViewModel = viewModel(),
     hasMiniPlayer: Boolean = false,
     onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
     onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> }
@@ -474,11 +481,17 @@ fun PlaylistScreen(
             openIndex = null
         } else {
             val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+            val playerState by playerViewModel.uiState.collectAsState()
+            val queuedTrackIds = remember(playerState.queue) {
+                playerState.queue.map { it.id }.toSet()
+            }
             PlaylistDetailView(
                 playlist = pl,
                 allTracks = tracks,
                 plTracks = plTracks,
                 strings = strings,
+                queuedTrackIds = queuedTrackIds,
+                onAddNext = { t -> playerViewModel.insertNextInQueue(t) },
                 onBack = { playlistDetailGuard.pop { openIndex = null } },
                 onTrackClick = { list, i -> onTrackClick(list, i, if (pl.isSystem) strings.likedSongs else pl.name) },
                 onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name) },
@@ -1373,6 +1386,8 @@ private fun PlaylistDetailView(
     allTracks: List<AudioTrack>,
     plTracks: List<AudioTrack>,
     strings: dev.shephard.player.ui.i18n.Strings,
+    queuedTrackIds: Set<Long>,
+    onAddNext: (AudioTrack) -> Unit,
     onBack: () -> Unit,
     onTrackClick: (List<AudioTrack>, Int) -> Unit,
     onPlayAll: () -> Unit,
@@ -1399,9 +1414,32 @@ private fun PlaylistDetailView(
     val reorderItems = remember { mutableStateListOf<AudioTrack>() }
     var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var isReordering by remember { mutableStateOf(false) }
+    // GLITCH FIX: drag bırakıldığında reorderItems zaten DOĞRU (yeni) sırada duruyor ve
+    // onReorder(reorderItems) çağrılıp ViewModel'e asenkron yazılıyor. Ama bu yazmanın
+    // sonucu (güncellenmiş plTracks) state'e geri yansımadan ÖNCE, aynı recomposition'da
+    // `isReordering` zaten false olduğu için senkron efekti tetikleniyor ve o an plTracks
+    // HÂLÂ ESKİ (reorder öncesi) sırada olduğundan "eşleşmiyor" diye reorderItems'ı eski
+    // sıraya RESETLİYORDU — kullanıcı parmağını kaldırınca öğenin yarım saniyeliğine eski
+    // yerine zıplayıp sonra tekrar doğru yere gelmesinin sebebi tam olarak buydu. Çözüm:
+    // tam olarak hangi sıralamayı commit ettiğimizi ayrı tutup, plTracks o sıralamaya
+    // GERÇEKTEN ulaşana kadar (yani DataStore/ViewModel yankısı gelene kadar) senkron
+    // efektini atlıyoruz — böylece ara/stale plTracks hiçbir zaman reorderItems'ı geçersiz
+    // kılamıyor.
+    var pendingCommittedOrder by remember { mutableStateOf<List<Long>?>(null) }
 
     LaunchedEffect(plTracks, isReordering) {
-        if (!isReordering && reorderItems.map { it.id } != plTracks.map { it.id }) {
+        if (isReordering) return@LaunchedEffect
+        val pending = pendingCommittedOrder
+        if (pending != null) {
+            if (plTracks.map { it.id } == pending) {
+                // ViewModel/DataStore artık bizim commit ettiğimiz sırayı yansıtıyor —
+                // beklemeyi bitir, normal senkronizasyona dön.
+                pendingCommittedOrder = null
+            }
+            // plTracks henüz eski (stale) sıradaysa, reorderItems'a DOKUNMA — zaten doğru.
+            return@LaunchedEffect
+        }
+        if (reorderItems.map { it.id } != plTracks.map { it.id }) {
             reorderItems.clear()
             reorderItems.addAll(plTracks)
         }
@@ -1434,10 +1472,16 @@ private fun PlaylistDetailView(
     }
     LaunchedEffect(reorderableState.isAnyItemDragging) {
         isReordering = reorderableState.isAnyItemDragging
+        if (reorderableState.isAnyItemDragging) {
+            // Yeni bir drag başladı: önceki commit'in yankısını beklemeyi bırak, artık
+            // reorderItems zaten kullanıcının şu anki sürüklemesiyle güncelleniyor.
+            pendingCommittedOrder = null
+        }
         if (!reorderableState.isAnyItemDragging) {
             dragInfo?.let { (from, to) ->
                 dragInfo = null
                 if (from != to && reorderItems.map { it.id } != plTracks.map { it.id }) {
+                    pendingCommittedOrder = reorderItems.map { it.id }
                     onReorder(reorderItems.toList())
                 }
             }
@@ -1688,8 +1732,10 @@ private fun PlaylistDetailView(
                             DraggablePlaylistTrackRow(
                                 track = t,
                                 isDragged = isDragging,
+                                isInQueue = t.id in queuedTrackIds,
                                 onTrackClick = { onTrackClick(reorderItems.toList(), i) },
                                 onRemove = { onRemoveTrack(t.id) },
+                                onAddNext = { onAddNext(t) },
                                 dragHandleModifier = Modifier.draggableHandle()
                             )
                         }
@@ -1698,8 +1744,10 @@ private fun PlaylistDetailView(
                     itemsIndexed(plTracks) { i, t ->
                         PlaylistTrackRow(
                             track = t,
+                            isInQueue = t.id in queuedTrackIds,
                             onClick = { onTrackClick(plTracks, i) },
-                            onRemove = { onRemoveTrack(t.id) }
+                            onRemove = { onRemoveTrack(t.id) },
+                            onAddNext = { onAddNext(t) }
                         )
                     }
                 }
@@ -1711,64 +1759,136 @@ private fun PlaylistDetailView(
 @Composable
 private fun PlaylistTrackRow(
     track: AudioTrack,
+    isInQueue: Boolean,
     onClick: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onAddNext: () -> Unit
 ) {
     val liquidGlassOn = LocalBlurEnabled.current
-    Row(
+    val density = LocalDensity.current
+    // MusicScreen.TrackRow ile birebir aynı sola-swipe-ile-sıradaki-şarkıya-ekle deseni
+    // (bkz. o dosyadaki açıklama). Aynı şarkı istenildiği kadar art arda eklenebilir.
+    val swipeThresholdPx = with(density) { 120.dp.toPx() }
+    var offsetX by remember(track.id) { mutableFloatStateOf(0f) }
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
-            .then(
-                // Liste elemanı: pahalı GPU blur yerine ucuz yarı saydam tint (performans)
-                Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
-            )
-            .padding(vertical = 8.dp, horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MiuixAppTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
-        ) {
-            var loaded by remember(track.id) { mutableStateOf(false) }
-            AsyncImage(
-                model = track.albumArtUri,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop,
-                onState = { loaded = it is AsyncImagePainter.State.Success }
-            )
-            if (!loaded) {
+        val absOffset = kotlin.math.abs(offsetX.coerceAtMost(0f))
+        val progress = (absOffset / swipeThresholdPx).coerceIn(0f, 1f)
+        if (absOffset > 10f) {
+            val isThresholdReached = absOffset >= swipeThresholdPx
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f * progress),
+                        RoundedCornerShape(20.dp)
+                    )
+                    .padding(horizontal = 20.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                val iconScale by androidx.compose.animation.core.animateFloatAsState(
+                    targetValue = if (isThresholdReached) 1.25f else (0.8f + 0.2f * progress),
+                    label = "playlistTrackSwipeIconScale"
+                )
                 Icon(
-                    Icons.Filled.MusicNote,
-                    contentDescription = null,
+                    imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                    contentDescription = "Play next",
                     tint = MiuixAppTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier
+                        .size(26.dp)
+                        .graphicsLayer {
+                            scaleX = iconScale
+                            scaleY = iconScale
+                            alpha = progress
+                        }
                 )
             }
         }
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                track.title,
-                color = MiuixAppTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                track.artist,
-                color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                style = MiuixAppTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(x = with(density) { offsetX.coerceAtMost(0f).toDp() })
+                .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
+                .clip(RoundedCornerShape(20.dp))
+                .then(
+                    // Liste elemanı: pahalı GPU blur yerine ucuz yarı saydam tint (performans)
+                    Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
+                )
+                .pointerInput(track.id) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (offsetX <= -swipeThresholdPx) onAddNext()
+                            offsetX = 0f
+                        },
+                        onDragCancel = { offsetX = 0f }
+                    ) { change, dragAmount ->
+                        change.consume()
+                        offsetX = (offsetX + dragAmount).coerceAtMost(0f)
+                    }
+                }
+                .padding(vertical = 8.dp, horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MiuixAppTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                var loaded by remember(track.id) { mutableStateOf(false) }
+                AsyncImage(
+                    model = track.albumArtUri,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop,
+                    onState = { loaded = it is AsyncImagePainter.State.Success }
+                )
+                if (!loaded) {
+                    Icon(
+                        Icons.Filled.MusicNote,
+                        contentDescription = null,
+                        tint = MiuixAppTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        track.title,
+                        color = MiuixAppTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (isInQueue) {
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                            contentDescription = "In queue",
+                            tint = MiuixAppTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                Text(
+                    track.artist,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixAppTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(track.formattedDuration(), style = MiuixAppTheme.typography.labelSmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(8.dp))
         }
-        Text(track.formattedDuration(), style = MiuixAppTheme.typography.labelSmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.width(8.dp))
     }
 }
 
@@ -1776,8 +1896,10 @@ private fun PlaylistTrackRow(
 private fun DraggablePlaylistTrackRow(
     track: AudioTrack,
     isDragged: Boolean,
+    isInQueue: Boolean,
     onTrackClick: () -> Unit,
     onRemove: () -> Unit,
+    onAddNext: () -> Unit,
     dragHandleModifier: Modifier
 ) {
     val elevation by androidx.compose.animation.core.animateDpAsState(
@@ -1789,59 +1911,134 @@ private fun DraggablePlaylistTrackRow(
     // aynı kartı kullanıyor: aynı köşe yarıçapı (20.dp) ve aynı yarı saydam
     // surfaceVariant dolgusu. Sürükleme sırasında bunun ÜSTÜNE accent tint biniyor,
     // böylece taşınan öğe hâlâ ayırt edilebiliyor.
+    //
+    // Sola-swipe-ile-ekle: dikey drag SADECE sağdaki küçük DragHandle ikonundan
+    // tetiklendiği için (dragHandleModifier sadece o ikona uygulanıyor, satırın tamamına
+    // değil), satırın geri kalanına yatay swipe eklemek dikey reorder ile ÇAKIŞMIYOR.
+    val density = LocalDensity.current
+    val swipeThresholdPx = with(density) { 120.dp.toPx() }
+    var offsetX by remember(track.id) { mutableFloatStateOf(0f) }
     val rowShape = RoundedCornerShape(20.dp)
     val cardColor = MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-    Row(
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
-            .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onTrackClick() }
-            .shadow(elevation, rowShape)
-            .zIndex(if (isDragged) 1f else 0f)
             .clip(rowShape)
-            .background(cardColor, rowShape)
-            .then(
-                if (isDragged) Modifier.background(
-                    MiuixAppTheme.colorScheme.primary.copy(alpha = 0.14f),
-                    rowShape
-                ) else Modifier
-            )
-            .padding(vertical = 6.dp, horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MiuixAppTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
-        ) {
-            var loaded by remember(track.id) { mutableStateOf(false) }
-            AsyncImage(
-                model = track.albumArtUri,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop,
-                onState = { loaded = it is AsyncImagePainter.State.Success }
-            )
-            if (!loaded) {
-                Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        val absOffset = kotlin.math.abs(offsetX.coerceAtMost(0f))
+        val progress = (absOffset / swipeThresholdPx).coerceIn(0f, 1f)
+        if (absOffset > 10f && !isDragged) {
+            val isThresholdReached = absOffset >= swipeThresholdPx
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f * progress), rowShape)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                val iconScale by androidx.compose.animation.core.animateFloatAsState(
+                    targetValue = if (isThresholdReached) 1.25f else (0.8f + 0.2f * progress),
+                    label = "draggableTrackSwipeIconScale"
+                )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                    contentDescription = "Play next",
+                    tint = MiuixAppTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .size(26.dp)
+                        .graphicsLayer {
+                            scaleX = iconScale
+                            scaleY = iconScale
+                            alpha = progress
+                        }
+                )
             }
         }
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(track.title, color = MiuixAppTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(track.artist, color = MiuixAppTheme.colorScheme.onSurfaceVariant, style = MiuixAppTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        Text(track.formattedDuration(), style = MiuixAppTheme.typography.labelSmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.width(4.dp))
-        Icon(
-            imageVector = Icons.Filled.DragHandle,
-            contentDescription = "Reorder",
-            tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
+
+        Row(
             modifier = Modifier
-                .size(28.dp)
-                .then(dragHandleModifier)
-        )
+                .fillMaxWidth()
+                .height(64.dp)
+                .offset(x = with(density) { offsetX.coerceAtMost(0f).toDp() })
+                .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onTrackClick() }
+                .shadow(elevation, rowShape)
+                .zIndex(if (isDragged) 1f else 0f)
+                .clip(rowShape)
+                .background(cardColor, rowShape)
+                .then(
+                    if (isDragged) Modifier.background(
+                        MiuixAppTheme.colorScheme.primary.copy(alpha = 0.14f),
+                        rowShape
+                    ) else Modifier
+                )
+                .pointerInput(track.id) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (offsetX <= -swipeThresholdPx) onAddNext()
+                            offsetX = 0f
+                        },
+                        onDragCancel = { offsetX = 0f }
+                    ) { change, dragAmount ->
+                        change.consume()
+                        offsetX = (offsetX + dragAmount).coerceAtMost(0f)
+                    }
+                }
+                .padding(vertical = 6.dp, horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MiuixAppTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                var loaded by remember(track.id) { mutableStateOf(false) }
+                AsyncImage(
+                    model = track.albumArtUri,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop,
+                    onState = { loaded = it is AsyncImagePainter.State.Success }
+                )
+                if (!loaded) {
+                    Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        track.title,
+                        color = MiuixAppTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (isInQueue) {
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                            contentDescription = "In queue",
+                            tint = MiuixAppTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                Text(track.artist, color = MiuixAppTheme.colorScheme.onSurfaceVariant, style = MiuixAppTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Text(track.formattedDuration(), style = MiuixAppTheme.typography.labelSmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                imageVector = Icons.Filled.DragHandle,
+                contentDescription = "Reorder",
+                tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .size(28.dp)
+                    .then(dragHandleModifier)
+            )
+        }
     }
 }
