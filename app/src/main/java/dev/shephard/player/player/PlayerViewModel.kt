@@ -675,53 +675,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    /**
-     * Music / Playlist Detail listelerindeki "sola kaydır → sıradaki şarkıdan sonraya ekle"
-     * (Spotify tarzı) hareketi için. `playNext(queueIndex)`'ten farkı: o fonksiyon queue'da
-     * ZATEN BULUNAN bir track'i taşır (index tabanlı); bu fonksiyon ise queue'da hiç
-     * olmayabilecek keyfi bir [track]'i kabul edip, çalan parçadan hemen sonraki sıraya
-     * YENİ bir MediaItem olarak EKLER — `addMediaItem`, mevcut playback'i etkilemez (yeniden
-     * prepare/seek yapılmaz, ses kesilmez).
-     *
-     * Kullanıcı isteği: AYNI şarkı queue'ya istenildiği kadar art arda eklenebilsin (Queue
-     * drawer'daki playNext(queueIndex) davranışının aksine — o zaten queue'daki tek bir
-     * kopyayı taşır, kopyalamaz). Bu yüzden burada "zaten queue'da var mı" kontrolü YAPILMAZ,
-     * her çağrı yeni bir ekleme oluşturur.
-     */
-    fun insertNextInQueue(track: AudioTrack) {
-        val c = controller ?: return
-        val current = _uiState.value.queue
-        val currentTrackId = _uiState.value.currentTrack?.id
-
-        if (current.isEmpty() || currentTrackId == null) {
-            // Hiçbir şey çalmıyorsa, bu track'i tek başına başlat.
-            setQueueAndPlay(listOf(track), 0, null)
-            return
-        }
-
-        val currentStart = current.indexOfFirst { it.id == currentTrackId }.coerceAtLeast(0)
-        val insertPos = currentStart + 1
-
-        val mediaItem = MediaItem.Builder()
-            .setMediaId(track.id.toString())
-            .setUri(track.uri)
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(track.title)
-                    .setArtist(track.artist)
-                    .setAlbumTitle(track.album)
-                    .setArtworkUri(track.albumArtUri)
-                    .build()
-            )
-            .build()
-
-        c.addMediaItem(insertPos, mediaItem)
-
-        val newList = current.toMutableList().apply { add(insertPos, track) }
-        queueTracks = newList
-        _uiState.value = _uiState.value.copy(queue = newList)
-    }
-
     override fun onCleared() {
         flushListeningTime()
         controller?.removeListener(playerListener)
