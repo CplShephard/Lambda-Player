@@ -2,7 +2,13 @@
 
 package dev.shephard.player.ui.screens
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.material.icons.filled.Delete
 
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -34,13 +40,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.gestures.snapping.SnapLayoutInfoProvider
-import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -170,116 +170,20 @@ fun NowPlayingSheet(
         hasEnteredRest = true
     }
 
-    // Kapak resmi swipe-to-change-song: OuterTune'daki gibi sürekli aktif (togglesız),
-    // LazyHorizontalGrid + snap fling ile akıcı, native hızda swipe. Önceki/mevcut/sonraki
-    // parça queue içindeki index'e göre bulunur (controller'a gerek yok).
-    val currentQueueIndex = remember(state.queue, track?.id) {
-        state.queue.indexOfFirst { it.id == track?.id }
-    }
-    val previousArtTrack = if (currentQueueIndex > 0) state.queue.getOrNull(currentQueueIndex - 1) else null
-    val nextArtTrack = if (currentQueueIndex >= 0) state.queue.getOrNull(currentQueueIndex + 1) else null
-    val artSwipeItems = listOfNotNull(previousArtTrack, track, nextArtTrack)
-    val artSwipeCurrentIndex = artSwipeItems.indexOfFirst { it.id == track?.id }.coerceAtLeast(0)
-
-    val artGridState = rememberLazyGridState()
-    val artGridScrollOffset by remember { derivedStateOf { artGridState.firstVisibleItemScrollOffset } }
-    val artGridFirstVisibleIndex by remember { derivedStateOf { artGridState.firstVisibleItemIndex } }
-
-    // Sheet ilk açıldığında artGridState index=0'da başlar, ama gerçek
-    // artSwipeCurrentIndex genelde 1'dir. Bu fark kullanıcı hiç dokunmadan skip
-    // tetiklememeli; commit yalnızca grid gerçek kullanıcı scroll'u gördükten sonra yapılır.
-    var hasUserScrolledArtGrid by remember { mutableStateOf(false) }
-    var artSkipInFlight by remember { mutableStateOf(false) }
-    var hasPlacedInitialArt by remember { mutableStateOf(false) }
-    LaunchedEffect(artGridState.isScrollInProgress) {
-        if (artGridState.isScrollInProgress) hasUserScrolledArtGrid = true
-    }
-
-    // Snap tamamlanınca hedef indexe göre şarkıyı değiştir. Key'e firstVisibleItemIndex'i
-    // de dahil ediyoruz: bazı Compose sürümlerinde item tam snap noktasındayken offset 0
-    // kalır, sadece index değişir; eski kod offset değişmediği için skip'i kaçırabiliyordu.
-    LaunchedEffect(artGridFirstVisibleIndex, artGridScrollOffset, artGridState.isScrollInProgress) {
-        if (!hasUserScrolledArtGrid || artSkipInFlight) return@LaunchedEffect
-        if (artGridState.isScrollInProgress || artGridScrollOffset != 0) return@LaunchedEffect
-        when {
-            artGridFirstVisibleIndex > artSwipeCurrentIndex -> {
-                artSkipInFlight = true
-                hasUserScrolledArtGrid = false
-                playerViewModel.skipToNext()
-            }
-            artGridFirstVisibleIndex < artSwipeCurrentIndex -> {
-                artSkipInFlight = true
-                hasUserScrolledArtGrid = false
-                playerViewModel.skipToPrevious()
-            }
-        }
-    }
-
-    // Track/queue değişince yeni "önceki/mevcut/sonraki" penceresinin mevcut öğesine oturt.
-    // Dışarıdan next/previous tuşuyla gelen değişimde eski kapak yeni pencerede komşu index'te
-    // durur; önce o komşuya snap edip sonra merkeze animate ediyoruz. Böylece next: sağdan
-    // ortaya, previous: soldan ortaya gelen eski NowPlaying animasyonu geri gelir. Swipe ile
-    // tetiklenen değişimde ise kullanıcı zaten fiziksel scroll animasyonunu gördüğü için sadece
-    // sessizce merkeze sabitliyoruz.
-    //
-    // ÖNEMLİ: Kayma animasyonu YALNIZCA çalan şarkı gerçekten değiştiğinde oynar.
-    // Queue yalnızca yeniden sıralandığında (remix, sürükle-bırak, play next...) çalan
-    // şarkı aynı kaldığı için sessizce merkeze snap edilir — remix tuşuna art arda
-    // basınca "çalan şarkı sonrakiyle yer değiştiriyor" gibi görünen görsel hata buydu.
-    var lastArtTrackId by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(track?.id, state.queue) {
-        hasUserScrolledArtGrid = false
-        val trackChanged = track?.id != lastArtTrackId
-        lastArtTrackId = track?.id
-        if (artSwipeItems.isNotEmpty()) {
-            val target = artSwipeCurrentIndex
-            if (!hasPlacedInitialArt) {
-                artGridState.scrollToItem(target)
-                hasPlacedInitialArt = true
-            } else if (artSkipInFlight) {
-                artGridState.scrollToItem(target)
-                artSkipInFlight = false
-            } else if (!trackChanged) {
-                // Sadece queue sırası değişti (örn. remix): animasyonsuz merkeze otur.
-                artGridState.scrollToItem(target)
-            } else {
-                val start = when {
-                    navigationDirection > 0 && target > 0 -> target - 1
-                    navigationDirection < 0 && target < artSwipeItems.lastIndex -> target + 1
-                    else -> target
-                }
-                if (start != target) {
-                    // Stride'ı (bir kapak + aradaki 16dp boşluk) scroll'dan ÖNCE, mevcut
-                    // layout bilgisinden hesapla — scrollToItem sonrası layoutInfo bir frame
-                    // geride kalabiliyor.
-                    val itemWidthPx = artGridState.layoutInfo.visibleItemsInfo.firstOrNull()?.size?.width ?: 0
-                    val stridePx = itemWidthPx + with(density) { 16.dp.toPx() }
-                    artGridState.scrollToItem(start)
-                    if (itemWidthPx > 0) {
-                        // animateScrollToItem'ın sabit (çok hızlı) animasyonu yerine daha
-                        // yavaş, yumuşak bir tween — şarkıdan şarkıya geçiş artık akıcı görünür.
-                        artGridState.animateScrollBy(
-                            value = stridePx * (target - start),
-                            animationSpec = androidx.compose.animation.core.tween(
-                                durationMillis = 500,
-                                easing = androidx.compose.animation.core.FastOutSlowInEasing
-                            )
-                        )
-                        // Olası yuvarlama sapmasını düzelt (görsel sıçrama yaratmaz, fark < 1px)
-                        artGridState.scrollToItem(target)
-                    } else {
-                        artGridState.animateScrollToItem(target)
-                    }
-                } else {
-                    artGridState.scrollToItem(target)
-                }
-            }
-        } else {
-            artSkipInFlight = false
-        }
-    }
-
     val glow = Color(state.glowColorArgb)
+
+    // Next/Previous tuşlarına basınca kapak geçişinin akıcı olması için tween süre/easing
+    // ayarı. Kasma şikayeti eski LazyHorizontalGrid+snap-fling mekanizmasının HER FRAME
+    // scroll state hesaplaması yapmasından kaynaklanıyordu; AnimatedContent ise sadece
+    // track gerçekten değiştiğinde (tuşa basılınca) bir kerelik animasyon çalıştırır.
+    val artSlideSpec = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(
+        durationMillis = 320,
+        easing = androidx.compose.animation.core.FastOutSlowInEasing
+    )
+    val artFadeSpec = androidx.compose.animation.core.tween<Float>(
+        durationMillis = 220,
+        easing = androidx.compose.animation.core.LinearOutSlowInEasing
+    )
 
     // Drag dismiss için pencerenin GERÇEK ölçülen yüksekliği (px). Daha önce
     // LocalConfiguration.screenHeightDp kullanılıyordu, bu ise her zaman cihazın TÜM ekran
@@ -409,125 +313,103 @@ fun NowPlayingSheet(
 
             // Album art + title
             Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-                // Kapak resmi: OuterTune'daki "swipe to change songs" ile birebir aynı mekanizma —
-                // LazyHorizontalGrid + snap fling, togglesız her zaman aktif. Önceki/mevcut/sonraki
-                // kapak yan yana dizilir, snap tamamlanınca gerçek şarkı değişimi tetiklenir.
-                // Elle yazılmış detectHorizontalDragGestures + Animatable yerine native scroll
-                // fiziği (fling velocity, snap animasyonu) kullanıldığı için akıcılık OS seviyesinde.
+                // Kapak resmi: next/previous tuşlarına basınca AnimatedContent ile
+                // soldan/sağdan kayan geçiş (yön navigationDirection'a göre). Swipe gesture'ı
+                // kaldırıldı — kullanıcı isteğiyle geri alındı, sadece tuşlarla değişim var.
                 BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                     val maxArtHeight = maxHeight * 0.42f
-                    // ÖNEMLİ: item genişliği tam ekran (maxWidth) OLAMAZ eğer aralarında
-                    // Arrangement.spacedBy ile boşluk varsa — çünkü LazyHorizontalGrid'de
-                    // spacing, her item'dan SONRA eklenir ve toplam genişliği aşar. Sonuç:
-                    // komşu (henüz görünmemesi gereken) kapağın kenarından ince bir dikey
-                    // şerit ekranın sağında/solunda sızıyordu. Item genişliğini spacing kadar
-                    // küçülterek (item + spacing = tam ekran) komşu kapak artık tam olarak
-                    // ekranın dışında kalıyor, swipe sırasında iki kapak arasında görülmek
-                    // istenen boşluk da bu spacing ile sağlanıyor.
-                    val artItemSpacing = 16.dp
-                    val artItemWidth = maxWidth - artItemSpacing
-                    val titleBlockHeight = 92.dp
-                    val artRowHeight = minOf(artItemWidth, maxArtHeight) + titleBlockHeight
 
-                    val artSnapLayoutInfoProvider = remember(artGridState) {
-                        SnapLayoutInfoProvider(
-                            lazyGridState = artGridState,
-                            snapPosition = androidx.compose.foundation.gestures.snapping.SnapPosition.Center
-                        )
-                    }
-
-                    if (artSwipeItems.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 24.dp)
-                                .aspectRatio(1f)
-                                .heightIn(max = maxArtHeight)
-                                .clip(RoundedCornerShape(28.dp))
-                                .background(MiuixAppTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.MusicNote,
-                                contentDescription = null,
-                                tint = MiuixAppTheme.colorScheme.primary,
-                                modifier = Modifier.size(72.dp)
-                            )
-                        }
-                    } else {
-                        LazyHorizontalGrid(
-                            state = artGridState,
-                            rows = GridCells.Fixed(1),
-                            flingBehavior = rememberSnapFlingBehavior(artSnapLayoutInfoProvider),
-                            userScrollEnabled = true,
-                            horizontalArrangement = Arrangement.spacedBy(artItemSpacing),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 24.dp)
-                                .height(artRowHeight)
-                        ) {
-                            gridItemsIndexed(
-                                items = artSwipeItems,
-                                key = { _, item -> item.id }
-                            ) { _, itemTrack ->
-                                // Kapak VE başlık/artist aynı swipe item'ının içinde: parmak
-                                // kapağı kaydırırken ikisi de fiziksel olarak birlikte hareket
-                                // eder — ayrı bir AnimatedContent ile "senkronize" etmeye gerek
-                                // kalmaz, çünkü zaten aynı scroll offsetini paylaşıyorlar.
+                    androidx.compose.animation.AnimatedContent(
+                        targetState = track,
+                        transitionSpec = {
+                            // navigationDirection: skipToNext() sırasında +1, skipToPrevious()
+                            // sırasında -1 set ediliyor (PlayerViewModel). Next'e basınca yeni
+                            // kapak sağdan gelir eskisi sola kayar; previous'ta bunun tersi —
+                            // eski swipe-to-change'teki görsel yönle birebir aynı.
+                            val forward = navigationDirection >= 0
+                            val enter = slideInHorizontally(
+                                animationSpec = artSlideSpec,
+                                initialOffsetX = { fullWidth -> if (forward) fullWidth else -fullWidth }
+                            ) + fadeIn(animationSpec = artFadeSpec)
+                            val exit = slideOutHorizontally(
+                                animationSpec = artSlideSpec,
+                                targetOffsetX = { fullWidth -> if (forward) -fullWidth else fullWidth }
+                            ) + fadeOut(animationSpec = artFadeSpec)
+                            enter togetherWith exit
+                        },
+                        label = "nowPlayingArt",
+                        modifier = Modifier.fillMaxWidth()
+                    ) { animatedTrack ->
+                        if (animatedTrack == null) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 24.dp)
+                                    .aspectRatio(1f)
+                                    .heightIn(max = maxArtHeight)
+                                    .clip(RoundedCornerShape(28.dp))
+                                    .background(MiuixAppTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.MusicNote,
+                                    contentDescription = null,
+                                    tint = MiuixAppTheme.colorScheme.primary,
+                                    modifier = Modifier.size(72.dp)
+                                )
+                            }
+                        } else {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 24.dp)
+                                        .aspectRatio(1f)
+                                        .heightIn(max = maxArtHeight)
+                                        .clip(RoundedCornerShape(28.dp))
+                                        .background(MiuixAppTheme.colorScheme.surfaceVariant),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    var artLoaded by remember(animatedTrack.id) { mutableStateOf(false) }
+                                    AsyncImage(
+                                        model = animatedTrack.albumArtUri,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop,
+                                        onState = { artLoaded = it is AsyncImagePainter.State.Success }
+                                    )
+                                    if (!artLoaded) {
+                                        Icon(
+                                            imageVector = Icons.Filled.MusicNote,
+                                            contentDescription = null,
+                                            tint = MiuixAppTheme.colorScheme.primary,
+                                            modifier = Modifier.size(72.dp)
+                                        )
+                                    }
+                                }
                                 Column(
-                                    modifier = Modifier.width(artItemWidth),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 24.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .aspectRatio(1f)
-                                            .heightIn(max = maxArtHeight)
-                                            .clip(RoundedCornerShape(28.dp))
-                                            .background(MiuixAppTheme.colorScheme.surfaceVariant),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        var artLoaded by remember(itemTrack.id) { mutableStateOf(false) }
-                                        AsyncImage(
-                                            model = itemTrack.albumArtUri,
-                                            contentDescription = null,
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Crop,
-                                            onState = { artLoaded = it is AsyncImagePainter.State.Success }
-                                        )
-                                        if (!artLoaded) {
-                                            Icon(
-                                                imageVector = Icons.Filled.MusicNote,
-                                                contentDescription = null,
-                                                tint = MiuixAppTheme.colorScheme.primary,
-                                                modifier = Modifier.size(72.dp)
-                                            )
-                                        }
-                                    }
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 24.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Text(
-                                            text = itemTrack.title,
-                                            style = MiuixAppTheme.typography.titleLarge,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MiuixAppTheme.colorScheme.onBackground,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.padding(horizontal = 24.dp)
-                                        )
-                                        Text(
-                                            text = itemTrack.artist,
-                                            style = MiuixAppTheme.typography.bodyMedium,
-                                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.padding(horizontal = 24.dp)
-                                        )
-                                    }
+                                    Text(
+                                        text = animatedTrack.title,
+                                        style = MiuixAppTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MiuixAppTheme.colorScheme.onBackground,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(horizontal = 24.dp)
+                                    )
+                                    Text(
+                                        text = animatedTrack.artist,
+                                        style = MiuixAppTheme.typography.bodyMedium,
+                                        color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(horizontal = 24.dp)
+                                    )
                                 }
                             }
                         }
@@ -620,7 +502,6 @@ fun NowPlayingSheet(
                             onMove = { from, to -> playerViewModel.moveQueueItem(from, to) },
                             onPlay = { playerViewModel.playQueueItem(it) },
                             onRemove = { playerViewModel.removeFromQueue(it) },
-                            onPlayNext = { playerViewModel.playNext(it) },
                             strings = strings
                         )
                     }
@@ -1128,7 +1009,6 @@ private fun QueueList(
     onMove: (from: Int, to: Int) -> Unit,
     onPlay: (index: Int) -> Unit,
     onRemove: (index: Int) -> Unit,
-    onPlayNext: (index: Int) -> Unit,
     strings: dev.shephard.player.ui.i18n.Strings
 ) {
     val currentStartIndex = remember(queue, currentTrackId) {
@@ -1206,7 +1086,6 @@ private fun QueueList(
                         isPlaying = track.id == currentTrackId,
                         isDragged = isDragging,
                         onPlay = { onPlay(index) },
-                        onPlayNext = { onPlayNext(index) },
                         onRemove = { onRemove(index) },
                         dragHandleModifier = Modifier.draggableHandle()
                     )
@@ -1223,7 +1102,6 @@ private fun QueueTrackItem(
     isPlaying: Boolean,
     isDragged: Boolean,
     onPlay: () -> Unit,
-    onPlayNext: () -> Unit,
     onRemove: () -> Unit,
     dragHandleModifier: Modifier,
 ) {
@@ -1246,32 +1124,26 @@ private fun QueueTrackItem(
         val absOffset = kotlin.math.abs(offsetX)
         val progress = (absOffset / swipeThresholdPx).coerceIn(0f, 1f)
         if (absOffset > 10f) {
-            val isSwipeRight = offsetX > 0f
-            val isSwipeLeft = offsetX < 0f
             val isThresholdReached = absOffset >= swipeThresholdPx
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        when {
-                            isSwipeRight -> Color(0xFFE53935).copy(alpha = 0.16f * progress)
-                            isSwipeLeft -> MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f * progress)
-                            else -> Color.Transparent
-                        },
+                        Color(0xFFE53935).copy(alpha = 0.16f * progress),
                         RoundedCornerShape(12.dp)
                     )
                     .padding(horizontal = 20.dp),
-                contentAlignment = if (isSwipeRight) Alignment.CenterStart else Alignment.CenterEnd
+                contentAlignment = Alignment.CenterStart
             ) {
                 val iconScale by animateFloatAsState(
                     targetValue = if (isThresholdReached) 1.25f else (0.8f + 0.2f * progress),
                     label = "swipeIconScale"
                 )
                 Icon(
-                    imageVector = if (isSwipeRight) Icons.Filled.Delete else Icons.AutoMirrored.Filled.QueueMusic,
-                    contentDescription = if (isSwipeRight) "Remove" else "Pin to play next",
-                    tint = if (isSwipeRight) Color(0xFFE53935) else MiuixAppTheme.colorScheme.primary,
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = "Remove",
+                    tint = Color(0xFFE53935),
                     modifier = Modifier
                         .size(26.dp)
                         .graphicsLayer {
@@ -1301,15 +1173,15 @@ private fun QueueTrackItem(
                 .pointerInput(track.id) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
-                            when {
-                                offsetX < -swipeThresholdPx -> onPlayNext()
-                                offsetX > swipeThresholdPx -> onRemove()
-                            }
+                            if (offsetX > swipeThresholdPx) onRemove()
                             offsetX = 0f
                         }
                     ) { change, dragAmount ->
                         change.consume()
-                        offsetX += dragAmount
+                        // Sadece sağa (pozitif) sürüklemeye izin ver — sola swipe ile
+                        // "sıradaki şarkıya sabitleme" özelliği kaldırıldı, sadece
+                        // sağa-swipe-ile-kaldırma davranışı kalıyor.
+                        offsetX = (offsetX + dragAmount).coerceAtLeast(0f)
                     }
                 }
                 .padding(vertical = 6.dp, horizontal = 8.dp),
