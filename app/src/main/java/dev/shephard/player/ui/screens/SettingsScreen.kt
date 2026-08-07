@@ -41,6 +41,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.components.captureForTopBarBlur
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -163,7 +164,7 @@ fun SettingsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .dev.shephard.player.ui.components.captureForTopBarBlur(topBarState)
+                    .captureForTopBarBlur(topBarState)
                     .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                     .overScrollVertical()
                     .verticalScroll(rememberScrollState())
@@ -834,6 +835,7 @@ private fun SettingsPageScaffold(
     onBack: () -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val strings = LocalStrings.current
     val density = LocalDensity.current
     val scrollState = rememberScrollState()
     val topAppBarScrollBehavior = MiuixScrollBehavior()

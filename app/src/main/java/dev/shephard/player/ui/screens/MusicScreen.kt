@@ -46,6 +46,7 @@ import dev.shephard.player.ui.miuix.IconButton
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.components.MiuixDrawer
 import dev.shephard.player.ui.components.MiuixDrawerActionHeader
+import dev.shephard.player.ui.components.captureForTopBarBlur
 import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.miuix.OutlinedTextField
 import dev.shephard.player.ui.miuix.Text
@@ -180,7 +181,7 @@ fun MusicScreen(
                             state = gridState,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .dev.shephard.player.ui.components.captureForTopBarBlur(topBarState)
+                                .captureForTopBarBlur(topBarState)
                                 .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                                 .overScrollVertical(),
                             contentPadding = PaddingValues(
@@ -205,7 +206,7 @@ fun MusicScreen(
                             state = listState,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .dev.shephard.player.ui.components.captureForTopBarBlur(topBarState)
+                                .captureForTopBarBlur(topBarState)
                                 .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                                 .overScrollVertical(),
                             contentPadding = PaddingValues(

@@ -65,6 +65,7 @@ import dev.shephard.player.ui.miuix.IconButton
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.components.MiuixDrawer
 import dev.shephard.player.ui.components.MiuixDrawerActionHeader
+import dev.shephard.player.ui.components.captureForTopBarBlur
 import dev.shephard.player.ui.navigation.PageTransitions
 import dev.shephard.player.ui.navigation.SubmenuNavGuard
 import dev.shephard.player.ui.components.rememberDrawerDismiss
@@ -955,7 +956,7 @@ private fun PlaylistListView(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .dev.shephard.player.ui.components.captureForTopBarBlur(topBarState)
+                        .captureForTopBarBlur(topBarState)
                         .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                         .padding(32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -985,7 +986,7 @@ private fun PlaylistListView(
                         state = playlistGridState,
                         modifier = Modifier
                             .fillMaxSize()
-                            .dev.shephard.player.ui.components.captureForTopBarBlur(topBarState)
+                            .captureForTopBarBlur(topBarState)
                             .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                             .overScrollVertical(),
                         contentPadding = PaddingValues(
@@ -1032,7 +1033,7 @@ private fun PlaylistListView(
                         state = playlistListState,
                         modifier = Modifier
                             .fillMaxSize()
-                            .dev.shephard.player.ui.components.captureForTopBarBlur(topBarState)
+                            .captureForTopBarBlur(topBarState)
                             .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                             .overScrollVertical(),
                         contentPadding = PaddingValues(
