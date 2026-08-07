@@ -115,6 +115,9 @@ import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
 import dev.shephard.player.ui.components.CustomColorPickerDialog
 import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.miuixBlurSurface
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import dev.shephard.player.ui.glass.bgeffect.BgEffectBackground
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -160,6 +163,7 @@ fun SettingsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .dev.shephard.player.ui.components.captureForTopBarBlur(topBarState)
                     .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                     .overScrollVertical()
                     .verticalScroll(rememberScrollState())
@@ -173,19 +177,19 @@ fun SettingsScreen(
                 SettingsNavigationCard(
                     icon = Icons.Filled.ColorLens,
                     title = strings.themeSettings,
-                    summary = "Colors, wallpaper, Liquid Glass, layout and language",
+                    summary = strings.themeSettingsSummary,
                     onClick = onOpenThemeSettings
                 )
                 SettingsNavigationCard(
                     icon = Icons.Filled.MusicNote,
                     title = strings.playbackSettings,
-                    summary = "Crossfade, gapless playback and audio focus",
+                    summary = strings.playbackSettingsSummary,
                     onClick = onOpenPlayerSettings
                 )
                 SettingsNavigationCard(
                     icon = Icons.Filled.Info,
-                    title = "About Lambda Player",
-                    summary = "Version, project links and credits",
+                    title = strings.aboutLambdaPlayerTitle,
+                    summary = strings.aboutLambdaPlayerSummary,
                     onClick = onOpenAbout
                 )
 
@@ -349,7 +353,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             )
             val themeModeSelectedIndex = themeModeOptions.indexOfFirst { it.first == themeMode }.coerceAtLeast(0)
             top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
-                title = strings.darkMode,
+                title = strings.themeMode,
                 items = themeModeOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
                 selectedIndex = themeModeSelectedIndex,
                 // ÖNEMLİ: BasicComponent (WindowSpinnerPreference'ın altında kullandığı
@@ -424,7 +428,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 ) {
                     AsyncImage(
                         model = wallpaper,
-                        contentDescription = "Wallpaper preview",
+                        contentDescription = strings.wallpaperPreviewContentDescription,
                         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
                         contentScale = ContentScale.Crop,
                         onState = { previewLoaded = it is AsyncImagePainter.State.Success }
@@ -761,27 +765,27 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
             }
             item(key = "about_content") {
                 Column(modifier = Modifier.fillParentMaxHeight()) {
-                    SmallTitle("About")
+                    SmallTitle(strings.aboutSectionTitle)
                     MiuixNativeCard(
                         modifier = Modifier
                             .padding(horizontal = 12.dp)
                             .padding(bottom = 12.dp)
                     ) {
                         ArrowPreference(
-                            title = "GitHub",
+                            title = strings.github,
                             summary = "CplShephard",
                             onClick = { uriHandler.openUri("https://github.com/CplShephard") }
                         )
                         // MADDE 9 — InstallerX About'taki "Open Source Licenses" satırının
                         // yerinde artık Lambda Player'ın kendi kaynak kodu bağlantısı var.
                         ArrowPreference(
-                            title = "Lambda Player Source Code",
+                            title = strings.sourceCode,
                             summary = "github.com/CplShephard/Lambda-Player",
                             onClick = { uriHandler.openUri("https://github.com/CplShephard/Lambda-Player") }
                         )
                         ArrowPreference(
                             title = "Miuix",
-                            summary = "A UI library for Compose MultiPlatform",
+                            summary = strings.miuixDescription,
                             onClick = { uriHandler.openUri("https://github.com/miuix-project/miuix") }
                         )
                     }
@@ -792,7 +796,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
 
         // Üstte sabit app bar: "About" başlığı kaydırdıkça ORTADA belirir
         SmallTopAppBar(
-            title = "About",
+            title = strings.aboutSectionTitle,
             modifier = Modifier.align(Alignment.TopCenter),
             color = MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
             titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
@@ -809,7 +813,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = strings.backContentDescription,
                         tint = MiuixAppTheme.colorScheme.onBackground
                     )
                 }
@@ -833,6 +837,11 @@ private fun SettingsPageScaffold(
     val density = LocalDensity.current
     val scrollState = rememberScrollState()
     val topAppBarScrollBehavior = MiuixScrollBehavior()
+    val liquidGlassOn = LocalBlurEnabled.current
+    // InstallerX'teki gibi sayfaya özel backdrop — bkz. CollapsingTopBarState.pageBackdrop
+    // açıklaması (CollapsingTopBar.kt). Bu scaffold CollapsingTopBarState kullanmadığı için
+    // kendi backdrop'unu kuruyor.
+    val pageBackdrop = if (liquidGlassOn) rememberLayerBackdrop() else null
 
     // Büyük başlık ~44dp'lik kaydırma aralığında kaybolur; aynı aralıkta app bar'daki
     // ortalanmış küçük başlık belirir.
@@ -844,7 +853,19 @@ private fun SettingsPageScaffold(
     Column(modifier = Modifier.fillMaxSize().background(MiuixAppTheme.colorScheme.background)) {
         SmallTopAppBar(
             title = title,
-            color = MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
+            modifier = if (pageBackdrop != null) {
+                Modifier.miuixBlurSurface(
+                    backdrop = pageBackdrop,
+                    shape = androidx.compose.ui.graphics.RectangleShape,
+                    blurRadius = 26f,
+                    tintAlpha = scrollProgress * 0.85f,
+                    fallbackColor = androidx.compose.ui.graphics.Color.Transparent
+                )
+            } else Modifier,
+            color = if (pageBackdrop != null)
+                androidx.compose.ui.graphics.Color.Transparent
+            else
+                MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
             titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
             scrollBehavior = topAppBarScrollBehavior,
             // NOT: SmallTopAppBar zaten WindowInsets.systemBars(Top)'u KOŞULSUZ kendi
@@ -862,13 +883,14 @@ private fun SettingsPageScaffold(
                         .bounceClick { onBack() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MiuixAppTheme.colorScheme.onBackground)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription, tint = MiuixAppTheme.colorScheme.onBackground)
                 }
             }
         )
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .then(pageBackdrop?.let { Modifier.layerBackdrop(it) } ?: Modifier)
                 .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection)
                 .overScrollVertical()
                 .verticalScroll(scrollState)

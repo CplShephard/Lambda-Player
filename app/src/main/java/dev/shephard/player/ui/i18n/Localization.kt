@@ -115,6 +115,23 @@ data class Strings(
     val blurEffect: String,
     val blurEffectDescription: String,
     val layout: String,
+    // Theme Mode toggle'ının (Light/Dark/Auto seçtiren dropdown) BAŞLIĞI — önceden
+    // yanlışlıkla `darkMode` ("Dark mode") kullanılıyordu, oysa bu üç seçenekten sadece
+    // biri "dark mode", dropdown'ın kendisi genel bir tema modu seçicisidir.
+    val themeMode: String,
+    // About sayfası — önceden tamamen hardcoded İngilizce'ydi, hiçbir dile çevrilmiyordu.
+    val aboutSectionTitle: String,
+    val github: String,
+    val sourceCode: String,
+    val miuixDescription: String,
+    val backContentDescription: String,
+    // Settings ana sayfasındaki navigasyon kartlarının açıklama satırları (summary) ve
+    // About kartının kendi başlığı — önceden hardcoded İngilizce'ydi.
+    val themeSettingsSummary: String,
+    val playbackSettingsSummary: String,
+    val aboutLambdaPlayerTitle: String,
+    val aboutLambdaPlayerSummary: String,
+    val wallpaperPreviewContentDescription: String,
 )
 
 private val EN = Strings(
@@ -203,7 +220,18 @@ private val EN = Strings(
     removeCover = "Remove cover",
     blurEffect = "Blur Effect",
     blurEffectDescription = "Real background blur for the dock, cards and sheets. The dock turns into Liquid Glass on Android 13+.",
-    layout = "Layout"
+    layout = "Layout",
+    themeMode = "Theme Mode",
+    aboutSectionTitle = "About",
+    github = "GitHub",
+    sourceCode = "Lambda Player Source Code",
+    miuixDescription = "A UI library for Compose MultiPlatform",
+    backContentDescription = "Back",
+    themeSettingsSummary = "Colors, wallpaper, Liquid Glass, layout and language",
+    playbackSettingsSummary = "Crossfade, gapless playback and audio focus",
+    aboutLambdaPlayerTitle = "About Lambda Player",
+    aboutLambdaPlayerSummary = "Version, project links and credits",
+    wallpaperPreviewContentDescription = "Wallpaper preview"
 )
 
 private val TR = EN.copy(
@@ -291,7 +319,18 @@ private val TR = EN.copy(
     removeCover = "Kapağı kaldır",
     blurEffect = "Bulanıklık Efekti",
     blurEffectDescription = "Dock, kartlar ve sayfalar için gerçek arka plan bulanıklığı. Android 13+ cihazlarda dock Liquid Glass görünümüne geçer.",
-    layout = "Düzen"
+    layout = "Düzen",
+    themeMode = "Tema Modu",
+    aboutSectionTitle = "Hakkında",
+    github = "GitHub",
+    sourceCode = "Lambda Player Kaynak Kodu",
+    miuixDescription = "Compose MultiPlatform için bir UI kütüphanesi",
+    backContentDescription = "Geri",
+    themeSettingsSummary = "Renkler, duvar kağıdı, Liquid Glass, düzen ve dil",
+    playbackSettingsSummary = "Crossfade, kesintisiz oynatma ve ses odağı",
+    aboutLambdaPlayerTitle = "Lambda Player Hakkında",
+    aboutLambdaPlayerSummary = "Sürüm, proje bağlantıları ve emeği geçenler",
+    wallpaperPreviewContentDescription = "Duvar kağıdı önizlemesi"
 )
 
 private val ZH = EN.copy(
@@ -379,7 +418,18 @@ private val ZH = EN.copy(
     removeCover = "移除封面",
     blurEffect = "模糊效果",
     blurEffectDescription = "为底栏、卡片和面板启用真实的背景模糊。Android 13+ 上底栏将呈现液态玻璃效果。",
-    layout = "布局"
+    layout = "布局",
+    themeMode = "主题模式",
+    aboutSectionTitle = "关于",
+    github = "GitHub",
+    sourceCode = "Lambda Player 源代码",
+    miuixDescription = "适用于 Compose MultiPlatform 的 UI 库",
+    backContentDescription = "返回",
+    themeSettingsSummary = "颜色、壁纸、液态玻璃、布局和语言",
+    playbackSettingsSummary = "淡入淡出、无缝播放和音频焦点",
+    aboutLambdaPlayerTitle = "关于 Lambda Player",
+    aboutLambdaPlayerSummary = "版本、项目链接和致谢",
+    wallpaperPreviewContentDescription = "壁纸预览"
 )
 
 private val ES = EN.copy(
@@ -467,7 +517,18 @@ private val ES = EN.copy(
     removeCover = "Quitar portada",
     blurEffect = "Efecto de Desenfoque",
     blurEffectDescription = "Desenfoque real del fondo para el dock, tarjetas y hojas. En Android 13+ el dock se convierte en Liquid Glass.",
-    layout = "Diseño"
+    layout = "Diseño",
+    themeMode = "Modo de tema",
+    aboutSectionTitle = "Acerca de",
+    github = "GitHub",
+    sourceCode = "Código fuente de Lambda Player",
+    miuixDescription = "Una biblioteca de UI para Compose MultiPlatform",
+    backContentDescription = "Atrás",
+    themeSettingsSummary = "Colores, fondo de pantalla, Liquid Glass, diseño e idioma",
+    playbackSettingsSummary = "Crossfade, reproducción continua y enfoque de audio",
+    aboutLambdaPlayerTitle = "Acerca de Lambda Player",
+    aboutLambdaPlayerSummary = "Versión, enlaces del proyecto y créditos",
+    wallpaperPreviewContentDescription = "Vista previa del fondo de pantalla"
 )
 
 private val RU = EN.copy(
@@ -555,7 +616,18 @@ private val RU = EN.copy(
     removeCover = "Удалить обложку",
     blurEffect = "Эффект размытия",
     blurEffectDescription = "Настоящее размытие фона для дока, карточек и панелей. На Android 13+ док становится Liquid Glass.",
-    layout = "Вид"
+    layout = "Вид",
+    themeMode = "Режим темы",
+    aboutSectionTitle = "О приложении",
+    github = "GitHub",
+    sourceCode = "Исходный код Lambda Player",
+    miuixDescription = "Библиотека UI для Compose MultiPlatform",
+    backContentDescription = "Назад",
+    themeSettingsSummary = "Цвета, обои, Liquid Glass, макет и язык",
+    playbackSettingsSummary = "Кроссфейд, бесшовное воспроизведение и аудиофокус",
+    aboutLambdaPlayerTitle = "О Lambda Player",
+    aboutLambdaPlayerSummary = "Версия, ссылки на проект и благодарности",
+    wallpaperPreviewContentDescription = "Предпросмотр обоев"
 )
 
 private val KA = EN.copy(
@@ -643,7 +715,18 @@ private val KA = EN.copy(
     removeCover = "ყდის წაშლა",
     blurEffect = "დაბინდვის ეფექტი",
     blurEffectDescription = "ნამდვილი ფონის დაბინდვა დოკის, ბარათებისა და პანელებისთვის. Android 13+-ზე დოკი Liquid Glass ხდება.",
-    layout = "ხედი"
+    layout = "ხედი",
+    themeMode = "თემის რეჟიმი",
+    aboutSectionTitle = "შესახებ",
+    github = "GitHub",
+    sourceCode = "Lambda Player-ის კოდი",
+    miuixDescription = "UI ბიბლიოთეკა Compose MultiPlatform-ისთვის",
+    backContentDescription = "უკან",
+    themeSettingsSummary = "ფერები, ფონი, Liquid Glass, განლაგება და ენა",
+    playbackSettingsSummary = "კროსფეიდი, უწყვეტი დაკვრა და აუდიო ფოკუსი",
+    aboutLambdaPlayerTitle = "Lambda Player-ის შესახებ",
+    aboutLambdaPlayerSummary = "ვერსია, პროექტის ბმულები და მადლობები",
+    wallpaperPreviewContentDescription = "ფონის გადახედვა"
 )
 
 private val AR = EN.copy(
@@ -731,7 +814,18 @@ private val AR = EN.copy(
     removeCover = "إزالة الغلاف",
     blurEffect = "تأثير الضبابية",
     blurEffectDescription = "ضبابية حقيقية للخلفية لشريط التنقل والبطاقات واللوحات. على Android 13+ يتحول الشريط إلى Liquid Glass.",
-    layout = "التخطيط"
+    layout = "التخطيط",
+    themeMode = "وضع السمة",
+    aboutSectionTitle = "حول",
+    github = "GitHub",
+    sourceCode = "الكود المصدري لـ Lambda Player",
+    miuixDescription = "مكتبة واجهة مستخدم لـ Compose MultiPlatform",
+    backContentDescription = "رجوع",
+    themeSettingsSummary = "الألوان، الخلفية، Liquid Glass، التخطيط واللغة",
+    playbackSettingsSummary = "التلاشي المتقاطع، التشغيل السلس وتركيز الصوت",
+    aboutLambdaPlayerTitle = "حول Lambda Player",
+    aboutLambdaPlayerSummary = "الإصدار وروابط المشروع وشكر وتقدير",
+    wallpaperPreviewContentDescription = "معاينة الخلفية"
 )
 
 val AllLanguages: List<Strings> = listOf(EN, TR, ZH, ES, RU, KA, AR)

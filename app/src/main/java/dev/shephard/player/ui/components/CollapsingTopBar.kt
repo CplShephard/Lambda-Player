@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.Composable
@@ -15,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.miuixBlurSurface
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.Text
@@ -22,6 +25,9 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import androidx.compose.ui.text.font.FontWeight
 
 /**
@@ -52,14 +58,36 @@ import androidx.compose.ui.text.font.FontWeight
 @Composable
 fun rememberCollapsingTopBarState(): CollapsingTopBarState {
     val scrollBehavior = MiuixScrollBehavior()
-    return remember(scrollBehavior) { CollapsingTopBarState(scrollBehavior) }
+    // InstallerX'teki gibi: kaydırınca küçülen top bar'ın gerçek blur alması için, SAYFAYA
+    // ÖZEL bir backdrop kuruluyor (bkz. rememberMiuixBlurBackdrop / MiuixThemeSettingsPage.kt
+    // referans alındı). Bu, dock/MiniPlayer'ın kullandığı `LocalAppBackdrop` (sadece sabit
+    // wallpaper, tüm uygulama için TEK ve ucuz) ile KARIŞTIRILMAMALI — o global backdrop'u
+    // burada kullanmıyoruz çünkü top bar'ın arkasında görünmesi gereken şey wallpaper değil,
+    // o AN görüntülenen sayfanın kayan içeriğidir (InstallerX'te de böyle). Sadece bu sayfa
+    // aktifken var olduğu için (composable dispose olunca kaybolur), performans maliyeti
+    // dock'unkinden farklı olarak TEK bir sayfayla sınırlı — tüm navigasyon boyunca sürekli
+    // canlı kalan global bir capture değil.
+    val liquidGlassOn = LocalBlurEnabled.current
+    val pageBackdrop = if (liquidGlassOn) rememberLayerBackdrop() else null
+    return remember(scrollBehavior, pageBackdrop) { CollapsingTopBarState(scrollBehavior, pageBackdrop) }
 }
 
-class CollapsingTopBarState(val scrollBehavior: ScrollBehavior) {
+class CollapsingTopBarState(
+    val scrollBehavior: ScrollBehavior,
+    val pageBackdrop: LayerBackdrop? = null,
+) {
     /** 0f = tam açık (büyük başlık görünür), 1f = tam kapalı (sadece app bar'daki küçük başlık). */
     val collapseFraction: Float
         get() = scrollBehavior.state.collapsedFraction.coerceIn(0f, 1f)
 }
+
+/**
+ * Sayfanın kayan içeriğini (LazyColumn/LazyVerticalGrid) top bar'ın blur kaynağına kaydeder.
+ * Ekranın kendi scrollable'ına `Modifier.thenIfPageBackdrop(state)` şeklinde eklenmeli —
+ * InstallerX'teki `Modifier.layerBackdrop(topBarBackdrop)` çağrısının karşılığı.
+ */
+fun Modifier.captureForTopBarBlur(state: CollapsingTopBarState): Modifier =
+    state.pageBackdrop?.let { this.then(Modifier.layerBackdrop(it)) } ?: this
 
 @Composable
 fun CollapsingTopBar(
@@ -70,10 +98,25 @@ fun CollapsingTopBar(
     val scrollProgress = state.collapseFraction
     SmallTopAppBar(
         title = title,
-        modifier = modifier,
-        // About bölümündeki gibi: kaydırdıkça (scrollProgress arttıkça) app bar'ın arkaplanı
-        // koyu (temaya göre siyah/beyaz) ve opak hâle gelir; en üstteyken şeffaftır.
-        color = MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
+        // InstallerX'teki gibi: backdrop varsa app bar arka planı TRANSPARENT bırakılır,
+        // gerçek blur aşağıdaki .miuixBlurSurface() ile geliyor. Backdrop yoksa (blur kapalı
+        // ya da desteklenmiyor) eski düz-renk-fade davranışına düşülür.
+        modifier = modifier
+            .then(
+                if (state.pageBackdrop != null) {
+                    Modifier.miuixBlurSurface(
+                        backdrop = state.pageBackdrop,
+                        shape = androidx.compose.ui.graphics.RectangleShape,
+                        blurRadius = 26f,
+                        tintAlpha = scrollProgress * 0.85f,
+                        fallbackColor = androidx.compose.ui.graphics.Color.Transparent
+                    )
+                } else Modifier
+            ),
+        color = if (state.pageBackdrop != null)
+            androidx.compose.ui.graphics.Color.Transparent
+        else
+            MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
         titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
         scrollBehavior = state.scrollBehavior,
         // SmallTopAppBar zaten WindowInsets.systemBars(Top)'u koşulsuz kendi uyguluyor;
@@ -136,12 +179,26 @@ fun InstallerXTopBar(
         titleColor = cs.onBackground.copy(alpha = collapseFraction),
         subtitle = subtitle,
         subtitleColor = cs.onSurfaceVariant,
-        // About bölümündeki gibi: kaydırdıkça (collapseFraction arttıkça) arkaplan koyu
-        // (temaya göre siyah/beyaz) ve opak olur; en üstteyken şeffaftır.
-        color = cs.background.copy(alpha = collapseFraction),
+        // InstallerX'teki gibi: backdrop varsa TRANSPARENT + gerçek blur (.miuixBlurSurface),
+        // yoksa (blur kapalı/desteklenmiyor) eski düz-renk-fade davranışı.
+        color = if (state.pageBackdrop != null)
+            androidx.compose.ui.graphics.Color.Transparent
+        else
+            cs.background.copy(alpha = collapseFraction),
         scrollBehavior = state.scrollBehavior,
         defaultWindowInsetsPadding = false,
-        modifier = modifier,
+        modifier = modifier
+            .then(
+                if (state.pageBackdrop != null) {
+                    Modifier.miuixBlurSurface(
+                        backdrop = state.pageBackdrop,
+                        shape = androidx.compose.ui.graphics.RectangleShape,
+                        blurRadius = 26f,
+                        tintAlpha = collapseFraction * 0.85f,
+                        fallbackColor = androidx.compose.ui.graphics.Color.Transparent
+                    )
+                } else Modifier
+            ),
     )
 }
 
@@ -163,10 +220,22 @@ fun SubmenuTopBar(
     val collapseFraction = state.collapseFraction
     SmallTopAppBar(
         title = title,
-        modifier = modifier,
-        // About bölümündeki gibi: kaydırdıkça (collapseFraction arttıkça) arkaplan koyu
-        // (temaya göre siyah/beyaz) ve opak olur; en üstteyken şeffaftır.
-        color = cs.background.copy(alpha = collapseFraction),
+        modifier = modifier
+            .then(
+                if (state.pageBackdrop != null) {
+                    Modifier.miuixBlurSurface(
+                        backdrop = state.pageBackdrop,
+                        shape = androidx.compose.ui.graphics.RectangleShape,
+                        blurRadius = 26f,
+                        tintAlpha = collapseFraction * 0.85f,
+                        fallbackColor = androidx.compose.ui.graphics.Color.Transparent
+                    )
+                } else Modifier
+            ),
+        color = if (state.pageBackdrop != null)
+            androidx.compose.ui.graphics.Color.Transparent
+        else
+            cs.background.copy(alpha = collapseFraction),
         titleColor = cs.onBackground.copy(alpha = collapseFraction),
         scrollBehavior = state.scrollBehavior,
         defaultWindowInsetsPadding = false,

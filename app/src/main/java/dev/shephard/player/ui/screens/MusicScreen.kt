@@ -180,6 +180,7 @@ fun MusicScreen(
                             state = gridState,
                             modifier = Modifier
                                 .fillMaxSize()
+                                .dev.shephard.player.ui.components.captureForTopBarBlur(topBarState)
                                 .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                                 .overScrollVertical(),
                             contentPadding = PaddingValues(
@@ -204,6 +205,7 @@ fun MusicScreen(
                             state = listState,
                             modifier = Modifier
                                 .fillMaxSize()
+                                .dev.shephard.player.ui.components.captureForTopBarBlur(topBarState)
                                 .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                                 .overScrollVertical(),
                             contentPadding = PaddingValues(

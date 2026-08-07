@@ -111,6 +111,10 @@ import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.glass.blurSurfaceCompact
+import dev.shephard.player.ui.glass.miuixBlurSurface
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
@@ -951,6 +955,7 @@ private fun PlaylistListView(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .dev.shephard.player.ui.components.captureForTopBarBlur(topBarState)
                         .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                         .padding(32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -980,6 +985,7 @@ private fun PlaylistListView(
                         state = playlistGridState,
                         modifier = Modifier
                             .fillMaxSize()
+                            .dev.shephard.player.ui.components.captureForTopBarBlur(topBarState)
                             .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                             .overScrollVertical(),
                         contentPadding = PaddingValues(
@@ -1026,6 +1032,7 @@ private fun PlaylistListView(
                         state = playlistListState,
                         modifier = Modifier
                             .fillMaxSize()
+                            .dev.shephard.player.ui.components.captureForTopBarBlur(topBarState)
                             .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                             .overScrollVertical(),
                         contentPadding = PaddingValues(
@@ -1311,14 +1318,27 @@ private fun PlaylistDetailTopBar(
     title: String,
     cover: android.net.Uri?,
     onBack: () -> Unit,
-    collapse: Float
+    collapse: Float,
+    pageBackdrop: top.yukonga.miuix.kmp.blur.LayerBackdrop?
 ) {
     val cs = MiuixAppTheme.colorScheme
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .background(cs.background.copy(alpha = collapse))
+            .then(
+                if (pageBackdrop != null) {
+                    Modifier.miuixBlurSurface(
+                        backdrop = pageBackdrop,
+                        shape = androidx.compose.ui.graphics.RectangleShape,
+                        blurRadius = 26f,
+                        tintAlpha = collapse * 0.85f,
+                        fallbackColor = androidx.compose.ui.graphics.Color.Transparent
+                    )
+                } else {
+                    Modifier.background(cs.background.copy(alpha = collapse))
+                }
+            )
             .height(52.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -1384,6 +1404,10 @@ private fun PlaylistDetailView(
     onChangeSort: (String) -> Unit = {}
 ) {
     val liquidGlassOn = LocalBlurEnabled.current
+    // Diğer sayfalardaki (CollapsingTopBarState.pageBackdrop) desenle aynı: bu sayfaya
+    // özel bir backdrop, aşağıdaki LazyColumn içeriğini yakalayıp PlaylistDetailTopBar'ın
+    // gerçek blur uygulaması için kullanıyor.
+    val detailPageBackdrop = if (liquidGlassOn) rememberLayerBackdrop() else null
 
     // OuterTune'daki LocalPlaylistScreen deseni: gerçek liste mutableStateListOf,
     // reorderableState onMove callback'i doğrudan bu listeyi günceller, drag bitince
@@ -1501,11 +1525,15 @@ private fun PlaylistDetailView(
             cover = playlist.coverUri?.let { Uri.parse(it) }
                 ?: plTracks.firstOrNull()?.albumArtUri,
             onBack = onBack,
-            collapse = detailCollapse
+            collapse = detailCollapse,
+            pageBackdrop = detailPageBackdrop
         )
         LazyColumn(
             state = listState,
             modifier = Modifier
+                .then(
+                    detailPageBackdrop?.let { Modifier.layerBackdrop(it) } ?: Modifier
+                )
                 .fillMaxSize()
                 .overScrollVertical(),
             contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),

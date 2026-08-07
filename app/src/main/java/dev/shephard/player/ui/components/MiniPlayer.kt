@@ -2,7 +2,6 @@ package dev.shephard.player.ui.components
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -72,21 +71,18 @@ fun MiniPlayer(
 
     // Geçiş yönü AnimatedContent içinde kuyruk konumuna göre belirlenir.
 
-    val glow = Color(state.glowColorArgb)
-    val animatedGlow by animateColorAsState(
-        targetValue = glow,
-        animationSpec = tween(durationMillis = 450),
-        label = "miniGlowColor"
-    )
-
     val liquidGlassOn = LocalBlurEnabled.current
     val contentBackdrop = LocalContentBackdrop.current
     val miniPlayerShape = RoundedCornerShape(14.dp)
+    // Tema accent rengi — artık şarkıya göre değil, temaya (açık/koyu fark etmeksizin)
+    // göre sabit. Önceki `glow`/`animatedGlow` (state.glowColorArgb, kapak resminden
+    // çıkarılan renk) kaldırıldı.
+    val themeAccent = MiuixAppTheme.colorScheme.primary
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
         Box(
             modifier = Modifier
@@ -105,9 +101,9 @@ fun MiniPlayer(
                             .background(
                                 Brush.linearGradient(
                                     colors = listOf(
-                                        animatedGlow.copy(alpha = 0.22f),
+                                        themeAccent.copy(alpha = 0.22f),
                                         Color.Transparent,
-                                        animatedGlow.copy(alpha = 0.10f)
+                                        themeAccent.copy(alpha = 0.10f)
                                     )
                                 ),
                                 miniPlayerShape
@@ -116,9 +112,9 @@ fun MiniPlayer(
                         Modifier.background(
                             Brush.linearGradient(
                                 colors = listOf(
-                                    animatedGlow.copy(alpha = 0.34f),
+                                    themeAccent.copy(alpha = 0.34f),
                                     MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-                                    animatedGlow.copy(alpha = 0.18f)
+                                    themeAccent.copy(alpha = 0.18f)
                                 )
                             )
                         )
@@ -260,8 +256,8 @@ fun MiniPlayer(
             // geri kalanı (kapak, başlık, butonlar, blur yüzeyi) her tikte recompose OLMAZ.
             MiniPlayerProgressBar(
                 progressFlow = progressFlow,
-                activeColor = animatedGlow,
-                inactiveColor = animatedGlow.copy(alpha = 0.18f),
+                activeColor = themeAccent,
+                inactiveColor = themeAccent.copy(alpha = 0.18f),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
