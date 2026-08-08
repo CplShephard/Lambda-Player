@@ -105,7 +105,8 @@ fun BouncyIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    icon: ImageVector,
+    icon: ImageVector? = null,
+    painter: androidx.compose.ui.graphics.painter.Painter? = null,
     contentDescription: String? = null,
     tint: Color = MiuixAppTheme.colorScheme.onSurface,
     iconSize: Dp = 24.dp,
@@ -128,11 +129,20 @@ fun BouncyIconButton(
         modifier = boxModifier,
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = if (enabled) tint else tint.copy(alpha = 0.3f),
-            modifier = Modifier.size(iconSize)
-        )
+        if (painter != null) {
+            Icon(
+                painter = painter,
+                contentDescription = contentDescription,
+                tint = if (enabled) tint else tint.copy(alpha = 0.3f),
+                modifier = Modifier.size(iconSize)
+            )
+        } else if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = if (enabled) tint else tint.copy(alpha = 0.3f),
+                modifier = Modifier.size(iconSize)
+            )
+        }
     }
 }

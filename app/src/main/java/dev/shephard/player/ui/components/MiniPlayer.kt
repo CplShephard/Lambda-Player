@@ -38,8 +38,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -90,34 +88,18 @@ fun MiniPlayer(
                 .clip(miniPlayerShape)
                 .then(
                     if (liquidGlassOn && contentBackdrop != null) {
-                        Modifier
-                            .miuixBlurSurface(
-                                backdrop = contentBackdrop,
-                                shape = miniPlayerShape,
-                                blurRadius = 28f,
-                                tintAlpha = 0.58f,
-                                fallbackColor = MiuixAppTheme.colorScheme.surfaceVariant
-                            )
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        themeAccent.copy(alpha = 0.22f),
-                                        Color.Transparent,
-                                        themeAccent.copy(alpha = 0.10f)
-                                    )
-                                ),
-                                miniPlayerShape
-                            )
-                    } else {
-                        Modifier.background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    themeAccent.copy(alpha = 0.34f),
-                                    MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-                                    themeAccent.copy(alpha = 0.18f)
-                                )
-                            )
+                        // Blur açık: gerçek arka plan bulanıklığı + düz (glow'suz) tema tonu.
+                        Modifier.miuixBlurSurface(
+                            backdrop = contentBackdrop,
+                            shape = miniPlayerShape,
+                            blurRadius = 28f,
+                            tintAlpha = 0.58f,
+                            fallbackColor = MiuixAppTheme.colorScheme.surfaceVariant
                         )
+                    } else {
+                        // Blur kapalı: düz, tam opak tema rengi — kenarlarda şeffaflık veya
+                        // accent renk (glow) YOK, sade tek renk kart.
+                        Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant)
                     }
                 )
                 .bounceClick(pressScale = 0.97f) { onClick() }

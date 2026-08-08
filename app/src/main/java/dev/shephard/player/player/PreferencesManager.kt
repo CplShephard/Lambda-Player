@@ -33,6 +33,7 @@ object PrefsKeys {
     val TRACK_OVERRIDES_JSON = stringPreferencesKey("track-overrides_json")
     val LYRICS_JSON = stringPreferencesKey("lyrics_json")
     val LIQUID_GLASS_ENABLED = booleanPreferencesKey("liquid_glass_enabled")
+    val LISTEN_STATS_EVENTS_JSON = stringPreferencesKey("listen_stats_events_json")
 }
 
 object ThemeModePreference {
@@ -219,5 +220,13 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setCardAlpha(value: Float) {
         context.dataStore.edit { it[PrefsKeys.CARD_ALPHA] = value.coerceIn(0f, 1f) }
+    }
+
+    val listenStatsEventsJson: Flow<String> = context.dataStore.data.map {
+        it[PrefsKeys.LISTEN_STATS_EVENTS_JSON] ?: "[]"
+    }
+
+    suspend fun setListenStatsEventsJson(json: String) {
+        context.dataStore.edit { it[PrefsKeys.LISTEN_STATS_EVENTS_JSON] = json }
     }
 }

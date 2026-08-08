@@ -18,6 +18,8 @@ import androidx.media3.session.SessionToken
 import androidx.palette.graphics.Palette
 import com.google.common.util.concurrent.ListenableFuture
 import dev.shephard.player.data.AudioTrack
+import dev.shephard.player.data.ListenEvent
+import dev.shephard.player.data.ListenStatsCalculator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -91,6 +93,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var lastListeningStoreWriteMs: Long = 0L
     private var pendingExternalUri: Uri? = null
 
+    // --- Dinleme istatistikleri (Flamingo Player'daki "Stats" özelliğinin uyarlanmışı) ---
+    // Şu an çalan track için "oturum": gün başlangıcına göre bölünmüş dinlenen süre
+    // (gece yarısını geçen dinlemeler doğru günlere ayrılsın diye), ve "play sayılır mı"
+    // eşiği (şarkının %50'si dinlenince bir "play" olarak sayılır — Flamingo'nunkiyle aynı
+    // kural). Track her değiştiğinde oturum kapatılıp kalıcı listeye (statsEvents) eklenir.
+    private var statsSessionTrackId: Long? = null
+    private var statsSessionQualified: Boolean = false
+    private var statsSessionQualifyDayStartMs: Long = 0L
+    private var statsListenedMsByDayStart: LinkedHashMap<Long, Long> = LinkedHashMap()
+    private var statsEvents: List<ListenEvent> = emptyList()
+    private var statsEventsLoaded: Boolean = false
+    private val _statsEventsFlow = MutableStateFlow<List<ListenEvent>>(emptyList())
+    val statsEventsFlow: StateFlow<List<ListenEvent>> = _statsEventsFlow.asStateFlow()
+
     // The animated NowPlaying glow must not live inside PlayerUiState: updating that
     // data class every ~80ms invalidates MainContainer/NavGraph/Settings while music is
     // playing. Keep it in a tiny dedicated flow that only NowPlayingSheet observes.
@@ -121,6 +137,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             flushListeningTime()
             val track = queueTracks.find { it.id.toString() == mediaItem?.mediaId }
+            finalizeStatsSession()
+            statsSessionTrackId = track?.id
             _uiState.value = _uiState.value.copy(currentTrack = track)
             _progress.value = PlaybackProgress(
                 positionMs = 0L,
@@ -158,6 +176,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         observePosition()
         observeSettings()
         observeLikedSongs()
+        loadStatsEvents()
+    }
+
+    private fun loadStatsEvents() {
+        viewModelScope.launch {
+            val json = prefs.listenStatsEventsJson.first()
+            statsEvents = ListenStatsCalculator.decodeEvents(json)
+            statsEventsLoaded = true
+            _statsEventsFlow.value = statsEvents
+        }
     }
 
     private fun connectToService() {
@@ -307,12 +335,83 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
+    /**
+     * Her tick'te (≈500ms) çağrılır. Şu an çalan track için gün bazında (gece yarısını
+     * geçen dinlemeler doğru güne ayrılsın diye) dinlenen süreyi biriktirir, ve şarkının
+     * %50'si dinlenince bir "play" olarak sayılmasını sağlayan eşiği kontrol eder — bkz.
+     * Flamingo Player'ın ListenStatsTracker.tick() ile aynı kural.
+     */
+    private fun accrueStatsSession(deltaMs: Long, nowMs: Long) {
+        val trackId = statsSessionTrackId ?: return
+        val dayStart = ListenStatsCalculator.dayStartMs(nowMs)
+        statsListenedMsByDayStart[dayStart] = (statsListenedMsByDayStart[dayStart] ?: 0L) + deltaMs
+
+        if (!statsSessionQualified) {
+            val durationMs = controller?.duration?.coerceAtLeast(0L) ?: 0L
+            val positionMs = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+            if (durationMs > 0 && positionMs.toDouble() / durationMs.toDouble() >= 0.5) {
+                statsSessionQualified = true
+                statsSessionQualifyDayStartMs = dayStart
+            }
+        }
+    }
+
+    /** Track gerçekten değiştiğinde (onMediaItemTransition) çağrılır — oturumu kalıcı listeye ekler. */
+    private fun finalizeStatsSession() {
+        val trackId = statsSessionTrackId
+        if (trackId != null && statsListenedMsByDayStart.isNotEmpty()) {
+            val track = queueTracks.find { it.id == trackId } ?: _uiState.value.currentTrack
+            if (track != null) {
+                val newEvents = statsListenedMsByDayStart.entries
+                    .filter { it.value > 0 }
+                    .map { (dayStart, listenedMs) ->
+                        ListenEvent(
+                            trackId = track.id,
+                            title = track.title,
+                            artist = track.artist,
+                            album = track.album,
+                            dayStartMs = dayStart,
+                            timestampMs = System.currentTimeMillis(),
+                            listenedMs = listenedMs,
+                            countsAsPlay = dayStart == statsSessionQualifyDayStartMs && statsSessionQualified
+                        )
+                    }
+                if (newEvents.isNotEmpty()) {
+                    statsEvents = statsEvents + newEvents
+                    _statsEventsFlow.value = statsEvents
+                    persistStatsEvents()
+                }
+            }
+        }
+        statsSessionTrackId = null
+        statsSessionQualified = false
+        statsSessionQualifyDayStartMs = 0L
+        statsListenedMsByDayStart = LinkedHashMap()
+    }
+
+    private fun persistStatsEvents() {
+        if (!statsEventsLoaded) return
+        val snapshot = statsEvents
+        viewModelScope.launch {
+            prefs.setListenStatsEventsJson(ListenStatsCalculator.encodeEvents(snapshot))
+        }
+    }
+
+    fun clearListenStats() {
+        statsEvents = emptyList()
+        _statsEventsFlow.value = emptyList()
+        persistStatsEvents()
+    }
+
     private fun accrueListeningTime() {
         val now = System.currentTimeMillis()
         val last = lastPlaybackTickMs
         if (last != null) {
             val delta = (now - last).coerceIn(0L, 2000L)
-            if (delta > 0) addListeningDeltaInMemory(delta, updateUiState = false)
+            if (delta > 0) {
+                addListeningDeltaInMemory(delta, updateUiState = false)
+                accrueStatsSession(delta, now)
+            }
         }
         lastPlaybackTickMs = now
 
@@ -677,6 +776,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     override fun onCleared() {
         flushListeningTime()
+        finalizeStatsSession()
         controller?.removeListener(playerListener)
         controllerFuture?.let { MediaController.releaseFuture(it) }
         controller = null

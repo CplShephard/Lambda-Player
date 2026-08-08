@@ -1,0 +1,408 @@
+package dev.shephard.player.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.shephard.player.data.ListenStatsCalculator
+import dev.shephard.player.data.StatsAlbumEntry
+import dev.shephard.player.data.StatsArtistEntry
+import dev.shephard.player.data.StatsPeriod
+import dev.shephard.player.data.StatsTrackEntry
+import dev.shephard.player.player.PlayerViewModel
+import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.components.captureForTopBarBlur
+import dev.shephard.player.ui.components.rememberCollapsingTopBarState
+import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.miuixBlurSurface
+import dev.shephard.player.ui.i18n.LocalStrings
+import dev.shephard.player.ui.miuix.Icon
+import dev.shephard.player.ui.miuix.MiuixAppTheme
+import dev.shephard.player.ui.miuix.Text
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+
+/**
+ * Flamingo Player'daki "Stats" özelliğinden esinlenilen dinleme istatistikleri sayfası.
+ * Settings > Total Listening Time kartına basınca açılır (bkz. NavGraph.kt StatsRoute).
+ *
+ * Flamingo'nun UI kodu (Title/YosWrapper/ProfileButton, MMKV+Gson depolama) doğrudan
+ * kopyalanmadı — konsept (dönem pill'leri, özet kartı, en çok dinlenen sanatçı/albüm/şarkı
+ * yatay listeleri) alınıp Lambda Player'ın Miuix tasarım diline ve mevcut altyapısına
+ * (DataStore, PlayerViewModel.statsEventsFlow) uyarlandı.
+ */
+@Composable
+fun StatsScreen(
+    playerViewModel: PlayerViewModel = viewModel(),
+    onBack: () -> Unit
+) {
+    val strings = LocalStrings.current
+    val cs = MiuixAppTheme.colorScheme
+    val density = LocalDensity.current
+    val scrollState = rememberScrollState()
+    val topBarState = rememberCollapsingTopBarState()
+
+    val allEvents by playerViewModel.statsEventsFlow.collectAsState()
+    var selectedPeriod by remember { mutableStateOf(StatsPeriod.Today) }
+
+    val snapshot = remember(allEvents, selectedPeriod) {
+        val periodEvents = ListenStatsCalculator.filterEventsForPeriod(allEvents, selectedPeriod)
+        ListenStatsCalculator.buildSnapshot(periodEvents)
+    }
+
+    val collapseRangePx = with(density) { 44.dp.toPx() }
+    val scrollProgress by remember {
+        derivedStateOf { (scrollState.value / collapseRangePx).coerceIn(0f, 1f) }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().background(cs.background)) {
+        SmallTopAppBar(
+            title = strings.statsTitle,
+            modifier = if (topBarState.pageBackdrop != null) {
+                Modifier.miuixBlurSurface(
+                    backdrop = topBarState.pageBackdrop,
+                    shape = androidx.compose.ui.graphics.RectangleShape,
+                    blurRadius = 26f,
+                    tintAlpha = scrollProgress * 0.85f,
+                    fallbackColor = Color.Transparent
+                )
+            } else Modifier,
+            color = if (topBarState.pageBackdrop != null) Color.Transparent else cs.background.copy(alpha = scrollProgress),
+            titleColor = cs.onBackground.copy(alpha = scrollProgress),
+            scrollBehavior = topBarState.scrollBehavior,
+            defaultWindowInsetsPadding = false,
+            navigationIcon = {
+                Box(
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(cs.surfaceVariant.copy(alpha = 0.75f))
+                        .bounceClick { onBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription, tint = cs.onBackground)
+                }
+            }
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(topBarState.pageBackdrop?.let { Modifier.layerBackdrop(it) } ?: Modifier)
+                .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            StatsPeriodPills(selectedPeriod = selectedPeriod, onPeriodSelected = { selectedPeriod = it })
+
+            StatsSummaryCard(
+                totalListenedMs = snapshot.summary.totalListenedMs,
+                playCount = snapshot.summary.playCount,
+                uniqueAlbumCount = snapshot.summary.uniqueAlbumCount
+            )
+
+            if (snapshot.artistEntries.isEmpty() && snapshot.albumEntries.isEmpty() && snapshot.trackEntries.isEmpty()) {
+                StatsEmptyState()
+            } else {
+                if (snapshot.artistEntries.isNotEmpty()) {
+                    StatsSectionHeader(strings.statsTopArtists)
+                    StatsArtistRow(snapshot.artistEntries.take(10))
+                }
+                if (snapshot.albumEntries.isNotEmpty()) {
+                    StatsSectionHeader(strings.statsTopAlbums)
+                    StatsAlbumRow(snapshot.albumEntries.take(10))
+                }
+                if (snapshot.trackEntries.isNotEmpty()) {
+                    StatsSectionHeader(strings.statsTopTracks)
+                    StatsTrackList(snapshot.trackEntries.take(10))
+                }
+            }
+
+            Spacer(Modifier.height(90.dp))
+        }
+    }
+}
+
+@Composable
+private fun StatsPeriodPills(
+    selectedPeriod: StatsPeriod,
+    onPeriodSelected: (StatsPeriod) -> Unit
+) {
+    val strings = LocalStrings.current
+    val periods = listOf(
+        StatsPeriod.Today to strings.statsPeriodToday,
+        StatsPeriod.ThisWeek to strings.statsPeriodThisWeek,
+        StatsPeriod.ThisMonth to strings.statsPeriodThisMonth,
+        StatsPeriod.ThisYear to strings.statsPeriodThisYear,
+        StatsPeriod.AllTime to strings.statsPeriodAllTime
+    )
+    val rowScrollState = rememberScrollState()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rowScrollState),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        periods.forEach { (period, label) ->
+            val selected = period == selectedPeriod
+            val cs = MiuixAppTheme.colorScheme
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(if (selected) cs.primary else cs.surfaceVariant.copy(alpha = 0.6f))
+                    .clickable { onPeriodSelected(period) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = label,
+                    color = if (selected) cs.onPrimary else cs.onSurfaceVariant,
+                    style = MiuixAppTheme.typography.bodyMedium,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsSummaryCard(totalListenedMs: Long, playCount: Int, uniqueAlbumCount: Int) {
+    val strings = LocalStrings.current
+    val cs = MiuixAppTheme.colorScheme
+    val totalMinutes = totalListenedMs / 60000L
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(cs.surfaceVariant.copy(alpha = 0.5f))
+            .padding(20.dp)
+    ) {
+        Text(
+            text = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m",
+            style = MiuixAppTheme.typography.displayMedium,
+            fontWeight = FontWeight.Bold,
+            color = cs.onBackground
+        )
+        Spacer(Modifier.height(4.dp))
+        Row {
+            Text(
+                text = "$playCount ${strings.statsPlays}",
+                style = MiuixAppTheme.typography.bodyMedium,
+                color = cs.onSurfaceVariant
+            )
+            Text(
+                text = "  •  $uniqueAlbumCount ${strings.statsAlbumsListened}",
+                style = MiuixAppTheme.typography.bodyMedium,
+                color = cs.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatsSectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MiuixAppTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MiuixAppTheme.colorScheme.onBackground,
+        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+    )
+}
+
+@Composable
+private fun StatsArtistRow(entries: List<StatsArtistEntry>) {
+    val cs = MiuixAppTheme.colorScheme
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        items(entries, key = { it.artistName }) { entry ->
+            Column(
+                modifier = Modifier.width(88.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(cs.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Person, contentDescription = null, tint = cs.primary, modifier = Modifier.size(32.dp))
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = entry.artistName,
+                    style = MiuixAppTheme.typography.bodySmall,
+                    color = cs.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = formatStatsMinutes(entry.listenedMs),
+                    style = MiuixAppTheme.typography.labelSmall,
+                    color = cs.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsAlbumRow(entries: List<StatsAlbumEntry>) {
+    val cs = MiuixAppTheme.colorScheme
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        items(entries, key = { it.albumName }) { entry ->
+            Column(
+                modifier = Modifier.width(120.dp),
+                horizontalAlignment = Alignment.Start
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(120.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(cs.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Album, contentDescription = null, tint = cs.primary, modifier = Modifier.size(36.dp))
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = entry.albumName,
+                    style = MiuixAppTheme.typography.bodySmall,
+                    color = cs.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = entry.artistName,
+                    style = MiuixAppTheme.typography.labelSmall,
+                    color = cs.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsTrackList(entries: List<StatsTrackEntry>) {
+    val cs = MiuixAppTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        entries.forEachIndexed { index, entry ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(cs.surfaceVariant.copy(alpha = 0.35f))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = (index + 1).toString(),
+                    style = MiuixAppTheme.typography.bodyMedium,
+                    color = cs.onSurfaceVariant,
+                    modifier = Modifier.width(28.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = entry.title,
+                        style = MiuixAppTheme.typography.bodyMedium,
+                        color = cs.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = entry.artistName,
+                        style = MiuixAppTheme.typography.labelSmall,
+                        color = cs.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Text(
+                    text = formatStatsMinutes(entry.listenedMs),
+                    style = MiuixAppTheme.typography.labelMedium,
+                    color = cs.primary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsEmptyState() {
+    val strings = LocalStrings.current
+    val cs = MiuixAppTheme.colorScheme
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            Icons.Filled.MusicNote,
+            contentDescription = null,
+            tint = cs.onSurfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.size(56.dp)
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = strings.statsEmptyTitle,
+            style = MiuixAppTheme.typography.titleMedium,
+            color = cs.onBackground
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = strings.statsEmptySubtitle,
+            style = MiuixAppTheme.typography.bodyMedium,
+            color = cs.onSurfaceVariant
+        )
+    }
+}
+
+private fun formatStatsMinutes(listenedMs: Long): String {
+    val totalMinutes = listenedMs / 60000L
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+}

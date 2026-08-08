@@ -53,16 +53,12 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.VerticalAlignCenter
 import dev.shephard.player.ui.miuix.ExperimentalMaterial3Api
 import dev.shephard.player.ui.miuix.Icon
@@ -91,6 +87,11 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.res.painterResource
+import dev.shephard.player.R
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -169,8 +170,6 @@ fun NowPlayingSheet(
         dragOffset.animateTo(0f, animationSpec = nowPlayingEnterSpring)
         hasEnteredRest = true
     }
-
-    val glow = Color(state.glowColorArgb)
 
     // Next/Previous tuşlarına basınca kapak geçişinin akıcı olması için tween süre/easing
     // ayarı. Kasma şikayeti eski LazyHorizontalGrid+snap-fling mekanizmasının HER FRAME
@@ -270,13 +269,9 @@ fun NowPlayingSheet(
                 }
             )
     ) {
-        // Ambient glow background — amplitude flow'unu (≈80ms'de bir) SADECE bu küçük
-        // composable dinler; sheet'in geri kalanı amplitude tiklerinden etkilenmez.
-        AmbientGlowBackground(
-            playerViewModel = playerViewModel,
-            glow = glow,
-            hasTrack = track != null
-        )
+        // Kapak resminden blur'lu arka plan — amplitude/glow'a artık bağlı değil, track
+        // değişmediği sürece yeniden çizilmez.
+        AmbientGlowBackground(track = track)
 
         Column(
             modifier = Modifier
@@ -458,10 +453,10 @@ fun NowPlayingSheet(
                     onClick = {
                         showLyrics = true
                     },
-                    icon = Icons.Filled.Lyrics,
+                    painter = painterResource(id = R.drawable.ic_np_lyrics),
                     contentDescription = strings.lyrics,
-                    tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                    iconSize = 28.dp
+                    tint = Color.White,
+                    iconSize = 24.dp
                 )
                 // MADDE 10 — beğen/ekle tuşu da Blur ile birlikte görünüm değiştiriyordu.
                 // Artık her iki durumda da aynı düz dolgulu daire.
@@ -694,10 +689,10 @@ fun NowPlayingSheet(
                 )
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToPrevious() },
-                    icon = Icons.Filled.SkipPrevious,
+                    painter = painterResource(id = R.drawable.ic_np_previous),
                     contentDescription = strings.previous,
-                    tint = MiuixAppTheme.colorScheme.onBackground,
-                    iconSize = 36.dp
+                    tint = Color.White,
+                    iconSize = 34.dp
                 )
                 // MADDE 10 — ÇAL/DURAKLAT tuşu Blur açılınca `blurSurface(GlassTint.ACCENT)`
                 // ile yarı saydam ve KOYU bir daireye dönüşüyordu; üstündeki ikon ise
@@ -734,19 +729,19 @@ fun NowPlayingSheet(
                         label = "playPauseIcon"
                     ) { isPlaying ->
                         Icon(
-                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            painter = painterResource(id = if (isPlaying) R.drawable.ic_np_pause else R.drawable.ic_np_play),
                             contentDescription = if (isPlaying) strings.pause else strings.play,
-                            tint = MiuixAppTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(36.dp)
+                            tint = Color.White,
+                            modifier = Modifier.size(if (isPlaying) 30.dp else 36.dp)
                         )
                     }
                 }
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToNext() },
-                    icon = Icons.Filled.SkipNext,
+                    painter = painterResource(id = R.drawable.ic_np_next),
                     contentDescription = strings.next,
-                    tint = MiuixAppTheme.colorScheme.onBackground,
-                    iconSize = 36.dp
+                    tint = Color.White,
+                    iconSize = 34.dp
                 )
                 BouncyIconButton(
                     onClick = { playerViewModel.cycleRepeatMode() },
@@ -762,79 +757,54 @@ fun NowPlayingSheet(
 }
 
 /**
- * Ambient glow arka planı — amplitude flow'unu (≈80ms tik) yalnızca bu composable toplar,
- * böylece NowPlayingSheet'in geri kalanı müzik çalarken sürekli recompose olmaz.
+ * Flamingo Player'daki NowPlaying arka planıyla aynı yaklaşım: kapak resminin doygunluğu
+ * artırılmış, bulanıklaştırılmış hali + üstüne sabit koyu overlay. Önceki gradient/glow
+ * (kapak renginden hesaplanan `glow` accent rengiyle yapılan Brush.verticalGradient/
+ * radialGradient, amplitude'a göre nabız gibi büyüyüp küçülen) TAMAMEN kaldırıldı — artık
+ * kapak resmi doğrudan (statik) arka plan.
  *
- * Siyah şerit düzeltmesi: eski kod pulse'ı `0.85f + amplitude * 0.15f` olarak hesaplıyordu.
- * Şarkı DURDURULUNCA amplitude 0'a düşüyor, glow katmanı merkezden %85'e küçülüyor ve üstte
- * (durum çubuğunun olduğu yerde) ekran yüksekliğinin %7.5'i kadar saf siyah arka plan açığa
- * çıkıyordu — kullanıcının gördüğü "siyah şerit çizgi" buydu. Ölçek artık hiçbir zaman
- * 1.0'ın altına inmez (1.0f + amplitude * 0.12f), yani glow her zaman ekranı tam kaplar.
- *
- * Gradient optimizasyonu: tam ekran iki katmana uygulanan 96px/128px RenderEffect blur'ları
- * kaldırıldı. Gradient'ler zaten yumuşak geçişli olduğu için blur görsel olarak fark
- * yaratmıyordu ama her frame'de iki tam ekran blur pass'i GPU'ya mal oluyordu.
+ * NOT: Flamingo'nun KenBurnsView (yavaş pan/zoom) efekti burada YOK — bu, projeye yeni bir
+ * üçüncü parti bağımlılık (com.flaviofaria:kenburnsview) eklemeyi gerektirirdi. Statik
+ * blur'lu kapak, görsel sonucun büyük kısmını hiçbir ekstra bağımlılık olmadan veriyor.
  */
 @Composable
 private fun AmbientGlowBackground(
-    playerViewModel: PlayerViewModel,
-    glow: Color,
-    hasTrack: Boolean
+    track: AudioTrack?
 ) {
-    val amplitude by playerViewModel.amplitude.collectAsState()
-
-    // pulse sadece graphicsLayer scale'ini etkiler; Brush sabit kalır (allocation yok).
-    val pulse by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = 1.0f + amplitude * 0.12f,
-        animationSpec = androidx.compose.animation.core.tween(180),
-        label = "glowPulse"
-    )
-    val glowAlpha by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (!hasTrack) 0f else 0.55f + amplitude * 0.2f,
-        animationSpec = androidx.compose.animation.core.tween(300),
-        label = "glowAlpha"
-    )
-
-    // Brush'lar glow rengine göre memoize — amplitude değişimlerinde yeniden oluşturulmaz.
-    val verticalGlowBrush = remember(glow) {
-        Brush.verticalGradient(
-            colorStops = arrayOf(
-                0.00f to glow.copy(alpha = 0.90f),
-                0.40f to glow.copy(alpha = 0.55f),
-                0.70f to glow.copy(alpha = 0.12f),
-                0.80f to Color.Transparent,
-                1.00f to Color.Transparent
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (track?.albumArtUri != null) {
+            AsyncImage(
+                model = track.albumArtUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        // Blur öncesi hafif taşırma: kenarlarda blur'un şeffaf/keskin
+                        // kesim göstermemesi için resmi biraz büyütüyoruz.
+                        scaleX = 1.15f
+                        scaleY = 1.15f
+                    }
+                    .blur(radius = 60.dp),
+                colorFilter = ColorFilter.colorMatrix(
+                    ColorMatrix().apply { setToSaturation(1.35f) }
+                )
             )
-        )
+            // Flamingo'daki sabit koyu overlay (0x33000000, Overlay blend) — kontrastı
+            // korur, üstteki beyaz metin/ikonlar her kapak resminde okunur kalır.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0x59000000))
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MiuixAppTheme.colorScheme.surfaceVariant)
+            )
+        }
     }
-    val radialGlowBrush = remember(glow) {
-        Brush.radialGradient(
-            colors = listOf(
-                glow.copy(alpha = 0.55f),
-                glow.copy(alpha = 0.15f),
-                Color.Transparent
-            ),
-            center = Offset(0f, 320f),
-            radius = 680f
-        )
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .graphicsLayer {
-                alpha = glowAlpha
-                scaleX = pulse
-                scaleY = pulse
-            }
-            .background(verticalGlowBrush)
-    )
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .graphicsLayer { alpha = glowAlpha * 0.85f }
-            .background(radialGlowBrush)
-    )
 }
 
 /**

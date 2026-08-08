@@ -39,6 +39,7 @@ object SettingsRoute : NavKey
 object ThemeRoute : NavKey
 object PlayerRoute : NavKey
 object AboutRoute : NavKey
+object StatsRoute : NavKey
 
 // Ana sekmelerin sıralaması — orijinal koddaki `destinations` listesiyle birebir aynı.
 // Yön buna göre hesaplanıyor: hedef index kaynaktan büyükse ileri (Sol), küçükse geri (Sağ).
@@ -101,7 +102,7 @@ private val originalTabTransition: Map<String, Any> =
     }
 
 private fun isSubmenu(key: NavKey?): Boolean =
-    key is ThemeRoute || key is PlayerRoute || key is AboutRoute
+    key is ThemeRoute || key is PlayerRoute || key is AboutRoute || key is StatsRoute
 
 @Composable
 fun NavGraph(
@@ -184,6 +185,9 @@ fun NavGraph(
                     },
                     onOpenAbout = {
                         submenuGuard.push(currentTop, AboutRoute) { backStack.add(AboutRoute) }
+                    },
+                    onOpenStats = {
+                        submenuGuard.push(currentTop, StatsRoute) { backStack.add(StatsRoute) }
                     }
                 )
             }
@@ -197,6 +201,12 @@ fun NavGraph(
             }
             entry<AboutRoute> {
                 AboutSettingsScreen(onBack = { submenuGuard.pop { backStack.removeAt(backStack.lastIndex) } })
+            }
+            entry<StatsRoute> {
+                dev.shephard.player.ui.screens.StatsScreen(
+                    playerViewModel = playerViewModel,
+                    onBack = { submenuGuard.pop { backStack.removeAt(backStack.lastIndex) } }
+                )
             }
         }
     }

@@ -132,6 +132,20 @@ data class Strings(
     val aboutLambdaPlayerTitle: String,
     val aboutLambdaPlayerSummary: String,
     val wallpaperPreviewContentDescription: String,
+    // Stats sayfası (Flamingo Player'dan uyarlanan dinleme istatistikleri).
+    val statsTitle: String,
+    val statsPeriodToday: String,
+    val statsPeriodThisWeek: String,
+    val statsPeriodThisMonth: String,
+    val statsPeriodThisYear: String,
+    val statsPeriodAllTime: String,
+    val statsPlays: String,
+    val statsAlbumsListened: String,
+    val statsTopArtists: String,
+    val statsTopAlbums: String,
+    val statsTopTracks: String,
+    val statsEmptyTitle: String,
+    val statsEmptySubtitle: String,
 )
 
 private val EN = Strings(
@@ -231,7 +245,20 @@ private val EN = Strings(
     playbackSettingsSummary = "Crossfade, gapless playback and audio focus",
     aboutLambdaPlayerTitle = "About Lambda Player",
     aboutLambdaPlayerSummary = "Version, project links and credits",
-    wallpaperPreviewContentDescription = "Wallpaper preview"
+    wallpaperPreviewContentDescription = "Wallpaper preview",
+    statsTitle = "Stats",
+    statsPeriodToday = "Today",
+    statsPeriodThisWeek = "This Week",
+    statsPeriodThisMonth = "This Month",
+    statsPeriodThisYear = "This Year",
+    statsPeriodAllTime = "All Time",
+    statsPlays = "plays",
+    statsAlbumsListened = "albums",
+    statsTopArtists = "Top Artists",
+    statsTopAlbums = "Top Albums",
+    statsTopTracks = "Top Tracks",
+    statsEmptyTitle = "No listening data yet",
+    statsEmptySubtitle = "Play some music to see your stats here"
 )
 
 private val TR = EN.copy(
@@ -330,7 +357,20 @@ private val TR = EN.copy(
     playbackSettingsSummary = "Crossfade, kesintisiz oynatma ve ses odağı",
     aboutLambdaPlayerTitle = "Lambda Player Hakkında",
     aboutLambdaPlayerSummary = "Sürüm, proje bağlantıları ve emeği geçenler",
-    wallpaperPreviewContentDescription = "Duvar kağıdı önizlemesi"
+    wallpaperPreviewContentDescription = "Duvar kağıdı önizlemesi",
+    statsTitle = "İstatistikler",
+    statsPeriodToday = "Bugün",
+    statsPeriodThisWeek = "Bu Hafta",
+    statsPeriodThisMonth = "Bu Ay",
+    statsPeriodThisYear = "Bu Yıl",
+    statsPeriodAllTime = "Tüm Zamanlar",
+    statsPlays = "çalınma",
+    statsAlbumsListened = "albüm",
+    statsTopArtists = "En Çok Dinlenen Sanatçılar",
+    statsTopAlbums = "En Çok Dinlenen Albümler",
+    statsTopTracks = "En Çok Dinlenen Şarkılar",
+    statsEmptyTitle = "Henüz dinleme verisi yok",
+    statsEmptySubtitle = "İstatistiklerini görmek için biraz müzik dinle"
 )
 
 private val ZH = EN.copy(
@@ -429,7 +469,20 @@ private val ZH = EN.copy(
     playbackSettingsSummary = "淡入淡出、无缝播放和音频焦点",
     aboutLambdaPlayerTitle = "关于 Lambda Player",
     aboutLambdaPlayerSummary = "版本、项目链接和致谢",
-    wallpaperPreviewContentDescription = "壁纸预览"
+    wallpaperPreviewContentDescription = "壁纸预览",
+    statsTitle = "统计",
+    statsPeriodToday = "今天",
+    statsPeriodThisWeek = "本周",
+    statsPeriodThisMonth = "本月",
+    statsPeriodThisYear = "今年",
+    statsPeriodAllTime = "全部时间",
+    statsPlays = "次播放",
+    statsAlbumsListened = "张专辑",
+    statsTopArtists = "热门艺人",
+    statsTopAlbums = "热门专辑",
+    statsTopTracks = "热门歌曲",
+    statsEmptyTitle = "暂无收听数据",
+    statsEmptySubtitle = "播放一些音乐即可在此查看统计"
 )
 
 private val ES = EN.copy(
@@ -528,7 +581,20 @@ private val ES = EN.copy(
     playbackSettingsSummary = "Crossfade, reproducción continua y enfoque de audio",
     aboutLambdaPlayerTitle = "Acerca de Lambda Player",
     aboutLambdaPlayerSummary = "Versión, enlaces del proyecto y créditos",
-    wallpaperPreviewContentDescription = "Vista previa del fondo de pantalla"
+    wallpaperPreviewContentDescription = "Vista previa del fondo de pantalla",
+    statsTitle = "Estadísticas",
+    statsPeriodToday = "Hoy",
+    statsPeriodThisWeek = "Esta Semana",
+    statsPeriodThisMonth = "Este Mes",
+    statsPeriodThisYear = "Este Año",
+    statsPeriodAllTime = "Todo el Tiempo",
+    statsPlays = "reproducciones",
+    statsAlbumsListened = "álbumes",
+    statsTopArtists = "Artistas Principales",
+    statsTopAlbums = "Álbumes Principales",
+    statsTopTracks = "Canciones Principales",
+    statsEmptyTitle = "Aún no hay datos de escucha",
+    statsEmptySubtitle = "Reproduce música para ver tus estadísticas aquí"
 )
 
 private val RU = EN.copy(
@@ -627,7 +693,20 @@ private val RU = EN.copy(
     playbackSettingsSummary = "Кроссфейд, бесшовное воспроизведение и аудиофокус",
     aboutLambdaPlayerTitle = "О Lambda Player",
     aboutLambdaPlayerSummary = "Версия, ссылки на проект и благодарности",
-    wallpaperPreviewContentDescription = "Предпросмотр обоев"
+    wallpaperPreviewContentDescription = "Предпросмотр обоев",
+    statsTitle = "Статистика",
+    statsPeriodToday = "Сегодня",
+    statsPeriodThisWeek = "На этой неделе",
+    statsPeriodThisMonth = "В этом месяце",
+    statsPeriodThisYear = "В этом году",
+    statsPeriodAllTime = "За всё время",
+    statsPlays = "прослушиваний",
+    statsAlbumsListened = "альбомов",
+    statsTopArtists = "Топ исполнителей",
+    statsTopAlbums = "Топ альбомов",
+    statsTopTracks = "Топ треков",
+    statsEmptyTitle = "Пока нет данных о прослушивании",
+    statsEmptySubtitle = "Послушайте музыку, чтобы увидеть статистику здесь"
 )
 
 private val KA = EN.copy(
@@ -726,7 +805,20 @@ private val KA = EN.copy(
     playbackSettingsSummary = "კროსფეიდი, უწყვეტი დაკვრა და აუდიო ფოკუსი",
     aboutLambdaPlayerTitle = "Lambda Player-ის შესახებ",
     aboutLambdaPlayerSummary = "ვერსია, პროექტის ბმულები და მადლობები",
-    wallpaperPreviewContentDescription = "ფონის გადახედვა"
+    wallpaperPreviewContentDescription = "ფონის გადახედვა",
+    statsTitle = "სტატისტიკა",
+    statsPeriodToday = "დღეს",
+    statsPeriodThisWeek = "ამ კვირას",
+    statsPeriodThisMonth = "ამ თვეს",
+    statsPeriodThisYear = "წელს",
+    statsPeriodAllTime = "სულ",
+    statsPlays = "დაკვრა",
+    statsAlbumsListened = "ალბომი",
+    statsTopArtists = "საუკეთესო შემსრულებლები",
+    statsTopAlbums = "საუკეთესო ალბომები",
+    statsTopTracks = "საუკეთესო სიმღერები",
+    statsEmptyTitle = "ჯერ არ არის მოსმენის მონაცემები",
+    statsEmptySubtitle = "დაუკარი მუსიკა სტატისტიკის სანახავად"
 )
 
 private val AR = EN.copy(
@@ -825,7 +917,20 @@ private val AR = EN.copy(
     playbackSettingsSummary = "التلاشي المتقاطع، التشغيل السلس وتركيز الصوت",
     aboutLambdaPlayerTitle = "حول Lambda Player",
     aboutLambdaPlayerSummary = "الإصدار وروابط المشروع وشكر وتقدير",
-    wallpaperPreviewContentDescription = "معاينة الخلفية"
+    wallpaperPreviewContentDescription = "معاينة الخلفية",
+    statsTitle = "الإحصائيات",
+    statsPeriodToday = "اليوم",
+    statsPeriodThisWeek = "هذا الأسبوع",
+    statsPeriodThisMonth = "هذا الشهر",
+    statsPeriodThisYear = "هذا العام",
+    statsPeriodAllTime = "كل الأوقات",
+    statsPlays = "تشغيل",
+    statsAlbumsListened = "ألبومات",
+    statsTopArtists = "أفضل الفنانين",
+    statsTopAlbums = "أفضل الألبومات",
+    statsTopTracks = "أفضل الأغاني",
+    statsEmptyTitle = "لا توجد بيانات استماع بعد",
+    statsEmptySubtitle = "شغّل بعض الموسيقى لرؤية إحصائياتك هنا"
 )
 
 val AllLanguages: List<Strings> = listOf(EN, TR, ZH, ES, RU, KA, AR)

@@ -139,7 +139,8 @@ fun SettingsScreen(
     playerViewModel: PlayerViewModel = viewModel(),
     onOpenThemeSettings: () -> Unit = {},
     onOpenPlayerSettings: () -> Unit = {},
-    onOpenAbout: () -> Unit = {}
+    onOpenAbout: () -> Unit = {},
+    onOpenStats: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
@@ -173,7 +174,7 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // InstallerX tarzı ana Settings: üstte widget kart, altında üç büyük yönlendirme.
-                TotalListeningTimeCard(playerViewModel = playerViewModel)
+                TotalListeningTimeCard(playerViewModel = playerViewModel, onClick = onOpenStats)
 
                 SettingsNavigationCard(
                     icon = Icons.Filled.ColorLens,
@@ -984,10 +985,10 @@ private fun SettingsActionRow(
 // recompose sadece bu küçük composable ile sınırlı kalıyor — SettingsScreen'in geri kalanı
 // (toggle'lar, slider'lar) her tick'te yeniden çizilmiyor.
 @Composable
-private fun TotalListeningTimeCard(playerViewModel: PlayerViewModel) {
+private fun TotalListeningTimeCard(playerViewModel: PlayerViewModel, onClick: () -> Unit) {
     val strings = LocalStrings.current
     val totalMs by playerViewModel.totalListeningMsLive.collectAsState()
-    SectionCard(modifier = Modifier.miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { }) {
+    SectionCard(modifier = Modifier.miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }) {
         Text(
             text = strings.totalListeningTime,
             style = MiuixAppTheme.typography.titleMedium,
