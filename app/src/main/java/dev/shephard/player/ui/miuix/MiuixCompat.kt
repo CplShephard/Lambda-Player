@@ -172,6 +172,19 @@ fun Icon(
 )
 
 @Composable
+fun Icon(
+    painter: androidx.compose.ui.graphics.painter.Painter,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    tint: Color = LocalContentColor.current,
+) = top.yukonga.miuix.kmp.basic.Icon(
+    painter = painter,
+    contentDescription = contentDescription,
+    modifier = modifier,
+    tint = tint,
+)
+
+@Composable
 fun IconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
