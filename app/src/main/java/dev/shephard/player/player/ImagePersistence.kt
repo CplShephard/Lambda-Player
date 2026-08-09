@@ -45,7 +45,18 @@ object ImagePersistence {
     ): Uri? = withContext(Dispatchers.IO) {
         try {
             val dir = File(context.filesDir, subDir).apply { mkdirs() }
-            val destFile = File(dir, "${fileNamePrefix}${System.currentTimeMillis()}.jpg")
+            // GIF kapak desteği: dosya uzantısını her zaman .jpg'ye sabitlemek, byte içeriği
+            // GIF olduğunda bazı content resolver'ların/decoder'ların dosyayı MIME type'ını
+            // yanlış çözümlemesine (ve animasyonun statik bir kareye düşmesine) yol açabilir.
+            // Kaynağın gerçek MIME type'ına göre doğru uzantıyı seçiyoruz.
+            val mimeType = context.contentResolver.getType(sourceUri)
+            val extension = when (mimeType) {
+                "image/gif" -> "gif"
+                "image/png" -> "png"
+                "image/webp" -> "webp"
+                else -> "jpg"
+            }
+            val destFile = File(dir, "${fileNamePrefix}${System.currentTimeMillis()}.$extension")
 
             context.contentResolver.openInputStream(sourceUri)?.use { input ->
                 destFile.outputStream().use { output ->

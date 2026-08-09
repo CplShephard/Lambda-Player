@@ -118,11 +118,12 @@ fun MainContainer(
         LocalAppBackdrop provides backgroundBackdrop,
         LocalContentBackdrop provides contentBackdrop,
     ) {
-        val backStack = remember { mutableStateListOf<NavKey>(MusicRoute) }
+        val backStack = remember { mutableStateListOf<NavKey>(HomeRoute) }
         var showNowPlaying by remember { mutableStateOf(false) }
 
         val currentRouteKey = backStack.last()
         val currentRoute: String? = when (currentRouteKey) {
+            is HomeRoute -> Destination.Home.route
             is MusicRoute -> Destination.Music.route
             is PlaylistsRoute -> Destination.Playlists.route
             is SettingsRoute -> Destination.Settings.route
@@ -172,11 +173,11 @@ fun MainContainer(
         }
 
         // Back: collapse player first, then pop nav stack.
-        BackHandler(enabled = showNowPlaying || currentRoute != Destination.Music.route) {
+        BackHandler(enabled = showNowPlaying || currentRoute != Destination.Home.route) {
             when {
                 showNowPlaying -> showNowPlaying = false
                 !isBottomRoute -> if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
-                else -> while (backStack.size > 1 && backStack.last() != MusicRoute) backStack.removeAt(backStack.lastIndex)
+                else -> while (backStack.size > 1 && backStack.last() != HomeRoute) backStack.removeAt(backStack.lastIndex)
             }
         }
 
@@ -283,10 +284,11 @@ fun MainContainer(
                                         currentRoute = currentRoute,
                                         onNavigate = { destination ->
                                             val key = when (destination) {
+                                                Destination.Home -> HomeRoute
                                                 Destination.Music -> MusicRoute
                                                 Destination.Playlists -> PlaylistsRoute
                                                 Destination.Settings -> SettingsRoute
-                                                else -> MusicRoute
+                                                else -> HomeRoute
                                             }
                                             if (backStack.last() != key) {
                                                 androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
@@ -434,6 +436,7 @@ private fun FloatingDock(
             bottomNavDestinations.forEachIndexed { index, dest ->
                 val selected = index == selectedIndex
                 val label = when (dest) {
+                    Destination.Home -> strings.home
                     Destination.Music -> strings.music
                     Destination.Playlists -> strings.playlists
                     Destination.Settings -> strings.settings

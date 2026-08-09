@@ -263,6 +263,22 @@ fun PlaylistScreen(
     }
 
     fun launchPlaylistCoverCrop(sourceUri: Uri, index: Int) {
+        // GIF kapak desteği: crop her zaman statik JPEG üretir, animasyonu kaybettirir.
+        // GIF ise crop'u atlayıp mevcut "cropper yok" fallback mantığıyla olduğu gibi kaydet.
+        if (context.contentResolver.getType(sourceUri) == "image/gif") {
+            scope.launch {
+                val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, sourceUri)
+                if (persisted != null && index in playlists.indices) {
+                    val pl = playlists[index]
+                    val updated = pl.copy(coverUri = persisted.toString())
+                    val all = playlists.toMutableList()
+                    all[index] = updated
+                    prefs.setPlaylistsJson(encodePlaylists(all))
+                }
+            }
+            return
+        }
+
         val dir = java.io.File(context.filesDir, "persisted_covers").apply { mkdirs() }
         val file = java.io.File(dir, "playlist_cover_${System.currentTimeMillis()}.jpg")
         val outputUri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
@@ -343,6 +359,15 @@ fun PlaylistScreen(
     }
 
     fun launchNewCoverCrop(sourceUri: Uri) {
+        // GIF kapak desteği: crop her zaman statik JPEG üretir, animasyonu kaybettirir.
+        if (context.contentResolver.getType(sourceUri) == "image/gif") {
+            scope.launch {
+                val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, sourceUri)
+                if (persisted != null) newCoverUri = persisted
+            }
+            return
+        }
+
         val dir = java.io.File(context.filesDir, "persisted_covers").apply { mkdirs() }
         val file = java.io.File(dir, "playlist_cover_${System.currentTimeMillis()}.jpg")
         val outputUri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)

@@ -138,6 +138,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("com.google.guava:guava:33.2.1-android")
     implementation("io.coil-kt:coil-compose:2.6.0")
+    // GIF kapak resmi desteği (Now Playing Sheet + Mini Player): Coil'in kendi GIF
+    // decoder'ları — coil-compose'un içine dahil değil, ayrı bir modül.
+    implementation("io.coil-kt:coil-gif:2.6.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.palette:palette-ktx:1.0.0")
 

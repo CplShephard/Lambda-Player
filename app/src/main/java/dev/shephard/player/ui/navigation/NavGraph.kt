@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 InstallerX Revived contributors
 package dev.shephard.player.ui.navigation
 
 import androidx.compose.animation.ContentTransform
@@ -26,6 +28,7 @@ import androidx.navigation3.ui.NavDisplayTransitionEffects
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.ui.screens.AboutSettingsScreen
+import dev.shephard.player.ui.screens.HomeScreen
 import dev.shephard.player.ui.screens.MusicScreen
 import dev.shephard.player.ui.screens.PlayerSettingsScreen
 import dev.shephard.player.ui.screens.PlaylistScreen
@@ -33,6 +36,7 @@ import dev.shephard.player.ui.screens.SettingsScreen
 import dev.shephard.player.ui.screens.ThemeSettingsScreen
 
 // Miuix NavDisplay route anahtarları — her biri androidx.navigation3.runtime.NavKey.
+object HomeRoute : NavKey
 object MusicRoute : NavKey
 object PlaylistsRoute : NavKey
 object SettingsRoute : NavKey
@@ -43,7 +47,7 @@ object StatsRoute : NavKey
 
 // Ana sekmelerin sıralaması — orijinal koddaki `destinations` listesiyle birebir aynı.
 // Yön buna göre hesaplanıyor: hedef index kaynaktan büyükse ileri (Sol), küçükse geri (Sağ).
-private val tabOrder = listOf(MusicRoute, PlaylistsRoute, SettingsRoute)
+private val tabOrder = listOf(HomeRoute, MusicRoute, PlaylistsRoute, SettingsRoute)
 
 // ÖNEMLİ: Scene<T>.entries.last().contentKey, navigation3-runtime'ın DEFAULT
 // contentKeyFactory'sine göre `key.toString()` sonucudur — `MusicRoute` gibi bir NavKey
@@ -54,9 +58,7 @@ private val tabOrder = listOf(MusicRoute, PlaylistsRoute, SettingsRoute)
 private fun tabIndexOf(contentKey: Any?): Int =
     tabOrder.indexOfFirst { it.toString() == contentKey?.toString() }
 
-// MADDE 1 — Musics/Playlists/Settings İÇİN SPRİNG ANİMASYONU İPTAL EDİLDİ.
-// Bir önceki turda InstallerX'ten alınan scale/paralaks spring (PageTransitions.enterPush)
-// kullanılıyordu; kullanıcı isteğiyle eski klasik slide+fade geçişine dönüldü.
+// MADDE 1 — Home/Musics/Playlists/Settings İÇİN ANİMASYON.
 // Yön DİNAMİK: `Scene.entries.lastOrNull()?.contentKey` üzerinden hesaplanır.
 // İleri = sağdan giriş / sola çıkış; geri = tersi.
 private val originalSlideSpec = spring<IntOffset>(
@@ -115,37 +117,19 @@ fun NavGraph(
 ) {
     val currentTop = backStack.last()
 
-    // InstallerX Revived'ın Navigator.push/pop debounce'unun portu — bkz. SubmenuNavGuard.kt.
-    // Sadece Theme/Player/About (submenu) geçişlerine uygulanır.
     val submenuGuard = remember { SubmenuNavGuard() }
 
-    // Bir önceki üst route'u hatırla: transitionEffects'in (corner clip + dim scrim) yalnızca
-    // alt menü (Theme / Player / About) geçişlerinde Miuix stiline geçmesi için kullanılır.
     var prevTop by remember { mutableStateOf<NavKey>(currentTop) }
     LaunchedEffect(currentTop) { prevTop = currentTop }
 
     val involvesSubmenu = isSubmenu(currentTop) || isSubmenu(prevTop)
 
-    // Üst seviye sekmeler = ORİJİNAL klasik slide (köşe kırpma / dim scrim YOK).
-    // Alt menüler (Theme / Player / About) = YENİ Miuix animasyonu (squircle köşe kırpma + dim scrim
-    // + predictive back). Bunlar metadata'sız bırakıldığı için global Miuix varsayılan slide'ı
-    // kullanır; corner clip + dim ise aşağıdaki transitionEffects ile yalnızca alt menü
-    // geçişlerinde devreye girer.
     val transitionEffects = remember(involvesSubmenu) {
         if (involvesSubmenu) {
             NavDisplayTransitionEffects(
                 enableCornerClip = true,
                 dimAmount = 0.5f,
                 blockInputDuringTransition = true,
-                // KAPANIRKEN KÖŞE YUVARLAKLIĞI TUTARSIZLIĞI FIX: Bu bayrak, hangi köşelerin
-                // yuvarlanacağını "son predictive-back swipe'ının hangi kenardan başladığına"
-                // (lastSwipeEdge) göre belirliyor. Ama biz gerçek edge-swipe gesture'ı
-                // KULLANMIYORUZ — geri gitme geri tuşu/onBack() çağrısıyla (programatik)
-                // tetikleniyor. lastSwipeEdge hiçbir zaman kullanıcı girdisinden anlamlı bir
-                // değer almadığı için, kapanış animasyonundaki köşe yuvarlaklığı SS'lerde
-                // görüldüğü gibi tutarsız kalıyordu (bazen açılışla aynı köşeler yuvarlak,
-                // bazen ters/düz). Kapatınca artık her zaman açılışla AYNI köşe kırpma
-                // yönünü kullanıyor.
                 popDirectionFollowsSwipeEdge = false,
             )
         } else {
@@ -160,6 +144,14 @@ fun NavGraph(
     val entryProvider = remember(backStack) {
         entryProvider<NavKey> {
             // --- ÜST SEVİYE SEKMELER: orijinal klasik slide ---
+            entry<HomeRoute>(metadata = originalTabTransition) {
+                HomeScreen(
+                    libraryViewModel = viewModel(),
+                    playerViewModel = playerViewModel,
+                    hasMiniPlayer = hasMiniPlayer,
+                    onTrackClick = { tracks, index, name -> onTrackClick(tracks, index, name) }
+                )
+            }
             entry<MusicRoute>(metadata = originalTabTransition) {
                 MusicScreen(
                     playerViewModel = playerViewModel,

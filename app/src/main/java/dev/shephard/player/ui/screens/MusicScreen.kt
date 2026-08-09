@@ -552,6 +552,18 @@ private fun EditMusicDrawer(
     }
 
     fun launchCoverCrop(sourceUri: android.net.Uri) {
+        // GIF kapak desteği: sistem cropper'ı her zaman statik JPEG çıktısı üretir, bu da
+        // animasyonu tamamen kaybettirir. GIF seçildiyse crop'u atlayıp dosyayı olduğu gibi
+        // (kare olmasa bile) kalıcı depolamaya kopyalıyoruz — animasyon korunur.
+        val mimeType = context.contentResolver.getType(sourceUri)
+        if (mimeType == "image/gif") {
+            coverScope.launch {
+                val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, sourceUri)
+                if (persisted != null) coverUri = persisted
+            }
+            return
+        }
+
         val dir = java.io.File(context.filesDir, "persisted_covers").apply { mkdirs() }
         val file = java.io.File(dir, "cover_${System.currentTimeMillis()}.jpg")
         val outputUri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)

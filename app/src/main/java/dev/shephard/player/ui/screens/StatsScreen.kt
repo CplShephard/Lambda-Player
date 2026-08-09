@@ -14,17 +14,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -42,8 +38,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.shephard.player.data.ListenStatsCalculator
-import dev.shephard.player.data.StatsAlbumEntry
-import dev.shephard.player.data.StatsArtistEntry
 import dev.shephard.player.data.StatsPeriod
 import dev.shephard.player.data.StatsTrackEntry
 import dev.shephard.player.player.PlayerViewModel
@@ -139,21 +133,11 @@ fun StatsScreen(
                 uniqueAlbumCount = snapshot.summary.uniqueAlbumCount
             )
 
-            if (snapshot.artistEntries.isEmpty() && snapshot.albumEntries.isEmpty() && snapshot.trackEntries.isEmpty()) {
+            if (snapshot.trackEntries.isEmpty()) {
                 StatsEmptyState()
             } else {
-                if (snapshot.artistEntries.isNotEmpty()) {
-                    StatsSectionHeader(strings.statsTopArtists)
-                    StatsArtistRow(snapshot.artistEntries.take(10))
-                }
-                if (snapshot.albumEntries.isNotEmpty()) {
-                    StatsSectionHeader(strings.statsTopAlbums)
-                    StatsAlbumRow(snapshot.albumEntries.take(10))
-                }
-                if (snapshot.trackEntries.isNotEmpty()) {
-                    StatsSectionHeader(strings.statsTopTracks)
-                    StatsTrackList(snapshot.trackEntries.take(10))
-                }
+                StatsSectionHeader(strings.statsTopTracks)
+                StatsTrackList(snapshot.trackEntries.take(10))
             }
 
             Spacer(Modifier.height(90.dp))
@@ -248,80 +232,6 @@ private fun StatsSectionHeader(title: String) {
         color = MiuixAppTheme.colorScheme.onBackground,
         modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
     )
-}
-
-@Composable
-private fun StatsArtistRow(entries: List<StatsArtistEntry>) {
-    val cs = MiuixAppTheme.colorScheme
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(entries, key = { it.artistName }) { entry ->
-            Column(
-                modifier = Modifier.width(88.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .clip(CircleShape)
-                        .background(cs.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Filled.Person, contentDescription = null, tint = cs.primary, modifier = Modifier.size(32.dp))
-                }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = entry.artistName,
-                    style = MiuixAppTheme.typography.bodySmall,
-                    color = cs.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = formatStatsMinutes(entry.listenedMs),
-                    style = MiuixAppTheme.typography.labelSmall,
-                    color = cs.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatsAlbumRow(entries: List<StatsAlbumEntry>) {
-    val cs = MiuixAppTheme.colorScheme
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(entries, key = { it.albumName }) { entry ->
-            Column(
-                modifier = Modifier.width(120.dp),
-                horizontalAlignment = Alignment.Start
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(cs.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Filled.Album, contentDescription = null, tint = cs.primary, modifier = Modifier.size(36.dp))
-                }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = entry.albumName,
-                    style = MiuixAppTheme.typography.bodySmall,
-                    color = cs.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = entry.artistName,
-                    style = MiuixAppTheme.typography.labelSmall,
-                    color = cs.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
 }
 
 @Composable

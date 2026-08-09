@@ -1,8 +1,11 @@
 package dev.shephard.player
 
 import android.app.Application
+import android.os.Build
 import coil.ImageLoader
 import coil.ImageLoaderFactory
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
@@ -23,6 +26,16 @@ import coil.request.CachePolicy
  * bellekten düşer ve albüm kapağı MediaStore content-uri'den YENİDEN çözülüp yeniden
  * okunuyordu. Disk cache eklenince cover'lar ilk yüklemeden sonra diske yazılır ve sonraki
  * açılışlarda diskten anında gelir (ağ/kaynak isteği tekrarlanmaz).
+ *
+ * MADDE — GIF KAPAK DESTEĞİ: kullanıcı bir şarkının/playlist'in kapağı olarak bir .gif
+ * seçerse (örn. cihazdan galeri ile kapak değiştirme), Coil'in varsayılan decoder'ları
+ * GIF'i SADECE İLK KAREYİ (statik) çözer, animasyon oynamaz. `ImageDecoderDecoder`
+ * (Android 9/API 28+, donanım hızlandırmalı, `Movie`/`AnimatedImageDrawable` kullanır) ve
+ * ondan önceki cihazlar için `GifDecoder` (yazılım tabanlı) eklenince, `AsyncImage` bir GIF
+ * URI'si aldığında OTOMATİK olarak animasyonlu oynatır — bu değişiklik, Now Playing Sheet'in
+ * arka planı, Mini Player'ın kapak resmi ve tüm track/playlist kapak gösterimleri dahil,
+ * `AsyncImage` kullanılan HER yerde tek bir merkezi noktadan geçerli olur (başka hiçbir
+ * dosyada değişiklik gerekmez, çünkü decoder seçimi ImageLoader seviyesinde yapılır).
  */
 class LambdaPlayerApplication : Application(), ImageLoaderFactory {
     override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
@@ -44,5 +57,12 @@ class LambdaPlayerApplication : Application(), ImageLoaderFactory {
         // Her iki cache de tam kullanılsın (okuma + yazma).
         .memoryCachePolicy(CachePolicy.ENABLED)
         .diskCachePolicy(CachePolicy.ENABLED)
+        .components {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                add(ImageDecoderDecoder.Factory())
+            } else {
+                add(GifDecoder.Factory())
+            }
+        }
         .build()
 }

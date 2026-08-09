@@ -182,9 +182,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun loadStatsEvents() {
         viewModelScope.launch {
             val json = prefs.listenStatsEventsJson.first()
-            statsEvents = ListenStatsCalculator.decodeEvents(json)
+            val loadedEvents = ListenStatsCalculator.decodeEvents(json)
+            // YARIŞ DURUMU DÜZELTMESİ: Bu okuma suspend olduğu için, tamamlanana kadar
+            // kullanıcı zaten müzik dinleyip track değiştirmiş (finalizeStatsSession
+            // çağrılmış) olabilir — o event'ler statsEventsLoaded henüz false olduğu için
+            // DataStore'a YAZILAMAMIŞ ama statsEvents (bellek) listesine EKLENMİŞ olabilir.
+            // Burada blindly `statsEvents = loadedEvents` yaparsak, o bellek-only event'ler
+            // DataStore'dan gelen (henüz onları içermeyen) eski liste ile EZİLİR ve kalıcı
+            // olarak kaybolurdu — "her güncellemede/açılışta stats sıfırlanıyor" hissinin
+            // gerçek sebebi buydu. Şimdi DataStore'dan gelenle bellektekini BİRLEŞTİRİYORUZ.
+            statsEvents = if (statsEvents.isEmpty()) {
+                loadedEvents
+            } else {
+                loadedEvents + statsEvents
+            }
             statsEventsLoaded = true
             _statsEventsFlow.value = statsEvents
+            // Birleştirme sırasında DataStore'da henüz olmayan bellek-only event'ler
+            // eklenmiş olabilir — hemen kalıcı hale getir, bir sonraki track değişimini
+            // beklemeye gerek yok.
+            if (statsEvents.size != loadedEvents.size) {
+                persistStatsEvents()
+            }
         }
     }
 
