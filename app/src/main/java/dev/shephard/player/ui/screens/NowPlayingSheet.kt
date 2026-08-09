@@ -52,6 +52,10 @@ import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lyrics
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
@@ -90,8 +94,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.res.painterResource
-import dev.shephard.player.R
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -127,17 +129,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
-import kotlin.math.absoluteValue
 
 @Composable
 fun NowPlayingSheet(
     playerViewModel: PlayerViewModel = viewModel(),
-    onDismiss: () -> Unit,
-    externalDragOffset: androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>? = null,
-    dismissTargetOffset: Float? = null,
-    initialDragOffset: Float? = null,
-    callOnDismissAfterAnimating: Boolean = true,
-    onInteractingChanged: (Boolean) -> Unit = {}
+    onDismiss: () -> Unit
 ) {
     val state by playerViewModel.uiState.collectAsState()
     val navigationDirection by playerViewModel.navigationDirection.collectAsState()
@@ -155,14 +151,7 @@ fun NowPlayingSheet(
     // içinde ÇAĞRILAMAZ, bu yüzden en üst seviyede alınıp değer olarak kullanılıyor.
     val dragOffsetScreenHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
     val dragOffsetInitialHeight = with(density) { dragOffsetScreenHeight.dp.toPx() }
-    // Mini player → sheet "morph" özelliği: MainContainer artık ExpandingPlayerSheet
-    // aracılığıyla KENDİ dragOffset Animatable'ını oluşturup buraya geçiriyor — böylece
-    // MiniPlayer'ın konumu ile bu sheet'in konumu AYNI state'i paylaşır (gerçek fiziksel
-    // büyüme illüzyonu). externalDragOffset verilmezse (örn. eski bir çağrı noktası varsa)
-    // eskisi gibi kendi içinde oluşturur — geriye dönük uyumlu, hiçbir şey kırılmaz.
-    val dragOffset = externalDragOffset ?: remember {
-        androidx.compose.animation.core.Animatable(initialDragOffset ?: dragOffsetInitialHeight)
-    }
+    val dragOffset = remember { androidx.compose.animation.core.Animatable(dragOffsetInitialHeight) }
     val dragScope = rememberCoroutineScope()
 
     // Sheet her ekrana geldiğinde dragOffset'i 0'a al: parmakla kapatıp tekrar açınca
@@ -172,22 +161,15 @@ fun NowPlayingSheet(
     // ulaşınca (yani sheet TAM oturunca) köşe yarıçapı 30dp -> 0dp'ye iner. Böylece
     // köşeler, açılış animasyonu bitince — değil, TAM bitince — 0'a düşer (sihirli
     // gecikme yok).
-    //
-    // externalDragOffset verildiğinde: açılış animasyonu artık BURADA değil,
-    // ExpandingPlayerSheet'te (MainContainer.kt) yönetiliyor — MiniPlayer'dan sheet'e
-    // geçiş orada başlatılıyor. Bu yüzden bu LaunchedEffect SADECE externalDragOffset
-    // null olduğunda (eski/bağımsız kullanım) çalışır.
-    var hasEnteredRest by remember { mutableStateOf(externalDragOffset != null) }
+    var hasEnteredRest by remember { mutableStateOf(false) }
     val nowPlayingEnterSpring = androidx.compose.animation.core.spring<Float>(
         dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
         stiffness = 180f
     )
     LaunchedEffect(Unit) {
-        if (externalDragOffset == null) {
-            hasEnteredRest = false
-            dragOffset.animateTo(0f, animationSpec = nowPlayingEnterSpring)
-            hasEnteredRest = true
-        }
+        hasEnteredRest = false
+        dragOffset.animateTo(0f, animationSpec = nowPlayingEnterSpring)
+        hasEnteredRest = true
     }
 
     // Next/Previous tuşlarına basınca kapak geçişinin akıcı olması için tween süre/easing
@@ -257,28 +239,21 @@ fun NowPlayingSheet(
                 },
                 onDragStarted = {
                     isInteractingWithSheet = true
-                    onInteractingChanged(true)
                 },
                 onDragStopped = { velocity ->
                     if (dragOffset.value > dismissThresholdPx || velocity > 2500f) {
                         dragScope.launch {
-                            val target = dismissTargetOffset ?: screenHeightPx
-                            val remaining = (target - dragOffset.value).absoluteValue.coerceAtLeast(0f)
+                            val remaining = (screenHeightPx - dragOffset.value).coerceAtLeast(0f)
                             val duration = (remaining / screenHeightPx * 180).toLong().coerceIn(60L, 180L)
                             dragOffset.animateTo(
-                                targetValue = target,
+                                targetValue = screenHeightPx,
                                 animationSpec = androidx.compose.animation.core.tween(
                                     durationMillis = duration.toInt(),
                                     easing = androidx.compose.animation.core.FastOutLinearInEasing
                                 )
                             )
-                            isInteractingWithSheet = false
-                            onInteractingChanged(false)
-                            // dismissTargetOffset verildiğinde (ExpandingPlayerSheet modu) sheet
-                            // "kapanmıyor", mini player konumuna dönüyor — onDismiss burada
-                            // ÇAĞRILMAZ, MainContainer zaten dragOffset'i izleyip mini/tam
-                            // durumunu kendisi belirliyor.
-                            if (callOnDismissAfterAnimating) onDismiss()
+                            // Sheet ekran dışında — direkt kapat, reset LaunchedEffect(Unit)'e bırakılır
+                            onDismiss()
                         }
                     } else {
                         dragScope.launch {
@@ -290,7 +265,6 @@ fun NowPlayingSheet(
                                 )
                             )
                             isInteractingWithSheet = false
-                            onInteractingChanged(false)
                         }
                     }
                 }
@@ -480,10 +454,10 @@ fun NowPlayingSheet(
                     onClick = {
                         showLyrics = true
                     },
-                    painter = painterResource(id = R.drawable.ic_np_lyrics),
+                    icon = Icons.Filled.Lyrics,
                     contentDescription = strings.lyrics,
-                    tint = Color.White,
-                    iconSize = 24.dp
+                    tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                    iconSize = 28.dp
                 )
                 // MADDE 10 — beğen/ekle tuşu da Blur ile birlikte görünüm değiştiriyordu.
                 // Artık her iki durumda da aynı düz dolgulu daire.
@@ -716,10 +690,10 @@ fun NowPlayingSheet(
                 )
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToPrevious() },
-                    painter = painterResource(id = R.drawable.ic_np_previous),
+                    icon = Icons.Filled.SkipPrevious,
                     contentDescription = strings.previous,
-                    tint = Color.White,
-                    iconSize = 34.dp
+                    tint = MiuixAppTheme.colorScheme.onBackground,
+                    iconSize = 36.dp
                 )
                 // MADDE 10 — ÇAL/DURAKLAT tuşu Blur açılınca `blurSurface(GlassTint.ACCENT)`
                 // ile yarı saydam ve KOYU bir daireye dönüşüyordu; üstündeki ikon ise
@@ -756,19 +730,19 @@ fun NowPlayingSheet(
                         label = "playPauseIcon"
                     ) { isPlaying ->
                         Icon(
-                            painter = painterResource(id = if (isPlaying) R.drawable.ic_np_pause else R.drawable.ic_np_play),
+                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (isPlaying) strings.pause else strings.play,
-                            tint = Color.White,
-                            modifier = Modifier.size(if (isPlaying) 30.dp else 36.dp)
+                            tint = MiuixAppTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(36.dp)
                         )
                     }
                 }
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToNext() },
-                    painter = painterResource(id = R.drawable.ic_np_next),
+                    icon = Icons.Filled.SkipNext,
                     contentDescription = strings.next,
-                    tint = Color.White,
-                    iconSize = 34.dp
+                    tint = MiuixAppTheme.colorScheme.onBackground,
+                    iconSize = 36.dp
                 )
                 BouncyIconButton(
                     onClick = { playerViewModel.cycleRepeatMode() },

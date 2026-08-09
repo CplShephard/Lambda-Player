@@ -1,13 +1,11 @@
 package dev.shephard.player.ui.navigation
 
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.core.EaseOutQuart
-import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,9 +14,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -57,21 +54,18 @@ private val tabOrder = listOf(MusicRoute, PlaylistsRoute, SettingsRoute)
 private fun tabIndexOf(contentKey: Any?): Int =
     tabOrder.indexOfFirst { it.toString() == contentKey?.toString() }
 
-// MADDE 1 (eski) — Musics/Playlists/Settings için spring slide+fade kullanılıyordu.
-// ŞİMDİ (Flamingo Player'dan alınan geçiş): Flamingo Player'ın MainActivity.kt'deki
-// AnimatedNavHost enter/exit/popEnter/popExitTransition tanımlarıyla BİREBİR aynı animasyon
-// — fadeIn/fadeOut + expandHorizontally/shrinkHorizontally (yatay genişleyerek/daralarak
-// gelen-giden sayfa), tween(durationMillis=340, easing=EaseOutQuart) boyut için,
-// tween(durationMillis=180, easing=EaseOutQuart) fade için (340-160=180, Flamingo'daki
-// `animateSpeed - 160` hesabıyla aynı). Yön hâlâ DİNAMİK: tabIndexOf ile hesaplanır.
-private const val flamingoAnimateSpeedMs = 340
-private val flamingoSizeSpec: FiniteAnimationSpec<IntSize> = tween(
-    durationMillis = flamingoAnimateSpeedMs,
-    easing = EaseOutQuart
+// MADDE 1 — Musics/Playlists/Settings İÇİN SPRİNG ANİMASYONU İPTAL EDİLDİ.
+// Bir önceki turda InstallerX'ten alınan scale/paralaks spring (PageTransitions.enterPush)
+// kullanılıyordu; kullanıcı isteğiyle eski klasik slide+fade geçişine dönüldü.
+// Yön DİNAMİK: `Scene.entries.lastOrNull()?.contentKey` üzerinden hesaplanır.
+// İleri = sağdan giriş / sola çıkış; geri = tersi.
+private val originalSlideSpec = spring<IntOffset>(
+    dampingRatio = 0.8f,
+    stiffness = 380f,
 )
-private val flamingoFadeSpec: FiniteAnimationSpec<Float> = tween(
-    durationMillis = flamingoAnimateSpeedMs - 160,
-    easing = EaseOutQuart
+private val originalFadeSpec = spring<Float>(
+    dampingRatio = 1f,
+    stiffness = 380f,
 )
 
 private val originalTabTransition: Map<String, Any> =
@@ -81,29 +75,13 @@ private val originalTabTransition: Map<String, Any> =
         val forward = toIdx >= fromIdx
         if (forward) {
             ContentTransform(
-                fadeIn(flamingoFadeSpec) + expandHorizontally(
-                    animationSpec = flamingoSizeSpec,
-                    clip = false,
-                    expandFrom = Alignment.Start
-                ) { -it / 2 },
-                fadeOut(flamingoFadeSpec) + shrinkHorizontally(
-                    animationSpec = flamingoSizeSpec,
-                    clip = false,
-                    shrinkTowards = Alignment.End
-                ) { it / 2 },
+                slideInHorizontally(initialOffsetX = { it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
+                slideOutHorizontally(targetOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
             )
         } else {
             ContentTransform(
-                fadeIn(flamingoFadeSpec) + expandHorizontally(
-                    animationSpec = flamingoSizeSpec,
-                    clip = false,
-                    expandFrom = Alignment.End
-                ) { it / 2 },
-                fadeOut(flamingoFadeSpec) + shrinkHorizontally(
-                    animationSpec = flamingoSizeSpec,
-                    clip = false,
-                    shrinkTowards = Alignment.Start
-                ) { -it / 2 },
+                slideInHorizontally(initialOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
+                slideOutHorizontally(targetOffsetX = { it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
             )
         }
     } + NavDisplay.popTransitionSpec {
@@ -112,29 +90,13 @@ private val originalTabTransition: Map<String, Any> =
         val forward = toIdx >= fromIdx
         if (forward) {
             ContentTransform(
-                fadeIn(flamingoFadeSpec) + expandHorizontally(
-                    animationSpec = flamingoSizeSpec,
-                    clip = false,
-                    expandFrom = Alignment.Start
-                ) { -it / 2 },
-                fadeOut(flamingoFadeSpec) + shrinkHorizontally(
-                    animationSpec = flamingoSizeSpec,
-                    clip = false,
-                    shrinkTowards = Alignment.End
-                ) { it / 2 },
+                slideInHorizontally(initialOffsetX = { it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
+                slideOutHorizontally(targetOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
             )
         } else {
             ContentTransform(
-                fadeIn(flamingoFadeSpec) + expandHorizontally(
-                    animationSpec = flamingoSizeSpec,
-                    clip = false,
-                    expandFrom = Alignment.End
-                ) { it / 2 },
-                fadeOut(flamingoFadeSpec) + shrinkHorizontally(
-                    animationSpec = flamingoSizeSpec,
-                    clip = false,
-                    shrinkTowards = Alignment.Start
-                ) { -it / 2 },
+                slideInHorizontally(initialOffsetX = { -it }, animationSpec = originalSlideSpec) + fadeIn(originalFadeSpec),
+                slideOutHorizontally(targetOffsetX = { it }, animationSpec = originalSlideSpec) + fadeOut(originalFadeSpec),
             )
         }
     }
