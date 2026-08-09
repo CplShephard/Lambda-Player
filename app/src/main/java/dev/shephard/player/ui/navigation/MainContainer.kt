@@ -337,9 +337,19 @@ fun MainContainer(
                 exit = fadeOut(tween(0)),
                 modifier = Modifier.fillMaxSize()
             ) {
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                // Mini player → sheet "morph" illüzyonu: sheet artık ekranın TAM ALTINDAN
+                // değil, MiniPlayer'ın kabaca durduğu Y konumundan (yaklaşık kart yüksekliği +
+                // dock için bırakılan boşluk) yukarı doğru büyüyerek açılıyor. Gerçek shared-
+                // element/SharedTransitionApi kullanmadan (mevcut dock/zIndex/submenu mantığına
+                // hiç dokunmadan) MiniPlayer'ın kaybolup sheet'in onun yerinden çıkması hissini
+                // veriyor — tam ekran kayma yerine kısa bir mesafeden "genişleyerek" gelir.
+                val miniPlayerApproxHeightPx = with(density) { 108.dp.toPx() }
                 NowPlayingSheet(
                     playerViewModel = playerViewModel,
-                    onDismiss = { showNowPlaying = false }
+                    onDismiss = { showNowPlaying = false },
+                    initialDragOffset = miniPlayerApproxHeightPx,
+                    dismissTargetOffset = miniPlayerApproxHeightPx
                 )
             }
         }
