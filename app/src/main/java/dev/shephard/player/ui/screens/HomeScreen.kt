@@ -158,14 +158,14 @@ fun HomeScreen(
         transitionSpec = {
             if (targetState != null) {
                 androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.enterPush,
-                    initialContentExit = PageTransitions.exitPush,
+                    targetContentEnter = PageTransitions.enterSubmenu,
+                    initialContentExit = PageTransitions.exitSubmenu,
                     targetContentZIndex = 1f
                 )
             } else {
                 androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.popEnterPush,
-                    initialContentExit = PageTransitions.popExitPush,
+                    targetContentEnter = PageTransitions.popEnterSubmenu,
+                    initialContentExit = PageTransitions.popExitSubmenu,
                     targetContentZIndex = 0f
                 )
             }

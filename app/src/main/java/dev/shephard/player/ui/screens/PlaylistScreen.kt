@@ -12,6 +12,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -466,8 +471,8 @@ fun PlaylistScreen(
                 // targetContentZIndex=1 → detay (giren, target) HER ZAMAN üstte kalır; liste
                 // (header + create FAB dahil) altta kalır ve detay örter.
                 androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.enterPush,
-                    initialContentExit = PageTransitions.exitPush,
+                    targetContentEnter = PageTransitions.enterSubmenu,
+                    initialContentExit = PageTransitions.exitSubmenu,
                     targetContentZIndex = 1f
                 )
             } else {
@@ -476,8 +481,8 @@ fun PlaylistScreen(
                 // targetContentZIndex=0 yapınca target (liste) altta kalır, initial (detay) üstte
                 // kayar. (Bu Compose sürümünde yalnızca targetContentZIndex parametresi var.)
                 androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.popEnterPush,
-                    initialContentExit = PageTransitions.popExitPush,
+                    targetContentEnter = PageTransitions.popEnterSubmenu,
+                    initialContentExit = PageTransitions.popExitSubmenu,
                     targetContentZIndex = 0f
                 )
             }
@@ -1195,9 +1200,12 @@ private fun PlaylistListView(
             } else {
                 val playlistGridState = rememberLazyGridState()
                 val playlistListState = rememberLazyListState()
+                val sortedPlaylists = remember(playlists) {
+                    val (pinned, unpinned) = playlists.partition { it.pinned }
+                    pinned + unpinned
+                }
+                val hasPinned = playlists.any { it.pinned }
                 if (layout == LayoutMode.GRID) {
-                    val pinnedPlaylists = playlists.filter { it.pinned }
-                    val unpinnedPlaylists = playlists.filter { !it.pinned }
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
                         state = playlistGridState,
@@ -1215,8 +1223,12 @@ private fun PlaylistListView(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        if (pinnedPlaylists.size >= 1) {
-                            item(span = { GridItemSpan(2) }) {
+                        item(key = "pinned_header", span = { GridItemSpan(2) }) {
+                            AnimatedVisibility(
+                                visible = hasPinned,
+                                enter = fadeIn() + expandVertically(),
+                                exit = fadeOut() + shrinkVertically()
+                            ) {
                                 Text(
                                     text = strings.pinnedPlaylists,
                                     style = MiuixAppTheme.typography.labelMedium,
@@ -1224,27 +1236,12 @@ private fun PlaylistListView(
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
                             }
-                            items(
-                                count = pinnedPlaylists.size,
-                                key = { i -> pinnedPlaylists[i].name + "_" + pinnedPlaylists[i].createdAt }
-                            ) { i ->
-                                val pl = pinnedPlaylists[i]
-                                val realIdx = playlists.indexOf(pl)
-                                val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                                Box(modifier = Modifier.animateItem()) {
-                                    PlaylistGridCard(playlist = pl, plTracks = plTracks, strings = strings,
-                                        onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
-                                }
-                            }
-                            item(span = { GridItemSpan(2) }) {
-                                Spacer(Modifier.height(4.dp))
-                            }
                         }
                         items(
-                            count = unpinnedPlaylists.size,
-                            key = { i -> unpinnedPlaylists[i].name + "_" + unpinnedPlaylists[i].createdAt }
+                            count = sortedPlaylists.size,
+                            key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }
                         ) { i ->
-                            val pl = unpinnedPlaylists[i]
+                            val pl = sortedPlaylists[i]
                             val realIdx = playlists.indexOf(pl)
                             val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
                             Box(modifier = Modifier.animateItem()) {
@@ -1254,8 +1251,6 @@ private fun PlaylistListView(
                         }
                     }
                 } else {
-                    val pinnedPlaylists = playlists.filter { it.pinned }
-                    val unpinnedPlaylists = playlists.filter { !it.pinned }
                     LazyColumn(
                         state = playlistListState,
                         modifier = Modifier
@@ -1271,8 +1266,12 @@ private fun PlaylistListView(
                         ),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        if (pinnedPlaylists.size >= 1) {
-                            item {
+                        item(key = "pinned_header") {
+                            AnimatedVisibility(
+                                visible = hasPinned,
+                                enter = fadeIn() + expandVertically(),
+                                exit = fadeOut() + shrinkVertically()
+                            ) {
                                 Text(
                                     text = strings.pinnedPlaylists,
                                     style = MiuixAppTheme.typography.labelMedium,
@@ -1280,25 +1279,12 @@ private fun PlaylistListView(
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
                             }
-                            items(
-                                count = pinnedPlaylists.size,
-                                key = { i -> pinnedPlaylists[i].name + "_" + pinnedPlaylists[i].createdAt }
-                            ) { i ->
-                                val pl = pinnedPlaylists[i]
-                                val realIdx = playlists.indexOf(pl)
-                                val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                                Box(modifier = Modifier.animateItem()) {
-                                    PlaylistListCard(playlist = pl, plTracks = plTracks, strings = strings,
-                                        onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
-                                }
-                            }
-                            item { Spacer(Modifier.height(4.dp)) }
                         }
                         items(
-                            count = unpinnedPlaylists.size,
-                            key = { i -> unpinnedPlaylists[i].name + "_" + unpinnedPlaylists[i].createdAt }
+                            count = sortedPlaylists.size,
+                            key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }
                         ) { i ->
-                            val pl = unpinnedPlaylists[i]
+                            val pl = sortedPlaylists[i]
                             val realIdx = playlists.indexOf(pl)
                             val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
                             Box(modifier = Modifier.animateItem()) {
@@ -1569,8 +1555,8 @@ private fun PlaylistDetailTopBar(
                     Modifier.miuixBlurSurface(
                         backdrop = pageBackdrop,
                         shape = androidx.compose.ui.graphics.RectangleShape,
-                        blurRadius = 26f,
-                        tintAlpha = collapse * 0.85f,
+                        blurRadius = 70f,
+                        tintAlpha = if (collapse > 0.01f) (0.68f + collapse * 0.27f).coerceIn(0f, 0.95f) else 0f,
                         fallbackColor = androidx.compose.ui.graphics.Color.Transparent
                     )
                 } else {

@@ -103,8 +103,8 @@ fun StatsScreen(
                 Modifier.miuixBlurSurface(
                     backdrop = topBarState.pageBackdrop,
                     shape = androidx.compose.ui.graphics.RectangleShape,
-                    blurRadius = 26f,
-                    tintAlpha = scrollProgress * 0.85f,
+                    blurRadius = 70f,
+                    tintAlpha = if (scrollProgress > 0.01f) (0.68f + scrollProgress * 0.27f).coerceIn(0f, 0.95f) else 0f,
                     fallbackColor = Color.Transparent
                 )
             } else Modifier,

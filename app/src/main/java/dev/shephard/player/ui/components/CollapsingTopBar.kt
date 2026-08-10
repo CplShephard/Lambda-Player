@@ -107,8 +107,8 @@ fun CollapsingTopBar(
                     Modifier.miuixBlurSurface(
                         backdrop = state.pageBackdrop,
                         shape = androidx.compose.ui.graphics.RectangleShape,
-                        blurRadius = 26f,
-                        tintAlpha = scrollProgress * 0.85f,
+                        blurRadius = 70f,
+                        tintAlpha = if (scrollProgress > 0.01f) (0.68f + scrollProgress * 0.27f).coerceIn(0f, 0.95f) else 0f,
                         fallbackColor = androidx.compose.ui.graphics.Color.Transparent
                     )
                 } else Modifier
@@ -193,8 +193,8 @@ fun InstallerXTopBar(
                     Modifier.miuixBlurSurface(
                         backdrop = state.pageBackdrop,
                         shape = androidx.compose.ui.graphics.RectangleShape,
-                        blurRadius = 26f,
-                        tintAlpha = collapseFraction * 0.85f,
+                        blurRadius = 70f,
+                        tintAlpha = if (collapseFraction > 0.01f) (0.68f + collapseFraction * 0.27f).coerceIn(0f, 0.95f) else 0f,
                         fallbackColor = androidx.compose.ui.graphics.Color.Transparent
                     )
                 } else Modifier
@@ -226,8 +226,8 @@ fun SubmenuTopBar(
                     Modifier.miuixBlurSurface(
                         backdrop = state.pageBackdrop,
                         shape = androidx.compose.ui.graphics.RectangleShape,
-                        blurRadius = 26f,
-                        tintAlpha = collapseFraction * 0.85f,
+                        blurRadius = 70f,
+                        tintAlpha = if (collapseFraction > 0.01f) (0.68f + collapseFraction * 0.27f).coerceIn(0f, 0.95f) else 0f,
                         fallbackColor = androidx.compose.ui.graphics.Color.Transparent
                     )
                 } else Modifier
