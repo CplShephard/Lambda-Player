@@ -1,8 +1,9 @@
+package dev.shephard.player.ui.screens
+
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.LibraryViewModel
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
-package dev.shephard.player.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

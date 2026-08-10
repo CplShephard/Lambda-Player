@@ -977,6 +977,7 @@ private fun QueueList(
     currentTrackId: Long?,
     onMove: (from: Int, to: Int) -> Unit,
     onPlay: (index: Int) -> Unit,
+    onPlayNext: (index: Int) -> Unit = {},
     onRemove: (index: Int) -> Unit,
     strings: dev.shephard.player.ui.i18n.Strings
 ) {

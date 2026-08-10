@@ -21,6 +21,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -681,28 +682,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             hexPlaceholder = strings.hexPlaceholder
         )
     }
-}
 
-@Composable
-fun PlayerSettingsScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
-    val prefs = remember { PreferencesManager(context) }
-    val scope = rememberCoroutineScope()
-    val strings = LocalStrings.current
-    val crossfade by prefs.crossfadeEnabled.collectAsState(initial = false)
-    val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
-    val playWith by prefs.playWithOthers.collectAsState(initial = false)
-
-    SettingsPageScaffold(title = strings.playbackSettings, onBack = onBack) {
-        SectionCard {
-            Text(strings.playbackSettings, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
-            Spacer(Modifier.height(8.dp))
-            ToggleRow(label = strings.crossfade, checked = crossfade) { scope.launch { prefs.setCrossfadeEnabled(it) } }
-            ToggleRow(label = strings.gapless, checked = gapless) { scope.launch { prefs.setGaplessEnabled(it) } }
-            ToggleRow(label = strings.playWithOthers, checked = playWith) { scope.launch { prefs.setPlayWithOthers(it) } }
-        }
-        Spacer(Modifier.height(110.dp))
-    }
     if (showRemoveWallpaperConfirm) {
         dev.shephard.player.ui.miuix.MiuixDialog(
             onDismissRequest = { showRemoveWallpaperConfirm = false },
@@ -756,6 +736,28 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
                 }
             }
         )
+    }
+}
+
+@Composable
+fun PlayerSettingsScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val prefs = remember { PreferencesManager(context) }
+    val scope = rememberCoroutineScope()
+    val strings = LocalStrings.current
+    val crossfade by prefs.crossfadeEnabled.collectAsState(initial = false)
+    val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
+    val playWith by prefs.playWithOthers.collectAsState(initial = false)
+
+    SettingsPageScaffold(title = strings.playbackSettings, onBack = onBack) {
+        SectionCard {
+            Text(strings.playbackSettings, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
+            Spacer(Modifier.height(8.dp))
+            ToggleRow(label = strings.crossfade, checked = crossfade) { scope.launch { prefs.setCrossfadeEnabled(it) } }
+            ToggleRow(label = strings.gapless, checked = gapless) { scope.launch { prefs.setGaplessEnabled(it) } }
+            ToggleRow(label = strings.playWithOthers, checked = playWith) { scope.launch { prefs.setPlayWithOthers(it) } }
+        }
+        Spacer(Modifier.height(110.dp))
     }
 }
 
