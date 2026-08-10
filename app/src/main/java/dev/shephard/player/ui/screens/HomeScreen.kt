@@ -33,6 +33,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.navigation.SubmenuNavGuard
+import dev.shephard.player.ui.navigation.PageTransitions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
@@ -144,34 +145,53 @@ fun HomeScreen(
                 it.name != "Favoriler"
         }.shuffled().take(5)
     }
-    var selectedPlaylist by remember { mutableStateOf<LocalPlaylist?>(null) }
+    var openPlaylistIndex by remember { mutableStateOf<Int?>(null) }
     val playlistDetailGuard = remember { SubmenuNavGuard() }
 
-    BackHandler(enabled = selectedPlaylist != null) {
-        playlistDetailGuard.pop { selectedPlaylist = null }
+    BackHandler(enabled = openPlaylistIndex != null) {
+        playlistDetailGuard.pop { openPlaylistIndex = null }
     }
 
-    val selectedPl = selectedPlaylist
-    if (selectedPl != null) {
+    AnimatedContent(
+        targetState = openPlaylistIndex,
+        modifier = Modifier.fillMaxSize(),
+        transitionSpec = {
+            if (targetState != null) {
+                androidx.compose.animation.ContentTransform(
+                    targetContentEnter = PageTransitions.enterPush,
+                    initialContentExit = PageTransitions.exitPush,
+                    targetContentZIndex = 1f
+                )
+            } else {
+                androidx.compose.animation.ContentTransform(
+                    targetContentEnter = PageTransitions.popEnterPush,
+                    initialContentExit = PageTransitions.popExitPush,
+                    targetContentZIndex = 0f
+                )
+            }
+        },
+        label = "homePlaylistSubmenu"
+    ) { idx ->
+        val selectedPl = idx?.let { featuredPlaylists.getOrNull(it) }
+        if (selectedPl != null) {
         val plTracks = remember(selectedPl, tracks, likedIds) { resolvePlaylistTracks(selectedPl, tracks, likedIds) }
         PlaylistDetailView(
             playlist = selectedPl,
             allTracks = tracks,
             plTracks = plTracks,
             strings = strings,
-            onBack = { playlistDetailGuard.pop { selectedPlaylist = null } },
+            onBack = { playlistDetailGuard.pop { openPlaylistIndex = null } },
             onTrackClick = { list, i -> onTrackClick(list, i, selectedPl.name) },
             onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, selectedPl.name) },
             onPlayRemix = { if (plTracks.isNotEmpty()) onTrackClick(plTracks.shuffled(), 0, selectedPl.name) },
             onRemoveTrack = { trackId ->
                 val newTrackIds = selectedPl.trackIds - trackId
-                val idx = rawPlaylists.indexOf(selectedPl)
-                if (idx >= 0) {
+                val rawIdx = rawPlaylists.indexOf(selectedPl)
+                if (rawIdx >= 0) {
                     val next = rawPlaylists.toMutableList()
-                    next[idx] = selectedPl.copy(trackIds = newTrackIds)
+                    next[rawIdx] = selectedPl.copy(trackIds = newTrackIds)
                     scope.launch { prefs.setPlaylistsJson(encodePlaylists(next)) }
                 }
-                selectedPlaylist = selectedPl.copy(trackIds = newTrackIds)
             },
             onAddTracks = { },
             onPickCover = { },
@@ -220,7 +240,10 @@ fun HomeScreen(
                         title = strings.featuredPlaylists,
                         playlists = featuredPlaylists,
                         onPlaylistClick = { pl ->
-                            playlistDetailGuard.push(selectedPlaylist, pl) { selectedPlaylist = pl }
+                            val i = featuredPlaylists.indexOf(pl)
+                            if (i >= 0) {
+                                playlistDetailGuard.push(openPlaylistIndex, i) { openPlaylistIndex = i }
+                            }
                         }
                     )
                 }
@@ -237,6 +260,7 @@ fun HomeScreen(
                 }
             }
         }
+    }
     }
 }
 

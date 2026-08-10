@@ -466,8 +466,8 @@ fun PlaylistScreen(
                 // targetContentZIndex=1 → detay (giren, target) HER ZAMAN üstte kalır; liste
                 // (header + create FAB dahil) altta kalır ve detay örter.
                 androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.enterSubmenu,
-                    initialContentExit = PageTransitions.exitSubmenu,
+                    targetContentEnter = PageTransitions.enterPush,
+                    initialContentExit = PageTransitions.exitPush,
                     targetContentZIndex = 1f
                 )
             } else {
@@ -476,8 +476,8 @@ fun PlaylistScreen(
                 // targetContentZIndex=0 yapınca target (liste) altta kalır, initial (detay) üstte
                 // kayar. (Bu Compose sürümünde yalnızca targetContentZIndex parametresi var.)
                 androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.popEnterSubmenu,
-                    initialContentExit = PageTransitions.popExitSubmenu,
+                    targetContentEnter = PageTransitions.popEnterPush,
+                    initialContentExit = PageTransitions.popExitPush,
                     targetContentZIndex = 0f
                 )
             }
@@ -1224,23 +1224,33 @@ private fun PlaylistListView(
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
                             }
-                            items(pinnedPlaylists.size) { i ->
+                            items(
+                                count = pinnedPlaylists.size,
+                                key = { i -> pinnedPlaylists[i].name + "_" + pinnedPlaylists[i].createdAt }
+                            ) { i ->
                                 val pl = pinnedPlaylists[i]
                                 val realIdx = playlists.indexOf(pl)
                                 val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                                PlaylistGridCard(playlist = pl, plTracks = plTracks, strings = strings,
-                                    onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                                Box(modifier = Modifier.animateItem()) {
+                                    PlaylistGridCard(playlist = pl, plTracks = plTracks, strings = strings,
+                                        onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                                }
                             }
                             item(span = { GridItemSpan(2) }) {
                                 Spacer(Modifier.height(4.dp))
                             }
                         }
-                        items(unpinnedPlaylists.size) { i ->
+                        items(
+                            count = unpinnedPlaylists.size,
+                            key = { i -> unpinnedPlaylists[i].name + "_" + unpinnedPlaylists[i].createdAt }
+                        ) { i ->
                             val pl = unpinnedPlaylists[i]
                             val realIdx = playlists.indexOf(pl)
                             val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                            PlaylistGridCard(playlist = pl, plTracks = plTracks, strings = strings,
-                                onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                            Box(modifier = Modifier.animateItem()) {
+                                PlaylistGridCard(playlist = pl, plTracks = plTracks, strings = strings,
+                                    onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                            }
                         }
                     }
                 } else {
@@ -1270,21 +1280,31 @@ private fun PlaylistListView(
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
                             }
-                            items(pinnedPlaylists.size) { i ->
+                            items(
+                                count = pinnedPlaylists.size,
+                                key = { i -> pinnedPlaylists[i].name + "_" + pinnedPlaylists[i].createdAt }
+                            ) { i ->
                                 val pl = pinnedPlaylists[i]
                                 val realIdx = playlists.indexOf(pl)
                                 val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                                PlaylistListCard(playlist = pl, plTracks = plTracks, strings = strings,
-                                    onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                                Box(modifier = Modifier.animateItem()) {
+                                    PlaylistListCard(playlist = pl, plTracks = plTracks, strings = strings,
+                                        onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                                }
                             }
                             item { Spacer(Modifier.height(4.dp)) }
                         }
-                        items(unpinnedPlaylists.size) { i ->
+                        items(
+                            count = unpinnedPlaylists.size,
+                            key = { i -> unpinnedPlaylists[i].name + "_" + unpinnedPlaylists[i].createdAt }
+                        ) { i ->
                             val pl = unpinnedPlaylists[i]
                             val realIdx = playlists.indexOf(pl)
                             val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                            PlaylistListCard(playlist = pl, plTracks = plTracks, strings = strings,
-                                onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                            Box(modifier = Modifier.animateItem()) {
+                                PlaylistListCard(playlist = pl, plTracks = plTracks, strings = strings,
+                                    onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                            }
                         }
                     }
                 }
