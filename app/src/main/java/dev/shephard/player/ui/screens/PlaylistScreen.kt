@@ -238,6 +238,9 @@ fun PlaylistScreen(
     var playlistMenuIndex by remember { mutableStateOf<Int?>(null) }
     var editPlaylistIndex by remember { mutableStateOf<Int?>(null) }
     var editPlaylistName by remember { mutableStateOf("") }
+    var showRemoveCoverConfirm by remember { mutableStateOf(false) }
+    var showDeletePlaylistConfirm by remember { mutableStateOf(false) }
+    var playlistToDelete by remember { mutableStateOf<LocalPlaylist?>(null) }
     // Create playlist drawer'ı artık Edit drawer'ı ile aynı stilde: kapak fotoğrafı da
     // eklenebiliyor. Aşağıdaki state/launcher'lar create akışına özel.
     var newCoverUri by remember { mutableStateOf<Uri?>(null) }
@@ -800,8 +803,8 @@ fun PlaylistScreen(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .bounceClick {
-                                val all = playlists.toMutableList().also { it.removeAt(menuIdx) }
-                                scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                                playlistToDelete = pl
+                                showDeletePlaylistConfirm = true
                                 playlistMenuIndex = null
                             }
                             .padding(12.dp),
@@ -904,6 +907,18 @@ fun PlaylistScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                         }
+                    }
+                    if (editingPlaylist.coverUri != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = strings.removeCover,
+                            color = MiuixAppTheme.colorScheme.error,
+                            style = MiuixAppTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .bounceClick { showRemoveCoverConfirm = true }
+                                .padding(6.dp)
+                        )
                     }
                     Spacer(Modifier.height(16.dp))
                 }
@@ -1925,6 +1940,126 @@ private fun DraggablePlaylistTrackRow(
             modifier = Modifier
                 .size(28.dp)
                 .then(dragHandleModifier)
+        )
+    }
+    if (showRemoveCoverConfirm) {
+        dev.shephard.player.ui.miuix.MiuixDialog(
+            onDismissRequest = { showRemoveCoverConfirm = false },
+            title = strings.removeCover,
+            text = {
+                Text(
+                    text = strings.removeCoverConfirm,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            buttons = {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = { showRemoveCoverConfirm = false },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Text(
+                            text = strings.cancel,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = {
+                            showRemoveCoverConfirm = false
+                            val idx = editPlaylistIndex
+                            if (idx != null && idx in playlists.indices) {
+                                val pl = playlists[idx]
+                                val all = playlists.toMutableList()
+                                all[idx] = pl.copy(coverUri = null)
+                                scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                            }
+                        },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
+                    ) {
+                        Text(
+                            text = strings.removeCover,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = Color(0xFFE53935),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+        )
+    }
+
+    if (showDeletePlaylistConfirm && playlistToDelete != null) {
+        dev.shephard.player.ui.miuix.MiuixDialog(
+            onDismissRequest = { showDeletePlaylistConfirm = false; playlistToDelete = null },
+            title = strings.delete,
+            text = {
+                Text(
+                    text = strings.removePlaylistConfirm,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            buttons = {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = { showDeletePlaylistConfirm = false; playlistToDelete = null },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Text(
+                            text = strings.cancel,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = {
+                            val toDel = playlistToDelete
+                            showDeletePlaylistConfirm = false
+                            playlistToDelete = null
+                            if (toDel != null) {
+                                val all = playlists.toMutableList().filterNot { it.name == toDel.name && it.isSystem == toDel.isSystem }
+                                scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                            }
+                        },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
+                    ) {
+                        Text(
+                            text = strings.delete,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = Color(0xFFE53935),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
         )
     }
 }

@@ -120,6 +120,7 @@ fun MusicScreen(
 
     var selectedTrackForMenu by remember { mutableStateOf<AudioTrack?>(null) }
     var trackToEdit by remember { mutableStateOf<AudioTrack?>(null) }
+    var showRemoveCoverConfirm by remember { mutableStateOf(false) }
     var trackToDelete by remember { mutableStateOf<AudioTrack?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -704,7 +705,7 @@ private fun EditMusicDrawer(
             if (coverUri != null) {
                 Spacer(Modifier.height(8.dp))
                 TextButton(
-                    onClick = { coverUri = null },
+                    onClick = { showRemoveCoverConfirm = true },
                     modifier = Modifier.align(Alignment.End)
                 ) {
                     Text(strings.removeCover, color = MiuixAppTheme.colorScheme.error)
@@ -809,6 +810,60 @@ private fun EmptyState() {
             style = MiuixAppTheme.typography.bodyMedium,
             color = MiuixAppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp)
+        )
+    }
+    if (showRemoveCoverConfirm) {
+        dev.shephard.player.ui.miuix.MiuixDialog(
+            onDismissRequest = { showRemoveCoverConfirm = false },
+            title = strings.removeCover,
+            text = {
+                Text(
+                    text = strings.removeCoverConfirm,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            buttons = {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = { showRemoveCoverConfirm = false },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Text(
+                            text = strings.cancel,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = {
+                            showRemoveCoverConfirm = false
+                            coverUri = null
+                        },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
+                    ) {
+                        Text(
+                            text = strings.removeCover,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = Color(0xFFE53935),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
         )
     }
 }

@@ -2,6 +2,10 @@
 
 package dev.shephard.player.ui.screens
 
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Edit
+
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.asImageBitmap
 
@@ -204,6 +208,7 @@ fun SettingsScreen(
 @Composable
 fun ThemeSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    var showRemoveWallpaperConfirm by remember { mutableStateOf(false) }
     val prefs = remember { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
     val strings = LocalStrings.current
@@ -417,35 +422,136 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
 
         SectionCard {
             Text(strings.wallpaper, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
-            Spacer(Modifier.height(10.dp))
-            if (wallpaper.isNotEmpty()) {
-                var previewLoaded by remember(wallpaper) { mutableStateOf(false) }
+            Spacer(Modifier.height(14.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // SOLDA WALLPAPER PREVIEW (Ekranın full screen en-boy oranına uyarlanmış dikey önizleme)
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp)
+                        .width(115.dp)
+                        .aspectRatio(9f / 19.5f)
                         .clip(RoundedCornerShape(16.dp))
                         .background(MiuixAppTheme.colorScheme.background),
                     contentAlignment = Alignment.Center
                 ) {
-                    AsyncImage(
-                        model = wallpaper,
-                        contentDescription = strings.wallpaperPreviewContentDescription,
-                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
-                        contentScale = ContentScale.Crop,
-                        onState = { previewLoaded = it is AsyncImagePainter.State.Success }
-                    )
-                    if (!previewLoaded) Icon(Icons.Filled.BrokenImage, null, tint = MiuixAppTheme.colorScheme.onSurfaceVariant)
+                    if (wallpaper.isNotEmpty()) {
+                        var previewLoaded by remember(wallpaper) { mutableStateOf(false) }
+                        AsyncImage(
+                            model = wallpaper,
+                            contentDescription = strings.wallpaperPreviewContentDescription,
+                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
+                            contentScale = ContentScale.Crop,
+                            onState = { previewLoaded = it is AsyncImagePainter.State.Success }
+                        )
+                        if (!previewLoaded) {
+                            Icon(Icons.Filled.BrokenImage, null, tint = MiuixAppTheme.colorScheme.onSurfaceVariant)
+                        }
+                        // Slider ile parlaklık değişince önizlemede anında değişsin
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = wallpaperBrightnessValue))
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Filled.Image,
+                            contentDescription = null,
+                            tint = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
                 }
-                Spacer(Modifier.height(10.dp))
+
+                // SAĞDA ONUN HİZASINDA 3 TUŞ (Simgeli olarak liste görünümü)
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // 1. <Folder iconu> Add/Change wallpaper
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .clickable { wallpaperPicker.launch(arrayOf("image/*")) }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.FolderOpen,
+                            contentDescription = null,
+                            tint = MiuixAppTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = if (wallpaper.isEmpty()) strings.chooseFromGallery else strings.changeWallpaper,
+                            style = MiuixAppTheme.typography.bodyMedium,
+                            color = MiuixAppTheme.colorScheme.onBackground
+                        )
+                    }
+
+                    // 2. <miuix edit iconu> Düzenle (Yeniden kırpma)
+                    if (wallpaper.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .clickable {
+                                    runCatching {
+                                        launchWallpaperCrop(android.net.Uri.parse(wallpaper))
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = null,
+                                tint = MiuixAppTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = strings.edit,
+                                style = MiuixAppTheme.typography.bodyMedium,
+                                color = MiuixAppTheme.colorScheme.onBackground
+                            )
+                        }
+
+                        // 3. <çöp kutusu iconu> Delete (Remove wallpaper) -> opens confirmation Dialog
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .clickable { showRemoveWallpaperConfirm = true }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = null,
+                                tint = Color(0xFFE53935),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = strings.removeWallpaper,
+                                style = MiuixAppTheme.typography.bodyMedium,
+                                color = Color(0xFFE53935)
+                            )
+                        }
+                    }
+                }
             }
-            SettingsActionRow(
-                icon = Icons.Filled.Image,
-                title = if (wallpaper.isEmpty()) strings.chooseFromGallery else strings.changeWallpaper,
-                onClick = { wallpaperPicker.launch(arrayOf("image/*")) }
-            )
+
             if (wallpaper.isNotEmpty()) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(16.dp))
                 Text(strings.wallpaperBrightness, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
                 Slider(
                     value = wallpaperBrightnessValue,
@@ -457,11 +563,6 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                         activeTrackColor = MiuixAppTheme.colorScheme.primary,
                         inactiveTrackColor = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                     )
-                )
-                Text(
-                    text = strings.removeWallpaper,
-                    color = MiuixAppTheme.colorScheme.error,
-                    modifier = Modifier.bounceClick { scope.launch { prefs.setWallpaperUri("") } }.padding(8.dp)
                 )
             }
         }
@@ -601,6 +702,60 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
             ToggleRow(label = strings.playWithOthers, checked = playWith) { scope.launch { prefs.setPlayWithOthers(it) } }
         }
         Spacer(Modifier.height(110.dp))
+    }
+    if (showRemoveWallpaperConfirm) {
+        dev.shephard.player.ui.miuix.MiuixDialog(
+            onDismissRequest = { showRemoveWallpaperConfirm = false },
+            title = strings.removeWallpaper,
+            text = {
+                Text(
+                    text = strings.removeWallpaperConfirm,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            buttons = {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = { showRemoveWallpaperConfirm = false },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Text(
+                            text = strings.cancel,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = {
+                            showRemoveWallpaperConfirm = false
+                            scope.launch { prefs.setWallpaperUri("") }
+                        },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
+                    ) {
+                        Text(
+                            text = strings.removeWallpaper,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = Color(0xFFE53935),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+        )
     }
 }
 

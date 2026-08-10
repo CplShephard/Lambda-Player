@@ -1,3 +1,7 @@
+import dev.shephard.player.data.AudioTrack
+import dev.shephard.player.player.LibraryViewModel
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 package dev.shephard.player.ui.screens
 
 import androidx.compose.foundation.background
@@ -65,6 +69,7 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 @Composable
 fun StatsScreen(
     playerViewModel: PlayerViewModel = viewModel(),
+    libraryViewModel: LibraryViewModel = viewModel(),
     onBack: () -> Unit
 ) {
     val strings = LocalStrings.current
@@ -74,6 +79,7 @@ fun StatsScreen(
     val topBarState = rememberCollapsingTopBarState()
 
     val allEvents by playerViewModel.statsEventsFlow.collectAsState()
+    val tracks by libraryViewModel.tracks.collectAsState()
     var selectedPeriod by remember { mutableStateOf(StatsPeriod.Today) }
 
     val snapshot = remember(allEvents, selectedPeriod) {
@@ -137,7 +143,7 @@ fun StatsScreen(
                 StatsEmptyState()
             } else {
                 StatsSectionHeader(strings.statsTopTracks)
-                StatsTrackList(snapshot.trackEntries.take(10))
+                StatsTrackList(snapshot.trackEntries.take(10), tracks)
             }
 
             Spacer(Modifier.height(90.dp))
@@ -235,10 +241,13 @@ private fun StatsSectionHeader(title: String) {
 }
 
 @Composable
-private fun StatsTrackList(entries: List<StatsTrackEntry>) {
+private fun StatsTrackList(entries: List<StatsTrackEntry>, tracks: List<AudioTrack>) {
     val cs = MiuixAppTheme.colorScheme
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         entries.forEachIndexed { index, entry ->
+            val track = remember(entry.trackId, tracks) {
+                tracks.firstOrNull { it.id == entry.trackId }
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -251,8 +260,28 @@ private fun StatsTrackList(entries: List<StatsTrackEntry>) {
                     text = (index + 1).toString(),
                     style = MiuixAppTheme.typography.bodyMedium,
                     color = cs.onSurfaceVariant,
-                    modifier = Modifier.width(28.dp)
+                    modifier = Modifier.width(24.dp)
                 )
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(cs.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    var loaded by remember(track?.id) { mutableStateOf(false) }
+                    AsyncImage(
+                        model = track?.albumArtUri,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop,
+                        onSuccess = { loaded = true }
+                    )
+                    if (!loaded) {
+                        Icon(Icons.Filled.MusicNote, null, tint = cs.primary, modifier = Modifier.size(18.dp))
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = entry.title,
