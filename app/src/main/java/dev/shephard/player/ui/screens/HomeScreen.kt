@@ -22,6 +22,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -30,6 +32,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import dev.shephard.player.ui.components.overScrollVertical
+import dev.shephard.player.ui.navigation.SubmenuNavGuard
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
@@ -142,6 +145,11 @@ fun HomeScreen(
         }.shuffled().take(5)
     }
     var selectedPlaylist by remember { mutableStateOf<LocalPlaylist?>(null) }
+    val playlistDetailGuard = remember { SubmenuNavGuard() }
+
+    BackHandler(enabled = selectedPlaylist != null) {
+        playlistDetailGuard.pop { selectedPlaylist = null }
+    }
 
     val selectedPl = selectedPlaylist
     if (selectedPl != null) {
@@ -151,7 +159,7 @@ fun HomeScreen(
             allTracks = tracks,
             plTracks = plTracks,
             strings = strings,
-            onBack = { selectedPlaylist = null },
+            onBack = { playlistDetailGuard.pop { selectedPlaylist = null } },
             onTrackClick = { list, i -> onTrackClick(list, i, selectedPl.name) },
             onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, selectedPl.name) },
             onPlayRemix = { if (plTracks.isNotEmpty()) onTrackClick(plTracks.shuffled(), 0, selectedPl.name) },
@@ -174,6 +182,7 @@ fun HomeScreen(
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
                 InstallerXTopBar(
                     title = strings.home,
@@ -211,7 +220,7 @@ fun HomeScreen(
                         title = strings.featuredPlaylists,
                         playlists = featuredPlaylists,
                         onPlaylistClick = { pl ->
-                            selectedPlaylist = pl
+                            playlistDetailGuard.push(selectedPlaylist, pl) { selectedPlaylist = pl }
                         }
                     )
                 }
@@ -380,7 +389,19 @@ private fun RecentlyPlayedSection(
                     RecentlyPlayedCard(track = targetTrack, onClick = { onTrackClick(0) })
                 }
             } else {
-                RecentlyPlayedCard(track = track, onClick = { onTrackClick(page) })
+                AnimatedContent(
+                    targetState = track,
+                    transitionSpec = {
+                        (fadeIn(androidx.compose.animation.core.tween(300)) +
+                            androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(350)) { -it / 3 }).togetherWith(
+                            fadeOut(androidx.compose.animation.core.tween(200)) +
+                                androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(350)) { it / 3 }
+                        )
+                    },
+                    label = "recentTrackSlideRight"
+                ) { targetTrack ->
+                    RecentlyPlayedCard(track = targetTrack, onClick = { onTrackClick(page) })
+                }
             }
         }
     }
