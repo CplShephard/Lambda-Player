@@ -398,7 +398,8 @@ private fun FloatingDock(
     // bottomNavDestinations içinde eşleşmezdi ve `.let { if (it < 0) 0 else it }` yüzünden
     // dock Music sekmesini işaretliyordu. Submenü açıkken dock Settings'i işaretlemeli.
     val selectedIndex = when {
-        currentRoute == Destination.Music.route ||
+        currentRoute == Destination.Home.route ||
+            currentRoute == Destination.Music.route ||
             currentRoute == Destination.Playlists.route ||
             currentRoute == Destination.Settings.route ->
             bottomNavDestinations.indexOfFirst { it.route == currentRoute }

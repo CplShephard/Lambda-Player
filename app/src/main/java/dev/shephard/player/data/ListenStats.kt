@@ -20,7 +20,8 @@ data class ListenEvent(
     val dayStartMs: Long,
     val timestampMs: Long,
     val listenedMs: Long,
-    val countsAsPlay: Boolean
+    val countsAsPlay: Boolean,
+    val albumArtUri: String? = null
 )
 
 enum class StatsPeriod {

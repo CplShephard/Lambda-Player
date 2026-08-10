@@ -140,6 +140,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             finalizeStatsSession()
             statsSessionTrackId = track?.id
             _uiState.value = _uiState.value.copy(currentTrack = track)
+            if (track != null) {
+                recordRecentTrackStart(track)
+            }
             _progress.value = PlaybackProgress(
                 positionMs = 0L,
                 durationMs = controller?.duration?.coerceAtLeast(0L) ?: 0L
@@ -406,6 +409,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         statsSessionQualified = false
         statsSessionQualifyDayStartMs = 0L
         statsListenedMsByDayStart = LinkedHashMap()
+    }
+
+    private fun recordRecentTrackStart(track: AudioTrack) {
+        val now = System.currentTimeMillis()
+        val event = ListenEvent(
+            trackId = track.id,
+            title = track.title,
+            artist = track.artist,
+            album = track.album,
+            dayStartMs = ListenStatsCalculator.dayStartMs(now),
+            timestampMs = now,
+            listenedMs = 0L,
+            countsAsPlay = false,
+            albumArtUri = track.albumArtUri
+        )
+        statsEvents = statsEvents + event
+        _statsEventsFlow.value = statsEvents
+        persistStatsEvents()
     }
 
     private fun persistStatsEvents() {

@@ -22,6 +22,13 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import dev.shephard.player.ui.components.overScrollVertical
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.runtime.Composable
@@ -91,11 +98,13 @@ fun HomeScreen(
     }
 
     val recentlyPlayedTracks = remember(recentEvents, tracks) {
-        val recentIds = recentEvents
+        val matched = recentEvents
             .sortedByDescending { it.timestampMs }
-            .map { it.trackId }
-            .distinct()
-        val matched = recentIds.mapNotNull { id -> tracks.firstOrNull { it.id == id } }
+            .mapNotNull { ev ->
+                tracks.firstOrNull { it.id == ev.trackId }
+                    ?: tracks.firstOrNull { it.title == ev.title && it.artist == ev.artist }
+            }
+            .distinctBy { it.id }
         if (matched.isNotEmpty()) {
             matched.take(10)
         } else {
@@ -120,6 +129,7 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .captureForTopBarBlur(topBarState)
+                .overScrollVertical()
                 .verticalScroll(scrollState)
                 .padding(
                     top = innerPadding.calculateTopPadding() + 8.dp,
@@ -202,7 +212,7 @@ private fun FeaturedSongCard(
             contentDescription = track.title,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
-            onSuccess = { loaded = true }
+            onState = { loaded = it is coil.compose.AsyncImagePainter.State.Success }
         )
         if (!loaded) {
             Box(
@@ -280,7 +290,25 @@ private fun RecentlyPlayedSection(
             beyondViewportPageCount = 1
         ) { page ->
             val track = tracks[page]
-            RecentlyPlayedCard(track = track, onClick = { onTrackClick(page) })
+            AnimatedContent(
+                targetState = track,
+                transitionSpec = {
+                    (fadeIn(androidx.compose.animation.core.tween(300)) +
+                        scaleIn(
+                            initialScale = 0.82f,
+                            animationSpec = androidx.compose.animation.core.spring(
+                                dampingRatio = 0.52f,
+                                stiffness = 340f
+                            )
+                        )).togetherWith(
+                        fadeOut(androidx.compose.animation.core.tween(200)) +
+                            scaleOut(targetScale = 0.82f)
+                    )
+                },
+                label = "recentTrackBounceFade"
+            ) { targetTrack ->
+                RecentlyPlayedCard(track = targetTrack, onClick = { onTrackClick(page) })
+            }
         }
     }
 }
@@ -305,7 +333,7 @@ private fun RecentlyPlayedCard(
             contentDescription = track.title,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
-            onSuccess = { loaded = true }
+            onState = { loaded = it is coil.compose.AsyncImagePainter.State.Success }
         )
         if (!loaded) {
             Box(
