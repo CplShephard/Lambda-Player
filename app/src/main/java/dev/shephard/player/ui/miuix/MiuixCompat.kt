@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -419,6 +420,39 @@ fun FilledTonalButton(
 // bağımlıydı ve NowPlaying gibi Scaffold dışı yerlerden açılamıyordu.
 // Yerine: dev.shephard.player.ui.components.MiuixDrawer (WindowBottomSheet tabanlı,
 // InstallerX'in miuix install dialogundaki drawer ile birebir aynı).
+
+@Composable
+fun MiuixDialog(
+    onDismissRequest: () -> Unit,
+    title: String,
+    text: @Composable () -> Unit,
+    buttons: @Composable () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismissRequest
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(MiuixAppTheme.colorScheme.surface)
+                .padding(24.dp)
+        ) {
+            Text(
+                text = title,
+                style = MiuixAppTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MiuixAppTheme.colorScheme.onBackground
+            )
+            Box(modifier = Modifier.padding(top = 12.dp)) {
+                text()
+            }
+            Box(modifier = Modifier.padding(top = 16.dp)) {
+                buttons()
+            }
+        }
+    }
+}
 
 
 

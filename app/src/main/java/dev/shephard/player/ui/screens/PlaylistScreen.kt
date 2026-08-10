@@ -934,6 +934,182 @@ fun PlaylistScreen(
             }
         }
     }
+
+    if (showRemoveCoverConfirm) {
+        dev.shephard.player.ui.miuix.MiuixDialog(
+            onDismissRequest = { showRemoveCoverConfirm = false },
+            title = strings.removeCover,
+            text = {
+                Text(
+                    text = strings.removeCoverConfirm,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            buttons = {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = { showRemoveCoverConfirm = false },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Text(
+                            text = strings.cancel,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = {
+                            showRemoveCoverConfirm = false
+                            val idx = editPlaylistIndex
+                            if (idx != null && idx in playlists.indices) {
+                                val pl = playlists[idx]
+                                val all = playlists.toMutableList()
+                                all[idx] = pl.copy(coverUri = null)
+                                scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                            }
+                        },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
+                    ) {
+                        Text(
+                            text = strings.removeCover,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = Color(0xFFE53935),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+        )
+    }
+
+    if (showRemoveCreateCoverConfirm) {
+        dev.shephard.player.ui.miuix.MiuixDialog(
+            onDismissRequest = { showRemoveCreateCoverConfirm = false },
+            title = strings.removeCover,
+            text = {
+                Text(
+                    text = strings.removeCoverConfirm,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            buttons = {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = { showRemoveCreateCoverConfirm = false },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Text(
+                            text = strings.cancel,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = {
+                            showRemoveCreateCoverConfirm = false
+                            newCoverUri = null
+                        },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
+                    ) {
+                        Text(
+                            text = strings.removeCover,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = Color(0xFFE53935),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+        )
+    }
+
+    if (showDeletePlaylistConfirm && playlistToDelete != null) {
+        dev.shephard.player.ui.miuix.MiuixDialog(
+            onDismissRequest = { showDeletePlaylistConfirm = false; playlistToDelete = null },
+            title = strings.delete,
+            text = {
+                Text(
+                    text = strings.removePlaylistConfirm,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            buttons = {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = { showDeletePlaylistConfirm = false; playlistToDelete = null },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Text(
+                            text = strings.cancel,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = {
+                            val toDel = playlistToDelete
+                            showDeletePlaylistConfirm = false
+                            playlistToDelete = null
+                            if (toDel != null) {
+                                val all = playlists.toMutableList().filterNot { it.name == toDel.name && it.isSystem == toDel.isSystem }
+                                scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+                            }
+                        },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
+                    ) {
+                        Text(
+                            text = strings.delete,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = Color(0xFFE53935),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+        )
+    }
 }
 
 private fun resolvePlaylistTracks(pl: LocalPlaylist, tracks: List<AudioTrack>, likedIds: List<Long> = emptyList()): List<AudioTrack> {
@@ -1127,182 +1303,6 @@ private fun PlaylistListView(
     ) {
         Icon(Icons.Filled.Add, contentDescription = strings.createPlaylist)
     }
-    }
-
-    if (showRemoveCoverConfirm) {
-        dev.shephard.player.ui.miuix.MiuixDialog(
-            onDismissRequest = { showRemoveCoverConfirm = false },
-            title = strings.removeCover,
-            text = {
-                Text(
-                    text = strings.removeCoverConfirm,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            buttons = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = { showRemoveCoverConfirm = false },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Text(
-                            text = strings.cancel,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Normal,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = {
-                            showRemoveCoverConfirm = false
-                            val idx = editPlaylistIndex
-                            if (idx != null && idx in playlists.indices) {
-                                val pl = playlists[idx]
-                                val all = playlists.toMutableList()
-                                all[idx] = pl.copy(coverUri = null)
-                                scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
-                            }
-                        },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
-                    ) {
-                        Text(
-                            text = strings.removeCover,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = Color(0xFFE53935),
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
-        )
-    }
-
-    if (showRemoveCreateCoverConfirm) {
-        dev.shephard.player.ui.miuix.MiuixDialog(
-            onDismissRequest = { showRemoveCreateCoverConfirm = false },
-            title = strings.removeCover,
-            text = {
-                Text(
-                    text = strings.removeCoverConfirm,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            buttons = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = { showRemoveCreateCoverConfirm = false },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Text(
-                            text = strings.cancel,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Normal,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = {
-                            showRemoveCreateCoverConfirm = false
-                            newCoverUri = null
-                        },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
-                    ) {
-                        Text(
-                            text = strings.removeCover,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = Color(0xFFE53935),
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
-        )
-    }
-
-    if (showDeletePlaylistConfirm && playlistToDelete != null) {
-        dev.shephard.player.ui.miuix.MiuixDialog(
-            onDismissRequest = { showDeletePlaylistConfirm = false; playlistToDelete = null },
-            title = strings.delete,
-            text = {
-                Text(
-                    text = strings.removePlaylistConfirm,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            buttons = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = { showDeletePlaylistConfirm = false; playlistToDelete = null },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Text(
-                            text = strings.cancel,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Normal,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = {
-                            val toDel = playlistToDelete
-                            showDeletePlaylistConfirm = false
-                            playlistToDelete = null
-                            if (toDel != null) {
-                                val all = playlists.toMutableList().filterNot { it.name == toDel.name && it.isSystem == toDel.isSystem }
-                                scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
-                            }
-                        },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
-                    ) {
-                        Text(
-                            text = strings.delete,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = Color(0xFFE53935),
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
-        )
     }
 }
 
