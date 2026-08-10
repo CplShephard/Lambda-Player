@@ -216,7 +216,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
 
     val accent by prefs.accentColor.collectAsState(initial = AccentPalette.first())
     val wallpaper by prefs.wallpaperUri.collectAsState(initial = "")
-    val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = 0.55f)
+    val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = PreferencesManager.cachedWallpaperBrightness)
     val cardAlpha by prefs.cardAlpha.collectAsState(initial = 0.85f)
     val language by prefs.language.collectAsState(initial = "en")
     val themeMode by prefs.themeMode.collectAsState(initial = ThemeModePreference.LIGHT)
@@ -227,38 +227,10 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
 
     var langMenuOpen by remember { mutableStateOf(false) }
     var customPickerOpen by remember { mutableStateOf(false) }
-    // ÖNEMLİ — Wallpaper Brightness slider'ı BAŞTAN yazıldı.
-    // Eski kod: `wallpaperBrightnessValue by remember(wallpaperBrightness) { ... }` ile
-    // DataStore değerinden başlatılıyordu, AMA `onValueChangeFinished` içinde
-    // `prefs.setWallpaperBrightness(1f - wallpaperBrightnessValue)` ile TERSİ kaydediliyordu.
-    // Sonuç: kullanıcı slider'ı bıraktığı anda DataStore değeri değişiyor, `remember(wallpaperBrightness)`
-    // yeniden tetikleniyor ve slider'ın kendisi TERS değere zıplıyordu — slider'ın her
-    // bırakışta konumunun değişmesi ("berbat çalışıyor") sorununun kök nedeni buydu.
-    // Ters çevirme kaldırıldı, ama key'siz `remember { }` YENİ bir soruna yol açtı: bu
-    // composable'ın composition'ı navigation boyunca KORUNUYOR (route değişince yok
-    // edilmiyor), bu yüzden local state SADECE bu ekran hayatı boyunca ilk kez compose
-    // edildiği anda DataStore'dan bir kez okunuyordu — Theme Settings'ten çıkıp tekrar
-    // girildiğinde her seferinde aynı (ilk) değeri göstermeye devam ediyordu, gerçek
-    // DataStore değeri farklı olsa bile. Çözüm: her girişte (composable'ın recompose
-    // DEĞİL, gerçekten ekrana gelme anı) LaunchedEffect(Unit) ile local state'i DataStore'daki
-    // GÜNCEL değerle bir kez senkronize ediyoruz. Bu, sürüklerken slider'ın DataStore'un ara
-    // emisyonlarıyla "zıplamasını" önler (senkron sadece giriş anında olur, her emit'te değil)
-    // ve her girişte doğru konumu gösterir.
-    var wallpaperBrightnessValue by remember { mutableFloatStateOf(wallpaperBrightness) }
-    // İlk yükleme & DataStore değeri değiştiğinde (ör. başka yerden duvar kağıdı
-    // silindiğinde/ayarlandığında) local slider state'ini senkronize et. DataStore sadece
-    // `onValueChangeFinished`'te (bırakınca) yazıldığı için sürükleme sırasında emisyon olmaz,
-    // dolayısıyla slider buradan "zıplamaz".
+    var wallpaperBrightnessValue by remember { mutableFloatStateOf(PreferencesManager.cachedWallpaperBrightness) }
     LaunchedEffect(wallpaperBrightness) {
         wallpaperBrightnessValue = wallpaperBrightness
     }
-    // KRİTİK — Theme Settings'ten çıkıp tekrar girildiğinde composable'ın composition'ı
-    // navigation boyunca KORUNUYOR (route değişince yok edilmiyor), bu yüzden `remember` ve
-    // `LaunchedEffect(wallpaperBrightness)` yeniden çalışmıyor (değer değişmediyse). Sonuç:
-    // local slider state'i ESKİ değerde takılı kalıyor, gerçek DataStore değeri farklı olsa bile
-    // ("değer farklı ama hep aynı yerde duruyor" şikayeti). Çözüm: ekran her gerçekten görünür
-    // olduğunda (ON_RESUME) local state'i DataStore'daki GÜNCEL değerle bir kez senkronize et.
-    // Sürükleme sırasında ekran zaten RESUMED olduğu için bu callback sürüklerken tetiklenmez.
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
         wallpaperBrightnessValue = wallpaperBrightness
     }
@@ -454,7 +426,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Color.Black.copy(alpha = wallpaperBrightnessValue))
+                                .background(Color.Black.copy(alpha = 1f - wallpaperBrightnessValue))
                         )
                     } else {
                         Icon(

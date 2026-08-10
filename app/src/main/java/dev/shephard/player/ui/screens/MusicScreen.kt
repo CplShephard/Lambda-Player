@@ -303,65 +303,92 @@ fun MusicScreen(
         }
     }
 
-    // Delete confirmation
+    // Delete confirmation (Pop-up dialog)
     trackToDelete?.let { track ->
-        val deleteLiquidGlassOn = LocalBlurEnabled.current
-        MiuixDrawer(
+        dev.shephard.player.ui.miuix.MiuixDialog(
             onDismissRequest = { trackToDelete = null },
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp)
-                    .heightIn(min = 260.dp)
-            ) {
-                Text(strings.delete, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(12.dp))
-                Text(strings.deleteTrackConfirm, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(22.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { trackToDelete = null }) { Text(strings.cancel) }
-                    Spacer(Modifier.width(8.dp))
-                    TextButton(onClick = {
-                        val toDelete = track
-                        trackToDelete = null
-                        scope.launch(Dispatchers.IO) {
-                            val resolver = context.contentResolver
-                            val deletedDirectly = try {
-                                resolver.delete(toDelete.uri, null, null)
-                                true
-                            } catch (e: Exception) {
-                                val intentSender = when {
-                                    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R ->
-                                        runCatching {
-                                            android.provider.MediaStore.createDeleteRequest(
-                                                resolver, listOf(toDelete.uri)
-                                            ).intentSender
-                                        }.getOrNull()
-                                    android.os.Build.VERSION.SDK_INT >= 29 ->
-                                        (e as? android.app.RecoverableSecurityException)
-                                            ?.userAction?.actionIntent?.intentSender
-                                    else -> null
-                                }
-                                if (intentSender != null) {
-                                    val request = androidx.activity.result.IntentSenderRequest
-                                        .Builder(intentSender).build()
-                                    withContext(Dispatchers.Main) {
-                                        pendingDeleteUri = toDelete.uri
-                                        deleteConsentLauncher.launch(request)
+            title = strings.delete,
+            text = {
+                Text(
+                    text = strings.deleteTrackConfirm,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            buttons = {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = { trackToDelete = null },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Text(
+                            text = strings.cancel,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    dev.shephard.player.ui.miuix.TextButton(
+                        onClick = {
+                            val toDelete = track
+                            trackToDelete = null
+                            scope.launch(Dispatchers.IO) {
+                                val resolver = context.contentResolver
+                                val deletedDirectly = try {
+                                    resolver.delete(toDelete.uri, null, null)
+                                    true
+                                } catch (e: Exception) {
+                                    val intentSender = when {
+                                        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R ->
+                                            runCatching {
+                                                android.provider.MediaStore.createDeleteRequest(
+                                                    resolver, listOf(toDelete.uri)
+                                                ).intentSender
+                                            }.getOrNull()
+                                        android.os.Build.VERSION.SDK_INT >= 29 ->
+                                            (e as? android.app.RecoverableSecurityException)
+                                                ?.userAction?.actionIntent?.intentSender
+                                        else -> null
                                     }
+                                    if (intentSender != null) {
+                                        val request = androidx.activity.result.IntentSenderRequest
+                                            .Builder(intentSender).build()
+                                        withContext(Dispatchers.Main) {
+                                            pendingDeleteUri = toDelete.uri
+                                            deleteConsentLauncher.launch(request)
+                                        }
+                                    }
+                                    false
                                 }
-                                false
+                                if (deletedDirectly) {
+                                    withContext(Dispatchers.Main) { libraryViewModel.loadTracks() }
+                                }
                             }
-                            if (deletedDirectly) {
-                                withContext(Dispatchers.Main) { libraryViewModel.loadTracks() }
-                            }
-                        }
-                    }) { Text(strings.delete, color = MiuixAppTheme.colorScheme.error) }
+                        },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
+                    ) {
+                        Text(
+                            text = strings.delete,
+                            style = MiuixAppTheme.typography.labelLarge,
+                            color = Color(0xFFE53935),
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
                 }
-                Spacer(Modifier.height(24.dp))
             }
-        }
+        )
     }
 
     // Edit music drawer

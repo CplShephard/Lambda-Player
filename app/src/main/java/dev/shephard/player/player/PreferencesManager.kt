@@ -49,6 +49,10 @@ object LayoutMode {
 
 class PreferencesManager(private val context: Context) {
 
+    companion object {
+        var cachedWallpaperBrightness: Float = 0.55f
+    }
+
     val crossfadeEnabled: Flow<Boolean> = context.dataStore.data.map {
         it[PrefsKeys.CROSSFADE_ENABLED] ?: false
     }
@@ -124,7 +128,9 @@ class PreferencesManager(private val context: Context) {
 
     /** 0f..1f — applied as a black scrim opacity on top of the wallpaper. */
     val wallpaperBrightness: Flow<Float> = context.dataStore.data.map {
-        it[PrefsKeys.WALLPAPER_BRIGHTNESS] ?: 0.55f
+        val v = it[PrefsKeys.WALLPAPER_BRIGHTNESS] ?: 0.55f
+        cachedWallpaperBrightness = v
+        v
     }
 
     /** 0f..1f — opacity of card/surface backgrounds. Default 0.85 keeps wallpaper visible. */
@@ -215,6 +221,7 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun setWallpaperBrightness(value: Float) {
+        cachedWallpaperBrightness = value.coerceIn(0f, 1f)
         context.dataStore.edit { it[PrefsKeys.WALLPAPER_BRIGHTNESS] = value.coerceIn(0f, 1f) }
     }
 

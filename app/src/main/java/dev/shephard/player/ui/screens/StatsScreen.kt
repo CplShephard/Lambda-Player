@@ -197,9 +197,7 @@ private fun StatsPeriodPills(
 private fun StatsSummaryCard(totalListenedMs: Long, playCount: Int, uniqueAlbumCount: Int) {
     val strings = LocalStrings.current
     val cs = MiuixAppTheme.colorScheme
-    val totalMinutes = totalListenedMs / 60000L
-    val hours = totalMinutes / 60
-    val minutes = totalMinutes % 60
+    val formattedTime = formatStatsMinutes(totalListenedMs)
 
     Column(
         modifier = Modifier
@@ -209,7 +207,7 @@ private fun StatsSummaryCard(totalListenedMs: Long, playCount: Int, uniqueAlbumC
             .padding(20.dp)
     ) {
         Text(
-            text = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m",
+            text = formattedTime,
             style = MiuixAppTheme.typography.displayMedium,
             fontWeight = FontWeight.Bold,
             color = cs.onBackground
@@ -341,8 +339,13 @@ private fun StatsEmptyState() {
 }
 
 private fun formatStatsMinutes(listenedMs: Long): String {
-    val totalMinutes = listenedMs / 60000L
-    val hours = totalMinutes / 60
-    val minutes = totalMinutes % 60
-    return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+    val totalSeconds = listenedMs / 1000L
+    val hours = totalSeconds / 3600L
+    val minutes = (totalSeconds % 3600L) / 60L
+    val seconds = totalSeconds % 60L
+    return buildString {
+        if (hours > 0) append("${hours}h ")
+        if (minutes > 0 || hours > 0) append("${minutes}m ")
+        append("${seconds}s")
+    }
 }

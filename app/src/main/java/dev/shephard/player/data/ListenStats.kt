@@ -50,7 +50,8 @@ data class StatsTrackEntry(
     val title: String,
     val artistName: String,
     val albumName: String,
-    val listenedMs: Long
+    val listenedMs: Long,
+    val albumArtUri: String? = null
 )
 
 data class StatsPeriodSnapshot(
@@ -144,7 +145,8 @@ object ListenStatsCalculator {
                     title = first.title,
                     artistName = first.artist,
                     albumName = first.album,
-                    listenedMs = events.sumOf { it.listenedMs }
+                    listenedMs = events.sumOf { it.listenedMs },
+                    albumArtUri = first.albumArtUri
                 )
             }
             .sortedByDescending { it.listenedMs }
@@ -166,7 +168,8 @@ object ListenStatsCalculator {
             sb.append("\"dayStartMs\":").append(e.dayStartMs).append(',')
             sb.append("\"timestampMs\":").append(e.timestampMs).append(',')
             sb.append("\"listenedMs\":").append(e.listenedMs).append(',')
-            sb.append("\"countsAsPlay\":").append(e.countsAsPlay)
+            sb.append("\"countsAsPlay\":").append(e.countsAsPlay).append(',')
+            sb.append("\"albumArtUri\":\"").append(jsonEscape(e.albumArtUri ?: "")).append("\"")
             sb.append('}')
         }
         sb.append(']')
@@ -229,7 +232,8 @@ object ListenStatsCalculator {
             dayStartMs = fields["dayStartMs"]?.toLongOrNull() ?: 0L,
             timestampMs = fields["timestampMs"]?.toLongOrNull() ?: 0L,
             listenedMs = fields["listenedMs"]?.toLongOrNull() ?: 0L,
-            countsAsPlay = fields["countsAsPlay"] == "true"
+            countsAsPlay = fields["countsAsPlay"] == "true",
+            albumArtUri = fields["albumArtUri"]?.takeIf { it.isNotEmpty() }
         )
     }
 

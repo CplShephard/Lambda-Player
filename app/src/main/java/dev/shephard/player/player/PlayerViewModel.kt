@@ -376,32 +376,61 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 statsSessionQualifyDayStartMs = dayStart
             }
         }
+
+        if (statsEvents.isNotEmpty()) {
+            val lastIdx = statsEvents.lastIndex
+            val lastEv = statsEvents[lastIdx]
+            if (lastEv.trackId == trackId && lastEv.dayStartMs == dayStart) {
+                val updatedList = statsEvents.toMutableList()
+                updatedList[lastIdx] = lastEv.copy(
+                    listenedMs = lastEv.listenedMs + deltaMs,
+                    countsAsPlay = statsSessionQualified
+                )
+                statsEvents = updatedList
+                _statsEventsFlow.value = statsEvents
+            }
+        }
     }
 
     /** Track gerçekten değiştiğinde (onMediaItemTransition) çağrılır — oturumu kalıcı listeye ekler. */
     private fun finalizeStatsSession() {
         val trackId = statsSessionTrackId
         if (trackId != null && statsListenedMsByDayStart.isNotEmpty()) {
-            val track = queueTracks.find { it.id == trackId } ?: _uiState.value.currentTrack
-            if (track != null) {
-                val newEvents = statsListenedMsByDayStart.entries
-                    .filter { it.value > 0 }
-                    .map { (dayStart, listenedMs) ->
-                        ListenEvent(
-                            trackId = track.id,
-                            title = track.title,
-                            artist = track.artist,
-                            album = track.album,
-                            dayStartMs = dayStart,
-                            timestampMs = System.currentTimeMillis(),
-                            listenedMs = listenedMs,
-                            countsAsPlay = dayStart == statsSessionQualifyDayStartMs && statsSessionQualified
-                        )
+            val totalListened = statsListenedMsByDayStart.values.sum()
+            if (statsEvents.isNotEmpty() && statsEvents.last().trackId == trackId) {
+                val lastIdx = statsEvents.lastIndex
+                val lastEv = statsEvents[lastIdx]
+                val updatedList = statsEvents.toMutableList()
+                updatedList[lastIdx] = lastEv.copy(
+                    listenedMs = totalListened.coerceAtLeast(lastEv.listenedMs),
+                    countsAsPlay = statsSessionQualified
+                )
+                statsEvents = updatedList
+                _statsEventsFlow.value = statsEvents
+                persistStatsEvents()
+            } else {
+                val track = queueTracks.find { it.id == trackId } ?: _uiState.value.currentTrack
+                if (track != null) {
+                    val newEvents = statsListenedMsByDayStart.entries
+                        .filter { it.value > 0 }
+                        .map { (dayStart, listenedMs) ->
+                            ListenEvent(
+                                trackId = track.id,
+                                title = track.title,
+                                artist = track.artist,
+                                album = track.album,
+                                dayStartMs = dayStart,
+                                timestampMs = System.currentTimeMillis(),
+                                listenedMs = listenedMs,
+                                countsAsPlay = dayStart == statsSessionQualifyDayStartMs && statsSessionQualified,
+                                albumArtUri = track.albumArtUri?.toString()
+                            )
+                        }
+                    if (newEvents.isNotEmpty()) {
+                        statsEvents = statsEvents + newEvents
+                        _statsEventsFlow.value = statsEvents
+                        persistStatsEvents()
                     }
-                if (newEvents.isNotEmpty()) {
-                    statsEvents = statsEvents + newEvents
-                    _statsEventsFlow.value = statsEvents
-                    persistStatsEvents()
                 }
             }
         }
@@ -422,7 +451,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             timestampMs = now,
             listenedMs = 0L,
             countsAsPlay = false,
-            albumArtUri = track.albumArtUri
+            albumArtUri = track.albumArtUri?.toString()
         )
         statsEvents = statsEvents + event
         _statsEventsFlow.value = statsEvents
@@ -489,6 +518,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         pendingListeningDeltaMs = 0L
         lastListeningStoreWriteMs = System.currentTimeMillis()
         viewModelScope.launch(Dispatchers.IO) { prefs.addListeningTime(delta) }
+        persistStatsEvents()
     }
 
     private fun performCrossfadeIn() {
