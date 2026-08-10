@@ -16,9 +16,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -212,19 +215,6 @@ private fun StatsSummaryCard(totalListenedMs: Long, playCount: Int, uniqueAlbumC
             fontWeight = FontWeight.Bold,
             color = cs.onBackground
         )
-        Spacer(Modifier.height(4.dp))
-        Row {
-            Text(
-                text = "$playCount ${strings.statsPlays}",
-                style = MiuixAppTheme.typography.bodyMedium,
-                color = cs.onSurfaceVariant
-            )
-            Text(
-                text = "  •  $uniqueAlbumCount ${strings.statsAlbumsListened}",
-                style = MiuixAppTheme.typography.bodyMedium,
-                color = cs.onSurfaceVariant
-            )
-        }
     }
 }
 
@@ -242,14 +232,21 @@ private fun StatsSectionHeader(title: String) {
 @Composable
 private fun StatsTrackList(entries: List<StatsTrackEntry>, tracks: List<AudioTrack>) {
     val cs = MiuixAppTheme.colorScheme
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        entries.forEachIndexed { index, entry ->
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.heightIn(max = 2400.dp),
+        userScrollEnabled = false
+    ) {
+        itemsIndexed(entries, key = { _, e -> e.trackId }) { index, entry ->
             val track = remember(entry.trackId, tracks) {
                 tracks.firstOrNull { it.id == entry.trackId }
+                    ?: tracks.firstOrNull { it.title == entry.title && it.artist == entry.artistName }
             }
+            val coverUri = track?.albumArtUri ?: entry.albumArtUri
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .animateItem()
                     .clip(RoundedCornerShape(16.dp))
                     .background(cs.surfaceVariant.copy(alpha = 0.35f))
                     .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -268,13 +265,13 @@ private fun StatsTrackList(entries: List<StatsTrackEntry>, tracks: List<AudioTra
                         .background(cs.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
-                    var loaded by remember(track?.id) { mutableStateOf(false) }
+                    var loaded by remember(coverUri) { mutableStateOf(false) }
                     AsyncImage(
-                        model = track?.albumArtUri,
+                        model = coverUri,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
                         contentScale = ContentScale.Crop,
-                        onSuccess = { loaded = true }
+                        onState = { loaded = it is coil.compose.AsyncImagePainter.State.Success }
                     )
                     if (!loaded) {
                         Icon(Icons.Filled.MusicNote, null, tint = cs.primary, modifier = Modifier.size(18.dp))

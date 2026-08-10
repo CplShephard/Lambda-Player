@@ -460,7 +460,7 @@ fun NowPlayingSheet(
                     tint = Color.White,
                     iconSize = 28.dp
                 )
-                // Playliste ekle tuşunun arkaplanını sil + simge rengini beyaz yap
+                // Playliste ekle tuşunun arkaplanını sil + simge rengini beyaz yap + morph animasyonu
                 Box(
                     modifier = Modifier
                         .size(48.dp)
@@ -475,12 +475,30 @@ fun NowPlayingSheet(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = if (isLiked) Icons.Filled.Check else Icons.Filled.Add,
-                        contentDescription = if (isLiked) "Added" else "Add",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
+                    androidx.compose.animation.AnimatedContent(
+                        targetState = isLiked,
+                        transitionSpec = {
+                            (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)) +
+                                androidx.compose.animation.scaleIn(
+                                    initialScale = 0.45f,
+                                    animationSpec = androidx.compose.animation.core.spring(
+                                        dampingRatio = 0.55f,
+                                        stiffness = 400f
+                                    )
+                                )).togetherWith(
+                                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150)) +
+                                    androidx.compose.animation.scaleOut(targetScale = 1.35f)
+                            )
+                        },
+                        label = "likeMorph"
+                    ) { liked ->
+                        Icon(
+                            imageVector = if (liked) Icons.Filled.Check else Icons.Filled.Add,
+                            contentDescription = if (liked) "Added" else "Add",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 }
 
                 if (showQueue) {

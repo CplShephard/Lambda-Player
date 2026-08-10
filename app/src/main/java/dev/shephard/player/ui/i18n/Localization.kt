@@ -15,6 +15,7 @@ data class Strings(
     val home: String = "Home",
     val recentlyPlayed: String = "Recently Played",
     val featuredSongs: String = "Featured Songs",
+    val featuredPlaylists: String = "Featured Playlists",
     val music: String,
     val playlists: String,
     val settings: String,
@@ -269,7 +270,7 @@ private val EN = Strings(
 
 private val TR = EN.copy(
     code = "tr", displayName = "Türkçe",
-    home = "Ana Sayfa", featuredSongs = "Öne Çıkanlar", recentlyPlayed = "Son Çalınanlar",
+    home = "Ana Sayfa", featuredSongs = "Öne Çıkanlar", recentlyPlayed = "Son Çalınanlar", featuredPlaylists = "Öne Çıkan Çalma Listeleri",
     music = "Müzikler", playlists = "Çalma Listeleri", settings = "Ayarlar",
     nowPlaying = "Şimdi Çalınıyor", queue = "Sıra",
     play = "Oynat", pause = "Duraklat", next = "Sonraki", previous = "Önceki",
@@ -382,7 +383,7 @@ private val TR = EN.copy(
 
 private val ZH = EN.copy(
     code = "zh", displayName = "简体中文",
-    home = "首页", featuredSongs = "精选歌曲", recentlyPlayed = "最近播放",
+    home = "首页", featuredSongs = "精选歌曲", recentlyPlayed = "最近播放", featuredPlaylists = "精选播放列表",
     music = "音乐库", playlists = "播放列表", settings = "设置",
     nowPlaying = "正在播放", queue = "队列",
     play = "播放", pause = "暂停", next = "下一首", previous = "上一首",
@@ -495,7 +496,7 @@ private val ZH = EN.copy(
 
 private val ES = EN.copy(
     code = "es", displayName = "Español",
-    home = "Inicio", featuredSongs = "Canciones destacadas", recentlyPlayed = "Reproducido recientemente",
+    home = "Inicio", featuredSongs = "Canciones destacadas", recentlyPlayed = "Reproducido recientemente", featuredPlaylists = "Listas destacadas",
     music = "Músicas", playlists = "Listas", settings = "Ajustes",
     nowPlaying = "Reproduciendo", queue = "Cola",
     play = "Reproducir", pause = "Pausar", next = "Siguiente", previous = "Anterior",
@@ -608,7 +609,7 @@ private val ES = EN.copy(
 
 private val RU = EN.copy(
     code = "ru", displayName = "Русский",
-    home = "Главная", featuredSongs = "Рекомендуемые", recentlyPlayed = "Недавно прослушанные",
+    home = "Главная", featuredSongs = "Рекомендуемые", recentlyPlayed = "Недавно прослушанные", featuredPlaylists = "Рекомендуемые плейлисты",
     music = "Музыки", playlists = "Плейлисты", settings = "Настройки",
     nowPlaying = "Сейчас играет", queue = "Очередь",
     play = "Играть", pause = "Пауза", next = "Дальше", previous = "Назад",
@@ -721,7 +722,7 @@ private val RU = EN.copy(
 
 private val KA = EN.copy(
     code = "ka", displayName = "ქართული",
-    home = "მთავარი", featuredSongs = "რჩეული სიმღერები", recentlyPlayed = "ბოლოს მოსმენილი",
+    home = "მთავარი", featuredSongs = "რჩეული სიმღერები", recentlyPlayed = "ბოლოს მოსმენილი", featuredPlaylists = "რჩეული პლეილისტები",
     music = "მუსიკები", playlists = "პლეილისტები", settings = "პარამეტრები",
     nowPlaying = "ახლა უკრავს", queue = "რიგი",
     play = "დაკვრა", pause = "პაუზა", next = "შემდეგი", previous = "წინა",
@@ -834,7 +835,7 @@ private val KA = EN.copy(
 
 private val AR = EN.copy(
     code = "ar", displayName = "العربية",
-    home = "الرئيسية", featuredSongs = "أغاني مميزة", recentlyPlayed = "تم تشغيلها مؤخراً",
+    home = "الرئيسية", featuredSongs = "أغاني مميزة", recentlyPlayed = "تم تشغيلها مؤخراً", featuredPlaylists = "قوائم تشغيل مميزة",
     music = "الموسيقيات", playlists = "قوائم التشغيل", settings = "الإعدادات",
     nowPlaying = "قيد التشغيل", queue = "قائمة الانتظار",
     play = "تشغيل", pause = "إيقاف مؤقت", next = "التالي", previous = "السابق",

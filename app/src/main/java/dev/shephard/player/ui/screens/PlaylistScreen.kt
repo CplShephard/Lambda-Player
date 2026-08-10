@@ -1112,7 +1112,7 @@ fun PlaylistScreen(
     }
 }
 
-private fun resolvePlaylistTracks(pl: LocalPlaylist, tracks: List<AudioTrack>, likedIds: List<Long> = emptyList()): List<AudioTrack> {
+internal fun resolvePlaylistTracks(pl: LocalPlaylist, tracks: List<AudioTrack>, likedIds: List<Long> = emptyList()): List<AudioTrack> {
     if (pl.isSystem) {
         val trackMap = tracks.associateBy { it.id }
         return likedIds.mapNotNull { trackMap[it] }
@@ -1606,7 +1606,7 @@ private fun PlaylistDetailTopBar(
 }
 
 @Composable
-private fun PlaylistDetailView(
+internal fun PlaylistDetailView(
     playlist: LocalPlaylist,
     allTracks: List<AudioTrack>,
     plTracks: List<AudioTrack>,

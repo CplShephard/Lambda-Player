@@ -28,8 +28,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import dev.shephard.player.ui.components.overScrollVertical
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,6 +40,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +49,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,6 +60,8 @@ import coil.compose.AsyncImage
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PlayerViewModel
+import dev.shephard.player.player.PreferencesManager
+import kotlinx.coroutines.launch
 import dev.shephard.player.ui.components.InstallerXTopBar
 import dev.shephard.player.ui.components.captureForTopBarBlur
 import dev.shephard.player.ui.components.rememberCollapsingTopBarState
@@ -115,48 +121,111 @@ fun HomeScreen(
     val topBarState = rememberCollapsingTopBarState()
     val scrollState = rememberScrollState()
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Transparent,
-        topBar = {
-            InstallerXTopBar(
-                title = strings.home,
-                state = topBarState
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .captureForTopBarBlur(topBarState)
-                .overScrollVertical()
-                .verticalScroll(scrollState)
-                .padding(
-                    top = innerPadding.calculateTopPadding() + 8.dp,
-                    bottom = if (hasMiniPlayer) 176.dp else 96.dp
-                ),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            // Featured Songs Section (RecommendCard)
-            if (featuredTracks.isNotEmpty()) {
-                FeaturedSongsSection(
-                    title = strings.featuredSongs,
-                    tracks = featuredTracks,
-                    onTrackClick = { idx ->
-                        onTrackClick(featuredTracks, idx, strings.featuredSongs)
-                    }
+    val context = LocalContext.current
+    val prefs = remember { PreferencesManager(context) }
+    val scope = rememberCoroutineScope()
+    val rawPlaylistsJson by prefs.playlistsJson.collectAsState(initial = "[]")
+    val rawPlaylists = remember(rawPlaylistsJson) { parsePlaylists(rawPlaylistsJson) }
+    val likedSongIdsJson by prefs.likedSongIds.collectAsState(initial = "[]")
+    val likedIds = remember(likedSongIdsJson) {
+        try {
+            org.json.JSONArray(likedSongIdsJson).let { arr -> (0 until arr.length()).map { arr.getLong(it) } }
+        } catch (_: Exception) { emptyList() }
+    }
+    val featuredPlaylists = remember(rawPlaylists, strings) {
+        rawPlaylists.filter {
+            !it.isSystem &&
+                it.name != strings.likedSongs &&
+                it.name != "Liked Songs" &&
+                it.name != "Beğenilenler" &&
+                it.name != "Favoriler"
+        }.shuffled().take(5)
+    }
+    var selectedPlaylist by remember { mutableStateOf<LocalPlaylist?>(null) }
+
+    val selectedPl = selectedPlaylist
+    if (selectedPl != null) {
+        val plTracks = remember(selectedPl, tracks, likedIds) { resolvePlaylistTracks(selectedPl, tracks, likedIds) }
+        PlaylistDetailView(
+            playlist = selectedPl,
+            allTracks = tracks,
+            plTracks = plTracks,
+            strings = strings,
+            onBack = { selectedPlaylist = null },
+            onTrackClick = { list, i -> onTrackClick(list, i, selectedPl.name) },
+            onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, selectedPl.name) },
+            onPlayRemix = { if (plTracks.isNotEmpty()) onTrackClick(plTracks.shuffled(), 0, selectedPl.name) },
+            onRemoveTrack = { trackId ->
+                val newTrackIds = selectedPl.trackIds - trackId
+                val idx = rawPlaylists.indexOf(selectedPl)
+                if (idx >= 0) {
+                    val next = rawPlaylists.toMutableList()
+                    next[idx] = selectedPl.copy(trackIds = newTrackIds)
+                    scope.launch { prefs.setPlaylistsJson(encodePlaylists(next)) }
+                }
+                selectedPlaylist = selectedPl.copy(trackIds = newTrackIds)
+            },
+            onAddTracks = { },
+            onPickCover = { },
+            onReorder = { },
+            onChangeSort = { }
+        )
+    } else {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent,
+            topBar = {
+                InstallerXTopBar(
+                    title = strings.home,
+                    state = topBarState
                 )
             }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .captureForTopBarBlur(topBarState)
+                    .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                    .overScrollVertical()
+                    .verticalScroll(scrollState)
+                    .padding(
+                        top = innerPadding.calculateTopPadding() + 8.dp,
+                        bottom = if (hasMiniPlayer) 176.dp else 96.dp
+                    ),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                // Featured Songs Section (RecommendCard)
+                if (featuredTracks.isNotEmpty()) {
+                    FeaturedSongsSection(
+                        title = strings.featuredSongs,
+                        tracks = featuredTracks,
+                        onTrackClick = { idx ->
+                            onTrackClick(featuredTracks, idx, strings.featuredSongs)
+                        }
+                    )
+                }
 
-            // Recently Played / Viewed Section (RecentlyPlayedCard)
-            if (recentlyPlayedTracks.isNotEmpty()) {
-                RecentlyPlayedSection(
-                    title = strings.recentlyPlayed,
-                    tracks = recentlyPlayedTracks,
-                    onTrackClick = { idx ->
-                        onTrackClick(recentlyPlayedTracks, idx, strings.recentlyPlayed)
-                    }
-                )
+                // Featured Playlists Section
+                if (featuredPlaylists.isNotEmpty()) {
+                    FeaturedPlaylistsSection(
+                        title = strings.featuredPlaylists,
+                        playlists = featuredPlaylists,
+                        onPlaylistClick = { pl ->
+                            selectedPlaylist = pl
+                        }
+                    )
+                }
+
+                // Recently Played / Viewed Section (RecentlyPlayedCard)
+                if (recentlyPlayedTracks.isNotEmpty()) {
+                    RecentlyPlayedSection(
+                        title = strings.recentlyPlayed,
+                        tracks = recentlyPlayedTracks,
+                        onTrackClick = { idx ->
+                            onTrackClick(recentlyPlayedTracks, idx, strings.recentlyPlayed)
+                        }
+                    )
+                }
             }
         }
     }
@@ -290,24 +359,28 @@ private fun RecentlyPlayedSection(
             beyondViewportPageCount = 1
         ) { page ->
             val track = tracks[page]
-            AnimatedContent(
-                targetState = track,
-                transitionSpec = {
-                    (fadeIn(androidx.compose.animation.core.tween(300)) +
-                        scaleIn(
-                            initialScale = 0.82f,
-                            animationSpec = androidx.compose.animation.core.spring(
-                                dampingRatio = 0.52f,
-                                stiffness = 340f
-                            )
-                        )).togetherWith(
-                        fadeOut(androidx.compose.animation.core.tween(200)) +
-                            scaleOut(targetScale = 0.82f)
-                    )
-                },
-                label = "recentTrackBounceFade"
-            ) { targetTrack ->
-                RecentlyPlayedCard(track = targetTrack, onClick = { onTrackClick(page) })
+            if (page == 0) {
+                AnimatedContent(
+                    targetState = track,
+                    transitionSpec = {
+                        (fadeIn(androidx.compose.animation.core.tween(300)) +
+                            scaleIn(
+                                initialScale = 0.82f,
+                                animationSpec = androidx.compose.animation.core.spring(
+                                    dampingRatio = 0.52f,
+                                    stiffness = 340f
+                                )
+                            )).togetherWith(
+                            fadeOut(androidx.compose.animation.core.tween(200)) +
+                                scaleOut(targetScale = 0.82f)
+                        )
+                    },
+                    label = "recentTrackBounceFade"
+                ) { targetTrack ->
+                    RecentlyPlayedCard(track = targetTrack, onClick = { onTrackClick(0) })
+                }
+            } else {
+                RecentlyPlayedCard(track = track, onClick = { onTrackClick(page) })
             }
         }
     }
@@ -321,7 +394,7 @@ private fun RecentlyPlayedCard(
     Box(
         modifier = Modifier
             .width(268.dp)
-            .height(200.dp)
+            .aspectRatio(1f)
             .shadow(8.dp, RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
             .background(MiuixAppTheme.colorScheme.surfaceVariant)
@@ -383,5 +456,97 @@ private fun RecentlyPlayedCard(
                 overflow = TextOverflow.Ellipsis
             )
         }
+    }
+}
+
+@Composable
+private fun FeaturedPlaylistsSection(
+    title: String,
+    playlists: List<LocalPlaylist>,
+    onPlaylistClick: (LocalPlaylist) -> Unit
+) {
+    val pagerState = rememberPagerState(pageCount = { playlists.size })
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = title,
+            style = MiuixAppTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MiuixAppTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        HorizontalPager(
+            state = pagerState,
+            pageSize = PageSize.Fixed(172.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 60.dp),
+            pageSpacing = 16.dp,
+            beyondViewportPageCount = 1
+        ) { page ->
+            val pl = playlists[page]
+            FeaturedPlaylistCard(playlist = pl, onClick = { onPlaylistClick(pl) })
+        }
+    }
+}
+
+@Composable
+private fun FeaturedPlaylistCard(
+    playlist: LocalPlaylist,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .width(172.dp)
+            .aspectRatio(1f)
+            .shadow(8.dp, RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .background(MiuixAppTheme.colorScheme.surfaceVariant)
+            .clickable(onClick = onClick)
+    ) {
+        val coverUri = playlist.coverUri?.let { android.net.Uri.parse(it) }
+        var artLoaded by remember(coverUri) { mutableStateOf(false) }
+        if (coverUri != null) {
+            AsyncImage(
+                model = coverUri,
+                contentDescription = playlist.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                onState = { artLoaded = it is coil.compose.AsyncImagePainter.State.Success }
+            )
+        }
+        if (!artLoaded) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.LibraryMusic,
+                    contentDescription = null,
+                    tint = MiuixAppTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
+                        startY = 100f
+                    )
+                )
+        )
+        Text(
+            text = playlist.name,
+            style = MiuixAppTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(12.dp)
+        )
     }
 }
