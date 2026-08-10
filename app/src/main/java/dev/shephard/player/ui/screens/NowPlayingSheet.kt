@@ -96,6 +96,7 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -272,7 +273,7 @@ fun NowPlayingSheet(
     ) {
         // Kapak resminden blur'lu arka plan — amplitude/glow'a artık bağlı değil, track
         // değişmediği sürece yeniden çizilmez.
-        AmbientGlowBackground(track = track)
+        AmbientGlowBackground(track = track, isPlaying = state.isPlaying)
 
         Column(
             modifier = Modifier
@@ -447,7 +448,7 @@ fun NowPlayingSheet(
                     },
                     icon = Icons.AutoMirrored.Filled.QueueMusic,
                     contentDescription = strings.queue,
-                    tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                    tint = Color.White,
                     iconSize = 28.dp
                 )
                 BouncyIconButton(
@@ -456,19 +457,13 @@ fun NowPlayingSheet(
                     },
                     icon = Icons.Filled.Lyrics,
                     contentDescription = strings.lyrics,
-                    tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                    tint = Color.White,
                     iconSize = 28.dp
                 )
-                // MADDE 10 — beğen/ekle tuşu da Blur ile birlikte görünüm değiştiriyordu.
-                // Artık her iki durumda da aynı düz dolgulu daire.
+                // Playliste ekle tuşunun arkaplanını sil + simge rengini beyaz yap
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (isLiked) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
-                            else MiuixAppTheme.colorScheme.surfaceVariant
-                        )
+                        .size(48.dp)
                         .bounceClick {
                             if (trackId > 0) {
                                 if (isLiked) {
@@ -483,8 +478,8 @@ fun NowPlayingSheet(
                     Icon(
                         imageVector = if (isLiked) Icons.Filled.Check else Icons.Filled.Add,
                         contentDescription = if (isLiked) "Added" else "Add",
-                        tint = if (isLiked) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
 
@@ -685,26 +680,20 @@ fun NowPlayingSheet(
                     onClick = { playerViewModel.remixQueue() },
                     icon = Icons.Filled.Shuffle,
                     contentDescription = strings.remix,
-                    tint = if (isRemixed) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
+                    tint = Color.White,
                     iconSize = 28.dp
                 )
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToPrevious() },
-                    icon = Icons.Filled.SkipPrevious,
+                    painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_rewind),
                     contentDescription = strings.previous,
-                    tint = MiuixAppTheme.colorScheme.onBackground,
+                    tint = Color.White,
                     iconSize = 36.dp
                 )
-                // MADDE 10 — ÇAL/DURAKLAT tuşu Blur açılınca `blurSurface(GlassTint.ACCENT)`
-                // ile yarı saydam ve KOYU bir daireye dönüşüyordu; üstündeki ikon ise
-                // `onPrimary` (açık yeşil accent'te #111111, yani koyu) olduğu için tuş
-                // neredeyse okunmaz hale geliyordu. Bu tuş çalar arayüzünün ana eylemi;
-                // blur ayarından etkilenmemeli. Artık her zaman düz accent dolgulu.
+                // Pause / resume butonunun arkaplanı silindi + Flamingo simgeleri kullanıldı
                 Box(
                     modifier = Modifier
                         .size(72.dp)
-                        .clip(CircleShape)
-                        .background(MiuixAppTheme.colorScheme.primary)
                         .bounceClick {
                             playButtonScope.launch {
                                 playButtonScale.animateTo(0.85f, androidx.compose.animation.core.tween(80))
@@ -730,26 +719,25 @@ fun NowPlayingSheet(
                         label = "playPauseIcon"
                     ) { isPlaying ->
                         Icon(
-                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            painter = painterResource(id = if (isPlaying) dev.shephard.player.R.drawable.ic_nowplaying_pause else dev.shephard.player.R.drawable.ic_nowplaying_play),
                             contentDescription = if (isPlaying) strings.pause else strings.play,
-                            tint = MiuixAppTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(36.dp)
+                            tint = Color.White,
+                            modifier = Modifier.size(40.dp)
                         )
                     }
                 }
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToNext() },
-                    icon = Icons.Filled.SkipNext,
+                    painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_fforward),
                     contentDescription = strings.next,
-                    tint = MiuixAppTheme.colorScheme.onBackground,
+                    tint = Color.White,
                     iconSize = 36.dp
                 )
                 BouncyIconButton(
                     onClick = { playerViewModel.cycleRepeatMode() },
                     icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                     contentDescription = strings.repeat,
-                    tint = if (state.repeatMode != RepeatMode.OFF) MiuixAppTheme.colorScheme.primary
-                    else MiuixAppTheme.colorScheme.onSurfaceVariant,
+                    tint = Color.White,
                     iconSize = 28.dp
                 )
             }
@@ -770,8 +758,14 @@ fun NowPlayingSheet(
  */
 @Composable
 private fun AmbientGlowBackground(
-    track: AudioTrack?
+    track: AudioTrack?,
+    isPlaying: Boolean
 ) {
+    val darkOverlayAlpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isPlaying) 0.35f else 0.68f,
+        animationSpec = androidx.compose.animation.core.tween(400),
+        label = "darkOverlayAlpha"
+    )
     Box(modifier = Modifier.fillMaxSize()) {
         if (track?.albumArtUri != null) {
             AsyncImage(
@@ -791,18 +785,22 @@ private fun AmbientGlowBackground(
                     ColorMatrix().apply { setToSaturation(1.35f) }
                 )
             )
-            // Flamingo'daki sabit koyu overlay (0x33000000, Overlay blend) — kontrastı
-            // korur, üstteki beyaz metin/ikonlar her kapak resminde okunur kalır.
+            // Kararma efekti: Şarkı durdurulunca (isPlaying == false) arkaplan kararıyor
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0x59000000))
+                    .background(Color.Black.copy(alpha = darkOverlayAlpha))
             )
         } else {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(MiuixAppTheme.colorScheme.surfaceVariant)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = darkOverlayAlpha - 0.15f))
             )
         }
     }
