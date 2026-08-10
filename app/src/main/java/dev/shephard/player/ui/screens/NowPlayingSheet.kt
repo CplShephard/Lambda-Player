@@ -272,7 +272,7 @@ fun NowPlayingSheet(
     ) {
         // Kapak resminden blur'lu arka plan — amplitude/glow'a artık bağlı değil, track
         // değişmediği sürece yeniden çizilmez.
-        AmbientGlowBackground(track = track, isPlaying = state.isPlaying)
+        AmbientGlowBackground(track = track)
 
         Column(
             modifier = Modifier
@@ -447,7 +447,7 @@ fun NowPlayingSheet(
                     },
                     icon = Icons.AutoMirrored.Filled.QueueMusic,
                     contentDescription = strings.queue,
-                    tint = Color.White,
+                    tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
                     iconSize = 28.dp
                 )
                 BouncyIconButton(
@@ -456,13 +456,19 @@ fun NowPlayingSheet(
                     },
                     icon = Icons.Filled.Lyrics,
                     contentDescription = strings.lyrics,
-                    tint = Color.White,
+                    tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
                     iconSize = 28.dp
                 )
-                // MADDE 10 — beğen/ekle tuşu arkaplan silindi, sade ikon ve beyaz.
+                // MADDE 10 — beğen/ekle tuşu da Blur ile birlikte görünüm değiştiriyordu.
+                // Artık her iki durumda da aynı düz dolgulu daire.
                 Box(
                     modifier = Modifier
                         .size(40.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isLiked) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
+                            else MiuixAppTheme.colorScheme.surfaceVariant
+                        )
                         .bounceClick {
                             if (trackId > 0) {
                                 if (isLiked) {
@@ -477,8 +483,8 @@ fun NowPlayingSheet(
                     Icon(
                         imageVector = if (isLiked) Icons.Filled.Check else Icons.Filled.Add,
                         contentDescription = if (isLiked) "Added" else "Add",
-                        tint = Color.White,
-                        modifier = Modifier.size(26.dp)
+                        tint = if (isLiked) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
@@ -679,19 +685,26 @@ fun NowPlayingSheet(
                     onClick = { playerViewModel.remixQueue() },
                     icon = Icons.Filled.Shuffle,
                     contentDescription = strings.remix,
-                    tint = if (isRemixed) MiuixAppTheme.colorScheme.primary else Color.White,
+                    tint = if (isRemixed) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurfaceVariant,
                     iconSize = 28.dp
                 )
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToPrevious() },
-                    painter = painterResource(id = R.drawable.ic_nowplaying_rewind),
+                    icon = Icons.Filled.SkipPrevious,
                     contentDescription = strings.previous,
-                    tint = Color.White,
+                    tint = MiuixAppTheme.colorScheme.onBackground,
                     iconSize = 36.dp
                 )
+                // MADDE 10 — ÇAL/DURAKLAT tuşu Blur açılınca `blurSurface(GlassTint.ACCENT)`
+                // ile yarı saydam ve KOYU bir daireye dönüşüyordu; üstündeki ikon ise
+                // `onPrimary` (açık yeşil accent'te #111111, yani koyu) olduğu için tuş
+                // neredeyse okunmaz hale geliyordu. Bu tuş çalar arayüzünün ana eylemi;
+                // blur ayarından etkilenmemeli. Artık her zaman düz accent dolgulu.
                 Box(
                     modifier = Modifier
                         .size(72.dp)
+                        .clip(CircleShape)
+                        .background(MiuixAppTheme.colorScheme.primary)
                         .bounceClick {
                             playButtonScope.launch {
                                 playButtonScale.animateTo(0.85f, androidx.compose.animation.core.tween(80))
@@ -717,18 +730,18 @@ fun NowPlayingSheet(
                         label = "playPauseIcon"
                     ) { isPlaying ->
                         Icon(
-                            painter = painterResource(id = if (isPlaying) R.drawable.ic_nowplaying_pause else R.drawable.ic_nowplaying_play),
+                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (isPlaying) strings.pause else strings.play,
-                            tint = Color.White,
-                            modifier = Modifier.size(38.dp)
+                            tint = MiuixAppTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(36.dp)
                         )
                     }
                 }
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToNext() },
-                    painter = painterResource(id = R.drawable.ic_nowplaying_fforward),
+                    icon = Icons.Filled.SkipNext,
                     contentDescription = strings.next,
-                    tint = Color.White,
+                    tint = MiuixAppTheme.colorScheme.onBackground,
                     iconSize = 36.dp
                 )
                 BouncyIconButton(
@@ -736,7 +749,7 @@ fun NowPlayingSheet(
                     icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                     contentDescription = strings.repeat,
                     tint = if (state.repeatMode != RepeatMode.OFF) MiuixAppTheme.colorScheme.primary
-                    else Color.White,
+                    else MiuixAppTheme.colorScheme.onSurfaceVariant,
                     iconSize = 28.dp
                 )
             }
@@ -757,8 +770,7 @@ fun NowPlayingSheet(
  */
 @Composable
 private fun AmbientGlowBackground(
-    track: AudioTrack?,
-    isPlaying: Boolean
+    track: AudioTrack?
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         if (track?.albumArtUri != null) {
@@ -769,6 +781,8 @@ private fun AmbientGlowBackground(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
+                        // Blur öncesi hafif taşırma: kenarlarda blur'un şeffaf/keskin
+                        // kesim göstermemesi için resmi biraz büyütüyoruz.
                         scaleX = 1.15f
                         scaleY = 1.15f
                     }
@@ -777,14 +791,12 @@ private fun AmbientGlowBackground(
                     ColorMatrix().apply { setToSaturation(1.35f) }
                 )
             )
-            val dimAlpha by androidx.compose.animation.core.animateFloatAsState(
-                targetValue = if (isPlaying) 0.35f else 0.70f,
-                label = "pauseDimAlpha"
-            )
+            // Flamingo'daki sabit koyu overlay (0x33000000, Overlay blend) — kontrastı
+            // korur, üstteki beyaz metin/ikonlar her kapak resminde okunur kalır.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = dimAlpha))
+                    .background(Color(0x59000000))
             )
         } else {
             Box(
@@ -793,7 +805,45 @@ private fun AmbientGlowBackground(
                     .background(MiuixAppTheme.colorScheme.surfaceVariant)
             )
         }
-    }}
+    }
+}
+
+/**
+ * Seek bar + süre etiketleri. [PlayerViewModel.progress] flow'unu (500ms tik) YALNIZCA bu
+ * composable toplar — NowPlayingSheet'in geri kalanı konum güncellemelerinden tamamen izole.
+ */
+@Composable
+private fun SeekBarRow(playerViewModel: PlayerViewModel) {
+    val progress by playerViewModel.progress.collectAsState()
+    Column(modifier = Modifier.fillMaxWidth()) {
+        MinimalSeekBar(
+            progress = if (progress.durationMs > 0)
+                progress.positionMs.toFloat() / progress.durationMs.toFloat() else 0f,
+            onSeekPreview = { fraction ->
+                playerViewModel.onSeekPreview((fraction * progress.durationMs).toLong())
+            },
+            onSeekFinished = { fraction ->
+                playerViewModel.onSeekCommit((fraction * progress.durationMs).toLong())
+            },
+            modifier = Modifier.padding(horizontal = 20.dp)
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, start = 20.dp, end = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                formatMillis(progress.positionMs),
+                style = MiuixAppTheme.typography.labelMedium,
+                color = MiuixAppTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                formatMillis(progress.durationMs),
+                style = MiuixAppTheme.typography.labelMedium,
+                color = MiuixAppTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
 
 @Composable
 private fun AddToPlaylistDrawer(
@@ -1007,6 +1057,7 @@ private fun QueueList(
                         isPlaying = track.id == currentTrackId,
                         isDragged = isDragging,
                         onPlay = { onPlay(index) },
+                        onPlayNext = { onPlayNext(index) },
                         onRemove = { onRemove(index) },
                         dragHandleModifier = Modifier.draggableHandle()
                     )
@@ -1023,6 +1074,7 @@ private fun QueueTrackItem(
     isPlaying: Boolean,
     isDragged: Boolean,
     onPlay: () -> Unit,
+    onPlayNext: () -> Unit,
     onRemove: () -> Unit,
     dragHandleModifier: Modifier,
 ) {
@@ -1040,31 +1092,36 @@ private fun QueueTrackItem(
             .fillMaxWidth()
             .height(64.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
     ) {
         val absOffset = kotlin.math.abs(offsetX)
         val progress = (absOffset / swipeThresholdPx).coerceIn(0f, 1f)
         if (absOffset > 10f) {
+            val isSwipeRight = offsetX > 0f
+            val isSwipeLeft = offsetX < 0f
             val isThresholdReached = absOffset >= swipeThresholdPx
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        Color(0xFFE53935).copy(alpha = 0.16f * progress),
+                        when {
+                            isSwipeRight -> Color(0xFFE53935).copy(alpha = 0.16f * progress)
+                            isSwipeLeft -> MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f * progress)
+                            else -> Color.Transparent
+                        },
                         RoundedCornerShape(12.dp)
                     )
                     .padding(horizontal = 20.dp),
-                contentAlignment = Alignment.CenterStart
+                contentAlignment = if (isSwipeRight) Alignment.CenterStart else Alignment.CenterEnd
             ) {
                 val iconScale by animateFloatAsState(
                     targetValue = if (isThresholdReached) 1.25f else (0.8f + 0.2f * progress),
                     label = "swipeIconScale"
                 )
                 Icon(
-                    imageVector = Icons.Filled.Delete,
-                    contentDescription = "Remove",
-                    tint = Color(0xFFE53935),
+                    imageVector = if (isSwipeRight) Icons.Filled.Delete else Icons.AutoMirrored.Filled.QueueMusic,
+                    contentDescription = if (isSwipeRight) "Remove" else "Pin to play next",
+                    tint = if (isSwipeRight) Color(0xFFE53935) else MiuixAppTheme.colorScheme.primary,
                     modifier = Modifier
                         .size(26.dp)
                         .graphicsLayer {
@@ -1094,15 +1151,15 @@ private fun QueueTrackItem(
                 .pointerInput(track.id) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
-                            if (offsetX > swipeThresholdPx) onRemove()
+                            when {
+                                offsetX < -swipeThresholdPx -> onPlayNext()
+                                offsetX > swipeThresholdPx -> onRemove()
+                            }
                             offsetX = 0f
                         }
                     ) { change, dragAmount ->
                         change.consume()
-                        // Sadece sağa (pozitif) sürüklemeye izin ver — sola swipe ile
-                        // "sıradaki şarkıya sabitleme" özelliği kaldırıldı, sadece
-                        // sağa-swipe-ile-kaldırma davranışı kalıyor.
-                        offsetX = (offsetX + dragAmount).coerceAtLeast(0f)
+                        offsetX += dragAmount
                     }
                 }
                 .padding(vertical = 6.dp, horizontal = 8.dp),
