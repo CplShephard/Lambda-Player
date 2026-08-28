@@ -39,6 +39,8 @@ import dev.shephard.player.ui.miuix.Text
 import dev.shephard.player.ui.miuix.TextButton
 import dev.shephard.player.ui.navigation.MainContainer
 import dev.shephard.player.ui.theme.PlayerTheme
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
@@ -53,7 +55,9 @@ class MainActivity : ComponentActivity() {
             val context = LocalContext.current
             val prefs = remember { PreferencesManager(context) }
 
-            val useMiuix by prefs.useMiuix.collectAsState(initial = true)
+            // FIX: use the persisted value from the very first frame (no true->false flip)
+            val initialUseMiuix = remember { runBlocking { prefs.useMiuix.first() } }
+            val useMiuix by prefs.useMiuix.collectAsState(initial = initialUseMiuix)
             val themeMode by prefs.themeModeEnum.collectAsState(initial = dev.shephard.player.theme.ThemeMode.SYSTEM)
             val paletteStyle by prefs.paletteStyle.collectAsState(initial = dev.shephard.player.theme.PaletteStyle.TonalSpot)
             val colorSpec by prefs.colorSpec.collectAsState(initial = dev.shephard.player.theme.ThemeColorSpec.SPEC_2025)

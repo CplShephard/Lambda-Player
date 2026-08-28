@@ -142,15 +142,19 @@ fun NowPlayingSheet(
     val strings = LocalStrings.current
     val nowPlayingLiquidGlassOn = LocalBlurEnabled.current
 
-val density = LocalDensity.current
+    var showQueue by remember { mutableStateOf(false) }
+    var showPlaylists by remember { mutableStateOf(false) }
+    var showLyrics by remember { mutableStateOf(false) }
+
+    val density = LocalDensity.current
     val dismissThresholdPx = with(density) { 140.dp.toPx() }
 
-val dragOffsetScreenHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
+    val dragOffsetScreenHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
     val dragOffsetInitialHeight = with(density) { dragOffsetScreenHeight.dp.toPx() }
     val dragOffset = remember { androidx.compose.animation.core.Animatable(dragOffsetInitialHeight) }
     val dragScope = rememberCoroutineScope()
 
-var hasEnteredRest by remember { mutableStateOf(false) }
+    var hasEnteredRest by remember { mutableStateOf(false) }
     val nowPlayingEnterSpring = androidx.compose.animation.core.spring<Float>(
         dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
         stiffness = 180f
@@ -161,7 +165,7 @@ var hasEnteredRest by remember { mutableStateOf(false) }
         hasEnteredRest = true
     }
 
-val artSlideSpec = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(
+    val artSlideSpec = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(
         durationMillis = 320,
         easing = androidx.compose.animation.core.FastOutSlowInEasing
     )
@@ -170,9 +174,28 @@ val artSlideSpec = androidx.compose.animation.core.tween<androidx.compose.ui.uni
         easing = androidx.compose.animation.core.LinearOutSlowInEasing
     )
 
-val configuration = LocalConfiguration.current
+    val configuration = LocalConfiguration.current
     var measuredHeightPx by remember { mutableFloatStateOf(with(density) { configuration.screenHeightDp.dp.toPx() }) }
     val screenHeightPx = measuredHeightPx
+
+    val dismissWithAnimation: () -> Unit = {
+        dragScope.launch {
+            val remaining = (screenHeightPx - dragOffset.value).coerceAtLeast(0f)
+            val duration = (remaining / screenHeightPx * 220).toLong().coerceIn(120L, 220L)
+            dragOffset.animateTo(
+                targetValue = screenHeightPx,
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = duration.toInt(),
+                    easing = androidx.compose.animation.core.FastOutLinearInEasing
+                )
+            )
+            onDismiss()
+        }
+    }
+
+    androidx.activity.compose.BackHandler(enabled = !showQueue && !showLyrics && !showPlaylists) {
+        dismissWithAnimation()
+    }
 
 val playButtonScale = remember { androidx.compose.animation.core.Animatable(1f) }
     val playButtonScope = rememberCoroutineScope()
@@ -387,11 +410,7 @@ Row(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                var showQueue by remember { mutableStateOf(false) }
-                var showPlaylists by remember { mutableStateOf(false) }
-                var showLyrics by remember { mutableStateOf(false) }
-
-val lyricsSheetScope = rememberCoroutineScope()
+                val lyricsSheetScope = rememberCoroutineScope()
                 val trackId = track?.id ?: -1L
                 val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
 

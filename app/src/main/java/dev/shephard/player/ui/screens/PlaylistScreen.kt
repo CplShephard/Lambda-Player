@@ -217,17 +217,7 @@ val json by prefs.playlistsJson.collectAsState(initial = "[]")
     val rawPlaylists = remember(json) { parsePlaylists(json) }
     val playlists = remember(rawPlaylists, strings) { ensureLikedSongsPlaylist(rawPlaylists, strings) }
 
-LaunchedEffect(playlists) {
-        if (rawPlaylists.isNotEmpty()) {
-            val encoded = encodePlaylists(playlists)
-            val currentEncoded = encodePlaylists(rawPlaylists)
-            if (encoded != currentEncoded) {
-                prefs.setPlaylistsJson(encoded)
-            }
-        }
-    }
-
-var showCreate by remember { mutableStateOf(false) }
+    var showCreate by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
     var openIndex by remember { mutableStateOf<Int?>(null) }
 
@@ -1018,60 +1008,23 @@ if (showRemoveCreateCoverConfirm) {
     }
 
 if (showDeletePlaylistConfirm && playlistToDelete != null) {
-        dev.shephard.player.ui.miuix.MiuixDialog(
-            onDismissRequest = { showDeletePlaylistConfirm = false; playlistToDelete = null },
+        val toDel = playlistToDelete
+        dev.shephard.player.ui.miuix.MiuixDeleteConfirmationDialog(
+            show = true,
             title = strings.delete,
-            text = {
-                Text(
-                    text = strings.removePlaylistConfirm,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                )
+            message = strings.removePlaylistConfirm,
+            confirmText = strings.delete,
+            cancelText = strings.cancel,
+            onDismiss = {
+                showDeletePlaylistConfirm = false
+                playlistToDelete = null
             },
-            buttons = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = { showDeletePlaylistConfirm = false; playlistToDelete = null },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Text(
-                            text = strings.cancel,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Normal,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = {
-                            val toDel = playlistToDelete
-                            showDeletePlaylistConfirm = false
-                            playlistToDelete = null
-                            if (toDel != null) {
-                                val all = playlists.toMutableList().filterNot { it.name == toDel.name && it.isSystem == toDel.isSystem }
-                                scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
-                            }
-                        },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
-                    ) {
-                        Text(
-                            text = strings.delete,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = Color(0xFFE53935),
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
+            onConfirm = {
+                showDeletePlaylistConfirm = false
+                playlistToDelete = null
+                if (toDel != null) {
+                    val all = playlists.toMutableList().filterNot { it.name == toDel.name && it.isSystem == toDel.isSystem }
+                    scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
                 }
             }
         )

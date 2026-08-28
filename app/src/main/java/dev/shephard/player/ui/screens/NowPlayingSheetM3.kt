@@ -1,9 +1,22 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 InstallerX Revived contributors
 package dev.shephard.player.ui.screens
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,13 +33,15 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
@@ -36,21 +51,27 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +84,9 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -72,6 +96,7 @@ import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.i18n.LocalStrings
+import kotlinx.coroutines.launch
 
 private const val M3_WAVE_BAR_COUNT = 44
 
@@ -88,10 +113,88 @@ fun NowPlayingSheetM3(
     var showQueue by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
 
+    val density = LocalDensity.current
+    val dismissThresholdPx = with(density) { 140.dp.toPx() }
+
+    val configuration = LocalConfiguration.current
+    val dragOffsetInitialHeight = with(density) { configuration.screenHeightDp.dp.toPx() }
+    val dragOffset = remember { Animatable(dragOffsetInitialHeight) }
+    val dragScope = rememberCoroutineScope()
+
+    var hasEnteredRest by remember { mutableStateOf(false) }
+    val enterSpring = remember {
+        spring<Float>(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = 180f
+        )
+    }
+
+    LaunchedEffect(Unit) {
+        hasEnteredRest = false
+        dragOffset.animateTo(0f, animationSpec = enterSpring)
+        hasEnteredRest = true
+    }
+
+    var measuredHeightPx by remember { mutableFloatStateOf(with(density) { configuration.screenHeightDp.dp.toPx() }) }
+    val screenHeightPx = measuredHeightPx
+
+    var isInteractingWithSheet by remember { mutableStateOf(false) }
+    val isFullyExpanded by remember {
+        derivedStateOf { hasEnteredRest && !isInteractingWithSheet && dragOffset.value <= 0.5f }
+    }
+    val sheetCornerRadius by animateDpAsState(
+        targetValue = if (isFullyExpanded) 0.dp else 28.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "sheetCornerRadiusM3"
+    )
+
+    val dismissWithAnimation: () -> Unit = {
+        dragScope.launch {
+            val remaining = (screenHeightPx - dragOffset.value).coerceAtLeast(0f)
+            val duration = (remaining / screenHeightPx * 220).toLong().coerceIn(120L, 220L)
+            dragOffset.animateTo(
+                targetValue = screenHeightPx,
+                animationSpec = tween(
+                    durationMillis = duration.toInt(),
+                    easing = FastOutLinearInEasing
+                )
+            )
+            onDismiss()
+        }
+    }
+
+    BackHandler(enabled = !showQueue && !showLyrics) {
+        dismissWithAnimation()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .onSizeChanged { measuredHeightPx = it.height.toFloat() }
+            .graphicsLayer { translationY = dragOffset.value.coerceAtLeast(0f) }
+            .clip(RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius))
             .background(MaterialTheme.colorScheme.surfaceContainer)
+            .draggable(
+                orientation = Orientation.Vertical,
+                state = rememberDraggableState { delta ->
+                    val next = (dragOffset.value + delta).coerceAtLeast(0f)
+                    dragScope.launch { dragOffset.snapTo(next) }
+                },
+                onDragStarted = { isInteractingWithSheet = true },
+                onDragStopped = { velocity ->
+                    isInteractingWithSheet = false
+                    if (dragOffset.value > dismissThresholdPx || velocity > 2000f) {
+                        dismissWithAnimation()
+                    } else {
+                        dragScope.launch {
+                            dragOffset.animateTo(0f, animationSpec = enterSpring)
+                        }
+                    }
+                }
+            )
     ) {
         if (track?.albumArtUri != null) {
             AsyncImage(
@@ -128,25 +231,34 @@ fun NowPlayingSheetM3(
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
+            // Drag indicator handle
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp, bottom = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 36.dp, height = 4.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.4f))
+                )
+            }
+
+            // Header info
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp, start = 16.dp, end = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(horizontal = 24.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = Icons.Filled.KeyboardArrowDown,
-                        contentDescription = "Close",
-                        tint = Color.White
-                    )
-                }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = strings.nowPlaying,
                         style = MaterialTheme.typography.labelLarge,
-                        color = Color.White.copy(alpha = 0.8f)
+                        color = Color.White.copy(alpha = 0.85f)
                     )
                     if (state.currentPlaylistName != null) {
                         Text(
@@ -158,20 +270,19 @@ fun NowPlayingSheetM3(
                         )
                     }
                 }
-                Spacer(Modifier.size(48.dp))
             }
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 20.dp),
+                    .padding(top = 16.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
                     modifier = Modifier
                         .width(280.dp)
                         .aspectRatio(1f)
-                        .clip(RoundedCornerShape(28.dp))
+                        .clip(RoundedCornerShape(20.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                     contentAlignment = Alignment.Center
                 ) {
@@ -179,7 +290,7 @@ fun NowPlayingSheetM3(
                         AsyncImage(
                             model = track.albumArtUri,
                             contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)),
                             contentScale = ContentScale.Crop,
                         )
                     } else {
@@ -243,31 +354,42 @@ fun NowPlayingSheetM3(
                     Icon(
                         imageVector = Icons.Filled.SkipPrevious,
                         contentDescription = strings.previous,
-                        tint = Color.White
+                        tint = Color.White,
+                        modifier = Modifier.size(36.dp)
                     )
                 }
                 FilledIconButton(
                     onClick = { playerViewModel.togglePlayPause() },
-                    modifier = Modifier.size(72.dp),
+                    modifier = Modifier.size(68.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 ) {
                     Icon(
                         imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         contentDescription = if (state.isPlaying) strings.pause else strings.play,
-                        modifier = Modifier.size(34.dp)
+                        modifier = Modifier.size(36.dp)
                     )
                 }
                 IconButton(onClick = { playerViewModel.skipToNext() }) {
                     Icon(
                         imageVector = Icons.Filled.SkipNext,
                         contentDescription = strings.next,
-                        tint = Color.White
+                        tint = Color.White,
+                        modifier = Modifier.size(36.dp)
                     )
                 }
                 IconButton(onClick = { playerViewModel.cycleRepeatMode() }) {
+                    val icon = when (state.repeatMode) {
+                        RepeatMode.ONE -> Icons.Filled.RepeatOne
+                        else -> Icons.Filled.Repeat
+                    }
+                    val tint = if (state.repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.7f)
                     Icon(
-                        imageVector = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                        imageVector = icon,
                         contentDescription = strings.repeat,
-                        tint = if (state.repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.7f)
+                        tint = tint
                     )
                 }
             }
@@ -275,41 +397,31 @@ fun NowPlayingSheetM3(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 20.dp, start = 32.dp, end = 32.dp),
+                    .padding(top = 16.dp, bottom = 28.dp, start = 32.dp, end = 32.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val trackId = track?.id ?: -1L
-                val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
-                TextButton(onClick = { showQueue = true }) {
+                IconButton(onClick = { showQueue = true }) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.QueueMusic,
-                        contentDescription = null,
+                        contentDescription = strings.queue,
                         tint = Color.White.copy(alpha = 0.8f)
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Text(strings.queue, color = Color.White.copy(alpha = 0.8f))
                 }
-                TextButton(onClick = { showLyrics = true }) {
+                IconButton(onClick = { showLyrics = true }) {
                     Icon(
                         imageVector = Icons.Filled.Lyrics,
-                        contentDescription = null,
+                        contentDescription = strings.lyrics,
                         tint = Color.White.copy(alpha = 0.8f)
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Text(strings.lyrics, color = Color.White.copy(alpha = 0.8f))
                 }
-                IconButton(
-                    onClick = {
-                        if (trackId > 0) {
-                            if (isLiked) playerViewModel.removeFromLiked(trackId) else playerViewModel.addToLiked(trackId)
-                        }
-                    }
-                ) {
+                val trackId = track?.id ?: -1L
+                val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
+                IconButton(onClick = { if (trackId > 0) playerViewModel.toggleLike(trackId) }) {
                     Icon(
                         imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = strings.likedSongs,
-                        tint = if (isLiked) Color(0xFFE53935) else Color.White.copy(alpha = 0.8f)
+                        tint = if (isLiked) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.8f)
                     )
                 }
             }

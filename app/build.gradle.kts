@@ -108,7 +108,12 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-squircle:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-navigation3-ui:0.9.3")
 
-    implementation("androidx.navigation3:navigation3-runtime:1.1.4")
+    // FIX: bumped from 1.1.4 — navigation3 1.1.6 contains the official fix for the
+    // "IllegalArgumentException: Key ... was used multiple times" crash thrown by
+    // SaveableStateHolder (b/516312097). navigation3-ui is pinned explicitly too
+    // (previously it was only pulled in transitively by miuix-navigation3-ui).
+    implementation("androidx.navigation3:navigation3-runtime:1.1.7")
+    implementation("androidx.navigation3:navigation3-ui:1.1.7")
 
     implementation("me.zhanghai.android.appiconloader:appiconloader:1.5.0")
     implementation("sh.calvin.reorderable:reorderable:3.0.0")

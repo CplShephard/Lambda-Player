@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 InstallerX Revived contributors
 package dev.shephard.player.ui.screens
 
 import android.os.Build
@@ -82,7 +84,6 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
     val paletteStyle by prefs.paletteStyle.collectAsState(initial = PaletteStyle.TonalSpot)
     val colorSpec by prefs.colorSpec.collectAsState(initial = ThemeColorSpec.SPEC_2025)
     val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
-    val useMiuixMonet by prefs.useMiuixMonet.collectAsState(initial = false)
     val seedColor by prefs.seedColor.collectAsState(initial = M3SeedPalette.first())
     val blurEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
     val appleFloatingBar by prefs.useAppleFloatingBar.collectAsState(initial = false)
@@ -147,12 +148,14 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
     }
 
     if (showColorSpecDialog) {
+        val isSpec2025Supported = paletteStyle.supportsSpec2025
+        val availableSpecs = if (isSpec2025Supported) ThemeColorSpec.entries else listOf(ThemeColorSpec.SPEC_2021)
         AlertDialog(
             onDismissRequest = { showColorSpecDialog = false },
             title = { Text(strings.colorSpec) },
             text = {
                 Column {
-                    ThemeColorSpec.entries.forEach { spec ->
+                    availableSpecs.forEach { spec ->
                         M3OptionRow(
                             label = spec.displayName,
                             selected = spec == colorSpec,
@@ -236,13 +239,22 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
             item {
                 M3SwitchRow(strings.blurEffect, blurEnabled) { scope.launch { prefs.setLiquidGlassEnabled(it) } }
                 M3SwitchRow(strings.appleFloatingBar, appleFloatingBar) { scope.launch { prefs.setUseAppleFloatingBar(it) } }
-                M3SwitchRow(strings.miuixCustomColors, useMiuixMonet) { scope.launch { prefs.setUseMiuixMonet(it) } }
-                M3SwitchRow(strings.dynamicColor, dynamicColor) { scope.launch { prefs.setDynamicColor(it) } }
+            }
+
+            item { M3SectionTitle(strings.paletteStyle) }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                item {
+                    M3SwitchRow(strings.dynamicColor, dynamicColor) { scope.launch { prefs.setDynamicColor(it) } }
+                }
+            }
+            item {
                 M3ClickRow(
                     title = strings.paletteStyle,
                     value = paletteStyle.displayName,
                     onClick = { showPaletteStyleDialog = true }
                 )
+            }
+            item {
                 M3ClickRow(
                     title = strings.colorSpec,
                     value = colorSpec.displayName,
@@ -250,7 +262,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                 )
             }
 
-            item { M3SectionTitle(strings.accentColor) }
+            item { M3SectionTitle(strings.customColorTitle) }
             item {
                 Row(
                     modifier = Modifier
@@ -381,7 +393,7 @@ private fun M3OptionRow(label: String, selected: Boolean, onClick: () -> Unit) {
 fun CustomColorPickerDialogM3(
     onDismiss: () -> Unit,
     onColorPicked: (Int) -> Unit,
-    initialArgb: Int = 0xFF22C55E.toInt(),
+    initialArgb: Int = 0xFF4A672D.toInt(),
     title: String = "Pick a custom color",
     hexPlaceholder: String = "#RRGGBB",
 ) {

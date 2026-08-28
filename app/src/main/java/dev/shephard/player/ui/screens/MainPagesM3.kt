@@ -1,5 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 InstallerX Revived contributors
 package dev.shephard.player.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -170,7 +174,8 @@ fun PlaylistScreenM3(
     val strings = LocalStrings.current
     val tracks by libraryViewModel.tracks.collectAsState()
     val json by prefs.playlistsJson.collectAsState(initial = "[]")
-    val playlists = remember(json) { parsePlaylists(json) }
+    val rawPlaylists = remember(json) { parsePlaylists(json) }
+    val playlists = remember(rawPlaylists, strings) { ensureLikedSongsPlaylist(rawPlaylists, strings) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -211,20 +216,28 @@ fun PlaylistScreenM3(
                             modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            if (playlist.coverUri != null) {
-                                AsyncImage(
-                                    model = playlist.coverUri,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.size(52.dp),
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Filled.QueueMusic,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(52.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (playlist.coverUri != null) {
+                                    AsyncImage(
+                                        model = playlist.coverUri,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Filled.QueueMusic,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(28.dp),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
                             }
                             Spacer(Modifier.width(14.dp))
                             Column(Modifier.weight(1f)) {
@@ -278,20 +291,28 @@ private fun M3TrackRow(track: AudioTrack, isCurrent: Boolean, onClick: () -> Uni
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (track.albumArtUri != null) {
-                AsyncImage(
-                    model = track.albumArtUri,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(46.dp),
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Filled.MusicNote,
-                    contentDescription = null,
-                    modifier = Modifier.size(46.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                contentAlignment = Alignment.Center
+            ) {
+                if (track.albumArtUri != null) {
+                    AsyncImage(
+                        model = track.albumArtUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.MusicNote,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {

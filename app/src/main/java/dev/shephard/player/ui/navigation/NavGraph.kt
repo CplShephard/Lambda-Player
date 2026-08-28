@@ -6,6 +6,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
@@ -133,6 +134,7 @@ fun NavGraph(
                             )
                         } else {
                             SettingsScreenM3(
+                                playerViewModel = playerViewModel,
                                 onOpenThemeSettings = { backStack.add(ThemeRoute) },
                                 onOpenPlayerSettings = { backStack.add(PlayerRoute) },
                                 onOpenAbout = { backStack.add(AboutRoute) },
@@ -180,17 +182,23 @@ fun NavGraph(
         }
     }
 
-    val entries = rememberDecoratedNavEntries(
-        backStack = backStack,
-        entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
-        entryProvider = entryProvider,
-    )
-
     Box(modifier = modifier) {
-        NavDisplay(
-            entries = entries,
-            onBack = ::pop,
-            transitionEffects = transitionEffects,
-        )
+        // FIX: Create the decorated entries (and thus the SaveableStateHolder decorator)
+        // INSIDE key(useMiuix) so that every UI-engine switch gets a brand new state holder.
+        // Previously the decorator was remembered outside this key(), which meant the same
+        // SaveableStateHolder was reused by the recreated NavDisplay and threw
+        // "IllegalArgumentException: Key MainRoute was used multiple times".
+        key(useMiuix) {
+            val entries = rememberDecoratedNavEntries(
+                backStack = backStack,
+                entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
+                entryProvider = entryProvider,
+            )
+            NavDisplay(
+                entries = entries,
+                onBack = ::pop,
+                transitionEffects = transitionEffects,
+            )
+        }
     }
 }

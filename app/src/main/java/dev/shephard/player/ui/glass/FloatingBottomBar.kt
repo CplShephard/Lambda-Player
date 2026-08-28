@@ -1,6 +1,8 @@
-
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2025-2026 InstallerX Revived contributors
-
+//
+// Adapted from compose-miuix-ui example (IosLiquidGlassNavigationBar) — Apache 2.0.
+// Portions of the migration follow KernelSU commit f261dc4a3dc3f137ebbf38cd1fcbd06d2858c494.
 package dev.shephard.player.ui.glass
 
 import android.os.Build
@@ -24,7 +26,6 @@ import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
-import dev.shephard.player.ui.miuix.MiuixAppTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -33,7 +34,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -47,7 +47,6 @@ import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -59,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.util.lerp
+import dev.shephard.player.ui.theme.PlayerTheme
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
@@ -72,17 +72,20 @@ import top.yukonga.miuix.kmp.blur.highlight.LightSource
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.sensor.rememberDeviceTilt
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sign
 import kotlin.math.sin
 import kotlin.math.sqrt
+import androidx.compose.material3.LocalContentColor as M3LocalContentColor
 import top.yukonga.miuix.kmp.theme.LocalContentColor as MiuixLocalContentColor
 
 val LocalFloatingBottomBarContentColor = staticCompositionLocalOf { Color.Unspecified }
 val LocalFloatingBottomBarTabScale = staticCompositionLocalOf { { 1f } }
 
+// State class holding all colors for the bottom bar
 @Immutable
 class FloatingBottomBarColors(
     val containerColor: Color,
@@ -91,12 +94,13 @@ class FloatingBottomBarColors(
     val activeContentColor: Color
 )
 
+// Defaults object for creating the Colors instance
 object FloatingBottomBarDefaults {
     @Composable
     fun colors(
-        containerColor: Color = MiuixAppTheme.colorScheme.surfaceContainer,
-        indicatorColor: Color = MiuixAppTheme.colorScheme.primary,
-        contentColor: Color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+        containerColor: Color = MiuixTheme.colorScheme.surfaceContainer,
+        indicatorColor: Color = MiuixTheme.colorScheme.primary,
+        contentColor: Color = MiuixTheme.colorScheme.onSurface,
         activeContentColor: Color = indicatorColor
     ): FloatingBottomBarColors = FloatingBottomBarColors(
         containerColor = containerColor,
@@ -132,10 +136,12 @@ private val iosIndicatorSpecular: Highlight = Highlight(
     ),
 )
 
+// Mirrors miuix-blur HighlightStyle's LIGHT_REF — keep in sync.
 private const val LIGHT_REF_X = 0.5f
 private const val LIGHT_REF_Y = 0.7f
-private const val GRAVITY_DIR_THRESHOLD_SQ = 0.01f
+private const val GRAVITY_DIR_THRESHOLD_SQ = 0.01f // |g_xy| > 0.1, ≈ 6° tilt
 
+/** Tracks gravity for a `dualPeak` highlight's primary light, with an extra UV-clockwise offset on top. */
 @Composable
 private fun rememberGravityRotatedHighlight(
     base: Highlight,
@@ -179,7 +185,7 @@ fun RowScope.FloatingBottomBarItem(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val scale = LocalFloatingBottomBarTabScale.current
-
+    // Read the dynamic color from the bottom bar layer
     val contentColor = LocalFloatingBottomBarContentColor.current
 
     Column(
@@ -201,8 +207,10 @@ fun RowScope.FloatingBottomBarItem(
         verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Provide the color to Miuix & M3 components seamlessly
         CompositionLocalProvider(
-            MiuixLocalContentColor provides contentColor
+            MiuixLocalContentColor provides contentColor,
+            M3LocalContentColor provides contentColor
         ) {
             content()
         }
@@ -216,16 +224,15 @@ fun FloatingBottomBar(
     onSelected: (index: Int) -> Unit,
     backdrop: Backdrop,
     tabsCount: Int,
-    mode: FloatingBottomBarMode = FloatingBottomBarMode.LiquidGlass,
+    isBlurEnabled: Boolean = true,
+    mode: FloatingBottomBarMode = if (isBlurEnabled) FloatingBottomBarMode.LiquidGlass else FloatingBottomBarMode.None,
     colors: FloatingBottomBarColors = FloatingBottomBarDefaults.colors(),
     content: @Composable RowScope.() -> Unit
 ) {
-    val isInDark = MiuixAppTheme.colorScheme.surface.luminance() < 0.5f
+    val isInDark = PlayerTheme.isDark
     val pillShape = remember { CircleShape }
-    val isLiquidGlassMode = mode == FloatingBottomBarMode.LiquidGlass
-    val isBlurMode = mode == FloatingBottomBarMode.Blur
-    val containerColor =
-        if (isLiquidGlassMode) colors.containerColor.copy(0.4f) else colors.containerColor
+    val isBlur = isBlurEnabled && mode != FloatingBottomBarMode.None
+    val containerColor = if (isBlur) colors.containerColor.copy(0.4f) else colors.containerColor
 
     val tabsBackdrop = rememberLayerBackdrop()
     val density = LocalDensity.current
@@ -248,7 +255,7 @@ fun FloatingBottomBar(
         }
     }
 
-    var currentIndex by remember { mutableIntStateOf(selectedIndex().coerceIn(0, tabsCount - 1)) }
+    var currentIndex by remember(selectedIndex) { mutableIntStateOf(selectedIndex()) }
 
     class DampedDragAnimationHolder {
         var instance: DampedDragAnimation? = null
@@ -301,30 +308,18 @@ fun FloatingBottomBar(
         ).also { holder.instance = it }
     }
 
-    var isExternalIndexUpdate by remember { mutableStateOf(false) }
-    val selectedIndexValue = selectedIndex().coerceIn(0, tabsCount - 1)
-
-    LaunchedEffect(selectedIndexValue) {
-        if (selectedIndexValue != currentIndex) {
-            isExternalIndexUpdate = true
-            currentIndex = selectedIndexValue
-        } else {
-            isExternalIndexUpdate = false
-        }
+    LaunchedEffect(selectedIndex) {
+        snapshotFlow { selectedIndex() }.collectLatest { currentIndex = it }
     }
     LaunchedEffect(dampedDragAnimation) {
         snapshotFlow { currentIndex }.drop(1).collectLatest { index ->
             dampedDragAnimation.animateToValue(index.toFloat())
-            if (isExternalIndexUpdate) {
-                isExternalIndexUpdate = false
-            } else {
-                onSelected(index)
-            }
+            onSelected(index)
         }
     }
 
     val interactiveHighlight =
-        if (isLiquidGlassMode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (isBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             remember(animationScope, tabWidthPx) {
                 InteractiveHighlight(
                     animationScope = animationScope,
@@ -350,7 +345,7 @@ fun FloatingBottomBar(
         modifier = modifier.width(IntrinsicSize.Min),
         contentAlignment = Alignment.CenterStart
     ) {
-
+        // Base layer (Unselected state)
         CompositionLocalProvider(LocalFloatingBottomBarContentColor provides colors.contentColor) {
             Row(
                 Modifier
@@ -374,7 +369,7 @@ fun FloatingBottomBar(
                         onClick = {}
                     )
                     .then(
-                        if (isLiquidGlassMode) {
+                        if (isBlur) {
                             Modifier.drawBackdrop(
                                 backdrop = backdrop,
                                 shape = { pillShape },
@@ -395,22 +390,11 @@ fun FloatingBottomBar(
                                 },
                                 onDrawSurface = { drawRect(containerColor) },
                             )
-                        } else if (isBlurMode) {
-                            Modifier.drawBackdrop(
-                                backdrop = backdrop,
-                                shape = { pillShape },
-                                effects = {
-                                    blur(25.dp.toPx(), 25.dp.toPx())
-                                },
-                                onDrawSurface = {
-                                    drawRect(containerColor.copy(alpha = 0.65f))
-                                },
-                            )
                         } else {
                             Modifier.background(containerColor, pillShape)
                         }
                     )
-                    .then(if (isLiquidGlassMode && interactiveHighlight != null) interactiveHighlight.modifier else Modifier)
+                    .then(if (isBlur && interactiveHighlight != null) interactiveHighlight.modifier else Modifier)
                     .height(64.dp)
                     .padding(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -418,7 +402,7 @@ fun FloatingBottomBar(
             )
         }
 
-        if (isLiquidGlassMode) {
+        if (isBlur) {
             CompositionLocalProvider(
                 LocalFloatingBottomBarTabScale provides {
                     lerp(1f, 1.2f, dampedDragAnimation.pressProgress)
@@ -456,7 +440,7 @@ fun FloatingBottomBar(
 
         if (tabWidthPx > 0f) {
             val tabWidthDp = with(density) { tabWidthPx.toDp() }
-            if (isLiquidGlassMode) {
+            if (isBlur) {
                 Box(
                     Modifier
                         .padding(horizontal = 4.dp)
@@ -518,10 +502,8 @@ fun FloatingBottomBar(
                         .background(colors.indicatorColor.copy(alpha = 0.15f), pillShape)
                         .height(56.dp)
                         .width(tabWidthDp),
-
                     contentAlignment = Alignment.CenterStart
                 ) {
-
                     CompositionLocalProvider(LocalFloatingBottomBarContentColor provides colors.activeContentColor) {
                         Row(
                             Modifier

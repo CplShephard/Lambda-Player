@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 InstallerX Revived contributors
 package dev.shephard.player.ui.navigation
 
 import androidx.activity.compose.BackHandler
@@ -10,16 +12,26 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.NavigationBar as M3NavigationBar
+import androidx.compose.material3.NavigationBarItem as M3NavigationBarItem
+import androidx.compose.material3.Icon as M3Icon
+import androidx.compose.material3.Text as M3Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -35,19 +47,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.MiniPlayer
 import dev.shephard.player.ui.components.MiniPlayerM3
 import dev.shephard.player.ui.glass.FloatingBottomBar
+import dev.shephard.player.ui.glass.FloatingBottomBarDefaults
 import dev.shephard.player.ui.glass.FloatingBottomBarItem
 import dev.shephard.player.ui.glass.FloatingBottomBarMode
 import dev.shephard.player.ui.glass.LocalAppBackdrop
@@ -82,7 +99,12 @@ fun MainContainer(
     val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = 0.55f)
 
     val blurEnabled = LocalBlurEnabled.current
-    val useMiuix by prefs.useMiuix.collectAsState(initial = true)
+    // FIX: Read the persisted UI-engine preference synchronously ONCE so the first
+    // composition already uses the correct engine. Previously this started as `true`
+    // and flipped to the persisted value when DataStore loaded, which recreated
+    // NavDisplay mid-flight right after every launch (crash trigger, plus a visual flash).
+    val initialUseMiuix = remember { runBlocking { prefs.useMiuix.first() } }
+    val useMiuix by prefs.useMiuix.collectAsState(initial = initialUseMiuix)
     val appleFloatingBar by prefs.useAppleFloatingBar.collectAsState(initial = false)
     val lastMainPage by prefs.lastMainPage.collectAsState(initial = 0)
 
@@ -150,7 +172,7 @@ fun MainContainer(
         val containerBackground = if (useMiuix) {
             MiuixAppTheme.colorScheme.background
         } else {
-            androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer
+            MaterialTheme.colorScheme.surfaceContainer
         }
 
         Box(
@@ -191,7 +213,6 @@ fun MainContainer(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
-                                .navigationBarsPadding()
                                 .zIndex(if (!submenuInvolved) 1f else 0f)
                         ) {
                             MiniPlayerHost(
@@ -206,7 +227,6 @@ fun MainContainer(
                                 selectedIndex = { mainPagerState.selectedPage },
                                 onSelected = { index -> mainPagerState.animateToPage(index) },
                             )
-                            Spacer(Modifier.height(8.dp))
                         }
 
                         NavGraph(
@@ -262,8 +282,8 @@ private fun MainDock(
     onSelected: (Int) -> Unit,
 ) {
     when {
-        !useMiuix -> M3NavigationDock(selectedIndex = selectedIndex, onSelected = onSelected)
         appleStyle -> AppleFloatingDock(selectedIndex = selectedIndex, onSelected = onSelected)
+        !useMiuix -> M3NavigationDock(selectedIndex = selectedIndex, onSelected = onSelected)
         else -> MiuixNavigationDock(selectedIndex = selectedIndex, onSelected = onSelected)
     }
 }
@@ -274,10 +294,13 @@ private fun M3NavigationDock(
     onSelected: (Int) -> Unit,
 ) {
     val strings = LocalStrings.current
-    androidx.compose.material3.ShortNavigationBar(
+    val insets = WindowInsets.safeDrawing.only(
+        WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
+    )
+    M3NavigationBar(
         modifier = Modifier.fillMaxWidth(),
-        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer,
-        arrangement = androidx.compose.material3.ShortNavigationBarArrangement.EqualWeight,
+        windowInsets = insets,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         bottomNavDestinations.forEachIndexed { index, dest ->
             val label = when (dest) {
@@ -286,16 +309,22 @@ private fun M3NavigationDock(
                 Destination.Playlists -> strings.playlists
                 Destination.Settings -> strings.settings
             }
-            androidx.compose.material3.ShortNavigationBarItem(
+            M3NavigationBarItem(
                 selected = selectedIndex() == index,
                 onClick = { onSelected(index) },
                 icon = {
-                    androidx.compose.material3.Icon(
+                    M3Icon(
                         imageVector = if (selectedIndex() == index) dest.selectedIcon else dest.unselectedIcon,
                         contentDescription = label,
                     )
                 },
-                label = { androidx.compose.material3.Text(label) },
+                label = {
+                    M3Text(
+                        text = label,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
             )
         }
     }
@@ -370,7 +399,15 @@ private fun AppleFloatingDock(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {},
+            )
+            .padding(
+                bottom = 12.dp + WindowInsets.navigationBars.asPaddingValues()
+                    .calculateBottomPadding()
+            ),
         contentAlignment = Alignment.Center
     ) {
         FloatingBottomBar(
@@ -378,6 +415,7 @@ private fun AppleFloatingDock(
             onSelected = onSelected,
             backdrop = effectiveBackdrop,
             tabsCount = bottomNavDestinations.size,
+            isBlurEnabled = blurOn && backdrop != null,
             mode = mode
         ) {
             bottomNavDestinations.forEachIndexed { index, dest ->
@@ -390,6 +428,7 @@ private fun AppleFloatingDock(
                 }
                 FloatingBottomBarItem(
                     onClick = { onSelected(index) },
+                    modifier = Modifier.defaultMinSize(minWidth = 76.dp)
                 ) {
                     dev.shephard.player.ui.miuix.Icon(
                         imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
@@ -397,8 +436,9 @@ private fun AppleFloatingDock(
                     )
                     dev.shephard.player.ui.miuix.Text(
                         text = label,
-                        style = MiuixAppTheme.typography.labelSmall,
-                        maxLines = 1
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Visible
                     )
                 }
             }

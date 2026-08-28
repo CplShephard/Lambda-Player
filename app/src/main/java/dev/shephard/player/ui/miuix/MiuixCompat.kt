@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2025-2026 InstallerX Revived contributors
 @file:OptIn(ExperimentalFoundationApi::class)
 
 package dev.shephard.player.ui.miuix
@@ -11,11 +13,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -40,8 +44,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import dev.shephard.player.ui.theme.miuixSheetCardColorDark
+import dev.shephard.player.ui.theme.miuixSheetColorDark
+import dev.shephard.player.ui.theme.miuixSheetColorLight
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 @RequiresOptIn(level = RequiresOptIn.Level.WARNING)
 annotation class ExperimentalMaterial3Api
@@ -82,6 +91,10 @@ class MiuixColorScheme {
         @Composable get() = c.error
     val onError: Color
         @Composable get() = c.onError
+    val errorContainer: Color
+        @Composable get() = c.errorContainer
+    val onErrorContainer: Color
+        @Composable get() = c.onErrorContainer
     val outline: Color
         @Composable get() = c.outline
     val outlineVariant: Color
@@ -130,7 +143,6 @@ fun Text(
     color: Color = Color.Unspecified,
     style: TextStyle = MiuixAppTheme.typography.bodyMedium,
     fontWeight: FontWeight? = null,
-
     fontSize: TextUnit = TextUnit.Unspecified,
     textAlign: TextAlign? = null,
     maxLines: Int = Int.MAX_VALUE,
@@ -390,6 +402,56 @@ fun FilledTonalButton(
     modifier: Modifier = Modifier,
     content: @Composable RowScope.() -> Unit,
 ) = Button(onClick = onClick, modifier = modifier, content = content)
+
+@Composable
+fun MiuixDeleteConfirmationDialog(
+    show: Boolean,
+    title: String,
+    message: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    confirmText: String = "Delete",
+    cancelText: String = "Cancel",
+) {
+    WindowDialog(
+        show = show,
+        onDismissRequest = onDismiss,
+        title = title,
+        content = {
+            Column {
+                Text(
+                    text = message,
+                    color = MiuixTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    top.yukonga.miuix.kmp.basic.TextButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = onDismiss,
+                        text = cancelText
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    top.yukonga.miuix.kmp.basic.TextButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = onConfirm,
+                        text = confirmText,
+                        colors = ButtonDefaults.textButtonColors(
+                            color = MiuixTheme.colorScheme.errorContainer,
+                            textColor = MiuixTheme.colorScheme.error
+                        )
+                    )
+                }
+            }
+        }
+    )
+}
 
 @Composable
 fun MiuixDialog(
