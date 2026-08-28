@@ -21,15 +21,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/**
- * A minimal, single-line seek bar: thin track with a circular thumb,
- * matching a clean modern player aesthetic.
- *
- * [progress] is the current playback fraction (0f..1f), shown only while
- * the user is not actively dragging. While dragging, the thumb follows the
- * gesture directly for a fluid feel, and [onSeekPreview]/[onSeekFinished]
- * report the dragged fraction.
- */
 @Composable
 fun MinimalSeekBar(
     progress: Float,

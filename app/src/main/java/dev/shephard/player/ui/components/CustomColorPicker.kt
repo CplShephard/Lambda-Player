@@ -45,14 +45,6 @@ import kotlin.math.max
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import kotlin.math.min
 
-/**
- * Modal popup that lets the user pick a custom accent color via:
- *  1) A classic 2D saturation/value gradient palette with a draggable cursor
- *     (hue is selected by a separate slider below).
- *  2) A hex-code text field (#RRGGBB).
- *
- * The selected color is committed via [onColorPicked] as an ARGB int.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomColorPickerDialog(
@@ -83,10 +75,7 @@ fun CustomColorPickerDialog(
     MiuixDrawer(
         onDismissRequest = onDismiss,
     ) {
-        // MADDE — diğer drawer'lar gibi: sol tarafta × (cancel), sağ tarafta ✓ (apply)
-        // ikonları + dismiss animasyonu. `rememberDrawerDismiss()` kapanma animasyonunu
-        // kesilmeden oynatır. Ayrıca yükseklik 0.74 → 0.82'ye çıkarıldı ki hex alanı
-        // ve buton alttan kesilmesin.
+
         val dismissDrawer = rememberDrawerDismiss()
         Column(
             modifier = Modifier
@@ -99,8 +88,7 @@ fun CustomColorPickerDialog(
                     onCancel = dismissDrawer,
                     onConfirm = {
                         if (!hexError) {
-                            // MADDE 5 — Önce rengi kaydet, sonra dismissDrawer() ile kapanma
-                            // ANİMASYONUNU oynat (onDismissRequest üzerinden parent kapanır).
+
                             onColorPicked(pickedColor.toArgb())
                             dismissDrawer()
                         }
@@ -109,7 +97,6 @@ fun CustomColorPickerDialog(
                 )
                 Spacer(Modifier.height(16.dp))
 
-                // Preview swatch
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -243,7 +230,7 @@ private fun SaturationValueGrid(
                     colors = listOf(Color.Transparent, Color.Black)
                 )
             )
-            // Cursor
+
             val cx = saturation * size.width
             val cy = (1f - value) * size.height
             drawCircle(color = Color.Black, radius = 13f, center = Offset(cx, cy), style = Stroke(width = 2f))
@@ -295,8 +282,6 @@ private fun HueSlider(
         }
     }
 }
-
-// ----- helpers -----
 
 private fun rgbToHsv(argb: Int): FloatArray {
     val r = ((argb shr 16) and 0xFF) / 255f

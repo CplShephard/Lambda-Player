@@ -4,10 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
 
-/**
- * Reactive in-app localization. Switching language updates every label
- * immediately, with no activity / process restart.
- */
 data class Strings(
     val code: String,
     val displayName: String,
@@ -65,7 +61,7 @@ data class Strings(
     val lightMode: String,
     val autoMode: String,
     val dynamicColor: String,
-    // New strings
+
     val playlistsLayout: String,
     val musicsLayout: String,
     val grid: String,
@@ -122,24 +118,21 @@ data class Strings(
     val blurEffect: String,
     val blurEffectDescription: String,
     val layout: String,
-    // Theme Mode toggle'ının (Light/Dark/Auto seçtiren dropdown) BAŞLIĞI — önceden
-    // yanlışlıkla `darkMode` ("Dark mode") kullanılıyordu, oysa bu üç seçenekten sadece
-    // biri "dark mode", dropdown'ın kendisi genel bir tema modu seçicisidir.
+
     val themeMode: String,
-    // About sayfası — önceden tamamen hardcoded İngilizce'ydi, hiçbir dile çevrilmiyordu.
+
     val aboutSectionTitle: String,
     val github: String,
     val sourceCode: String,
     val miuixDescription: String,
     val backContentDescription: String,
-    // Settings ana sayfasındaki navigasyon kartlarının açıklama satırları (summary) ve
-    // About kartının kendi başlığı — önceden hardcoded İngilizce'ydi.
+
     val themeSettingsSummary: String,
     val playbackSettingsSummary: String,
     val aboutLambdaPlayerTitle: String,
     val aboutLambdaPlayerSummary: String,
     val wallpaperPreviewContentDescription: String,
-    // Stats sayfası (Flamingo Player'dan uyarlanan dinleme istatistikleri).
+
     val statsTitle: String,
     val statsPeriodToday: String,
     val statsPeriodThisWeek: String,
@@ -153,6 +146,23 @@ data class Strings(
     val statsTopTracks: String,
     val statsEmptyTitle: String,
     val statsEmptySubtitle: String,
+
+    val uiEngine: String = "UI Engine",
+    val miuixUi: String = "Miuix",
+    val googleUi: String = "Google",
+    val uiEngineDescription: String = "Choose which design language the app uses.",
+    val miuixCustomColors: String = "Miuix Custom Colors",
+    val miuixCustomColorsDescription: String = "Generate the whole Miuix palette from the seed color (Monet engine).",
+    val paletteStyle: String = "Palette Style",
+    val paletteStyleDescription: String = "Color generation style for the seed color.",
+    val colorSpec: String = "Color Spec",
+    val colorSpecDescription: String = "Color scheme specification version.",
+    val colorSpecOnly2021: String = "Current palette style only supports Spec 2021",
+    val appleFloatingBar: String = "Apple Floating Bar",
+    val appleFloatingBarDescription: String = "Use the floating pill dock instead of the Miuix navigation bar.",
+    val dynamicColorDescription: String = "Use the system wallpaper colors (Android 12+).",
+    val close: String = "Close",
+    val appearance: String = "Appearance",
 )
 
 private val EN = Strings(
@@ -185,7 +195,7 @@ private val EN = Strings(
     lightMode = "Light mode",
     autoMode = "Auto",
     dynamicColor = "Dynamic color",
-    // New
+
     playlistsLayout = "Playlists layout",
     musicsLayout = "Musics layout",
     grid = "Grid",

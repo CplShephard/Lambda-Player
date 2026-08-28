@@ -200,13 +200,13 @@ fun PlaylistScreen(
     val scope = rememberCoroutineScope()
     val strings = LocalStrings.current
 
-    val tracks by libraryViewModel.tracks.collectAsState()
+val tracks by libraryViewModel.tracks.collectAsState()
 
-    LaunchedEffect(Unit) {
+LaunchedEffect(Unit) {
         if (tracks.isEmpty()) libraryViewModel.loadTracks()
     }
 
-    val json by prefs.playlistsJson.collectAsState(initial = "[]")
+val json by prefs.playlistsJson.collectAsState(initial = "[]")
     val playlistsLayout by prefs.playlistsLayout.collectAsState(initial = LayoutMode.LIST)
     val likedSongIdsJson by prefs.likedSongIds.collectAsState(initial = "[]")
     val likedIds = remember(likedSongIdsJson) {
@@ -217,7 +217,7 @@ fun PlaylistScreen(
     val rawPlaylists = remember(json) { parsePlaylists(json) }
     val playlists = remember(rawPlaylists, strings) { ensureLikedSongsPlaylist(rawPlaylists, strings) }
 
-    LaunchedEffect(playlists) {
+LaunchedEffect(playlists) {
         if (rawPlaylists.isNotEmpty()) {
             val encoded = encodePlaylists(playlists)
             val currentEncoded = encodePlaylists(rawPlaylists)
@@ -227,16 +227,11 @@ fun PlaylistScreen(
         }
     }
 
-    var showCreate by remember { mutableStateOf(false) }
+var showCreate by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
     var openIndex by remember { mutableStateOf<Int?>(null) }
-    // Playlist detay ekranı görsel olarak Theme/Player/About ile aynı submenu animasyonunu
-    // paylaşıyor (bkz. aşağıdaki AnimatedContent, PageTransitions.enterSubmenu/exitSubmenu),
-    // ama NavGraph/backStack'in dışında kendi local `openIndex` state'iyle yönetiliyor. Bu
-    // yüzden NavGraph'taki SubmenuNavGuard fix'i buraya otomatik uygulanmıyordu — hızlıca bir
-    // playlist'e girip çıkıp başka birine girmek aynı "animasyon ortasında eski sahne arka
-    // planda takılı kalıyor" sorununu yaratıyordu. Aynı guard'ı burada da kuruyoruz.
-    val playlistDetailGuard = remember { SubmenuNavGuard() }
+
+val playlistDetailGuard = remember { SubmenuNavGuard() }
     var trackPickerForIndex by remember { mutableStateOf<Int?>(null) }
     var pickerSelected by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var showCoverPickerForIndex by remember { mutableStateOf<Int?>(null) }
@@ -246,17 +241,15 @@ fun PlaylistScreen(
     var showRemoveCoverConfirm by remember { mutableStateOf(false) }
     var showDeletePlaylistConfirm by remember { mutableStateOf(false) }
     var playlistToDelete by remember { mutableStateOf<LocalPlaylist?>(null) }
-    // Create playlist drawer'ı artık Edit drawer'ı ile aynı stilde: kapak fotoğrafı da
-    // eklenebiliyor. Aşağıdaki state/launcher'lar create akışına özel.
-    var newCoverUri by remember { mutableStateOf<Uri?>(null) }
+
+var newCoverUri by remember { mutableStateOf<Uri?>(null) }
     var showRemoveCreateCoverConfirm by remember { mutableStateOf(false) }
     var newCoverCropOutputUri by remember { mutableStateOf<Uri?>(null) }
 
-    // Playlist kapak resmi için kırpma çıktısı KALICI depolamaya (filesDir) yazılır.
-    var playlistCoverCropOutputUri by remember { mutableStateOf<Uri?>(null) }
+var playlistCoverCropOutputUri by remember { mutableStateOf<Uri?>(null) }
     var playlistCoverCropForIndex by remember { mutableStateOf<Int?>(null) }
 
-    val playlistCoverCropLauncher = rememberLauncherForActivityResult(
+val playlistCoverCropLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         val output = playlistCoverCropOutputUri
@@ -271,10 +264,9 @@ fun PlaylistScreen(
         playlistCoverCropForIndex = null
     }
 
-    fun launchPlaylistCoverCrop(sourceUri: Uri, index: Int) {
-        // GIF kapak desteği: crop her zaman statik JPEG üretir, animasyonu kaybettirir.
-        // GIF ise crop'u atlayıp mevcut "cropper yok" fallback mantığıyla olduğu gibi kaydet.
-        if (context.contentResolver.getType(sourceUri) == "image/gif") {
+fun launchPlaylistCoverCrop(sourceUri: Uri, index: Int) {
+
+if (context.contentResolver.getType(sourceUri) == "image/gif") {
             scope.launch {
                 val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, sourceUri)
                 if (persisted != null && index in playlists.indices) {
@@ -288,18 +280,18 @@ fun PlaylistScreen(
             return
         }
 
-        val dir = java.io.File(context.filesDir, "persisted_covers").apply { mkdirs() }
+val dir = java.io.File(context.filesDir, "persisted_covers").apply { mkdirs() }
         val file = java.io.File(dir, "playlist_cover_${System.currentTimeMillis()}.jpg")
         val outputUri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         playlistCoverCropOutputUri = outputUri
         playlistCoverCropForIndex = index
 
-        val cropIntent = android.content.Intent("com.android.camera.action.CROP").apply {
+val cropIntent = android.content.Intent("com.android.camera.action.CROP").apply {
             setDataAndType(sourceUri, "image/*")
             putExtra("crop", "true")
             putExtra("scale", true)
-            // Playlist kapakları her zaman 1:1 (kare) olmalı.
-            putExtra("outputX", 512)
+
+putExtra("outputX", 512)
             putExtra("outputY", 512)
             putExtra("aspectX", 1)
             putExtra("aspectY", 1)
@@ -311,7 +303,7 @@ fun PlaylistScreen(
             clipData = android.content.ClipData.newUri(context.contentResolver, "playlist_cover", sourceUri)
         }
 
-        val resolvedActivities = context.packageManager.queryIntentActivities(cropIntent, 0)
+val resolvedActivities = context.packageManager.queryIntentActivities(cropIntent, 0)
         for (info in resolvedActivities) {
             val packageName = info.activityInfo?.packageName ?: continue
             try {
@@ -323,7 +315,7 @@ fun PlaylistScreen(
             } catch (_: SecurityException) { }
         }
 
-        if (resolvedActivities.isNotEmpty()) {
+if (resolvedActivities.isNotEmpty()) {
             playlistCoverCropLauncher.launch(cropIntent)
         } else {
             scope.launch {
@@ -339,7 +331,7 @@ fun PlaylistScreen(
         }
     }
 
-    val coverPicker = rememberLauncherForActivityResult(
+val coverPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
@@ -357,8 +349,7 @@ fun PlaylistScreen(
         }
     }
 
-    // Create playlist için kapak kırpma akışı (Edit drawer'daki ile aynı desen).
-    val newCoverCropLauncher = rememberLauncherForActivityResult(
+val newCoverCropLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         val output = newCoverCropOutputUri
@@ -367,9 +358,9 @@ fun PlaylistScreen(
         }
     }
 
-    fun launchNewCoverCrop(sourceUri: Uri) {
-        // GIF kapak desteği: crop her zaman statik JPEG üretir, animasyonu kaybettirir.
-        if (context.contentResolver.getType(sourceUri) == "image/gif") {
+fun launchNewCoverCrop(sourceUri: Uri) {
+
+if (context.contentResolver.getType(sourceUri) == "image/gif") {
             scope.launch {
                 val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, sourceUri)
                 if (persisted != null) newCoverUri = persisted
@@ -377,17 +368,17 @@ fun PlaylistScreen(
             return
         }
 
-        val dir = java.io.File(context.filesDir, "persisted_covers").apply { mkdirs() }
+val dir = java.io.File(context.filesDir, "persisted_covers").apply { mkdirs() }
         val file = java.io.File(dir, "playlist_cover_${System.currentTimeMillis()}.jpg")
         val outputUri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         newCoverCropOutputUri = outputUri
 
-        val cropIntent = android.content.Intent("com.android.camera.action.CROP").apply {
+val cropIntent = android.content.Intent("com.android.camera.action.CROP").apply {
             setDataAndType(sourceUri, "image/*")
             putExtra("crop", "true")
             putExtra("scale", true)
-            // Playlist kapakları her zaman 1:1 (kare) olmalı.
-            putExtra("outputX", 512)
+
+putExtra("outputX", 512)
             putExtra("outputY", 512)
             putExtra("aspectX", 1)
             putExtra("aspectY", 1)
@@ -399,7 +390,7 @@ fun PlaylistScreen(
             clipData = android.content.ClipData.newUri(context.contentResolver, "playlist_cover", sourceUri)
         }
 
-        val resolvedActivities = context.packageManager.queryIntentActivities(cropIntent, 0)
+val resolvedActivities = context.packageManager.queryIntentActivities(cropIntent, 0)
         for (info in resolvedActivities) {
             val packageName = info.activityInfo?.packageName ?: continue
             try {
@@ -411,7 +402,7 @@ fun PlaylistScreen(
             } catch (_: SecurityException) { }
         }
 
-        if (resolvedActivities.isNotEmpty()) {
+if (resolvedActivities.isNotEmpty()) {
             newCoverCropLauncher.launch(cropIntent)
         } else {
             scope.launch {
@@ -421,7 +412,7 @@ fun PlaylistScreen(
         }
     }
 
-    val newCoverPicker = rememberLauncherForActivityResult(
+val newCoverPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
@@ -435,52 +426,37 @@ fun PlaylistScreen(
         }
     }
 
-    if (openIndex != null && openIndex !in playlists.indices) {
+if (openIndex != null && openIndex !in playlists.indices) {
         openIndex = null
     }
 
-    if (playlistMenuIndex != null && playlistMenuIndex !in playlists.indices) {
+if (playlistMenuIndex != null && playlistMenuIndex !in playlists.indices) {
         playlistMenuIndex = null
     }
 
-    LaunchedEffect(playlists) {
+LaunchedEffect(playlists) {
         if (editPlaylistIndex != null && editPlaylistIndex !in playlists.indices) {
             editPlaylistIndex = null
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = openIndex != null) {
+androidx.activity.compose.BackHandler(enabled = openIndex != null) {
         playlistDetailGuard.pop { openIndex = null }
     }
 
-    // Playlist detayı kendi arkaplanı OPAK (background) olduğu için açıkken solid görünür.
-    // Not: Buraya eskiden detay açıkken tüm alanı siyah kaplayan bir overlay eklenmişti ama
-    // o, ana PlaylistListView'deki duvar kağıdını da karartıyordu ("playlist detail'e girerken
-    // ana ekrandaki duvar kağıdı siyah oluyor" sorunu). Overlay kaldırıldı — detay kendi opak
-    // ekranı; ana liste her zamanki duvar kağıdını göstermeye devam ediyor.
-
-    // MADDE 2 (bu tur) — playlist detayına girerken artık Theme/Playback/About sayfalarının
-    // kullandığı GERÇEK Miuix NavDisplay varsayılan geçişi kullanılıyor (enterPush/exitPush
-    // DEĞİL — o, InstallerX'in eski NavHost döneminden kalma bir taklitti ve kullanıcı
-    // "saçma sapan" bularak bunun yerine Theme/Playback/About'un animasyonunu istedi).
-    androidx.compose.animation.AnimatedContent(
+androidx.compose.animation.AnimatedContent(
         targetState = openIndex,
         transitionSpec = {
             if (targetState != null) {
-                // Detaya giriş: Theme/Playback/About'a girerken kullanılan animasyonun aynısı.
-                // targetContentZIndex=1 → detay (giren, target) HER ZAMAN üstte kalır; liste
-                // (header + create FAB dahil) altta kalır ve detay örter.
-                androidx.compose.animation.ContentTransform(
+
+androidx.compose.animation.ContentTransform(
                     targetContentEnter = PageTransitions.enterSubmenu,
                     initialContentExit = PageTransitions.exitSubmenu,
                     targetContentZIndex = 1f
                 )
             } else {
-                // MADDE 4 — KAPANIŞ animasyonunda detay (initial, çıkan) listeye (target) ARKA
-                // düşmemeli. AnimatedContent varsayılan olarak target'ı üste koyuyor; kapanırken
-                // targetContentZIndex=0 yapınca target (liste) altta kalır, initial (detay) üstte
-                // kayar. (Bu Compose sürümünde yalnızca targetContentZIndex parametresi var.)
-                androidx.compose.animation.ContentTransform(
+
+androidx.compose.animation.ContentTransform(
                     targetContentEnter = PageTransitions.popEnterSubmenu,
                     initialContentExit = PageTransitions.popExitSubmenu,
                     targetContentZIndex = 0f
@@ -489,10 +465,8 @@ fun PlaylistScreen(
         },
         label = "playlistNav"
     ) { idx ->
-    // MADDE 4 — KAPANIŞ animasyonunda detay (initial) listeye (target) ARKA düşmemeli.
-    // AnimatedContent varsayılan olarak target'ı üste koyduğu için kapanırken liste detayın
-    // önüne geçiyordu. transitionSpec'te targetContentZIndex=0 yapınca detay (çıkan) üstte kalır.
-    if (idx == null) {
+
+if (idx == null) {
         PlaylistListView(
             playlists = playlists,
             tracks = tracks,
@@ -559,16 +533,13 @@ fun PlaylistScreen(
     }
     }
 
-    if (showCreate) {
+if (showCreate) {
         val createLiquidGlassOn = LocalBlurEnabled.current
         MiuixDrawer(
             onDismissRequest = { showCreate = false },
         ) {
-            // MADDE 6 — Create playlist drawer'ı artık Edit playlist drawer'ı ile AYNI stilde:
-            //  * MiuixDrawerActionHeader (✓ / × ikonları),
-            //  * ortalanmış 1:1 (168dp) kapak fotoğrafı — tıklayınca seçilir,
-            //  * sabit `heightIn` yok, içerik kadar yer kaplıyor.
-            val dismissDrawer = rememberDrawerDismiss()
+
+val dismissDrawer = rememberDrawerDismiss()
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -647,16 +618,14 @@ fun PlaylistScreen(
         }
     }
 
-    val pickerIdx = trackPickerForIndex
+val pickerIdx = trackPickerForIndex
     if (pickerIdx != null) {
         val pickerLiquidGlassOn = LocalBlurEnabled.current
         MiuixDrawer(
             onDismissRequest = { trackPickerForIndex = null },
         ) {
-            // MADDE 5 — "add tracks" drawer'ı diğer drawer'lar gibi: üstte × (cancel) / ✓ (apply)
-            // ikonları + kapanış animasyonu (rememberDrawerDismiss). Alt kısımdaki yazı
-            // Save/Cancel kaldırıldı, yerine MiuixDrawerActionHeader.
-            val dismissDrawer = rememberDrawerDismiss()
+
+val dismissDrawer = rememberDrawerDismiss()
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -719,8 +688,7 @@ fun PlaylistScreen(
         }
     }
 
-    // Playlist menu drawer
-    val menuIdx = playlistMenuIndex
+val menuIdx = playlistMenuIndex
     if (menuIdx != null) {
         val pl = playlists[menuIdx]
         val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
@@ -728,8 +696,8 @@ fun PlaylistScreen(
         MiuixDrawer(
             onDismissRequest = { playlistMenuIndex = null },
         ) {
-            // MADDE 6 — playlist menüsünde üç satır var; içerik kadar yer kaplıyor.
-            Column(
+
+Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
@@ -826,24 +794,17 @@ fun PlaylistScreen(
         }
     }
 
-    // Edit playlist name
-    val editIdx = editPlaylistIndex
+val editIdx = editPlaylistIndex
     if (editIdx != null) {
         val editLiquidGlassOn = LocalBlurEnabled.current
         val editingPlaylist = playlists.getOrNull(editIdx)
         MiuixDrawer(
             onDismissRequest = { editPlaylistIndex = null },
         ) {
-            // ÖNEMLİ: onCancel/onConfirm'de doğrudan `editPlaylistIndex = null` yerine
-            // `rememberDrawerDismiss()` kullanıyoruz — aksi halde MiuixDrawer'ın çıkış
-            // animasyonu (visible=false → WindowBottomSheet exit) hiç oynamadan drawer
-            // aniden composition'dan kalkıyordu.
-            val dismissDrawer = rememberDrawerDismiss()
-            // MADDE 4 + MADDE 6 — Playlist düzenleme drawer'ı:
-            //  * artık kapak düzenleme alanı da burada ve 1:1 (kare),
-            //  * Cancel/Save yazı butonları yerine Miuix'in × / ✓ ikonları,
-            //  * sabit `heightIn(min = 260.dp)` kaldırıldı; içerik kadar yer kaplıyor.
-            Column(
+
+val dismissDrawer = rememberDrawerDismiss()
+
+Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 12.dp)
@@ -940,7 +901,7 @@ fun PlaylistScreen(
         }
     }
 
-    if (showRemoveCoverConfirm) {
+if (showRemoveCoverConfirm) {
         dev.shephard.player.ui.miuix.MiuixDialog(
             onDismissRequest = { showRemoveCoverConfirm = false },
             title = strings.removeCover,
@@ -1001,7 +962,7 @@ fun PlaylistScreen(
         )
     }
 
-    if (showRemoveCreateCoverConfirm) {
+if (showRemoveCreateCoverConfirm) {
         dev.shephard.player.ui.miuix.MiuixDialog(
             onDismissRequest = { showRemoveCreateCoverConfirm = false },
             title = strings.removeCover,
@@ -1056,7 +1017,7 @@ fun PlaylistScreen(
         )
     }
 
-    if (showDeletePlaylistConfirm && playlistToDelete != null) {
+if (showDeletePlaylistConfirm && playlistToDelete != null) {
         dev.shephard.player.ui.miuix.MiuixDialog(
             onDismissRequest = { showDeletePlaylistConfirm = false; playlistToDelete = null },
             title = strings.delete,
@@ -1160,9 +1121,9 @@ private fun PlaylistListView(
 ) {
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-    // MADDE 4+ — Playlists ana sekmeleri de artık InstallerX tarzı LARGE header kullanıyor.
-    Scaffold(
+Box(modifier = Modifier.fillMaxSize()) {
+
+Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -1298,7 +1259,7 @@ private fun PlaylistListView(
         }
     }
 
-    FloatingActionButton(
+FloatingActionButton(
         onClick = onCreate,
         modifier = Modifier
             .align(Alignment.BottomEnd)
@@ -1332,8 +1293,8 @@ private fun PlaylistListCard(
             .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
             .then(
-                // Liste elemanı: pahalı GPU blur yerine ucuz yarı saydam tint (performans)
-                Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
+
+Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
             )
     ) {
         Row(
@@ -1351,8 +1312,8 @@ private fun PlaylistListCard(
                 val firstArt = coverUri ?: plTracks.firstOrNull()?.albumArtUri
                 var artLoaded by remember(firstArt) { mutableStateOf(false) }
                 if (playlist.isSystem) {
-                    // Fixed Liked Songs cover
-                    Box(
+
+Box(
                         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp))
                             .background(Brush.linearGradient(
                                 colors = listOf(
@@ -1385,9 +1346,9 @@ private fun PlaylistListCard(
                 }
             }
 
-            Spacer(Modifier.width(12.dp))
+Spacer(Modifier.width(12.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
+Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = if (playlist.isSystem) strings.likedSongs else playlist.name,
                     style = MiuixAppTheme.typography.titleMedium,
@@ -1434,8 +1395,8 @@ private fun PlaylistGridCard(
             .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
             .then(
-                // Liste elemanı: pahalı GPU blur yerine ucuz yarı saydam tint (performans)
-                Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
+
+Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
             )
             .padding(12.dp)
     ) {
@@ -1498,8 +1459,8 @@ private fun PlaylistGridCard(
                     .size(36.dp)
                     .clip(CircleShape)
                     .then(
-                        // Liste elemanı: pahalı GPU blur yerine ucuz yarı saydam tint (performans)
-                        Modifier.background(MiuixAppTheme.colorScheme.primary)
+
+Modifier.background(MiuixAppTheme.colorScheme.primary)
                     )
                     .bounceClick { onPlay() },
                 contentAlignment = Alignment.Center
@@ -1507,11 +1468,8 @@ private fun PlaylistGridCard(
                 Icon(
                     imageVector = Icons.Filled.PlayArrow,
                     contentDescription = strings.play,
-                    // MADDE 11 — daire accent (primary) renkle dolduruluyor ama ikon,
-                    // Liquid Glass AÇIKKEN yine `primary` ile boyanıyordu: accent üstüne
-                    // accent = görünmez ikon, yani "içi boş daire". Dolgu her iki durumda
-                    // da `primary` olduğuna göre ikon HER ZAMAN `onPrimary` olmalı.
-                    tint = MiuixAppTheme.colorScheme.onPrimary,
+
+tint = MiuixAppTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -1532,11 +1490,6 @@ private fun PlaylistGridCard(
     }
 }
 
-/**
- * Playlist detail'e özel başlık: diğer header'lar gibi aşağı kaydırınca isim küçülüp ORTADA
- * belirir; sadece playlistdetail'de ismin HEMEN SOLUNDA küçük kapak resmi de görünür.
- * Kaydırdıkça (collapseFraction arttıkça) arkaplan koyulaşır ve başlık+kapak ortada belirir.
- */
 @Composable
 private fun PlaylistDetailTopBar(
     title: String,
@@ -1566,8 +1519,8 @@ private fun PlaylistDetailTopBar(
             .height(52.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Geri tuşu (sol)
-        Box(
+
+Box(
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .padding(start = 12.dp)
@@ -1583,8 +1536,8 @@ private fun PlaylistDetailTopBar(
                 tint = cs.onBackground
             )
         }
-        // Ortalanmış küçük başlık + kapak (kaydırınca belirir)
-        Row(
+
+Row(
             modifier = Modifier.graphicsLayer { alpha = collapse },
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1628,49 +1581,25 @@ internal fun PlaylistDetailView(
     onChangeSort: (String) -> Unit = {}
 ) {
     val liquidGlassOn = LocalBlurEnabled.current
-    // Diğer sayfalardaki (CollapsingTopBarState.pageBackdrop) desenle aynı: bu sayfaya
-    // özel bir backdrop, aşağıdaki LazyColumn içeriğini yakalayıp PlaylistDetailTopBar'ın
-    // gerçek blur uygulaması için kullanıyor.
-    val detailPageBackdrop = if (liquidGlassOn) rememberLayerBackdrop() else null
 
-    // OuterTune'daki LocalPlaylistScreen deseni: gerçek liste mutableStateListOf,
-    // reorderableState onMove callback'i doğrudan bu listeyi günceller, drag bitince
-    // (isAnyItemDragging false olunca) tek seferde onReorder tetiklenir.
-    //
-    // ÖNEMLİ BUGFIX: plTracks, üst ekranda tracks/likedIds değiştikçe (remember key'leri
-    // yüzünden) sürükleme sırasında bile YENİDEN oluşan bir liste. Bu yüzden LaunchedEffect(plTracks)
-    // her tetiklendiğinde reorderItems'ı resetlemek, kullanıcı henüz parmağını kaldırmadan
-    // listeyi eski sıraya döndürüp item'ların "iç içe girmesine" (index kayması, yanlış item'ın
-    // sürüklenmesi) sebep oluyordu. Çözüm: aktif drag sırasında (isAnyItemDragging) hiçbir zaman
-    // resetleme yapma; sadece drag bitmişken ve gerçekten farklı bir veri geldiğinde senkronize et.
-    // (Bu blok, Lambda Player 5.0'daki doğrulanmış dragging koduyla birebir aynıdır.)
-    val reorderItems = remember { mutableStateListOf<AudioTrack>() }
+val detailPageBackdrop = if (liquidGlassOn) rememberLayerBackdrop() else null
+
+val reorderItems = remember { mutableStateListOf<AudioTrack>() }
     var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var isReordering by remember { mutableStateOf(false) }
-    // GLITCH FIX: drag bırakıldığında reorderItems zaten DOĞRU (yeni) sırada duruyor ve
-    // onReorder(reorderItems) çağrılıp ViewModel'e asenkron yazılıyor. Ama bu yazmanın
-    // sonucu (güncellenmiş plTracks) state'e geri yansımadan ÖNCE, aynı recomposition'da
-    // `isReordering` zaten false olduğu için senkron efekti tetikleniyor ve o an plTracks
-    // HÂLÂ ESKİ (reorder öncesi) sırada olduğundan "eşleşmiyor" diye reorderItems'ı eski
-    // sıraya RESETLİYORDU — kullanıcı parmağını kaldırınca öğenin yarım saniyeliğine eski
-    // yerine zıplayıp sonra tekrar doğru yere gelmesinin sebebi tam olarak buydu. Çözüm:
-    // tam olarak hangi sıralamayı commit ettiğimizi ayrı tutup, plTracks o sıralamaya
-    // GERÇEKTEN ulaşana kadar (yani DataStore/ViewModel yankısı gelene kadar) senkron
-    // efektini atlıyoruz — böylece ara/stale plTracks hiçbir zaman reorderItems'ı geçersiz
-    // kılamıyor.
-    var pendingCommittedOrder by remember { mutableStateOf<List<Long>?>(null) }
 
-    LaunchedEffect(plTracks, isReordering) {
+var pendingCommittedOrder by remember { mutableStateOf<List<Long>?>(null) }
+
+LaunchedEffect(plTracks, isReordering) {
         if (isReordering) return@LaunchedEffect
         val pending = pendingCommittedOrder
         if (pending != null) {
             if (plTracks.map { it.id } == pending) {
-                // ViewModel/DataStore artık bizim commit ettiğimiz sırayı yansıtıyor —
-                // beklemeyi bitir, normal senkronizasyona dön.
-                pendingCommittedOrder = null
+
+pendingCommittedOrder = null
             }
-            // plTracks henüz eski (stale) sıradaysa, reorderItems'a DOKUNMA — zaten doğru.
-            return@LaunchedEffect
+
+return@LaunchedEffect
         }
         if (reorderItems.map { it.id } != plTracks.map { it.id }) {
             reorderItems.clear()
@@ -1678,16 +1607,9 @@ internal fun PlaylistDetailView(
         }
     }
 
-    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    // ÖNEMLİ BUGFIX: reorderableState'in verdiği from.index / to.index, LazyColumn'daki TÜM
-    // item'lara göre mutlak konumdur (header, kapak/butonlar, sort selector gibi sürüklenemeyen
-    // item{} blokları dahil). reorderItems ise sadece parça listesini tutar ve bu header'ları
-    // içermez. İkisi arasındaki index farkını düzeltmezsek yanlış öğe taşınır/kaldırılır —
-    // dokunulan öğe yerinden oynamaz, komşu satırlar ise (yanlışlıkla) titreşerek tepki verir.
-    // Bu ekranda reorderable item'lardan önce İKİ ayrı item{} bloğu var: (1) geri tuşu + başlık/
-    // parça sayısı satırı, (2) kapak resmi + play/remix/add-tracks butonları + sıralama seçici.
-    // Bu yüzden sabit offset 2.
-    val reorderableHeaderItemCount = 2
+val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+
+val reorderableHeaderItemCount = 2
     val reorderableState = rememberReorderableLazyListState(
         lazyListState = listState
     ) { from, to ->
@@ -1706,9 +1628,8 @@ internal fun PlaylistDetailView(
     LaunchedEffect(reorderableState.isAnyItemDragging) {
         isReordering = reorderableState.isAnyItemDragging
         if (reorderableState.isAnyItemDragging) {
-            // Yeni bir drag başladı: önceki commit'in yankısını beklemeyi bırak, artık
-            // reorderItems zaten kullanıcının şu anki sürüklemesiyle güncelleniyor.
-            pendingCommittedOrder = null
+
+pendingCommittedOrder = null
         }
         if (!reorderableState.isAnyItemDragging) {
             dragInfo?.let { (from, to) ->
@@ -1721,15 +1642,7 @@ internal fun PlaylistDetailView(
         }
     }
 
-    // MADDE 5 + 2 (bu tur) — Playlist detayı artık Theme/Playback/About ile birebir aynı
-    // header'ı (SubmenuTopBar: SmallTopAppBar + geri tuşu + kaydırdıkça ortada beliren başlık)
-    // ve aynı düz (flat) opak arkaplanı kullanıyor.
-    //
-    // MADDE 4 — Scroll düzeltmesi: Özel PlaylistDetailTopBar bir Miuix scrollBehavior kullanmıyor;
-    // o yüzden LazyColumn'a nestedScroll eklenmedi (aksi halde scrollBehavior.heightOffsetLimit
-    // -Float.MAX_VALUE kalıp TÜM kaydırmayı yutar ve liste hiç kaymazdı). Bunun yerine collapse
-    // değerini LazyColumn'un KENDİ scroll pozisyonundan hesaplıyoruz.
-    val detailTitle = if (playlist.isSystem) strings.likedSongs else playlist.name
+val detailTitle = if (playlist.isSystem) strings.likedSongs else playlist.name
     val detailCollapse by remember {
         derivedStateOf {
             val index = listState.firstVisibleItemIndex
@@ -1742,9 +1655,8 @@ internal fun PlaylistDetailView(
             .fillMaxSize()
             .background(MiuixAppTheme.colorScheme.background)
     ) {
-        // MADDE 8 — playlist detail'e özel başlık: kapak resmi ismin solunda küçük görünür,
-        // kaydırınca isim küçülüp ortada belirir.
-        PlaylistDetailTopBar(
+
+PlaylistDetailTopBar(
             title = detailTitle,
             cover = playlist.coverUri?.let { Uri.parse(it) }
                 ?: plTracks.firstOrNull()?.albumArtUri,
@@ -1761,10 +1673,8 @@ internal fun PlaylistDetailView(
                 .fillMaxSize()
                 .overScrollVertical(),
             contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
-            // MADDE 2 — alphabetical / artist / timeAdded sıralamalarında parça kartları
-            // dipdibe duruyor, arka plandaki card'lar iç içe geçmiş gibi görünüyordu.
-            // MusicScreen'in liste görünümündeki ile aynı nefes payını veriyoruz.
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+
+verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             item {
                 Text(
@@ -1784,7 +1694,7 @@ internal fun PlaylistDetailView(
                 )
             }
 
-            item {
+item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1844,17 +1754,15 @@ internal fun PlaylistDetailView(
                         )
                     }
                     }
-                    } // end else (!isSystem)
+                    }
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // MADDE 6 — Play / Remix / Add butonları SOLID yapıldı (blurSurface kaldırıldı).
-                    // Play butonu her zaman primary zemin + BEYAZ ikon/yazı (remix/add gibi değil,
-                    // kullanıcı beyaz istedi).
-                    Row(
+
+Row(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(14.dp))
@@ -1920,8 +1828,8 @@ internal fun PlaylistDetailView(
                         }
                     }
                 }
-                // Sort selector
-                if (!playlist.isSystem) {
+
+if (!playlist.isSystem) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1950,7 +1858,7 @@ internal fun PlaylistDetailView(
                 }
             }
 
-            if (plTracks.isEmpty()) {
+if (plTracks.isEmpty()) {
                 item {
                     Text(
                         text = if (playlist.isSystem) "No liked songs yet" else "No tracks yet. Tap \"${strings.addTracks}\".",
@@ -2002,8 +1910,8 @@ private fun PlaylistTrackRow(
             .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
             .then(
-                // Liste elemanı: pahalı GPU blur yerine ucuz yarı saydam tint (performans)
-                Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
+
+Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
             )
             .padding(vertical = 8.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -2065,12 +1973,8 @@ private fun DraggablePlaylistTrackRow(
         targetValue = if (isDragged) 6.dp else 0.dp,
         label = "playlistItemElevation"
     )
-    // MADDE 3 — custom sıralamada, diğer üç sıralamanın aksine parçaların arkasında hiç
-    // kart yoktu (arka plan `Color.Transparent`'tı). Artık `PlaylistTrackRow` ile BİREBİR
-    // aynı kartı kullanıyor: aynı köşe yarıçapı (20.dp) ve aynı yarı saydam
-    // surfaceVariant dolgusu. Sürükleme sırasında bunun ÜSTÜNE accent tint biniyor,
-    // böylece taşınan öğe hâlâ ayırt edilebiliyor.
-    val rowShape = RoundedCornerShape(20.dp)
+
+val rowShape = RoundedCornerShape(20.dp)
     val cardColor = MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
     Row(
         modifier = Modifier

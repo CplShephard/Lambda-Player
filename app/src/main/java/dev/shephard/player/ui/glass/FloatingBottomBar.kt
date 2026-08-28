@@ -1,13 +1,6 @@
-// Adapted from InstallerX Revived (GPL-3.0-only)
+
 // Copyright (C) 2025-2026 InstallerX Revived contributors
-//
-// Originally adapted from compose-miuix-ui example (IosLiquidGlassNavigationBar) — Apache 2.0.
-// Portions of the migration follow KernelSU commit f261dc4a3dc3f137ebbf38cd1fcbd06d2858c494.
-//
-// Port notes for Lambda Player: the physics, gesture handling, backdrop pipeline, shader
-// effects and layer structure are kept byte-for-byte identical to InstallerX. Only the
-// theming source was swapped from Miuix's own `MiuixTheme`/`InstallerTheme` to Material 3,
-// because Lambda Player has no Miuix theme tree. Everything visual/behavioural is 1:1.
+
 package dev.shephard.player.ui.glass
 
 import android.os.Build
@@ -90,7 +83,6 @@ import top.yukonga.miuix.kmp.theme.LocalContentColor as MiuixLocalContentColor
 val LocalFloatingBottomBarContentColor = staticCompositionLocalOf { Color.Unspecified }
 val LocalFloatingBottomBarTabScale = staticCompositionLocalOf { { 1f } }
 
-// State class holding all colors for the bottom bar
 @Immutable
 class FloatingBottomBarColors(
     val containerColor: Color,
@@ -99,7 +91,6 @@ class FloatingBottomBarColors(
     val activeContentColor: Color
 )
 
-// Defaults object for creating the Colors instance
 object FloatingBottomBarDefaults {
     @Composable
     fun colors(
@@ -141,12 +132,10 @@ private val iosIndicatorSpecular: Highlight = Highlight(
     ),
 )
 
-// Mirrors miuix-blur HighlightStyle's LIGHT_REF — keep in sync.
 private const val LIGHT_REF_X = 0.5f
 private const val LIGHT_REF_Y = 0.7f
-private const val GRAVITY_DIR_THRESHOLD_SQ = 0.01f // |g_xy| > 0.1, ≈ 6° tilt
+private const val GRAVITY_DIR_THRESHOLD_SQ = 0.01f
 
-/** Tracks gravity for a `dualPeak` highlight's primary light, with an extra UV-clockwise offset on top. */
 @Composable
 private fun rememberGravityRotatedHighlight(
     base: Highlight,
@@ -190,7 +179,7 @@ fun RowScope.FloatingBottomBarItem(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val scale = LocalFloatingBottomBarTabScale.current
-    // Read the dynamic color from the bottom bar layer
+
     val contentColor = LocalFloatingBottomBarContentColor.current
 
     Column(
@@ -312,11 +301,6 @@ fun FloatingBottomBar(
         ).also { holder.instance = it }
     }
 
-    // Route/tap senkronizasyonu: selectedIndex bir lambda olduğu için snapshotFlow içinde
-    // okumak güvenilir değil; lambda çoğu çağıranda normal bir Int'i kapatıyor ve snapshot
-    // state okumuyor. Değeri kompozisyon sırasında Int olarak alıp LaunchedEffect'i bu gerçek
-    // değerle key'liyoruz. Böylece sekmeye TAP yapınca sayfa değişir değişmez indicator da
-    // aynı frame'de doğru sekmeye animasyonlanır.
     var isExternalIndexUpdate by remember { mutableStateOf(false) }
     val selectedIndexValue = selectedIndex().coerceIn(0, tabsCount - 1)
 
@@ -339,8 +323,6 @@ fun FloatingBottomBar(
         }
     }
 
-    // Keep the same compatibility guard as the InstallerX implementation:
-    // the AGSL RuntimeShader used by InteractiveHighlight needs API 33+.
     val interactiveHighlight =
         if (isLiquidGlassMode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             remember(animationScope, tabWidthPx) {
@@ -368,8 +350,7 @@ fun FloatingBottomBar(
         modifier = modifier.width(IntrinsicSize.Min),
         contentAlignment = Alignment.CenterStart
     ) {
-        // Base layer (Unselected state)
-        // Provide the default content color to this layer
+
         CompositionLocalProvider(LocalFloatingBottomBarContentColor provides colors.contentColor) {
             Row(
                 Modifier
@@ -537,10 +518,10 @@ fun FloatingBottomBar(
                         .background(colors.indicatorColor.copy(alpha = 0.15f), pillShape)
                         .height(56.dp)
                         .width(tabWidthDp),
-                    // Force start alignment for the Box container to prevent centering
+
                     contentAlignment = Alignment.CenterStart
                 ) {
-                    // Provide the active content color to the non-blur active layer
+
                     CompositionLocalProvider(LocalFloatingBottomBarContentColor provides colors.activeContentColor) {
                         Row(
                             Modifier

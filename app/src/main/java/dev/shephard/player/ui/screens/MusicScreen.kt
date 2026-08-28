@@ -123,20 +123,15 @@ fun MusicScreen(
     var trackToDelete by remember { mutableStateOf<AudioTrack?>(null) }
     val scope = rememberCoroutineScope()
 
-    // Tracks the file we're waiting on the system consent dialog to delete, so we
-    // can retry the delete after consent (required on Android 10) and rescan.
     var pendingDeleteUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
-    // Handles the system consent dialog shown when deleting media files the app
-    // does not own (Android 10+). On approval we retry the delete then rescan.
     val deleteConsentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
         val uri = pendingDeleteUri
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             scope.launch(Dispatchers.IO) {
-                // On Android 11+ the file is already gone; on Android 10 consent only
-                // granted permission, so retry the delete before refreshing the list.
+
                 uri?.let { runCatching { context.contentResolver.delete(it, null, null) } }
                 withContext(Dispatchers.Main) { libraryViewModel.loadTracks() }
             }
@@ -146,9 +141,6 @@ fun MusicScreen(
 
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
 
-    // MADDE 4+ — Music artık Theme/Playback/About gibi Lambda'nın kendi küçük başlığını değil,
-    // InstallerX'in Theme/Installer/Uninstaller ayar sayfalarındaki LARGE header desenini
-    // kullanıyor: başlık SOL ÜSTTE büyük durur, kaydırdıkça küçülüp app bar'ın ortasında belirir.
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = Color.Transparent,
@@ -231,14 +223,12 @@ fun MusicScreen(
         }
     }
 
-    // Track menu bottom sheet
     selectedTrackForMenu?.let { track ->
         val menuLiquidGlassOn = LocalBlurEnabled.current
         MiuixDrawer(
             onDismissRequest = { selectedTrackForMenu = null },
         ) {
-            // MADDE 6 — bu menüde sadece iki satır var; ekranın %88'ini kaplaması
-            // gereksizdi. İçerik kadar yer kaplıyor.
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -303,7 +293,6 @@ fun MusicScreen(
         }
     }
 
-    // Delete confirmation (Pop-up dialog)
     trackToDelete?.let { track ->
         dev.shephard.player.ui.miuix.MiuixDialog(
             onDismissRequest = { trackToDelete = null },
@@ -391,7 +380,6 @@ fun MusicScreen(
         )
     }
 
-    // Edit music drawer
     trackToEdit?.let { track ->
         EditMusicDrawer(
             track = track,
@@ -415,7 +403,7 @@ private fun GridTrackCard(
             .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
             .then(
-                // Liste elemanı: pahalı GPU blur yerine ucuz yarı saydam tint (performans)
+
                 Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
             )
             .padding(8.dp)
@@ -482,7 +470,7 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
             .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
             .then(
-                // Liste elemanı: pahalı GPU blur yerine ucuz yarı saydam tint (performans)
+
                 Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
             )
             .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -565,9 +553,8 @@ private fun EditMusicDrawer(
     var showRemoveCoverConfirm by remember { mutableStateOf(false) }
     val coverScope = rememberCoroutineScope()
 
-    // Kapak resmi için kırpma çıktısı KALICI depolamaya (filesDir) yazılır -- kapaklar da
-    // wallpaper gibi metin tercihleri kadar kalıcı olmalı, sadece seçilen content:// URI'sine
-    // güvenmek yerine kendi kopyamızı tutuyoruz.
+    // wallpaper gibi metin tercihleri kadar kalıcı olmalı, sadece seçilen content:
+
     var coverCropOutputUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
     val coverCropLauncher = rememberLauncherForActivityResult(
@@ -580,9 +567,7 @@ private fun EditMusicDrawer(
     }
 
     fun launchCoverCrop(sourceUri: android.net.Uri) {
-        // GIF kapak desteği: sistem cropper'ı her zaman statik JPEG çıktısı üretir, bu da
-        // animasyonu tamamen kaybettirir. GIF seçildiyse crop'u atlayıp dosyayı olduğu gibi
-        // (kare olmasa bile) kalıcı depolamaya kopyalıyoruz — animasyon korunur.
+
         val mimeType = context.contentResolver.getType(sourceUri)
         if (mimeType == "image/gif") {
             coverScope.launch {
@@ -601,7 +586,7 @@ private fun EditMusicDrawer(
             setDataAndType(sourceUri, "image/*")
             putExtra("crop", "true")
             putExtra("scale", true)
-            // Kapak resimleri her zaman 1:1 (kare) olmalı.
+
             putExtra("outputX", 512)
             putExtra("outputY", 512)
             putExtra("aspectX", 1)
@@ -629,7 +614,7 @@ private fun EditMusicDrawer(
         if (resolvedActivities.isNotEmpty()) {
             coverCropLauncher.launch(cropIntent)
         } else {
-            // Sistem cropper'ı yoksa seçilen görseli olduğu gibi kalıcı depolamaya kopyala.
+
             coverScope.launch {
                 val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, sourceUri)
                 if (persisted != null) coverUri = persisted
@@ -652,22 +637,15 @@ private fun EditMusicDrawer(
     MiuixDrawer(
         onDismissRequest = onDismiss,
     ) {
-        // ÖNEMLİ: doğrudan `onDismiss()` çağırmak yerine `rememberDrawerDismiss()`
-        // kullanıyoruz. MiuixDrawer'ın kendi state'i (`visible`) sadece kapanma isteği
-        // WindowBottomSheet'in `onDismissRequest`'i üzerinden geldiğinde çıkış animasyonu
-        // oynatabiliyor — `onDismiss()`'i burada doğrudan çağırmak bu mekanizmayı atlayıp
-        // drawer'ı animasyonsuz, aniden kaybettiriyordu (Apply/Cancel'a basınca "pat diye"
-        // yok olma sorununun kök nedeni buydu).
+
         val dismissDrawer = rememberDrawerDismiss()
-        // MADDE 6 — drawer ekranı fazla kaplıyordu (`fillMaxHeight(0.88f)`, yani ekranın
-        // %88'i). Artık içerik kadar yer kaplıyor; kapak 1:1 kare ve sabit boyutlu
-        // olduğu için toplam yükseklik ideal seviyede kalıyor.
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
-            // MADDE 4 — Apply/Cancel yazı butonları yerine Miuix'in ✓ / × ikonları.
+
             MiuixDrawerActionHeader(
                 title = strings.editMusic,
                 onCancel = dismissDrawer,
@@ -679,7 +657,7 @@ private fun EditMusicDrawer(
                         album = albumText,
                         coverUri = coverUri?.toString()
                     )
-                    // NowPlaying ve MiniPlayer'ı anında güncelle
+
                     val updatedTrack = track.copy(
                         title = titleText.ifBlank { track.title },
                         artist = artistText.ifBlank { track.artist },
@@ -691,9 +669,7 @@ private fun EditMusicDrawer(
                 }
             )
             Spacer(Modifier.height(16.dp))
-            // MADDE 4 — kapak önizlemesi 16:9 (160dp yükseklikte tam genişlik) idi;
-            // oysa kırpma zaten 1:1 yapıyordu, bu yüzden önizleme yanlış oranı
-            // gösteriyordu. Artık ortalanmış gerçek bir 1:1 kare.
+
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
@@ -817,7 +793,6 @@ private fun EditMusicDrawer(
         )
     }
 }
-
 
 @Composable
 private fun PermissionRequest(onRequest: () -> Unit) {

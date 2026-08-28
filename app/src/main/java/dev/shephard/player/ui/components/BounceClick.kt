@@ -24,24 +24,6 @@ import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurfaceCompact
 
-/**
- * Reusable tap-feedback Modifier: shrinks on press-down, then springs back
- * overshooting slightly, then settles. Drop-in replacement for [clickable]
- * anywhere we want a tactile, "alive" feel.
- *
- * Behavior matches the spring animation originally used on the brand logo
- * but exposed as a Modifier extension so every clickable surface in the app
- * can opt in by wrapping `Modifier.bounceClick(onClick = ...)` around it.
- *
- * Usage:
- *   IconButton(
- *       onClick = { ... },
- *       modifier = Modifier.bounceClick { /* action */ }
- *   )
- *
- * Or, on any clickable surface:
- *   Box(modifier = Modifier.bounceClick { /* action */ }) { ... }
- */
 fun Modifier.bounceClick(
     enabled: Boolean = true,
     pressScale: Float = 0.86f,
@@ -61,7 +43,7 @@ fun Modifier.bounceClick(
         label = "pressScale"
     )
 
-    this
+this
         .clickable(
             interactionSource = interactionSource,
             indication = null,
@@ -74,32 +56,6 @@ fun Modifier.bounceClick(
         }
 }
 
-/**
- * Convenience composable: a 48dp circular icon button with the bounce-on-tap
- * animation applied. Drop-in replacement for Material3 [dev.shephard.player.ui.miuix.IconButton]
- * — same accessibility semantics (it's still a Button role), same tap target,
- * plus the spring scale on press.
- *
- * We implement it on top of a Box rather than Material3 IconButton so the
- * bounceClick modifier handles the click event (avoiding the double-fire
- * that would happen if we wrapped Material3 IconButton with bounceClick).
- */
-/**
- * Convenience composable: a 48dp circular icon button with the bounce-on-tap
- * animation applied. Drop-in replacement for Material3 [dev.shephard.player.ui.miuix.IconButton]
- * — same accessibility semantics (it's still a Button role), same tap target,
- * plus the spring scale on press.
- *
- * We implement it on top of a Box rather than Material3 IconButton so the
- * bounceClick modifier handles the click event (avoiding the double-fire
- * that would happen if we wrapped Material3 IconButton with bounceClick).
- *
- * Liquid Glass entegrasyonu: [LocalBlurEnabled] açıkken ve çağıran taraf bir
- * `backgroundColor` verdiyse (yani dolu bir daire/buton isteniyorsa), düz renk yerine
- * buzlu cam dolgusu + parlak kenarlık uygulanır. Bu sayede uygulamadaki her
- * BouncyIconButton çağrısı (Now Playing sheet, playlist ekranı, dock vb.) tek bir
- * yerden otomatik olarak yeni görünüme geçer.
- */
 @Composable
 fun BouncyIconButton(
     onClick: () -> Unit,

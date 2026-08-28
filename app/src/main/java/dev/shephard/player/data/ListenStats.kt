@@ -2,16 +2,6 @@ package dev.shephard.player.data
 
 import java.util.Calendar
 
-/**
- * Flamingo Player'daki "Stats" (dinleme istatistikleri) özelliğinin Lambda Player'a
- * uyarlanmış hali. Orijinali MMKV + Gson kullanıyordu; burada projenin zaten kullandığı
- * DataStore (Preferences) + basit manuel JSON kodlaması kullanılıyor, yeni bir üçüncü
- * parti bağımlılık eklenmedi.
- *
- * Bir [ListenEvent], bir şarkının BİR GÜN İÇİNDE dinlenen süresini temsil eder — bir
- * dinleme oturumu gece yarısını geçerse iki ayrı event'e bölünür (dayStartMs farklı olur),
- * böylece "bugün/bu hafta/bu ay" filtrelemesi doğru çalışır (bkz. ListenStatsTracker).
- */
 data class ListenEvent(
     val trackId: Long,
     val title: String,
@@ -154,8 +144,6 @@ object ListenStatsCalculator {
         return StatsPeriodSnapshot(summary, artistEntries, albumEntries, trackEntries)
     }
 
-    // --- Manuel JSON kodlama (yeni bağımlılık eklememek için) ---
-
     fun encodeEvents(events: List<ListenEvent>): String {
         val sb = StringBuilder("[")
         events.forEachIndexed { index, e ->
@@ -180,10 +168,7 @@ object ListenStatsCalculator {
         if (json.isBlank() || json == "[]") return emptyList()
         return try {
             val events = mutableListOf<ListenEvent>()
-            // Basit, bağımlılıksız JSON parse: her obje bir satır gibi ayrıştırılır.
-            // Değerler her zaman encodeEvents ile bizim tarafımızdan üretildiği için
-            // format sabit (iç içe obje/array yok) — genel amaçlı bir JSON parser
-            // gerektirmiyor.
+
             var i = 0
             while (i < json.length) {
                 val objStart = json.indexOf('{', i)

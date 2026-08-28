@@ -61,15 +61,6 @@ import dev.shephard.player.ui.miuix.Text
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 
-/**
- * Flamingo Player'daki "Stats" özelliğinden esinlenilen dinleme istatistikleri sayfası.
- * Settings > Total Listening Time kartına basınca açılır (bkz. NavGraph.kt StatsRoute).
- *
- * Flamingo'nun UI kodu (Title/YosWrapper/ProfileButton, MMKV+Gson depolama) doğrudan
- * kopyalanmadı — konsept (dönem pill'leri, özet kartı, en çok dinlenen sanatçı/albüm/şarkı
- * yatay listeleri) alınıp Lambda Player'ın Miuix tasarım diline ve mevcut altyapısına
- * (DataStore, PlayerViewModel.statsEventsFlow) uyarlandı.
- */
 @Composable
 fun StatsScreen(
     playerViewModel: PlayerViewModel = viewModel(),

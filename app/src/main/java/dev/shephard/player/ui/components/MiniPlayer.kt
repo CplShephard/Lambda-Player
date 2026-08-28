@@ -68,14 +68,10 @@ fun MiniPlayer(
 ) {
     val track = state.currentTrack ?: return
 
-    // Geçiş yönü AnimatedContent içinde kuyruk konumuna göre belirlenir.
-
     val liquidGlassOn = LocalBlurEnabled.current
     val contentBackdrop = LocalContentBackdrop.current
     val miniPlayerShape = RoundedCornerShape(14.dp)
-    // Tema accent rengi — artık şarkıya göre değil, temaya (açık/koyu fark etmeksizin)
-    // göre sabit. Önceki `glow`/`animatedGlow` (state.glowColorArgb, kapak resminden
-    // çıkarılan renk) kaldırıldı.
+
     val themeAccent = MiuixAppTheme.colorScheme.primary
 
     Column(
@@ -89,7 +85,7 @@ fun MiniPlayer(
                 .clip(miniPlayerShape)
                 .then(
                     if (liquidGlassOn && contentBackdrop != null) {
-                        // Blur açık: gerçek arka plan bulanıklığı + düz (glow'suz) tema tonu.
+
                         Modifier.miuixBlurSurface(
                             backdrop = contentBackdrop,
                             shape = miniPlayerShape,
@@ -98,8 +94,7 @@ fun MiniPlayer(
                             fallbackColor = MiuixAppTheme.colorScheme.surfaceVariant
                         )
                     } else {
-                        // Blur kapalı: düz, tam opak tema rengi — kenarlarda şeffaflık veya
-                        // accent renk (glow) YOK, sade tek renk kart.
+
                         Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant)
                     }
                 )
@@ -111,12 +106,7 @@ fun MiniPlayer(
                     .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-            // Album art + track info: TEK bir AnimatedContent içinde birlikte animasyonlanır.
-            // Önceden kapak ve metin ayrı AnimatedContent bloklarıydı; aynı transitionSpec'i
-            // kullansalar da Compose bunları bağımsız iki "oyuncu" gibi ele alıyordu, bu da
-            // şarkı değişiminde ikisinin birbirinden kopuk hareket ediyormuş gibi görünmesine
-            // yol açıyordu. Artık tek content bloğu olduğu için ikisi de aynı animasyonun
-            // parçası ve tam senkron kayıyorlar.
+
             AnimatedContent(
                 targetState = track.id,
                 transitionSpec = {
@@ -180,7 +170,6 @@ fun MiniPlayer(
                 }
             }
 
-            // Previous
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -195,7 +184,6 @@ fun MiniPlayer(
                 )
             }
 
-            // Play/Pause
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -219,7 +207,6 @@ fun MiniPlayer(
                 }
             }
 
-            // Next
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -235,8 +222,6 @@ fun MiniPlayer(
             }
         }
 
-            // 500ms'lik konum tiklerini yalnızca bu küçük composable dinler; MiniPlayer'ın
-            // geri kalanı (kapak, başlık, butonlar, blur yüzeyi) her tikte recompose OLMAZ.
             MiniPlayerProgressBar(
                 progressFlow = progressFlow,
                 activeColor = themeAccent,

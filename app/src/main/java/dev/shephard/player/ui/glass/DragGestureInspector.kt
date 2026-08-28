@@ -1,10 +1,7 @@
-// Adapted from InstallerX Revived (GPL-3.0-only)
+
 // Copyright (C) 2025-2026 InstallerX Revived contributors
-// Portions derived from weishu/KernelSU (https://github.com/tiann/KernelSU), GPL-3.0.
-//
-// Unmodified port: a drag-gesture detector that reports the *initial* down event and
-// never consumes the pointer, so the floating dock's indicator can be dragged while
-// still letting the tab row receive clicks.
+// Portions derived from weishu/KernelSU (https:
+
 package dev.shephard.player.ui.glass
 
 import androidx.compose.foundation.gestures.awaitEachGesture

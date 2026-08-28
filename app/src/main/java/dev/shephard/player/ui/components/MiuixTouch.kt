@@ -18,33 +18,6 @@ import top.yukonga.miuix.kmp.utils.SinkFeedback
 import top.yukonga.miuix.kmp.utils.TiltFeedback
 import top.yukonga.miuix.kmp.utils.pressable
 
-/**
- * MADDE 7 — InstallerX ekran görüntülerindeki "widget'ın basılan köşesinden gerçekçi
- * bükülmesi" efekti.
- *
- * Önceden burada elle yazılmış bir `graphicsLayer` + `detectTapGestures` çözümü vardı:
- * `transformOrigin`ı parmağın DEĞDİĞİ noktaya alıp aynı anda hem ölçek küçültüyor hem
- * eğiyordu. Sonuç Miuix'inkine benzemiyordu — kart parmağın altına doğru "kaçıyordu".
- *
- * InstallerX'in yeşil durum kartında (MiuixHomePage) kullandığı şey aslında Miuix'in
- * kendi `Card(pressFeedbackType = PressFeedbackType.Tilt)` bileşenidir. O da arka planda
- * `top.yukonga.miuix.kmp.utils.TiltFeedback`'i bir `IndicationNodeFactory` olarak
- * `Modifier.pressable(...)` üzerinden bağlar. Kritik farklar:
- *
- *  - `transformOrigin` parmağın değdiği köşe DEĞİL, onun KARŞI köşesidir
- *    (x < w/2 → pivot 1f). Kağıdı karşı köşesinden tutup basılan köşeyi içeri
- *    bastırmak gibi; bükülme bu yüzden gerçekçi hissettiriyor.
- *  - Ölçek değişmez, sadece `rotationX`/`rotationY` uygulanır ve `cameraDistance`
- *    12 * density gibi çok kısa tutulur (güçlü perspektif = belirgin büküm).
- *  - Yay: `spring(0.6f, 400f)`.
- *
- * Bu yüzden kendi taklidimizi silip DOĞRUDAN Miuix'in `TiltFeedback`'ini kullanıyoruz.
- * Böylece Music/Playlist kartları, Settings kartları ve Total Listening Time kartı
- * InstallerX ile birebir aynı davranışa sahip oluyor.
- *
- * Not: `pressScale` / `maxTiltDegrees` parametreleri geriye dönük çağrı uyumluluğu için
- * duruyor; `maxTiltDegrees` doğrudan Miuix'in `tiltAmount` değeri olarak geçiriliyor.
- */
 fun Modifier.miuixWidgetClick(
     enabled: Boolean = true,
     @Suppress("UNUSED_PARAMETER") pressScale: Float = 0.94f,
@@ -69,10 +42,6 @@ fun Modifier.miuixWidgetClick(
         )
 }
 
-/**
- * Miuix `PressFeedbackType.Sink` karşılığı: basılınca hafifçe içeri çöker, eğilmez.
- * Tilt'in uygun olmadığı (ör. tam ekran genişliğinde ince satırlar) yerler için.
- */
 fun Modifier.miuixSinkClick(
     enabled: Boolean = true,
     sinkAmount: Float = 0.94f,
@@ -96,7 +65,6 @@ fun Modifier.miuixSinkClick(
         )
 }
 
-/** Simple non-bending press feedback for compact controls such as MiniPlayer buttons. */
 fun Modifier.pressScaleClick(
     enabled: Boolean = true,
     pressScale: Float = 0.92f,

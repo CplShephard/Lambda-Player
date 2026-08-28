@@ -33,32 +33,6 @@ import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
-/**
- * Lambda Player'ın TEK drawer/bottom-sheet bileşeni.
- *
- * Eskiden burada `OverlayBottomSheet` tabanlı, kendi elle yazılmış drag handle'ı olan bir
- * "MiuixSheet" vardı. İki büyük sorunu vardı:
- *
- *  1. `OverlayBottomSheet` içeriğini bir `Scaffold`'un `MiuixPopupHost` slotuna kaydeder.
- *     NowPlayingSheet (ve MainActivity'deki güncelleme sheet'i) Scaffold'un DIŞINDA
- *     çizildiği için oradan açılan drawer'lar hiçbir host tarafından render edilmiyordu.
- *  2. Daha önemlisi: miuix'in sheet katmanı `NavigationBackHandler` kullanıyor ve bu
- *     androidx.activity 1.12+ ister — proje 1.9.1'deydi, bu yüzden drawer açılır açılmaz
- *     uygulama çöküyordu. (build.gradle.kts'te sürümler yükseltildi.)
- *
- * Yeni sürüm, InstallerX'in miuix install dialogunda kullandığı drawer ile BİREBİR aynıdır:
- * `top.yukonga.miuix.kmp.window.WindowBottomSheet`. Bu bileşen gerçek bir platform
- * `Dialog` penceresinde çizilir; hiçbir Scaffold'a / popup host'a bağımlı değildir,
- * dolayısıyla uygulamanın HER yerinden (NowPlaying dahil) güvenle açılabilir.
- * Drag handle, köşe yarıçapı, folme spring animasyonu, dim katmanı, nested-scroll ve
- * predictive-back davranışı InstallerX'teki ile aynıdır çünkü aynı miuix katmanıdır.
- *
- * Kullanım: bileşen SADECE gösterilmek istendiğinde composition'a girer
- * (`if (show) { MiuixDrawer(...) }`). Giriş animasyonu otomatik başlar; kapanma isteğinde
- * önce çıkış animasyonu oynatılır, animasyon bitince [onDismissRequest] çağrılır.
- * Böylece çağıran taraf bayrağı `false` yaptığında sheet zaten ekrandan çıkmış olur ve
- * "zıplayarak kaybolma" olmaz.
- */
 @Composable
 fun MiuixDrawer(
     onDismissRequest: () -> Unit,
@@ -73,8 +47,7 @@ fun MiuixDrawer(
     enableNestedScroll: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    // Sheet composition'a girer girmez açılır; `show` state'i sadece ÇIKIŞ animasyonunu
-    // sürebilmek için var (InstallerX'teki `showBottomSheet` + `dismissSheet {}` deseni).
+
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
 
@@ -92,8 +65,7 @@ fun MiuixDrawer(
         allowDismiss = allowDismiss,
         enableNestedScroll = enableNestedScroll,
         onDismissRequest = {
-            // Sadece çıkış animasyonunu tetikle. Gerçek "kapat" bildirimi
-            // onDismissFinished'te gider.
+
             if (allowDismiss) visible = false
         },
         onDismissFinished = { currentOnDismissRequest() },
@@ -101,17 +73,6 @@ fun MiuixDrawer(
     )
 }
 
-/**
- * MADDE 4 — Kapak (cover) düzenleme drawer'larının başlık satırı.
- *
- * Eskiden solda "Cancel", sağda "Apply" YAZI butonları vardı. Artık Miuix'in kendi
- * ikon setinden (`miuix-icons`) gelen ✓ (`MiuixIcons.Ok`) ve × (`MiuixIcons.Close`)
- * işaretleri kullanılıyor — InstallerX'in miuix sheet başlıklarındaki ile aynı dil.
- *
- * Renkler tamamen temaya bağlı:
- *  - ✓ : dolgu `primary`, ikon `onPrimary`  → accent rengi değişince beraber değişir.
- *  - × : dolgu `surfaceVariant`, ikon `onSurface` → açık/koyu temayla beraber değişir.
- */
 @Composable
 fun MiuixDrawerActionHeader(
     title: String,
@@ -178,37 +139,21 @@ private fun MiuixDrawerCircleAction(
 }
 
 object MiuixDrawerDefaults {
-    /** InstallerX'in miuix sheet'i ile aynı köşe yarıçapı. */
+
     val CornerRadius: Dp = BottomSheetDefaults.cornerRadius
 
-    /**
-     * Drawer içerikleri kendi padding'lerini yönetiyor, bu yüzden miuix'in varsayılan
-     * 24dp yatay iç boşluğunu sıfırlıyoruz (aksi halde her şey iki kez padding alır).
-     */
     val InsideMargin: DpSize = DpSize(0.dp, 0.dp)
 
     @Composable
     fun backgroundColor(): Color = MiuixTheme.colorScheme.surfaceContainer
 }
 
-/**
- * Drawer içeriğinden kapanma isteği göndermek için. `WindowBottomSheet` içerideki
- * composable'lara `LocalDismissState` sağlar; bu fonksiyon çağrıldığında önce çıkış
- * animasyonu oynar, sonra `onDismissRequest` tetiklenir.
- *
- * Bir öğe seçildiğinde (örn. dil seçimi) doğrudan `open = false` yapmak yerine bunu
- * kullanın; böylece animasyon kesilmez.
- */
 @Composable
 fun rememberDrawerDismiss(): () -> Unit {
     val dismiss = LocalDismissState.current
     return remember(dismiss) { { dismiss?.invoke() } }
 }
 
-/**
- * `x?.let { MiuixDrawer(...) }` deseninde, x null olunca içerik anında yok olur ve çıkış
- * animasyonu boş bir sheet üstünde oynar. Bu yardımcı son null olmayan değeri tutar.
- */
 @Composable
 fun <T : Any> rememberLastNonNull(value: T?): T? {
     var last by remember { mutableStateOf(value) }

@@ -1,8 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    // AGP 9 ships built-in Kotlin support, so the standalone
-    // `org.jetbrains.kotlin.android` plugin must not be applied any more.
+
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
 }
@@ -49,8 +48,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-
-
     buildFeatures {
         compose = true
         buildConfig = true
@@ -61,7 +58,7 @@ android {
             jvmTarget.set(JvmTarget.JVM_17)
             freeCompilerArgs.addAll(
                 "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
-                // miuix-blur's public API uses Kotlin context parameters.
+
                 "-Xcontext-parameters"
             )
         }
@@ -85,47 +82,34 @@ android {
 }
 
 dependencies {
-    // KRİTİK — Miuix 0.9.3 içindeki her bottom sheet / dialog / popup,
-    // `androidx.navigationevent.compose.NavigationBackHandler` kullanıyor. Bu API
-    // `LocalNavigationEventDispatcherOwner`'ın sağlanmış olmasını ZORUNLU tutar ve o owner'ı
-    // ancak androidx.activity 1.12+ (ComponentActivity) sağlar. Proje daha önce
-    // activity-compose 1.9.1 kullanıyordu; bu yüzden HERHANGİ bir drawer (queue, lyrics,
-    // edit music, edit playlist, dil seçimi...) açılmaya çalışıldığında
-    // `IllegalStateException: No NavigationEventDispatcherOwner was provided` fırlatılıyor
-    // ve uygulama çöküyordu. Miuix'in ve InstallerX'in kendi kullandığı sürümlere
-    // hizalıyoruz.
+
     implementation("androidx.core:core-ktx:1.19.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.navigationevent:navigationevent-compose:1.1.2")
 
-    implementation(platform("androidx.compose:compose-bom:2026.06.01"))
+    implementation(platform("androidx.compose:compose-bom:2026.08.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material:material-icons-extended")
 
-    // Miuix / ComposeX stack — UI components + real Liquid Glass backdrop pipeline.
+    implementation("androidx.compose.material3:material3:1.5.0-alpha26")
+
+    implementation("com.materialkolor:material-kolor:5.0.0")
+
     implementation("top.yukonga.miuix.kmp:miuix-ui:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-preference:0.9.3")
-    // Miuix'in kendi ikon seti — Cover editleme drawer'larındaki ✓ (Ok) ve × (Close)
-    // işaretleri buradan geliyor (InstallerX de aynı artefaktı kullanıyor).
+
     implementation("top.yukonga.miuix.kmp:miuix-icons:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-shader-android:0.9.3")
-    // Miuix 0.9.3 NavDisplay (androidx.navigation3 tabanlı, GERÇEK Miuix geçişleri:
-    // squircle köşe kırpma + dim scrim + predictive back). Compose Navigation tamamen kaldırıldı.
+
     implementation("top.yukonga.miuix.kmp:miuix-squircle:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-navigation3-ui:0.9.3")
-    // miuix-navigation3-ui yalnızca androidx.navigation3.ui/scene/animation'ı kendi içinde
-    // bundle eder; navigation3.runtime (NavKey, entryProvider, entry...) external bağımlılıktır
-    // ve POM versiyonsuz (BOM'a dayalı) olduğu için transitive gelmez. Açıkça ekleniyor.
+
     implementation("androidx.navigation3:navigation3-runtime:1.1.4")
 
-    // androidx.navigation:navigation-compose (Compose Navigation v2) kaldırıldı; gezinme
-    // tamamen Miuix NavDisplay (androidx.navigation3 / miuix-navigation3-ui) üzerinden.
-    // Navigation3 runtime/scene/animation transitive olarak miuix-navigation3-ui ile gelir.
-    // (navigationevent-compose zaten yukarıda tanımlı; burada tekrar eklenmedi.)
     implementation("me.zhanghai.android.appiconloader:appiconloader:1.5.0")
     implementation("sh.calvin.reorderable:reorderable:3.0.0")
 
@@ -138,13 +122,11 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("com.google.guava:guava:33.2.1-android")
     implementation("io.coil-kt:coil-compose:2.6.0")
-    // GIF kapak resmi desteği (Now Playing Sheet + Mini Player): Coil'in kendi GIF
-    // decoder'ları — coil-compose'un içine dahil değil, ayrı bir modül.
+
     implementation("io.coil-kt:coil-gif:2.6.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.palette:palette-ktx:1.0.0")
 
-    // Tag editor for MP3 / M4A offline editing
     implementation("net.jthink:jaudiotagger:3.0.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")

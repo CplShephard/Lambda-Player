@@ -9,19 +9,6 @@ import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/**
- * `androidx.navigation3.animation.NavTransitionEasing`'in birebir kopyası.
- *
- * Orijinali `internal` olduğu için (miuix-navigation3-ui modülü, paket dışından erişilemez)
- * Lambda Player'ın kendi paketine taşındı. Theme/Playback/About sayfaları (herhangi bir
- * özel `transitionSpec` VERMEDİKLERİ için) bu easing'i kullanan `NavDisplay`'in kendi
- * dahili varsayılan geçişini kullanıyor — playlist detayına girme animasyonunu da bununla
- * BİREBİR AYNI yapmak için bu sınıfa ihtiyaç var.
- *
- * Matematiksel olarak kritik-sönümlü (critically damped) bir yay eğrisidir: [response]
- * saniye cinsinden karakteristik süreyi, [damping] sönümleme oranını belirler. Gerçek
- * Miuix NavDisplay'de `NavTransitionEasing(0.8f, 0.95f)` olarak kullanılıyor.
- */
 @Immutable
 internal class NavTransitionEasing(
     response: Float,
@@ -70,5 +57,4 @@ internal class NavTransitionEasing(
     }
 }
 
-/** Gerçek Miuix NavDisplay'in kullandığı sabit değer: `NavTransitionEasing(0.8f, 0.95f)`. */
 internal val NavAnimationEasing = NavTransitionEasing(0.8f, 0.95f)

@@ -19,13 +19,6 @@ fun AudioTrack.formattedDuration(): String {
     return "%d:%02d".format(minutes, seconds)
 }
 
-/**
- * Şarkı geçiş yönünü kuyruktaki konuma göre belirler — sayısal id karşılaştırması
- * yerine kullanılır. Şarkı ileri (sonraki) gidiyorsa true (soldan girer),
- * geri (önceki) gidiyorsa false (sağdan girer) döner.
- *
- * Hem NowPlayingSheet hem de MiniPlayer ortak bu mantığı kullanır.
- */
 fun slideForwardInQueue(queue: List<AudioTrack>, fromId: Long, toId: Long): Boolean {
     if (fromId == toId) return true
     val from = queue.indexOfFirst { it.id == fromId }
@@ -33,6 +26,4 @@ fun slideForwardInQueue(queue: List<AudioTrack>, fromId: Long, toId: Long): Bool
     return if (from >= 0 && to >= 0) to > from else true
 }
 
-/** Kuyruktan id'ye göre parçayı bulur (geçiş sırasında doğru kapak/metin göstermek için). */
 fun List<AudioTrack>.trackById(id: Long): AudioTrack? = firstOrNull { it.id == id }
-

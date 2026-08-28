@@ -8,6 +8,9 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dev.shephard.player.theme.PaletteStyle
+import dev.shephard.player.theme.ThemeColorSpec
+import dev.shephard.player.theme.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -24,7 +27,7 @@ object PrefsKeys {
     val PLAYLISTS_JSON = stringPreferencesKey("playlists_json")
     val WALLPAPER_BRIGHTNESS = floatPreferencesKey("wallpaper_brightness")
     val CARD_ALPHA = floatPreferencesKey("card_alpha")
-    val DARK_MODE = booleanPreferencesKey("dark_mode") // Legacy bool, kept for migration.
+    val DARK_MODE = booleanPreferencesKey("dark_mode")
     val THEME_MODE = intPreferencesKey("theme_mode")
     val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
     val PLAYLISTS_LAYOUT = intPreferencesKey("playlists_layout")
@@ -34,6 +37,13 @@ object PrefsKeys {
     val LYRICS_JSON = stringPreferencesKey("lyrics_json")
     val LIQUID_GLASS_ENABLED = booleanPreferencesKey("liquid_glass_enabled")
     val LISTEN_STATS_EVENTS_JSON = stringPreferencesKey("listen_stats_events_json")
+
+    val USE_MIUIX = booleanPreferencesKey("use_miuix")
+    val PALETTE_STYLE = stringPreferencesKey("palette_style")
+    val COLOR_SPEC = stringPreferencesKey("color_spec")
+    val USE_MIUIX_MONET = booleanPreferencesKey("use_miuix_monet")
+    val USE_APPLE_FLOATING_BAR = booleanPreferencesKey("use_apple_floating_bar")
+    val LAST_MAIN_PAGE = intPreferencesKey("last_main_page")
 }
 
 object ThemeModePreference {
@@ -45,6 +55,18 @@ object ThemeModePreference {
 object LayoutMode {
     const val LIST = 0
     const val GRID = 1
+}
+
+fun ThemeMode.toPreferenceInt(): Int = when (this) {
+    ThemeMode.LIGHT -> ThemeModePreference.LIGHT
+    ThemeMode.SYSTEM -> ThemeModePreference.AUTO
+    ThemeMode.DARK -> ThemeModePreference.DARK
+}
+
+fun Int.toThemeMode(): ThemeMode = when (this) {
+    ThemeModePreference.LIGHT -> ThemeMode.LIGHT
+    ThemeModePreference.AUTO -> ThemeMode.SYSTEM
+    else -> ThemeMode.DARK
 }
 
 class PreferencesManager(private val context: Context) {
@@ -101,6 +123,38 @@ class PreferencesManager(private val context: Context) {
         it[PrefsKeys.DYNAMIC_COLOR] ?: false
     }
 
+    val useMiuix: Flow<Boolean> = context.dataStore.data.map {
+        it[PrefsKeys.USE_MIUIX] ?: true
+    }
+
+    val paletteStyle: Flow<PaletteStyle> = context.dataStore.data.map {
+        PaletteStyle.fromValueOrDefault(it[PrefsKeys.PALETTE_STYLE] ?: "")
+    }
+
+    val colorSpec: Flow<ThemeColorSpec> = context.dataStore.data.map {
+        ThemeColorSpec.fromValueOrDefault(it[PrefsKeys.COLOR_SPEC] ?: "")
+    }
+
+    val useMiuixMonet: Flow<Boolean> = context.dataStore.data.map {
+        it[PrefsKeys.USE_MIUIX_MONET] ?: false
+    }
+
+    val useAppleFloatingBar: Flow<Boolean> = context.dataStore.data.map {
+        it[PrefsKeys.USE_APPLE_FLOATING_BAR] ?: false
+    }
+
+    val lastMainPage: Flow<Int> = context.dataStore.data.map {
+        it[PrefsKeys.LAST_MAIN_PAGE] ?: 0
+    }
+
+    suspend fun setLastMainPage(index: Int) {
+        context.dataStore.edit { it[PrefsKeys.LAST_MAIN_PAGE] = index }
+    }
+
+    val seedColor: Flow<Int> = accentColor
+
+    val themeModeEnum: Flow<ThemeMode> = themeMode.map { it.toThemeMode() }
+
     val liquidGlassEnabled: Flow<Boolean> = context.dataStore.data.map {
         it[PrefsKeys.LIQUID_GLASS_ENABLED] ?: false
     }
@@ -121,19 +175,16 @@ class PreferencesManager(private val context: Context) {
         it[PrefsKeys.TRACK_OVERRIDES_JSON] ?: "{}"
     }
 
-    /** JSON object: {"trackId": ["line1","line2", ...], ...} — indirilen/yüklenen lyrics. */
     val lyricsJson: Flow<String> = context.dataStore.data.map {
         it[PrefsKeys.LYRICS_JSON] ?: "{}"
     }
 
-    /** 0f..1f — applied as a black scrim opacity on top of the wallpaper. */
     val wallpaperBrightness: Flow<Float> = context.dataStore.data.map {
         val v = it[PrefsKeys.WALLPAPER_BRIGHTNESS] ?: 0.55f
         cachedWallpaperBrightness = v
         v
     }
 
-    /** 0f..1f — opacity of card/surface backgrounds. Default 0.85 keeps wallpaper visible. */
     val cardAlpha: Flow<Float> = context.dataStore.data.map {
         it[PrefsKeys.CARD_ALPHA] ?: 0.85f
     }
@@ -194,6 +245,30 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setDynamicColor(enabled: Boolean) {
         context.dataStore.edit { it[PrefsKeys.DYNAMIC_COLOR] = enabled }
+    }
+
+    suspend fun setUseMiuix(useMiuix: Boolean) {
+        context.dataStore.edit { it[PrefsKeys.USE_MIUIX] = useMiuix }
+    }
+
+    suspend fun setPaletteStyle(style: PaletteStyle) {
+        context.dataStore.edit { it[PrefsKeys.PALETTE_STYLE] = style.name }
+    }
+
+    suspend fun setColorSpec(spec: ThemeColorSpec) {
+        context.dataStore.edit { it[PrefsKeys.COLOR_SPEC] = spec.name }
+    }
+
+    suspend fun setUseMiuixMonet(use: Boolean) {
+        context.dataStore.edit { it[PrefsKeys.USE_MIUIX_MONET] = use }
+    }
+
+    suspend fun setUseAppleFloatingBar(use: Boolean) {
+        context.dataStore.edit { it[PrefsKeys.USE_APPLE_FLOATING_BAR] = use }
+    }
+
+    suspend fun setSeedColor(argb: Int) {
+        context.dataStore.edit { it[PrefsKeys.ACCENT_COLOR] = argb }
     }
 
     suspend fun setLiquidGlassEnabled(enabled: Boolean) {

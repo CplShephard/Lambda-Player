@@ -1,16 +1,5 @@
 package dev.shephard.player.ui.glass.bgeffect
 
-/**
- * MADDE 9 — InstallerX About sayfasının arkasındaki "dinamik ışık" (BgEffect) shader'ı.
- *
- * InstallerX Revived'ın `ui/library/effect/OS3BgFrag.kt` dosyasındaki AGSL shader'ının
- * BİREBİR aynısı. Dört adet yumuşak ışık noktası (metaball benzeri), üstlerine perlin
- * gürültüsüyle doygunluk/parlaklık kayması ve bandingi kıran ince bir gradient noise.
- *
- * Shader'ın kendisinde renk YOK — renkler `uColors` uniform'u ile dışarıdan veriliyor
- * (bkz. [BgEffectConfig]). Lambda'da bu paleti morumsu/mavimsiden yeşilimsi/açık
- * mavimsiye çevirdik; shader kodu değişmedi.
- */
 internal const val OS3_BG_FRAG = """
     uniform vec2 uResolution;
     uniform float uAnimTime;

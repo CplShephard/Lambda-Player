@@ -8,14 +8,6 @@ import top.yukonga.miuix.kmp.blur.asBrush
 import kotlin.math.cos
 import kotlin.math.sin
 
-/**
- * MADDE 9 — [OS3_BG_FRAG] shader'ının uniform'larını yöneten yardımcı.
- * InstallerX'in `BgEffectPainter`'ı ile birebir aynı (cihaz tipi ayrımı çıkarıldı;
- * Lambda telefon yerleşimini kullanıyor).
- *
- * Tüm `update*` fonksiyonları son değeri önbelleğe alır; böylece her karede gereksiz
- * `setFloatUniform` çağrısı yapılmaz.
- */
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 internal class BgEffectPainter {
 

@@ -13,12 +13,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-/**
- * MADDE 9 — dinamik ışığı çizen `Modifier.Node`.
- * InstallerX'in `BgEffectModifier`'ı ile birebir aynı; tek fark `surface` rengi
- * `Color.Transparent` verilebiliyor (Lambda'da About sayfasının ARKASINDA duvar kağıdı
- * var, opak bir dikdörtgen onu gizlerdi).
- */
 internal fun Modifier.bgEffectDraw(
     painter: BgEffectPainter,
     preset: BgEffectConfig.Config,

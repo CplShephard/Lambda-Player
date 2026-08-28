@@ -142,27 +142,15 @@ fun NowPlayingSheet(
     val strings = LocalStrings.current
     val nowPlayingLiquidGlassOn = LocalBlurEnabled.current
 
-    val density = LocalDensity.current
+val density = LocalDensity.current
     val dismissThresholdPx = with(density) { 140.dp.toPx() }
-    // Giriş (açılış) kaydırması artık burada `dragOffset` üzerinden yapılıyor (alttaki
-    // LaunchedEffect). İlk frame'de boşluk/flaş olmaması için başlangıç değeri ekran
-    // yüksekliği olarak veriliyor; sheet böylece ilk frame'de ekranın altında
-    // (görünmez) başlıyor, sonra yukarı kayıyor.
-    // NOT: LocalConfiguration.current bir @Composable çağrısıdır; remember/with lambda'sı
-    // içinde ÇAĞRILAMAZ, bu yüzden en üst seviyede alınıp değer olarak kullanılıyor.
-    val dragOffsetScreenHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
+
+val dragOffsetScreenHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
     val dragOffsetInitialHeight = with(density) { dragOffsetScreenHeight.dp.toPx() }
     val dragOffset = remember { androidx.compose.animation.core.Animatable(dragOffsetInitialHeight) }
     val dragScope = rememberCoroutineScope()
 
-    // Sheet her ekrana geldiğinde dragOffset'i 0'a al: parmakla kapatıp tekrar açınca
-    // eski sürükleme miktarının (translationY) kalıcı gri boşluk bırakmasını engeller.
-    // MADDE (köşe yarıçapı zamanlaması) — açılış kaydırması artık burada `dragOffset`
-    // üzerinden yapılıyor. Sheet ekranın altından yukarı kayar; `dragOffset` 0'a
-    // ulaşınca (yani sheet TAM oturunca) köşe yarıçapı 30dp -> 0dp'ye iner. Böylece
-    // köşeler, açılış animasyonu bitince — değil, TAM bitince — 0'a düşer (sihirli
-    // gecikme yok).
-    var hasEnteredRest by remember { mutableStateOf(false) }
+var hasEnteredRest by remember { mutableStateOf(false) }
     val nowPlayingEnterSpring = androidx.compose.animation.core.spring<Float>(
         dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
         stiffness = 180f
@@ -173,11 +161,7 @@ fun NowPlayingSheet(
         hasEnteredRest = true
     }
 
-    // Next/Previous tuşlarına basınca kapak geçişinin akıcı olması için tween süre/easing
-    // ayarı. Kasma şikayeti eski LazyHorizontalGrid+snap-fling mekanizmasının HER FRAME
-    // scroll state hesaplaması yapmasından kaynaklanıyordu; AnimatedContent ise sadece
-    // track gerçekten değiştiğinde (tuşa basılınca) bir kerelik animasyon çalıştırır.
-    val artSlideSpec = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(
+val artSlideSpec = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(
         durationMillis = 320,
         easing = androidx.compose.animation.core.FastOutSlowInEasing
     )
@@ -186,29 +170,14 @@ fun NowPlayingSheet(
         easing = androidx.compose.animation.core.LinearOutSlowInEasing
     )
 
-    // Drag dismiss için pencerenin GERÇEK ölçülen yüksekliği (px). Daha önce
-    // LocalConfiguration.screenHeightDp kullanılıyordu, bu ise her zaman cihazın TÜM ekran
-    // yüksekliğini varsayıyor — Android freeform/split-screen pencerelerde (uygulama ekranın
-    // sadece bir kısmını kaplarken) bu değer gerçek pencere boyutundan çok daha büyük çıkıyor,
-    // bu da aşağı sürükleyip kapatma animasyonunun yanlış mesafeye gitmesine sebep oluyordu.
-    // onSizeChanged ile Compose'un bize verdiği GERÇEK ölçülen pencere boyutunu kullanıyoruz.
-    val configuration = LocalConfiguration.current
+val configuration = LocalConfiguration.current
     var measuredHeightPx by remember { mutableFloatStateOf(with(density) { configuration.screenHeightDp.dp.toPx() }) }
     val screenHeightPx = measuredHeightPx
 
-    val playButtonScale = remember { androidx.compose.animation.core.Animatable(1f) }
+val playButtonScale = remember { androidx.compose.animation.core.Animatable(1f) }
     val playButtonScope = rememberCoroutineScope()
 
-    // Sheet tam ekran halindeyken (dragOffset == 0, yani parmakla etkileşimde değilken
-    // dinlenme pozisyonunda) üst cornerlar ekranı tamamen doldurmalı — tıpkı iOS'taki gibi.
-    // Kullanıcı sheet'i aşağı sürüklemeye başlar başlamaz corner'lar geri gelsin.
-    //
-    // Açılış animasyonu (MainContainer'daki AnimatedVisibility + slideInVertically) sırasında
-    // corner radius 30dp olmalı (ekran henüz tam kaplanmadığı için köşeler görünür durumda
-    // kalmalı), animasyon bitip sheet dinlenme konumuna oturunca 0dp'ye insin — bu sayede
-    // ekran görüntüsü/ekran kaydında köşeler görünmez. hasEnteredRest, sheet ilk açıldığında
-    // bir kere gecikmeyle true olur ve girişte 30dp'nin gösterilmesini sağlar.
-    var isInteractingWithSheet by remember { mutableStateOf(false) }
+var isInteractingWithSheet by remember { mutableStateOf(false) }
     val isFullyExpanded by remember {
         androidx.compose.runtime.derivedStateOf { hasEnteredRest && !isInteractingWithSheet && dragOffset.value <= 0.5f }
     }
@@ -225,7 +194,7 @@ fun NowPlayingSheet(
         topEnd = sheetCornerRadius
     )
 
-    Box(
+Box(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { measuredHeightPx = it.height.toFloat() }
@@ -253,8 +222,8 @@ fun NowPlayingSheet(
                                     easing = androidx.compose.animation.core.FastOutLinearInEasing
                                 )
                             )
-                            // Sheet ekran dışında — direkt kapat, reset LaunchedEffect(Unit)'e bırakılır
-                            onDismiss()
+
+onDismiss()
                         }
                     } else {
                         dragScope.launch {
@@ -271,18 +240,17 @@ fun NowPlayingSheet(
                 }
             )
     ) {
-        // Kapak resminden blur'lu arka plan — amplitude/glow'a artık bağlı değil, track
-        // değişmediği sürece yeniden çizilmez.
-        AmbientGlowBackground(track = track, isPlaying = state.isPlaying)
 
-        Column(
+AmbientGlowBackground(track = track, isPlaying = state.isPlaying)
+
+Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            // Top row
-            Row(
+
+Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp, start = 20.dp, end = 20.dp)
@@ -308,22 +276,16 @@ fun NowPlayingSheet(
                 Box(modifier = Modifier.size(48.dp))
             }
 
-            // Album art + title
-            Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-                // Kapak resmi: next/previous tuşlarına basınca AnimatedContent ile
-                // soldan/sağdan kayan geçiş (yön navigationDirection'a göre). Swipe gesture'ı
-                // kaldırıldı — kullanıcı isteğiyle geri alındı, sadece tuşlarla değişim var.
-                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+
+BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                     val maxArtHeight = maxHeight * 0.42f
 
-                    androidx.compose.animation.AnimatedContent(
+androidx.compose.animation.AnimatedContent(
                         targetState = track,
                         transitionSpec = {
-                            // navigationDirection: skipToNext() sırasında +1, skipToPrevious()
-                            // sırasında -1 set ediliyor (PlayerViewModel). Next'e basınca yeni
-                            // kapak sağdan gelir eskisi sola kayar; previous'ta bunun tersi —
-                            // eski swipe-to-change'teki görsel yönle birebir aynı.
-                            val forward = navigationDirection >= 0
+
+val forward = navigationDirection >= 0
                             val enter = slideInHorizontally(
                                 animationSpec = artSlideSpec,
                                 initialOffsetX = { fullWidth -> if (forward) fullWidth else -fullWidth }
@@ -414,15 +376,11 @@ fun NowPlayingSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+Spacer(modifier = Modifier.weight(1f))
 
-            // Seek bar — 500ms'lik konum tiklerini SADECE bu satır dinler.
-            // Sheet'in geri kalanı (kapak grid'i, glow, butonlar) artık her tikte
-            // recompose OLMAZ; NowPlaying kasmasının ana çözümü budur.
-            SeekBarRow(playerViewModel = playerViewModel)
+SeekBarRow(playerViewModel = playerViewModel)
 
-            // Action buttons row: Queue, Lyrics, +/check
-            Row(
+Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp, start = 20.dp, end = 20.dp),
@@ -433,16 +391,11 @@ fun NowPlayingSheet(
                 var showPlaylists by remember { mutableStateOf(false) }
                 var showLyrics by remember { mutableStateOf(false) }
 
-                // State'ler if dışında — Compose composition kuralı
-                val lyricsSheetScope = rememberCoroutineScope()
+val lyricsSheetScope = rememberCoroutineScope()
                 val trackId = track?.id ?: -1L
                 val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
 
-                // MADDE 10 — bu iki tuş Blur AÇILINCA arkalarında cam bir daire
-                // kazanıyordu (`backgroundColor = Color.Transparent` verilince
-                // BouncyIconButton `blurSurfaceCompact` uyguluyor). Oysa bu tuşların
-                // blur ile bir ilgisi yok; her iki durumda da sade ikon olmalılar.
-                BouncyIconButton(
+BouncyIconButton(
                     onClick = {
                         showQueue = true
                     },
@@ -460,8 +413,8 @@ fun NowPlayingSheet(
                     tint = Color.White,
                     iconSize = 28.dp
                 )
-                // Playliste ekle tuşunun arkaplanını sil + simge rengini beyaz yap + morph animasyonu
-                Box(
+
+Box(
                     modifier = Modifier
                         .size(48.dp)
                         .bounceClick {
@@ -501,7 +454,7 @@ fun NowPlayingSheet(
                     }
                 }
 
-                if (showQueue) {
+if (showQueue) {
                     MiuixDrawer(
                         onDismissRequest = { showQueue = false },
                     ) {
@@ -516,28 +469,24 @@ fun NowPlayingSheet(
                     }
                 }
 
-                if (showLyrics) {
+if (showLyrics) {
                     val lyricsContext = LocalContext.current
                     var isDownloading by remember { mutableStateOf(false) }
                     var downloadError by remember { mutableStateOf<String?>(null) }
                     val lyricListState = rememberLazyListState()
                     val syncedLyrics = state.syncedLyrics
-                    // Konum tikleri sadece lyrics drawer açıkken ve sadece bu blokta dinlenir
-                    // (senkronize sözlerde aktif satırın takibi için zaten gerekli).
-                    val lyricsProgress by playerViewModel.progress.collectAsState()
+
+val lyricsProgress by playerViewModel.progress.collectAsState()
                     val currentMs = lyricsProgress.positionMs
                     val activeIndex = if (syncedLyrics.isNotEmpty()) {
                         syncedLyrics.indexOfLast { it.timeMs <= currentMs }.coerceAtLeast(0)
                     } else -1
 
-                    // Düzenleme durumu.
-                    var isEditing by remember { mutableStateOf(false) }
+var isEditing by remember { mutableStateOf(false) }
                     var editText by remember { mutableStateOf("") }
                     val isDarkTheme = MiuixAppTheme.colorScheme.background.luminance() < 0.5f
 
-                    // Autoscroll kaldırıldı (kullanıcı talebi).
-
-                    val lyricsFilePicker = rememberLauncherForActivityResult(
+val lyricsFilePicker = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.OpenDocument()
                     ) { uri ->
                         if (uri != null) {
@@ -554,7 +503,7 @@ fun NowPlayingSheet(
                         }
                     }
 
-                    MiuixDrawer(
+MiuixDrawer(
                         onDismissRequest = { showLyrics = false },
                     ) {
                         Column(
@@ -564,9 +513,8 @@ fun NowPlayingSheet(
                                 .fillMaxHeight(0.72f)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                // MADDE 7 — içe aktarma (import) tuşu artık HER ZAMAN solda
-                                // görünür (daha önce sözler içe aktarılınca kayboluyordu).
-                                dev.shephard.player.ui.miuix.IconButton(
+
+dev.shephard.player.ui.miuix.IconButton(
                                     onClick = { lyricsFilePicker.launch(arrayOf("text/*", "application/octet-stream")) }
                                 ) {
                                     Icon(
@@ -581,8 +529,8 @@ fun NowPlayingSheet(
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.weight(1f).padding(start = 4.dp)
                                 )
-                                // Düzenleme tuşu (Miuix edit simgesi).
-                                dev.shephard.player.ui.miuix.IconButton(
+
+dev.shephard.player.ui.miuix.IconButton(
                                     onClick = {
                                         if (!isEditing) {
                                             editText = state.lyrics.joinToString("\n")
@@ -673,7 +621,7 @@ fun NowPlayingSheet(
                     }
                 }
 
-                if (showPlaylists) {
+if (showPlaylists) {
                     AddToPlaylistDrawer(
                         trackId = trackId,
                         track = track,
@@ -684,8 +632,7 @@ fun NowPlayingSheet(
                 }
             }
 
-            // Controls
-            Row(
+Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp, bottom = 32.dp, start = 20.dp, end = 20.dp)
@@ -708,8 +655,8 @@ fun NowPlayingSheet(
                     tint = Color.White,
                     iconSize = 36.dp
                 )
-                // Pause / resume butonunun arkaplanı silindi + Flamingo simgeleri kullanıldı
-                Box(
+
+Box(
                     modifier = Modifier
                         .size(72.dp)
                         .bounceClick {
@@ -763,17 +710,6 @@ fun NowPlayingSheet(
     }
 }
 
-/**
- * Flamingo Player'daki NowPlaying arka planıyla aynı yaklaşım: kapak resminin doygunluğu
- * artırılmış, bulanıklaştırılmış hali + üstüne sabit koyu overlay. Önceki gradient/glow
- * (kapak renginden hesaplanan `glow` accent rengiyle yapılan Brush.verticalGradient/
- * radialGradient, amplitude'a göre nabız gibi büyüyüp küçülen) TAMAMEN kaldırıldı — artık
- * kapak resmi doğrudan (statik) arka plan.
- *
- * NOT: Flamingo'nun KenBurnsView (yavaş pan/zoom) efekti burada YOK — bu, projeye yeni bir
- * üçüncü parti bağımlılık (com.flaviofaria:kenburnsview) eklemeyi gerektirirdi. Statik
- * blur'lu kapak, görsel sonucun büyük kısmını hiçbir ekstra bağımlılık olmadan veriyor.
- */
 @Composable
 private fun AmbientGlowBackground(
     track: AudioTrack?,
@@ -793,9 +729,8 @@ private fun AmbientGlowBackground(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        // Blur öncesi hafif taşırma: kenarlarda blur'un şeffaf/keskin
-                        // kesim göstermemesi için resmi biraz büyütüyoruz.
-                        scaleX = 1.15f
+
+scaleX = 1.15f
                         scaleY = 1.15f
                     }
                     .blur(radius = 60.dp),
@@ -803,8 +738,8 @@ private fun AmbientGlowBackground(
                     ColorMatrix().apply { setToSaturation(1.35f) }
                 )
             )
-            // Kararma efekti: Şarkı durdurulunca (isPlaying == false) arkaplan kararıyor
-            Box(
+
+Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = darkOverlayAlpha))
@@ -824,10 +759,6 @@ private fun AmbientGlowBackground(
     }
 }
 
-/**
- * Seek bar + süre etiketleri. [PlayerViewModel.progress] flow'unu (500ms tik) YALNIZCA bu
- * composable toplar — NowPlayingSheet'in geri kalanı konum güncellemelerinden tamamen izole.
- */
 @Composable
 private fun SeekBarRow(playerViewModel: PlayerViewModel) {
     val progress by playerViewModel.progress.collectAsState()
@@ -882,11 +813,11 @@ private fun AddToPlaylistDrawer(
     val isLiked = likedIds.contains(trackId)
     val addToPlaylistLiquidGlassOn = LocalBlurEnabled.current
 
-    MiuixDrawer(
+MiuixDrawer(
         onDismissRequest = onDismiss,
     ) {
-        // MADDE 6 — "add to playlist" drawer'ı da alçaltıldı.
-        Column(
+
+Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
@@ -899,8 +830,8 @@ private fun AddToPlaylistDrawer(
                     .weight(1f)
                     .overScrollVertical()
             ) {
-                // Liked Songs at top
-                item {
+
+item {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -941,8 +872,8 @@ private fun AddToPlaylistDrawer(
                         }
                     }
                 }
-                // User playlists
-                itemsIndexed(playlists) { idx, pl ->
+
+itemsIndexed(playlists) { idx, pl ->
                     if (pl.isSystem) return@itemsIndexed
                     val containsTrack = pl.trackIds.contains(trackId)
                     Row(
@@ -957,8 +888,8 @@ private fun AddToPlaylistDrawer(
                                 val all = playlists.toMutableList()
                                 all[idx] = updated
                                 scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
-                                // Queue'ye ekle (yalnızca ekleniyorsa, kaldırılmıyorsa)
-                                if (!containsTrack && track != null) {
+
+if (!containsTrack && track != null) {
                                     playerViewModel.addTrackToQueue(track)
                                 }
                             }
@@ -1002,9 +933,8 @@ private fun QueueList(
     val currentStartIndex = remember(queue, currentTrackId) {
         queue.indexOfFirst { it.id == currentTrackId }.coerceAtLeast(0)
     }
-    // OuterTune'daki gibi: gerçek liste mutableStateListOf ile tutulur, drag sırasında
-    // reorderableState onMove callback'i doğrudan bu listeyi günceller (item flicker olmadan).
-    val items = remember { mutableStateListOf<AudioTrack>() }
+
+val items = remember { mutableStateListOf<AudioTrack>() }
     LaunchedEffect(queue, currentStartIndex) {
         if (items.map { it.id } != queue.drop(currentStartIndex).map { it.id }) {
             items.clear()
@@ -1012,12 +942,9 @@ private fun QueueList(
         }
     }
 
-    val listState = rememberLazyListState()
+val listState = rememberLazyListState()
 
-    // Drag başlayıp bitene kadar olan from/to'yu tek seferde biriktirip
-    // gerçek move işlemini (onMove) sadece drag bitince tetikliyoruz —
-    // OuterTune'un Queue.kt'deki reorderableState + LaunchedEffect(isAnyItemDragging) deseni.
-    var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val reorderableState = rememberReorderableLazyListState(
         lazyListState = listState
     ) { from, to ->
@@ -1041,11 +968,9 @@ private fun QueueList(
         }
     }
 
-    val queueLiquidGlassOn = LocalBlurEnabled.current
-    // MADDE 6 — sıra (queue) drawer'ı ekranın %88'ini kaplıyordu. Kaydırılabilir bir
-    // liste içerdiği için sınırlı bir yüksekliğe ihtiyacı var; %66 hem listeyi rahat
-    // gösteriyor hem de arkadaki çalar ekranını görünür bırakıyor.
-    Column(
+val queueLiquidGlassOn = LocalBlurEnabled.current
+
+Column(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight(0.66f)
@@ -1104,7 +1029,7 @@ private fun QueueTrackItem(
         label = "queueItemElevation"
     )
 
-    Box(
+Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
@@ -1117,7 +1042,7 @@ private fun QueueTrackItem(
             val isSwipeLeft = offsetX < 0f
             val isThresholdReached = absOffset >= swipeThresholdPx
 
-            Box(
+Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
@@ -1150,7 +1075,7 @@ private fun QueueTrackItem(
             }
         }
 
-        Row(
+Row(
             modifier = Modifier
                 .fillMaxSize()
                 .offset(x = with(density) { offsetX.toDp() })
@@ -1246,7 +1171,6 @@ internal fun formatMillis(ms: Long): String {
     return "%d:%02d".format(m, s)
 }
 
-/** Parantez/köşeli parantez içindeki gereksiz ekleri temizler: "Title (feat. X)" → "Title" */
 private fun cleanTitle(title: String): String =
     title.trim()
         .replace(Regex("\\s*\\(feat\\.?[^)]*\\)", RegexOption.IGNORE_CASE), "")
@@ -1264,11 +1188,10 @@ private fun httpGet(urlStr: String, timeoutMs: Int = 8000): String? = try {
     if (conn.responseCode == 200) conn.inputStream.bufferedReader().readText() else null
 } catch (_: Exception) { null }
 
-/** lrclib.net — synced lyrics desteği olan birincil kaynak */
 private fun fetchFromLrclib(artist: String, title: String): List<String>? {
     val enc = { s: String -> java.net.URLEncoder.encode(s, "UTF-8") }
-    // Önce tam eşleşme dene
-    val body = httpGet("https://lrclib.net/api/get?artist_name=${enc(artist)}&track_name=${enc(title)}")
+
+val body = httpGet("https://lrclib.net/api/get?artist_name=${enc(artist)}&track_name=${enc(title)}")
         ?: httpGet("https://lrclib.net/api/get?artist_name=${enc(artist)}&track_name=${enc(cleanTitle(title))}")
         ?: return null
     val json = runCatching { org.json.JSONObject(body) }.getOrNull() ?: return null
@@ -1281,7 +1204,6 @@ private fun fetchFromLrclib(artist: String, title: String): List<String>? {
     return null
 }
 
-/** lrclib search endpoint — tam eşleşme bulunamazsa en iyi sonucu alır */
 private fun fetchFromLrclibSearch(artist: String, title: String): List<String>? {
     val enc = { s: String -> java.net.URLEncoder.encode(s, "UTF-8") }
     val cleanT = cleanTitle(title)
@@ -1299,7 +1221,6 @@ private fun fetchFromLrclibSearch(artist: String, title: String): List<String>? 
     return null
 }
 
-/** lyrics.ovh — basit fallback, synced desteklemez ama geniş kataloğu var */
 private fun fetchFromLyricsOvh(artist: String, title: String): List<String>? {
     val enc = { s: String -> java.net.URLEncoder.encode(s, "UTF-8") }
     val body = httpGet("https://api.lyrics.ovh/v1/${enc(artist)}/${enc(cleanTitle(title))}")
@@ -1310,12 +1231,6 @@ private fun fetchFromLyricsOvh(artist: String, title: String): List<String>? {
         ?.lines()?.map { it.trimEnd() }?.filter { it.isNotBlank() }
 }
 
-/**
- * Çoklu kaynak sırasıyla denenir:
- * 1. lrclib GET (tam eşleşme)
- * 2. lrclib SEARCH (bulanık eşleşme, temizlenmiş title)
- * 3. lyrics.ovh (fallback)
- */
 private fun fetchLyricsFromApi(artist: String, title: String): List<String>? =
     fetchFromLrclib(artist, title)
         ?: fetchFromLrclibSearch(artist, title)

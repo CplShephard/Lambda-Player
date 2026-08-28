@@ -90,6 +90,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import dev.shephard.player.ui.miuix.SwitchDefaults
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -119,9 +120,14 @@ import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
+import dev.shephard.player.theme.PaletteStyle
+import dev.shephard.player.theme.ThemeColorSpec
 import dev.shephard.player.ui.components.CustomColorPickerDialog
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.miuixBlurSurface
+import dev.shephard.player.ui.theme.material.PresetColors
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.horizontalScroll
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import dev.shephard.player.ui.glass.bgeffect.BgEffectBackground
@@ -129,15 +135,7 @@ import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
 
-/** Preset accent colors. The 7th slot is "Custom" — handled separately. */
-private val AccentPalette = listOf(
-    0xFF22C55E.toInt(), // green (lambda)
-    0xFF3B82F6.toInt(), // blue
-    0xFFE11D48.toInt(), // rose
-    0xFFF59E0B.toInt(), // amber
-    0xFF8B5CF6.toInt(), // violet
-    0xFF14B8A6.toInt(), // teal
-)
+private val SeedPalette = PresetColors.map { it.color.toArgb() }
 
 @Composable
 fun SettingsScreen(
@@ -151,11 +149,9 @@ fun SettingsScreen(
     val prefs = remember { PreferencesManager(context) }
     val strings = LocalStrings.current
 
-    val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
+val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
 
-    // MADDE 4+ — Settings artık InstallerX tarzı LARGE header kullanıyor (başlık sol üstte büyük,
-    // kaydırdıkça app bar'ın ortasında küçülüp belirir).
-    Scaffold(
+Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -178,10 +174,10 @@ fun SettingsScreen(
                     .padding(top = innerPadding.calculateTopPadding() + 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // InstallerX tarzı ana Settings: üstte widget kart, altında üç büyük yönlendirme.
-                TotalListeningTimeCard(playerViewModel = playerViewModel, onClick = onOpenStats)
 
-                SettingsNavigationCard(
+TotalListeningTimeCard(playerViewModel = playerViewModel, onClick = onOpenStats)
+
+SettingsNavigationCard(
                     icon = Icons.Filled.ColorLens,
                     title = strings.themeSettings,
                     summary = strings.themeSettingsSummary,
@@ -200,7 +196,7 @@ fun SettingsScreen(
                     onClick = onOpenAbout
                 )
 
-                Spacer(Modifier.height(110.dp))
+Spacer(Modifier.height(110.dp))
             }
         }
     }
@@ -214,18 +210,23 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val strings = LocalStrings.current
 
-    val accent by prefs.accentColor.collectAsState(initial = AccentPalette.first())
+val accent by prefs.accentColor.collectAsState(initial = SeedPalette.first())
     val wallpaper by prefs.wallpaperUri.collectAsState(initial = "")
     val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = PreferencesManager.cachedWallpaperBrightness)
     val cardAlpha by prefs.cardAlpha.collectAsState(initial = 0.85f)
     val language by prefs.language.collectAsState(initial = "en")
     val themeMode by prefs.themeMode.collectAsState(initial = ThemeModePreference.LIGHT)
     val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
+    val useMiuix by prefs.useMiuix.collectAsState(initial = true)
+    val useMiuixMonet by prefs.useMiuixMonet.collectAsState(initial = false)
+    val paletteStyle by prefs.paletteStyle.collectAsState(initial = PaletteStyle.TonalSpot)
+    val colorSpec by prefs.colorSpec.collectAsState(initial = ThemeColorSpec.SPEC_2025)
+    val appleFloatingBar by prefs.useAppleFloatingBar.collectAsState(initial = false)
     val liquidGlassEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
     val playlistsLayout by prefs.playlistsLayout.collectAsState(initial = LayoutMode.LIST)
     val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
 
-    var langMenuOpen by remember { mutableStateOf(false) }
+var langMenuOpen by remember { mutableStateOf(false) }
     var customPickerOpen by remember { mutableStateOf(false) }
     var wallpaperBrightnessValue by remember { mutableFloatStateOf(PreferencesManager.cachedWallpaperBrightness) }
     LaunchedEffect(wallpaperBrightness) {
@@ -235,10 +236,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         wallpaperBrightnessValue = wallpaperBrightness
     }
 
-    // MADDE 4 — duvar kağıdı seçerken de kapak seçimindeki gibi sistem cropper
-    // (com.android.camera.action.CROP) kullanılsın. Önce görsel seçilir, sonra crop
-    // intent'i ile kırpılır; kırpılan çıktı kalıcı depolamaya yazılır.
-    var wallpaperCropOutputUri by remember { mutableStateOf<android.net.Uri?>(null) }
+var wallpaperCropOutputUri by remember { mutableStateOf<android.net.Uri?>(null) }
     val wallpaperCropLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -248,7 +246,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    fun launchWallpaperCrop(sourceUri: android.net.Uri) {
+fun launchWallpaperCrop(sourceUri: android.net.Uri) {
         val dir = java.io.File(context.filesDir, "persisted_wallpaper").apply { mkdirs() }
         val file = java.io.File(dir, "wallpaper_${System.currentTimeMillis()}.jpg")
         val outputUri = androidx.core.content.FileProvider.getUriForFile(
@@ -256,22 +254,16 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         )
         wallpaperCropOutputUri = outputUri
 
-        // Cihazın GERÇEK ekran çözünürlüğünü al — hem outputX/Y hem de aspectX/Y bundan
-        // türetiliyor, böylece kırpma kutusu ekranın tam en-boy oranına kilitleniyor.
-        val displayMetrics = context.resources.displayMetrics
+val displayMetrics = context.resources.displayMetrics
         val screenWidth = displayMetrics.widthPixels
         val screenHeight = displayMetrics.heightPixels
 
-        val cropIntent = android.content.Intent("com.android.camera.action.CROP").apply {
+val cropIntent = android.content.Intent("com.android.camera.action.CROP").apply {
             setDataAndType(sourceUri, "image/*")
             putExtra("crop", "true")
             putExtra("scale", "true")
-            // ÖNEMLİ: aspectX/aspectY eklenince kırpma kutusu ekranın en-boy oranına
-            // KİLİTLENİR (serbest/"free scale" değil, "fullscreen scale" davranışı).
-            // Önceden sadece outputX/Y veriliyordu ve "scale":"true" ile birlikte
-            // kullanıcıya serbestçe herhangi bir orana çekilebilen bir kırpma kutusu
-            // sunuluyordu — duvar kağıdı bu yüzden ekranı tam kaplamayabiliyordu.
-            putExtra("aspectX", screenWidth)
+
+putExtra("aspectX", screenWidth)
             putExtra("aspectY", screenHeight)
             putExtra("outputX", screenWidth)
             putExtra("outputY", screenHeight)
@@ -295,15 +287,15 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         if (resolved.isNotEmpty()) {
             wallpaperCropLauncher.launch(cropIntent)
         } else {
-            // Sistem cropper yoksa seçilen görseli olduğu gibi kalıcı depolamaya kopyala.
-            scope.launch {
+
+scope.launch {
                 val persisted = dev.shephard.player.player.ImagePersistence.persistWallpaper(context, sourceUri)
                 prefs.setWallpaperUri((persisted ?: sourceUri).toString())
             }
         }
     }
 
-    val wallpaperPicker = rememberLauncherForActivityResult(
+val wallpaperPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: android.net.Uri? ->
         if (uri != null) {
@@ -317,16 +309,35 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    SettingsPageScaffold(title = strings.themeSettings, onBack = onBack) {
+SettingsPageScaffold(title = strings.themeSettings, onBack = onBack) {
         SectionCard {
+            Text(strings.uiEngine, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
+            Spacer(Modifier.height(12.dp))
+            val uiEngineOptions = listOf(strings.miuixUi, strings.googleUi)
+            val uiEngineSelectedIndex = if (useMiuix) 0 else 1
+            top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+                title = strings.uiEngine,
+                summary = strings.uiEngineDescription,
+                items = uiEngineOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it) },
+                selectedIndex = uiEngineSelectedIndex,
+                modifier = Modifier.clip(RoundedCornerShape(30.dp)),
+                onSelectedIndexChange = { index ->
+                    if ((index == 0) != useMiuix) {
+                        scope.launch { prefs.setUseMiuix(index == 0) }
+                    }
+                }
+            )
+            Spacer(Modifier.height(8.dp))
+            ToggleRow(label = strings.appleFloatingBar, checked = appleFloatingBar, description = strings.appleFloatingBarDescription) { enabled ->
+                scope.launch { prefs.setUseAppleFloatingBar(enabled) }
+            }
+        }
+
+SectionCard {
             Text(strings.themeSettings, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
             Spacer(Modifier.height(12.dp))
-            // MADDE 7 — eski ThemeModeSegmentedSwitch (Material tarzı üç butonlu segment)
-            // yerine InstallerX Revived'ın kullandığı GERÇEK Miuix bileşeni:
-            // WindowSpinnerPreference. Bu, gerçek Miuix animasyonlu dropdown pop-up'ını
-            // (WindowDropdownPopup) kullanıyor — kullanıcının referans gösterdiği
-            // "Light theme / Dark theme / Follow system theme" popup'ıyla birebir aynı.
-            val themeModeOptions = listOf(
+
+val themeModeOptions = listOf(
                 ThemeModePreference.LIGHT to strings.lightMode,
                 ThemeModePreference.DARK to strings.darkMode,
                 ThemeModePreference.AUTO to strings.autoMode,
@@ -336,26 +347,83 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 title = strings.themeMode,
                 items = themeModeOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
                 selectedIndex = themeModeSelectedIndex,
-                // ÖNEMLİ: BasicComponent (WindowSpinnerPreference'ın altında kullandığı
-                // bileşen) kendi clickable/basma efektini `modifier` parametresine
-                // doğrudan uyguluyor, kendi başına clip YAPMIYOR — bu yüzden basılı
-                // tutulduğunda ripple/highlight kartın yuvarlak köşelerini yok sayıp
-                // dikdörtgen (corner radius 0) görünüyordu. Burada clip ekliyoruz.
-                modifier = Modifier.clip(RoundedCornerShape(30.dp)),
+
+modifier = Modifier.clip(RoundedCornerShape(30.dp)),
                 onSelectedIndexChange = { index ->
                     scope.launch { prefs.setThemeMode(themeModeOptions[index].first) }
                 }
             )
             Spacer(Modifier.height(8.dp))
-            ToggleRow(label = strings.blurEffect, checked = liquidGlassEnabled) { enabled ->
+            ToggleRow(label = strings.blurEffect, checked = liquidGlassEnabled, description = strings.blurEffectDescription) { enabled ->
                 scope.launch { prefs.setLiquidGlassEnabled(enabled) }
             }
 
+Spacer(Modifier.height(8.dp))
+            ToggleRow(label = strings.miuixCustomColors, checked = useMiuixMonet, description = strings.miuixCustomColorsDescription) { enabled ->
+                scope.launch { prefs.setUseMiuixMonet(enabled) }
+            }
+            AnimatedVisibility(
+                visible = useMiuixMonet,
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
+            ) {
+                ToggleRow(label = strings.dynamicColor, checked = dynamicColor, description = strings.dynamicColorDescription) { enabled ->
+                    scope.launch { prefs.setDynamicColor(enabled) }
+                }
+            }
+            AnimatedVisibility(
+                visible = useMiuixMonet,
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
+            ) {
+                val paletteStyleOptions = PaletteStyle.entries
+                val paletteSelectedIndex = paletteStyleOptions.indexOf(paletteStyle).coerceAtLeast(0)
+                top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+                    title = strings.paletteStyle,
+                    items = paletteStyleOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.displayName) },
+                    selectedIndex = paletteSelectedIndex,
+                    modifier = Modifier.clip(RoundedCornerShape(30.dp)),
+                    onSelectedIndexChange = { index ->
+                        val newStyle = paletteStyleOptions[index]
+                        if (newStyle != paletteStyle) {
+                            scope.launch { prefs.setPaletteStyle(newStyle) }
+                        }
+                    }
+                )
+            }
+            AnimatedVisibility(
+                visible = useMiuixMonet,
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
+            ) {
+                val isSpec2025Supported = paletteStyle.supportsSpec2025
+                val availableSpecs = if (isSpec2025Supported) ThemeColorSpec.entries else listOf(ThemeColorSpec.SPEC_2021)
+                val activeSpec = if (!isSpec2025Supported) ThemeColorSpec.SPEC_2021 else colorSpec
+                val specSelectedIndex = availableSpecs.indexOf(activeSpec).coerceAtLeast(0)
+                top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+                    title = strings.colorSpec,
+                    summary = if (!isSpec2025Supported) strings.colorSpecOnly2021 else null,
+                    items = availableSpecs.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.displayName) },
+                    selectedIndex = specSelectedIndex,
+                    modifier = Modifier.clip(RoundedCornerShape(30.dp)),
+                    onSelectedIndexChange = { index ->
+                        val selectedSpec = availableSpecs[index]
+                        if (selectedSpec != colorSpec) {
+                            scope.launch { prefs.setColorSpec(selectedSpec) }
+                        }
+                    }
+                )
+            }
+        }
+
+SectionCard {
+            Text(strings.accentColor, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
             Spacer(Modifier.height(12.dp))
-            Text(strings.accentColor, style = MiuixAppTheme.typography.bodyMedium, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                AccentPalette.forEach { argb ->
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SeedPalette.forEach { argb ->
                     val selected = argb == accent
                     Box(
                         modifier = Modifier
@@ -393,7 +461,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        SectionCard {
+SectionCard {
             Text(strings.wallpaper, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
             Spacer(Modifier.height(14.dp))
             Row(
@@ -401,8 +469,8 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // SOLDA WALLPAPER PREVIEW (Ekranın full screen en-boy oranına uyarlanmış dikey önizleme)
-                Box(
+
+Box(
                     modifier = Modifier
                         .width(115.dp)
                         .aspectRatio(9f / 19.5f)
@@ -422,8 +490,8 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                         if (!previewLoaded) {
                             Icon(Icons.Filled.BrokenImage, null, tint = MiuixAppTheme.colorScheme.onSurfaceVariant)
                         }
-                        // Slider ile parlaklık değişince önizlemede anında değişsin
-                        Box(
+
+Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(Color.Black.copy(alpha = 1f - wallpaperBrightnessValue))
@@ -438,13 +506,12 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                     }
                 }
 
-                // SAĞDA ONUN HİZASINDA 3 TUŞ (Simgeli olarak liste görünümü)
-                Column(
+Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // 1. <Folder iconu> Add/Change wallpaper
-                    Row(
+
+Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
@@ -467,8 +534,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                         )
                     }
 
-                    // 2. <miuix edit iconu> Düzenle (Yeniden kırpma)
-                    if (wallpaper.isNotEmpty()) {
+if (wallpaper.isNotEmpty()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -496,8 +562,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                             )
                         }
 
-                        // 3. <çöp kutusu iconu> Delete (Remove wallpaper) -> opens confirmation Dialog
-                        Row(
+Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
@@ -523,7 +588,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 }
             }
 
-            if (wallpaper.isNotEmpty()) {
+if (wallpaper.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
                 Text(strings.wallpaperBrightness, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
                 Slider(
@@ -540,13 +605,11 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        SectionCard {
+SectionCard {
             Text(strings.layout, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
             Spacer(Modifier.height(10.dp))
-            // MADDE 7 — grid/list geçişi de artık InstallerX'in kullandığı gerçek Miuix
-            // WindowSpinnerPreference (animasyonlu dropdown popup) ile yapılıyor, eski
-            // Material tarzı LayoutToggleChip çiftleri yerine.
-            val layoutModeOptions = listOf(
+
+val layoutModeOptions = listOf(
                 LayoutMode.LIST to strings.list,
                 LayoutMode.GRID to strings.grid,
             )
@@ -573,7 +636,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             )
         }
 
-        SectionCard {
+SectionCard {
             Text(strings.language, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
             Spacer(Modifier.height(8.dp))
             SettingsActionRow(
@@ -583,16 +646,15 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             )
         }
 
-        Spacer(Modifier.height(110.dp))
+Spacer(Modifier.height(110.dp))
     }
 
-    if (langMenuOpen) {
+if (langMenuOpen) {
         MiuixDrawer(
             onDismissRequest = { langMenuOpen = false },
         ) {
-            // Bir dil seçildiğinde bayrağı doğrudan false yapmak yerine drawer'ın kendi
-            // kapanma akışını tetikliyoruz; böylece çıkış animasyonu kesilmiyor.
-            val dismissDrawer = rememberDrawerDismiss()
+
+val dismissDrawer = rememberDrawerDismiss()
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -640,14 +702,12 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    if (customPickerOpen && !dynamicColor) {
+if (customPickerOpen && !dynamicColor) {
         CustomColorPickerDialog(
             onDismiss = { customPickerOpen = false },
             onColorPicked = { argb ->
-                // MADDE 5 — Sadece rengi kaydet; drawer kapanışını onDismissRequest üzerinden
-                // (dismissDrawer animasyonu bitince) sağlıyoruz. Böylece Apply'a basınca da
-                // kapanma animasyonu oynar.
-                scope.launch { prefs.setAccentColor(argb) }
+
+scope.launch { prefs.setAccentColor(argb) }
             },
             initialArgb = accent,
             title = strings.customColorTitle,
@@ -655,7 +715,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         )
     }
 
-    if (showRemoveWallpaperConfirm) {
+if (showRemoveWallpaperConfirm) {
         dev.shephard.player.ui.miuix.MiuixDialog(
             onDismissRequest = { showRemoveWallpaperConfirm = false },
             title = strings.removeWallpaper,
@@ -709,6 +769,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             }
         )
     }
+
 }
 
 @Composable
@@ -721,7 +782,7 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
     val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
     val playWith by prefs.playWithOthers.collectAsState(initial = false)
 
-    SettingsPageScaffold(title = strings.playbackSettings, onBack = onBack) {
+SettingsPageScaffold(title = strings.playbackSettings, onBack = onBack) {
         SectionCard {
             Text(strings.playbackSettings, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
             Spacer(Modifier.height(8.dp))
@@ -733,18 +794,6 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
     }
 }
 
-/**
- * InstallerX Revived'ın MiuixAboutPage'i ile birebir aynı yapı:
- *
- * - Sabit (sticky) header: uygulama ikonu (Lambda Player'ın ORİJİNAL launcher ikonu,
- *   30dp corner radius ile), 35sp uygulama adı ve sürüm bilgisi. Liste kaydırıldıkça
- *   header InstallerX'teki eşiklerle (icon 0.35→0.50, ad 0.20→0.35, sürüm 0.05→0.20)
- *   sırayla küçülüp kaybolur.
- * - Üstte `SmallTopAppBar`: "About" başlığı, kaydırma ilerledikçe action bar'ın
- *   ORTASINDA küçük şekilde belirir (Miuix davranışı).
- * - İçerik: `SmallTitle` + Miuix `Card` içinde `ArrowPreference` satırları
- *   (GitHub / CplShephard ve Miuix — InstallerX bağlantısı kaldırıldı).
- */
 @Composable
 fun AboutSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -755,12 +804,12 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
         catch (_: PackageManager.NameNotFoundException) { "" }
     }
 
-    val density = LocalDensity.current
+val density = LocalDensity.current
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val appBarHeight = 56.dp
     val headerTopPadding = statusBarPadding + appBarHeight + 40.dp
 
-    val lazyListState = rememberLazyListState()
+val lazyListState = rememberLazyListState()
     val topAppBarScrollBehavior = MiuixScrollBehavior()
     var logoHeightPx by remember { mutableIntStateOf(0) }
     var headerHeightDp by remember { mutableStateOf(190.dp) }
@@ -778,8 +827,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    // InstallerX MiuixAboutPage'teki scrollProgress hesabının birebir aynısı.
-    val scrollProgress by remember {
+val scrollProgress by remember {
         derivedStateOf {
             if (logoHeightPx <= 0) {
                 0f
@@ -791,23 +839,17 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    // MADDE 9 — About sayfasına özel dinamik ışık (InstallerX'in BgEffect'i).
-    // Renkler morumsu/mavimsi yerine YEŞİLİMSİ / AÇIK MAVİMSİ (bkz. BgEffectConfig).
-    // Sayfa aşağı kaydırıldıkça (header solarken) ışık da yumuşakça sönüyor — InstallerX
-    // About'ta olduğu gibi.
-    val isDarkTheme = MiuixAppTheme.colorScheme.background.luminance() < 0.5f
+val isDarkTheme = MiuixAppTheme.colorScheme.background.luminance() < 0.5f
     BgEffectBackground(
         isDarkTheme = isDarkTheme,
         modifier = Modifier.fillMaxSize(),
         isFullSize = true,
-        // MADDE 2 — About arka planı SIMSIYAH olmalı; duvar kağıdı About ekranında
-        // etkili olmamalı. Bu yüzden opak siyah zemin çizilir, dinamik ışık (MADDE 9)
-        // onun ÜZERİNE biniyor.
-        surface = Color.Black,
+
+surface = Color.Black,
         alpha = { 1f - scrollProgress * 0.85f }
     ) {
-        // Sticky animated header (liste bunun ÜZERİNDEN kayar)
-        Column(
+
+Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = headerTopPadding)
@@ -875,22 +917,20 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
             )
         }
 
-        // Kaydırılabilir içerik
-        LazyColumn(
+LazyColumn(
             state = lazyListState,
             modifier = Modifier
                 .fillMaxSize()
                 .overScrollVertical()
                 .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection)
         ) {
-            // Header yüksekliğinde şeffaf boşluk (InstallerX'teki "logoSpacer")
-            item(key = "logoSpacer") {
-                // LazyColumn ekranın en üstünden başladığı için spacer, header'ın
-                // kapladığı tüm alanı (status bar + app bar + 40dp + header + 48dp) doldurur.
-                Box(
+
+item(key = "logoSpacer") {
+
+Box(
                     Modifier
                         .fillMaxWidth()
-                        .height(headerTopPadding + headerHeightDp + 48.dp)
+                        .height(headerTopPadding + headerHeightDp + 88.dp)
                         .onSizeChanged { size -> logoHeightPx = size.height }
                 )
             }
@@ -907,9 +947,8 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                             summary = "CplShephard",
                             onClick = { uriHandler.openUri("https://github.com/CplShephard") }
                         )
-                        // MADDE 9 — InstallerX About'taki "Open Source Licenses" satırının
-                        // yerinde artık Lambda Player'ın kendi kaynak kodu bağlantısı var.
-                        ArrowPreference(
+
+ArrowPreference(
                             title = strings.sourceCode,
                             summary = "github.com/CplShephard/Lambda-Player",
                             onClick = { uriHandler.openUri("https://github.com/CplShephard/Lambda-Player") }
@@ -917,7 +956,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                         ArrowPreference(
                             title = "Miuix",
                             summary = strings.miuixDescription,
-                            onClick = { uriHandler.openUri("https://github.com/miuix-project/miuix") }
+                            onClick = { uriHandler.openUri("https://github.com/composex/miuix") }
                         )
                     }
                     Spacer(Modifier.height(110.dp))
@@ -925,8 +964,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // Üstte sabit app bar: "About" başlığı kaydırdıkça ORTADA belirir
-        SmallTopAppBar(
+SmallTopAppBar(
             title = strings.aboutSectionTitle,
             modifier = Modifier.align(Alignment.TopCenter),
             color = MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
@@ -953,12 +991,6 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
     }
 }
 
-
-/**
- * Ayar alt sayfaları için Miuix/InstallerX tarzı iskelet:
- * içerikteki büyük başlık kaydırıldıkça kaybolur ve `SmallTopAppBar`'ın ORTASINDA
- * küçük şekilde belirmeye devam eder (Miuix'in daralan başlık davranışı).
- */
 @Composable
 private fun SettingsPageScaffold(
     title: String,
@@ -970,19 +1002,15 @@ private fun SettingsPageScaffold(
     val scrollState = rememberScrollState()
     val topAppBarScrollBehavior = MiuixScrollBehavior()
     val liquidGlassOn = LocalBlurEnabled.current
-    // InstallerX'teki gibi sayfaya özel backdrop — bkz. CollapsingTopBarState.pageBackdrop
-    // açıklaması (CollapsingTopBar.kt). Bu scaffold CollapsingTopBarState kullanmadığı için
-    // kendi backdrop'unu kuruyor.
-    val pageBackdrop = if (liquidGlassOn) rememberLayerBackdrop() else null
 
-    // Büyük başlık ~44dp'lik kaydırma aralığında kaybolur; aynı aralıkta app bar'daki
-    // ortalanmış küçük başlık belirir.
-    val collapseRangePx = with(density) { 44.dp.toPx() }
+val pageBackdrop = if (liquidGlassOn) rememberLayerBackdrop() else null
+
+val collapseRangePx = with(density) { 44.dp.toPx() }
     val scrollProgress by remember {
         derivedStateOf { (scrollState.value / collapseRangePx).coerceIn(0f, 1f) }
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(MiuixAppTheme.colorScheme.background)) {
+Column(modifier = Modifier.fillMaxSize().background(MiuixAppTheme.colorScheme.background)) {
         SmallTopAppBar(
             title = title,
             modifier = if (pageBackdrop != null) {
@@ -1000,11 +1028,8 @@ private fun SettingsPageScaffold(
                 MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
             titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
             scrollBehavior = topAppBarScrollBehavior,
-            // NOT: SmallTopAppBar zaten WindowInsets.systemBars(Top)'u KOŞULSUZ kendi
-            // uyguluyor (defaultWindowInsetsPadding sadece yatay/notch insets'i kontrol
-            // ediyor) — yani status bar padding'i buradan değil, Scaffold'un
-            // contentWindowInsets'inden geliyordu. Asıl düzeltme orada (bkz. MainContainer).
-            defaultWindowInsetsPadding = false,
+
+defaultWindowInsetsPadding = false,
             navigationIcon = {
                 Box(
                     modifier = Modifier
@@ -1029,9 +1054,8 @@ private fun SettingsPageScaffold(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Büyük sayfa başlığı — kaydırdıkça küçülüp solar, yerini üstteki
-            // ortalanmış küçük başlığa bırakır.
-            Text(
+
+Text(
                 text = title,
                 style = MiuixAppTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
@@ -1109,10 +1133,6 @@ private fun SettingsActionRow(
     }
 }
 
-// İzole edilmiş: totalListeningMs PlayerViewModel'in observePosition() döngüsü tarafından
-// artık 10 saniyelik paketler halinde güncelleniyor. Bu değer buradaki KENDİ collectAsState'inde toplandığı için
-// recompose sadece bu küçük composable ile sınırlı kalıyor — SettingsScreen'in geri kalanı
-// (toggle'lar, slider'lar) her tick'te yeniden çizilmiyor.
 @Composable
 private fun TotalListeningTimeCard(playerViewModel: PlayerViewModel, onClick: () -> Unit) {
     val strings = LocalStrings.current
@@ -1152,23 +1172,32 @@ private fun SectionCard(
 private typealias ColumnScope = androidx.compose.foundation.layout.ColumnScope
 
 @Composable
-private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun ToggleRow(label: String, checked: Boolean, description: String? = null, onChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // weight(1f): uzun (örn. Türkçe) etiketler Switch'i sıkıştırıp deforme etmesin.
-        // Etiket gerekirse birden fazla satıra sarar, toggle her zaman sabit boyutta kalır.
-        Text(
-            text = label,
-            color = MiuixAppTheme.colorScheme.onBackground,
-            style = MiuixAppTheme.typography.bodyLarge,
+        Column(
             modifier = Modifier
                 .weight(1f)
                 .padding(end = 16.dp)
-        )
+        ) {
+            Text(
+                text = label,
+                color = MiuixAppTheme.colorScheme.onBackground,
+                style = MiuixAppTheme.typography.bodyLarge
+            )
+            if (description != null) {
+                Text(
+                    text = description,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixAppTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
         Switch(
             checked = checked,
             onCheckedChange = onChange,

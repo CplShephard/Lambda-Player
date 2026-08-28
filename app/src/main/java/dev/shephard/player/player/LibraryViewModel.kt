@@ -47,7 +47,6 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val _filteredTracks = MutableStateFlow<List<AudioTrack>>(emptyList())
     val filteredTracks: StateFlow<List<AudioTrack>> = _filteredTracks.asStateFlow()
 
-    // trackId.toString() -> TrackOverride
     private val _overrides = MutableStateFlow<Map<String, TrackOverride>>(emptyMap())
     val overrides: StateFlow<Map<String, TrackOverride>> = _overrides.asStateFlow()
 
@@ -99,7 +98,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             _overrides.value = current
             val json = encodeOverrides(current)
             prefs.setTrackOverridesJson(json)
-            // Re-apply overrides to current raw track list
+
             val rawJson = prefs.trackOverridesJson.first()
             val newOverrides = parseOverrides(rawJson)
             val raw = withContext(Dispatchers.IO) {

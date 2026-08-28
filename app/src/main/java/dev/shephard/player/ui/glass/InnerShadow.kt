@@ -3,7 +3,7 @@
 
 package dev.shephard.player.ui.glass
 
-// Adapted from Kyant0/AndroidLiquidGlass — https://github.com/Kyant0/AndroidLiquidGlass (Apache 2.0).
+// Adapted from Kyant0/AndroidLiquidGlass — https:
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable

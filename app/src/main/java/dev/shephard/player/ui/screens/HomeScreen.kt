@@ -75,13 +75,6 @@ import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.Text
 import top.yukonga.miuix.kmp.basic.Scaffold
 
-/**
- * Flamingo Player'daki Home.kt sayfasından (RecommendCard - Featured Songs ve RecentlyPlayedCard
- * - Recently Played / Viewed) esinlenerek Lambda Player'a eklenen ana sayfa.
- *
- * Miuix / InstallerX tasarım diline, SmallTopAppBar (blur topbar / collapsing top bar),
- * ve projenin yerel dinleme istatistiklerine (statsEventsFlow) entegre edilmiştir.
- */
 @Composable
 fun HomeScreen(
     libraryViewModel: LibraryViewModel = viewModel(),
@@ -223,7 +216,7 @@ fun HomeScreen(
                     ),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // Featured Songs Section (RecommendCard)
+
                 if (featuredTracks.isNotEmpty()) {
                     FeaturedSongsSection(
                         title = strings.featuredSongs,
@@ -234,7 +227,6 @@ fun HomeScreen(
                     )
                 }
 
-                // Featured Playlists Section
                 if (featuredPlaylists.isNotEmpty()) {
                     FeaturedPlaylistsSection(
                         title = strings.featuredPlaylists,
@@ -248,7 +240,6 @@ fun HomeScreen(
                     )
                 }
 
-                // Recently Played / Viewed Section (RecentlyPlayedCard)
                 if (recentlyPlayedTracks.isNotEmpty()) {
                     RecentlyPlayedSection(
                         title = strings.recentlyPlayed,

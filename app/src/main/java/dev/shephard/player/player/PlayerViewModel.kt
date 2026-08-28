@@ -32,17 +32,6 @@ import kotlin.math.sin
 
 data class SyncedLyricLine(val timeMs: Long, val text: String)
 
-/**
- * Çalma konumu, [PlayerUiState]'ten AYRI tutulur.
- *
- * Eskiden `positionMs`/`durationMs` doğrudan `PlayerUiState` içindeydi ve 500 ms'de bir
- * güncelleniyordu. `uiState`'i toplayan HER composable (NowPlayingSheet'in tamamı dahil —
- * kapak swipe grid'i, gradientler, butonlar, drawer'lar) saniyede iki kez yeniden
- * besteleniyordu. NowPlaying'deki kasmanın asıl sebebi buydu.
- *
- * Artık konum yalnızca [PlayerViewModel.progress] üzerinden yayınlanıyor ve bunu sadece
- * seek bar / süre etiketleri / lyrics gibi küçük yaprak composable'lar dinliyor.
- */
 data class PlaybackProgress(
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
@@ -77,8 +66,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
-    // Çalma konumu 500 ms'de bir SADECE bu flow üzerinden yayınlanır.
-    // uiState'e yazılmadığı için NowPlayingSheet'in tamamı artık her tikte recompose olmaz.
     private val _progress = MutableStateFlow(PlaybackProgress())
     val progress: StateFlow<PlaybackProgress> = _progress.asStateFlow()
 
@@ -93,11 +80,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var lastListeningStoreWriteMs: Long = 0L
     private var pendingExternalUri: Uri? = null
 
-    // --- Dinleme istatistikleri (Flamingo Player'daki "Stats" özelliğinin uyarlanmışı) ---
-    // Şu an çalan track için "oturum": gün başlangıcına göre bölünmüş dinlenen süre
-    // (gece yarısını geçen dinlemeler doğru günlere ayrılsın diye), ve "play sayılır mı"
-    // eşiği (şarkının %50'si dinlenince bir "play" olarak sayılır — Flamingo'nunkiyle aynı
-    // kural). Track her değiştiğinde oturum kapatılıp kalıcı listeye (statsEvents) eklenir.
     private var statsSessionTrackId: Long? = null
     private var statsSessionQualified: Boolean = false
     private var statsSessionQualifyDayStartMs: Long = 0L
@@ -107,24 +89,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _statsEventsFlow = MutableStateFlow<List<ListenEvent>>(emptyList())
     val statsEventsFlow: StateFlow<List<ListenEvent>> = _statsEventsFlow.asStateFlow()
 
-    // The animated NowPlaying glow must not live inside PlayerUiState: updating that
-    // data class every ~80ms invalidates MainContainer/NavGraph/Settings while music is
-    // playing. Keep it in a tiny dedicated flow that only NowPlayingSheet observes.
     private val _amplitude = MutableStateFlow(0f)
     val amplitude: StateFlow<Float> = _amplitude.asStateFlow()
 
-    // Live listening time for the Settings widget. It updates in memory every tick so the
-    // counter moves second-by-second, while DataStore writes remain batched for performance.
     private val _totalListeningMsLive = MutableStateFlow(0L)
     val totalListeningMsLive: StateFlow<Long> = _totalListeningMsLive.asStateFlow()
 
-    // -1 = backward, 1 = forward, 0 = unknown
     private val _navigationDirection = MutableStateFlow(1)
     val navigationDirection: StateFlow<Int> = _navigationDirection.asStateFlow()
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
             if (isPlaying) {
                 val now = System.currentTimeMillis()
                 lastPlaybackTickMs = now
@@ -132,6 +107,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             } else {
                 flushListeningTime()
             }
+        }
+
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            _uiState.value = _uiState.value.copy(isPlaying = playWhenReady)
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -186,14 +165,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             val json = prefs.listenStatsEventsJson.first()
             val loadedEvents = ListenStatsCalculator.decodeEvents(json)
-            // YARIŞ DURUMU DÜZELTMESİ: Bu okuma suspend olduğu için, tamamlanana kadar
-            // kullanıcı zaten müzik dinleyip track değiştirmiş (finalizeStatsSession
-            // çağrılmış) olabilir — o event'ler statsEventsLoaded henüz false olduğu için
-            // DataStore'a YAZILAMAMIŞ ama statsEvents (bellek) listesine EKLENMİŞ olabilir.
-            // Burada blindly `statsEvents = loadedEvents` yaparsak, o bellek-only event'ler
-            // DataStore'dan gelen (henüz onları içermeyen) eski liste ile EZİLİR ve kalıcı
-            // olarak kaybolurdu — "her güncellemede/açılışta stats sıfırlanıyor" hissinin
-            // gerçek sebebi buydu. Şimdi DataStore'dan gelenle bellektekini BİRLEŞTİRİYORUZ.
+
             statsEvents = if (statsEvents.isEmpty()) {
                 loadedEvents
             } else {
@@ -201,9 +173,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
             statsEventsLoaded = true
             _statsEventsFlow.value = statsEvents
-            // Birleştirme sırasında DataStore'da henüz olmayan bellek-only event'ler
-            // eklenmiş olabilir — hemen kalıcı hale getir, bir sonraki track değişimini
-            // beklemeye gerek yok.
+
             if (statsEvents.size != loadedEvents.size) {
                 persistStatsEvents()
             }
@@ -254,7 +224,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.value = _uiState.value.copy(
             queue = restored,
             currentTrack = current,
-            isPlaying = c.isPlaying,
+            isPlaying = c.playWhenReady,
             shuffleEnabled = c.shuffleModeEnabled,
             repeatMode = mode
         )
@@ -293,8 +263,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     if (c.isPlaying) {
                         accrueListeningTime()
                     }
-                    // SADECE _progress güncellenir; _uiState'e dokunulmaz.
-                    // Böylece uiState toplayan hiçbir composable bu tikten etkilenmez.
+
                     _progress.value = PlaybackProgress(
                         positionMs = c.currentPosition.coerceAtLeast(0L),
                         durationMs = c.duration.coerceAtLeast(0L)
@@ -357,12 +326,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
-    /**
-     * Her tick'te (≈500ms) çağrılır. Şu an çalan track için gün bazında (gece yarısını
-     * geçen dinlemeler doğru güne ayrılsın diye) dinlenen süreyi biriktirir, ve şarkının
-     * %50'si dinlenince bir "play" olarak sayılmasını sağlayan eşiği kontrol eder — bkz.
-     * Flamingo Player'ın ListenStatsTracker.tick() ile aynı kural.
-     */
     private fun accrueStatsSession(deltaMs: Long, nowMs: Long) {
         val trackId = statsSessionTrackId ?: return
         val dayStart = ListenStatsCalculator.dayStartMs(nowMs)
@@ -392,7 +355,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    /** Track gerçekten değiştiğinde (onMediaItemTransition) çağrılır — oturumu kalıcı listeye ekler. */
     private fun finalizeStatsSession() {
         val trackId = statsSessionTrackId
         if (trackId != null && statsListenedMsByDayStart.isNotEmpty()) {
@@ -484,9 +446,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
         lastPlaybackTickMs = now
 
-        // Do not write DataStore every 500ms. That was the hidden Settings jank source:
-        // every write emitted totalListeningMs, causing collectors to wake up constantly.
-        // Batch writes while keeping exact time in memory and flush on pause/track switch.
         if (pendingListeningDeltaMs >= 10_000L || now - lastListeningStoreWriteMs >= 10_000L) {
             flushPendingListeningTime()
         }
@@ -536,7 +495,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-
     fun playExternalUri(uri: Uri) {
         val c = controller
         if (c == null) {
@@ -548,7 +506,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         originalQueue = emptyList()
 
         viewModelScope.launch {
-            // Embedded album art'ı arka planda çek
+
             val artUri: Uri? = withContext(Dispatchers.IO) {
                 runCatching {
                     val retriever = MediaMetadataRetriever()
@@ -556,7 +514,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     val bytes = retriever.embeddedPicture
                     retriever.release()
                     if (bytes != null) {
-                        // Bitmap'i app cache'e yaz, content URI olarak dön
+
                         val cacheFile = java.io.File(getApplication<Application>().cacheDir, "ext_art_${uri.hashCode()}.jpg")
                         cacheFile.writeBytes(bytes)
                         Uri.fromFile(cacheFile)
@@ -638,7 +596,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun togglePlayPause() {
         val c = controller ?: return
-        if (c.isPlaying) c.pause() else c.play()
+        if (c.playWhenReady) c.pause() else c.play()
     }
 
     fun skipToNext() {
@@ -671,20 +629,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         c.shuffleModeEnabled = !c.shuffleModeEnabled
     }
 
-    /**
-     * Remix, çalan parçayı queue'nun EN BAŞINA (index 0) sabitler, geri kalan TÜM parçaları
-     * (eskiden "öncesi" sayılanlar dahil) karıştırır. Çalan parça fiziksel olarak ÇALMAYA
-     * DEVAM EDER (moveMediaItem tabanlı reorder kullanıldığı için ExoPlayer yeniden
-     * prepare/seek yapmaz, ses kesilmez) — sadece queue listesindeki konumu değişebilir.
-     *
-     * ÖNEMLİ DÜZELTME: Önceki implementasyon çalan parçayı ORİJİNAL index'inde sabit
-     * tutuyordu. Matematiksel olarak geri kalan TÜM parçalar (öncesi dahil) karıştırılsa
-     * da, kullanıcı deneyiminde bunun görünür etkisi yoktu — zaten geçmişe (çalan parçadan
-     * önceki sıraya) geri gidilmediği için, kullanıcı sadece "queue'da ÖNÜMDEKİ" şarkıların
-     * değiştiğini görüyordu; çalan parça queue'nun son elemanıysa "sonrası" boş olduğundan
-     * gözle görülür HİÇBİR değişiklik olmuyordu. Artık çalan parça her zaman index 0'da —
-     * "öncesi" kavramı ortadan kalktığı için remix'in etkisi her zaman görünür.
-     */
     fun remixQueue() {
         val c = controller ?: return
         val current = _uiState.value.queue
@@ -692,11 +636,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (current.size <= 1 || currentTrack == null) return
 
         if (remixActive) {
-            // Geri al: TÜM kuyruğu orijinal sırasına döndür. Orijinal sıradan yalnızca hâlâ
-            // kuyrukta olan parçalar alınır (bu arada silinen/eklenen parçalar korunur).
+
             val queueIds = current.map(AudioTrack::id).toSet()
             val restored = originalQueue.filter { it.id in queueIds }
-            // Orijinalde olmayan (sonradan eklenen) parçaları koru, sonda bırak.
+
             val extras = current.filterNot { it.id in restored.map { it.id }.toSet() }
             val restoreQueue = restored + extras
             if (restoreQueue != current) {
@@ -710,10 +653,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
-        // Çalan parça HARİÇ tüm queue karıştırılır, sonra çalan parça EN BAŞA (index 0)
-        // sabitlenir. reorderPlayerPlaylist moveMediaItem tabanlı olduğu için çalan
-        // parçanın queue içindeki index'i değişse bile fiziksel olarak çalmaya devam
-        // eder (yeniden prepare/seek edilmez, ses kesilmez, cover glitch olmaz).
         originalQueue = current
         val rest = current.filterNot { it.id == currentTrack.id }.shuffled()
         val newOrder = listOf(currentTrack) + rest
@@ -763,12 +702,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _progress.value = PlaybackProgress()
     }
 
-    /**
-     * Reorders the player's playlist from [fromOrder] into [toOrder] using
-     * ExoPlayer's [Player.moveMediaItem]. Unlike setMediaItems, moveMediaItem never
-     * re-prepares the currently playing item, so playback continues uninterrupted
-     * while the upcoming queue is reshuffled.
-     */
     private fun reorderPlayerPlaylist(
         c: Player,
         fromOrder: List<AudioTrack>,
@@ -925,10 +858,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val color = withContext(Dispatchers.IO) {
                 runCatching {
                     val resolver = getApplication<Application>().contentResolver
-                    // Palette sadece renk dağılımıyla ilgilendiği için kapak resmini
-                    // düşük çözünürlükte decode etmek yeterli — tam boyutlu (örn. 3000x3000)
-                    // bir bitmap'i decode edip Palette'e vermek hem CPU hem bellek israfı,
-                    // ve şarkı geçişlerindeki lag'in ana kaynaklarından biriydi.
+
                     val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     resolver.openInputStream(uri)?.use { s -> BitmapFactory.decodeStream(s, null, bounds) }
                     val (w, h) = bounds.outWidth to bounds.outHeight
@@ -961,9 +891,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
         viewModelScope.launch {
             val lyrics = withContext(Dispatchers.IO) {
-                // 1) Kullanıcının daha önce indirip kalıcı kaydettiği lyrics (en yüksek öncelik)
+
                 loadSavedLyrics(track.id)
-                    // 2) Yoksa gömülü lyrics / .lrc dosyası dene
+
                     ?: runCatching {
                         loadLyricsFromRetriever(track.uri)
                             ?: loadLyricsFromLrcFile(track)
@@ -974,7 +904,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    /** Prefs'te trackId'ye göre kaydedilmiş lyrics varsa döndürür. */
     private suspend fun loadSavedLyrics(trackId: Long): List<String>? {
         return runCatching {
             val json = prefs.lyricsJson.first()
@@ -988,7 +917,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(getApplication(), uri)
-            val lyrics = retriever.extractMetadata(28 /* MediaMetadataRetriever.METADATA_KEY_LYRICS */)
+            val lyrics = retriever.extractMetadata(28 )
             retriever.release()
             lyrics?.lines()?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }
         } catch (e: Exception) {
@@ -1054,11 +983,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun parseLrcPublic(content: String): List<String> = parseLrc(content)
 
-    /**
-     * Metadata override kaydedildikten sonra çağrılır.
-     * currentTrack ve queue'deki ilgili track'i anında günceller →
-     * NowPlayingSheet ve MiniPlayer yeni title/cover'ı hemen gösterir.
-     */
     fun notifyTrackUpdated(updatedTrack: AudioTrack) {
         val current = _uiState.value
         val updatedQueue = current.queue.map { if (it.id == updatedTrack.id) updatedTrack else it }
@@ -1070,11 +994,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    /**
-     * Playlist'e yeni track eklendiğinde queue'ye de ekler.
-     * remixActive = true → rastgele pozisyona yerleştirir (currentTrack'ten sonra)
-     * remixActive = false → queue'nun sonuna ekler
-     */
     fun addTrackToQueue(track: AudioTrack) {
         val c = controller ?: return
         val current = _uiState.value
@@ -1107,7 +1026,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setManualLyrics(lines: List<String>) {
         _uiState.value = _uiState.value.copy(lyrics = lines, lyricsVisible = true)
-        // Kalıcı olarak kaydet — uygulamadan çıkıp tekrar girince lyrics kaybolmasın.
+
         val trackId = _uiState.value.currentTrack?.id ?: return
         if (lines.isEmpty()) return
         viewModelScope.launch {

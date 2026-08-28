@@ -3,12 +3,11 @@
 
 package dev.shephard.player.ui.glass
 
-// Adapted from Kyant0/AndroidLiquidGlass — https://github.com/Kyant0/AndroidLiquidGlass (Apache 2.0).
+// Adapted from Kyant0/AndroidLiquidGlass — https:
 
 import top.yukonga.miuix.kmp.blur.BackdropEffectScope
 import top.yukonga.miuix.kmp.blur.colorControls
 
-/** Lightweight stand-in for Kyant's `vibrancy()`. */
 fun BackdropEffectScope.vibrancy() {
     colorControls(
         brightness = 0f,

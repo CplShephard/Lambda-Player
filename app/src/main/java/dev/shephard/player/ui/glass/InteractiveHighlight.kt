@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2025-2026 InstallerX Revived contributors
-//
-// Portions of this file are derived from weishu/KernelSU
-// (https://github.com/tiann/KernelSU)
-// Copyright (C) KernelSU contributors
-// Licensed under GPL-3.0
+
+// (https:
+
 package dev.shephard.player.ui.glass
 
 import android.annotation.SuppressLint
@@ -54,7 +52,7 @@ class InteractiveHighlight(
     layout(color) uniform half4 color;
     uniform float radius;
     uniform float2 position;
-    
+
     half4 main(float2 coord) {
         float dist = distance(coord, position);
         float intensity = smoothstep(radius, radius * 0.5, dist);

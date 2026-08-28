@@ -17,18 +17,6 @@ import kotlinx.coroutines.isActive
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 import kotlin.math.floor
 
-/**
- * MADDE 9 — About sayfasının arkasındaki dinamik ışık.
- *
- * InstallerX Revived'ın `BgEffectBackground`'unun Lambda'ya uyarlanmış hâli:
- *  * cihaz tipi ayrımı (PHONE/PAD) kaldırıldı — telefon yerleşimi kullanılıyor,
- *  * [surface] `Color.Transparent` verilebiliyor; böylece efekt, Lambda'nın duvar
- *    kağıdı/arka planının ÜZERİNE biniyor, onu gizlemiyor,
- *  * renk paleti morumsu/mavimsi yerine yeşilimsi/açık mavimsi (bkz. [BgEffectConfig]).
- *
- * AGSL runtime shader gerektirir (Android 13 / API 33+). Desteklenmeyen cihazlarda
- * içerik hiçbir efekt olmadan aynen çizilir — yani sessizce devre dışı kalır.
- */
 @Composable
 fun BgEffectBackground(
     isDarkTheme: Boolean,
@@ -50,7 +38,6 @@ fun BgEffectBackground(
         val painter = remember { BgEffectPainter() }
         val preset = remember(isDarkTheme) { BgEffectConfig.get(isDarkTheme) }
 
-        // Üç renk kümesi arasında yavaşça gezinen "sahne" sayacı.
         val colorStage = remember { Animatable(0f) }
 
         LaunchedEffect(dynamicBackground, preset) {

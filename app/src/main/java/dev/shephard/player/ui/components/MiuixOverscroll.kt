@@ -1,13 +1,3 @@
-// Bu dosya, Miuix (top.yukonga.miuix.kmp) kütüphanesinin overscroll efektinin
-// Lambda Player'a (saf Android/Jetpack Compose) birebir aynı davranışla taşınmış halidir.
-// Orijinal kaynak: miuix-ui/src/commonMain/kotlin/top/yukonga/miuix/kmp/utils/Overscroll.kt
-//                  miuix-ui/src/commonMain/kotlin/top/yukonga/miuix/kmp/utils/SpringUtils.kt
-// Telif: Copyright 2025, compose-miuix-ui contributors — SPDX-License-Identifier: Apache-2.0
-//
-// KMP'ye özgü kısımlar (expect/actual platform() ayrımı, PullToRefreshState entegrasyonu)
-// çıkarılmış, ekran boyutu referansı Android'in kendi Configuration API'siyle sağlanmıştır.
-// Spring matematiği, damping formülü ve fling/drag davranışı MIUI'nin karakteristik
-// "lastik gibi esneme" hissini birebir vermek için değiştirilmeden korunmuştur.
 
 package dev.shephard.player.ui.components
 
@@ -52,12 +42,6 @@ import kotlin.math.pow
 import kotlin.math.round
 import kotlin.math.sign
 
-/**
- * Dikey yönde MIUI-tarzı overscroll (aşırı kaydırma) efekti uygular.
- * LazyColumn / Column(verticalScroll) gibi dikey scrollable'ların modifier zincirine eklenir.
- *
- * @param nestedScrollToParent İç içe scroll durumunda üst elemana da olay iletilsin mi.
- */
 @Stable
 fun Modifier.overScrollVertical(
     nestedScrollToParent: Boolean = true,
@@ -66,12 +50,6 @@ fun Modifier.overScrollVertical(
     nestedScrollToParent = nestedScrollToParent,
 )
 
-/**
- * Yatay yönde MIUI-tarzı overscroll (aşırı kaydırma) efekti uygular.
- * LazyRow / LazyHorizontalGrid gibi yatay scrollable'ların modifier zincirine eklenir.
- *
- * @param nestedScrollToParent İç içe scroll durumunda üst elemana da olay iletilsin mi.
- */
 @Stable
 fun Modifier.overScrollHorizontal(
     nestedScrollToParent: Boolean = true,
@@ -80,10 +58,6 @@ fun Modifier.overScrollHorizontal(
     nestedScrollToParent = nestedScrollToParent,
 )
 
-/**
- * Sınıra ulaşıldığında (listenin başı/sonu) yay (spring) fiziğiyle esneyen overscroll efekti.
- * Miuix / MIUI'nin karakteristik "lastik gibi geri sekme" davranışının birebir aynısıdır.
- */
 @Stable
 fun Modifier.overScrollOutOfBound(
     isVertical: Boolean = true,
@@ -148,8 +122,7 @@ private class OverscrollNode(
         private set(value) {
             if (field != value) {
                 field = value
-                // Yerleşim round() ile piksele oturtulur; sadece tam piksel değeri
-                // değiştiğinde yeniden yerleştirme tetiklenir (gereksiz relayout'u önler).
+
                 val rounded = round(value)
                 if (rounded != lastPlacedOffset) {
                     lastPlacedOffset = rounded
@@ -253,7 +226,6 @@ private class OverscrollNode(
         offset = sign(rawTouchAccumulation) * dampedDist
     }
 
-    /** Damping eğrisinin tersi: bir sürükleme çalışan yayın yerini aldığında [rawTouchAccumulation]'ı [offset]'ten yeniden türetir. */
     private fun syncRawAccumulationFromOffset() {
         rawTouchAccumulation = sign(offset) * SpringMath.obtainTouchDistance(offset, scrollRange)
     }
@@ -284,7 +256,6 @@ private class OverscrollNode(
             return dispatcher.dispatchPreScroll(available, source)
         }
 
-        // Sürükleme çalışan bir yayın yerini aldığında ham birikimi yeniden senkronla.
         if (animationJob?.isActive == true) syncRawAccumulationFromOffset()
         animationJob?.cancel()
 
@@ -301,15 +272,15 @@ private class OverscrollNode(
             return parentConsumed
         }
 
-        if (sign(delta) != sign(rawTouchAccumulation)) { // ters yön
+        if (sign(delta) != sign(rawTouchAccumulation)) {
             val actualConsumed = if (abs(rawTouchAccumulation) <= abs(delta)) {
-                -rawTouchAccumulation // tamamen tüketilebilir
+                -rawTouchAccumulation
             } else {
                 delta
             }
 
             if (abs(rawTouchAccumulation) <= abs(delta)) {
-                resetState() // tam tüketimden sonra doğrudan sıfırla
+                resetState()
             } else {
                 applyDrag(actualConsumed)
             }
@@ -372,7 +343,7 @@ private class OverscrollNode(
         if (abs(offset) > offsetThreshold) {
             if (sign(velocity) != sign(offset)) {
                 startSpringAnimation(velocity)
-                // Sert fırlatmayı önlemek için hız/his optimizasyonu
+
                 return parentConsumed + if (isVertical) {
                     Velocity(0f, realAvailable.y / 2.13333f)
                 } else {
@@ -403,26 +374,19 @@ private class OverscrollNode(
         }
 
         val realAvailable = available - parentConsumed
-        val velocity = (if (isVertical) realAvailable.y else realAvailable.x) / 1.53333f // sönümleme hızı
+        val velocity = (if (isVertical) realAvailable.y else realAvailable.x) / 1.53333f
         startSpringAnimation(velocity)
 
         return parentConsumed + if (isVertical) Velocity(0f, velocity) else Velocity(velocity, 0f)
     }
 }
 
-/**
- * Overscroll efektinin aktif olup olmadığını kontrol etmek/izlemek için kullanılır.
- */
 class OverScrollState {
     var isOverScrollActive by mutableStateOf(false)
         internal set
 }
 
 val LocalOverScrollState = compositionLocalOf { OverScrollState() }
-
-// ---------------------------------------------------------------------------------------
-// Yay (spring) fiziği ve damping matematiği — Miuix'in SpringUtils.kt dosyasından birebir.
-// ---------------------------------------------------------------------------------------
 
 internal object SpringMath {
     const val MAX_FRAME_DELTA_SECONDS = 0.016f
@@ -432,22 +396,12 @@ internal object SpringMath {
     const val STANDARD_SPRING_PERIOD = 0.4f
     const val SLOWER_SPRING_PERIOD_FOR_HIGH_VELOCITY = 0.55f
 
-    /**
-     * Damping dönüşümünden sonra hareket edilebilir mesafeyi hesaplar.
-     *
-     * Damping formülü: x - x^2 + x^3/3
-     */
     fun obtainDampingDistance(normalizedInput: Float, range: Float): Float {
         val x = max(0.0f, min(normalizedInput, 1.0f)).toDouble()
         val dampedFactor = x - x.pow(2.0) + (x.pow(3.0) / 3.0)
         return (dampedFactor * range).toFloat()
     }
 
-    /**
-     * Damping mesafesini alıp orijinal hareket mesafesine geri döndürür.
-     *
-     * Geri kazanım formülü: range - (range^(2/3)) * (range - 3 * absPixelOffset)^(1/3)
-     */
     fun obtainTouchDistance(currentPixelOffset: Float, range: Float): Float {
         var absPixelOffset = abs(currentPixelOffset)
         val absMaxOffset = abs(obtainDampingDistance(1.0f, range))
@@ -469,13 +423,10 @@ private class SpringOperator(dampingRatio: Float, naturalPeriod: Float) {
 
     init {
         val angularFrequency = (2.0 * PI) / naturalPeriod
-        stiffnessOverMass = angularFrequency * angularFrequency // k/m = ω^2
-        dampingCoefficient = 2.0 * dampingRatio * angularFrequency // c/m = 2 * ζ * ω
+        stiffnessOverMass = angularFrequency * angularFrequency
+        dampingCoefficient = 2.0 * dampingRatio * angularFrequency
     }
 
-    /**
-     * Euler formülünü kullanarak yeni hızı hesaplar.
-     */
     fun updateVelocity(
         currentVelocity: Double,
         deltaTime: Float,
@@ -539,10 +490,6 @@ internal class SpringEngine {
     }
 }
 
-/**
- * Bu yayı [startValue]'dan [targetValue]'ya [initialVelocity] ile sürer, yerleşene
- * (veya iptal edilene) kadar her karede [onFrame]'i çağırır, sonra [onSettle]'ı çağırır.
- */
 internal suspend fun SpringEngine.runSettleAnimation(
     startValue: Float,
     targetValue: Float = 0f,

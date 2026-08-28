@@ -8,35 +8,11 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 
-/**
- * Kullanıcının seçtiği (veya kırptığı) görselleri -- playlist kapakları, müzik kapak
- * override'ları, wallpaper -- uygulamanın KENDİ kalıcı depolamasına kopyalar.
- *
- * ÖNEMLİ: Daha önce bu görseller sadece seçilen `content://` URI'sine (ve
- * `takePersistableUriPermission` ile alınan kalıcı izne) güveniyordu. Bu, metin tercihleri
- * gibi kalıcı olması gerekirken bazı cihaz/galeri/dosya yöneticisi kombinasyonlarında
- * (özellikle bazı OEM galeri uygulamaları uygulama yeniden başlatıldığında ya da OS
- * güncellemesinden sonra verdiği izni geçersiz kılabiliyor, ya da paylaşılan albüm/bulut
- * senkronizasyonlu galerilerde kaynak dosya taşınabiliyor) görselin sessizce kaybolmasına
- * ("resim yok" haline dönmesine) yol açıyordu. Kalıcı metin tercihleri gibi davranması için
- * dosyayı DOĞRUDAN uygulamanın `filesDir` altına (cache değil, kalıcı depolama) kopyalayıp
- * DataStore'a bizim kendi `content://` (FileProvider) URI'mizi yazıyoruz -- kaynak URI'ye
- * bağımlılığımız kalmıyor.
- */
 object ImagePersistence {
 
     private const val COVERS_DIR = "persisted_covers"
     private const val WALLPAPER_DIR = "persisted_wallpaper"
 
-    /**
-     * Verilen kaynak URI'nin (bir galeri/dosya yöneticisi seçiminden ya da sistem
-     * cropper'ının çıktısından gelebilir) baytlarını uygulamanın kalıcı `filesDir` alanına
-     * kopyalar ve bu kopyayı işaret eden kalıcı bir `content://` (FileProvider) URI döner.
-     *
-     * @param subDir hangi kalıcı alt klasöre kaydedileceği (kapaklar vs wallpaper için ayrı)
-     * @param fileNamePrefix dosya adının başına eklenecek önek (ör. "cover_", "wallpaper_")
-     * @return kalıcı FileProvider URI'si, kopyalama başarısız olursa null
-     */
     suspend fun persistImage(
         context: Context,
         sourceUri: Uri,
@@ -45,10 +21,7 @@ object ImagePersistence {
     ): Uri? = withContext(Dispatchers.IO) {
         try {
             val dir = File(context.filesDir, subDir).apply { mkdirs() }
-            // GIF kapak desteği: dosya uzantısını her zaman .jpg'ye sabitlemek, byte içeriği
-            // GIF olduğunda bazı content resolver'ların/decoder'ların dosyayı MIME type'ını
-            // yanlış çözümlemesine (ve animasyonun statik bir kareye düşmesine) yol açabilir.
-            // Kaynağın gerçek MIME type'ına göre doğru uzantıyı seçiyoruz.
+
             val mimeType = context.contentResolver.getType(sourceUri)
             val extension = when (mimeType) {
                 "image/gif" -> "gif"
@@ -72,11 +45,9 @@ object ImagePersistence {
         }
     }
 
-    /** Müzik/playlist kapak resimleri için [persistImage] kısayolu. */
     suspend fun persistCover(context: Context, sourceUri: Uri): Uri? =
         persistImage(context, sourceUri, COVERS_DIR, "cover_")
 
-    /** Wallpaper için [persistImage] kısayolu. */
     suspend fun persistWallpaper(context: Context, sourceUri: Uri): Uri? =
         persistImage(context, sourceUri, WALLPAPER_DIR, "wallpaper_")
 }

@@ -130,8 +130,7 @@ fun Text(
     color: Color = Color.Unspecified,
     style: TextStyle = MiuixAppTheme.typography.bodyMedium,
     fontWeight: FontWeight? = null,
-    // Miuix'in gerçek Text'i bu parametreleri zaten destekliyor; About ekranındaki
-    // InstallerX tarzı başlık (35.sp) ve ortalanmış sürüm satırı için geçiriyoruz.
+
     fontSize: TextUnit = TextUnit.Unspecified,
     textAlign: TextAlign? = null,
     maxLines: Int = Int.MAX_VALUE,
@@ -148,17 +147,6 @@ fun Text(
     overflow = overflow,
 )
 
-/**
- * MADDE 1 — Dock'taki ikonlar tema rengini almıyordu.
- *
- * Sebep: bu sarmalayıcı `tint` varsayılanını `colorScheme.onSurface` olarak SABİTLİYORDU.
- * Miuix'in gerçek `Icon`'u ise varsayılan olarak `LocalContentColor`'ı kullanır. Dock
- * (`FloatingBottomBarItem`) seçili/seçili olmayan sekme rengini tam olarak
- * `LocalContentColor` üzerinden sağlıyor: `Text` bu yüzden doğru rengi alıyordu, `Icon`
- * ise sabitlenmiş `onSurface` yüzünden almıyordu. Varsayılanı Miuix ile aynı hale
- * getiriyoruz — böylece dock, Card, BasicComponent gibi content-color sağlayan her
- * kapsayıcıda ikonlar da metinle aynı rengi alır.
- */
 @Composable
 fun Icon(
     imageVector: ImageVector,
@@ -261,15 +249,6 @@ object SliderDefaults {
     ) = SliderColors()
 }
 
-/**
- * Miuix Slider.
- *
- * Miuix'in kendi varsayılanı `thumbColor = colorScheme.onPrimary`. Lambda'da `onPrimary`,
- * accent rengin parlaklığına göre siyaha düşebiliyor (ör. varsayılan yeşil accent'te
- * onPrimary = #111111) — bu yüzden tema ayarlarındaki slider'ların ucundaki yuvarlak
- * simge SİYAH görünüyordu. Orijinal Miuix'te bu tutamak her zaman beyazdır, o yüzden
- * burada thumb rengini accent'ten bağımsız olarak sabit beyaza kilitliyoruz.
- */
 @Composable
 fun Slider(
     value: Float,
@@ -307,9 +286,6 @@ fun Checkbox(
     if (checked) Box(Modifier.size(12.dp).clip(CircleShape).background(MiuixAppTheme.colorScheme.onPrimary))
 }
 
-// SwitchColors artık GERÇEK miuix SwitchColors'unu sarıyor — çünkü önceki wrapper
-// `colors` parametresini tamamen yok sayıyordu; sonuçta thumb her zaman miuix varsayılanı
-// (`onPrimary`) oluyordu ve kullanıcı "açılınca thumb siyah oluyor" sorunu yaşıyordu.
 class SwitchColors internal constructor(
     internal val miuixColors: top.yukonga.miuix.kmp.basic.SwitchColors
 )
@@ -415,12 +391,6 @@ fun FilledTonalButton(
     content: @Composable RowScope.() -> Unit,
 ) = Button(onClick = onClick, modifier = modifier, content = content)
 
-// Eski `ModalBottomSheet` / `SheetState` / `rememberModalBottomSheetState` uyumluluk
-// katmanı TAMAMEN kaldırıldı. `OverlayBottomSheet` tabanlıydı, Scaffold'un popup host'una
-// bağımlıydı ve NowPlaying gibi Scaffold dışı yerlerden açılamıyordu.
-// Yerine: dev.shephard.player.ui.components.MiuixDrawer (WindowBottomSheet tabanlı,
-// InstallerX'in miuix install dialogundaki drawer ile birebir aynı).
-
 @Composable
 fun MiuixDialog(
     onDismissRequest: () -> Unit,
@@ -453,6 +423,3 @@ fun MiuixDialog(
         }
     }
 }
-
-
-
