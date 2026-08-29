@@ -70,11 +70,11 @@ fun YosFloatingLight(
         }
         withContext(Dispatchers.IO) {
             val request = ImageRequest.Builder(context).data(uri).build()
-            val src = imageLoader.execute(request).drawable?.let { d ->
-                android.graphics.drawable.BitmapDrawable.createFromStream(
-                    context.contentResolver.openInputStream(uri), null,
-                )?.bitmap
-            }
+            val src: android.graphics.Bitmap? = runCatching {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    android.graphics.BitmapFactory.decodeStream(stream)
+                }
+            }.getOrNull()
             processed = src?.let { imageResolve(it) }
         }
     }

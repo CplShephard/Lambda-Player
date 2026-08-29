@@ -51,6 +51,23 @@ object SettingsLibrary {
         get() = _nowplayingBackgroundEffect.value
         set(value) { _nowplayingBackgroundEffect.value = value }
 
+    // Lyric font weight name (matches androidx.compose.ui.text.font.FontWeight names):
+    //   "Normal", "Medium", "SemiBold", "Bold". Default is "Medium" which is
+    //   visually closest to the Flamingo lyric view's look.
+    private val _lyricFontWeight = MutableStateFlow("Medium")
+    val LyricFontWeightFlow: StateFlow<String> = _lyricFontWeight.asStateFlow()
+    var LyricFontWeight: String
+        get() = _lyricFontWeight.value
+        set(value) { _lyricFontWeight.value = value }
+
+    // Whether the lyric view should use balanced line breaks
+    // (LineBreak.Strategy.Balanced vs Simple). Defaults to true.
+    private val _lyricLineBalance = MutableStateFlow(true)
+    val LyricLineBalanceFlow: StateFlow<Boolean> = _lyricLineBalance.asStateFlow()
+    var LyricLineBalance: Boolean
+        get() = _lyricLineBalance.value
+        set(value) { _lyricLineBalance.value = value }
+
     /**
      * Hook the in-memory flows to the on-disk [PreferencesManager] values.
      * Call this from a Composable so the seed values are picked up on

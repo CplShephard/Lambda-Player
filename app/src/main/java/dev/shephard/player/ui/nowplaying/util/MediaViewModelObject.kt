@@ -3,8 +3,10 @@
 package dev.shephard.player.ui.nowplaying.util
 
 import android.net.Uri
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.media3.common.util.UnstableApi
 
 /**
@@ -24,10 +26,10 @@ object MediaViewModelObject {
     val lrcEntries: MutableState<List<List<Pair<Float, String>>>> = mutableStateOf(emptyList())
     val bitmap: MutableState<Uri?> = mutableStateOf(null)
 
-    val bitrate = mutableStateOf(0)
-    val samplingRate = mutableStateOf(0)
-    val isDolby = mutableStateOf(false)
+    val bitrate: MutableIntState = mutableIntStateOf(0)
+    val samplingRate: MutableIntState = mutableIntStateOf(0)
+    val isDolby: MutableState<Boolean> = mutableStateOf(false)
 
-    val otherSideForLines = mutableStateOf<List<String>>(emptyList())
-    val mainLyricLines = mutableStateOf<List<String>>(emptyList())
+    val otherSideForLines: MutableState<List<String>> = mutableStateOf(emptyList())
+    val mainLyricLines: MutableState<List<String>> = mutableStateOf(emptyList())
 }

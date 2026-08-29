@@ -140,10 +140,10 @@ fun YosLyricView(
     val lrcEntries = lrcEntriesLambda()
 
     //val thisLyricLines = MediaViewModelObject.mainLyricLines
-    if (lrcEntries.isEmpty() || otherSideForLines.isEmpty() /*|| thisLyricLines.isEmpty()*/) {
+    if (lrcEntries.isEmpty() || otherSideForLines.value.isEmpty() /*|| thisLyricLines.isEmpty()*/) {
         println(
             lrcEntries.isEmpty()
-                .toString() + otherSideForLines.isEmpty()/* + thisLyricLines.isEmpty()*/
+                .toString() + otherSideForLines.value.isEmpty()/* + thisLyricLines.isEmpty()*/
         )
         Box(
             contentAlignment = Alignment.Center,
@@ -208,10 +208,10 @@ fun YosLyricView(
         val height = rememberSaveable(key = "YosLyricView_height") { mutableIntStateOf(0) }
 
         val targetWeight = 0.0618f
-        val targetOffset = rememberSaveable(height.intValue, key = "YosLyricView_targetOffset") {
-            //println("计算边距使用：${height.intValue}")
-            //println("计算边距为：${height.intValue * targetWeight}")
-            height.intValue * targetWeight
+        val targetOffset = rememberSaveable(height.value, key = "YosLyricView_targetOffset") {
+            //println("计算边距使用：${height.value}")
+            //println("计算边距为：${height.value * targetWeight}")
+            height.value * targetWeight
         }
         // 顶部边距
 
@@ -230,7 +230,7 @@ fun YosLyricView(
         val targetItem = remember("YosLyricView_targetItem") {
             derivedStateOf {
                 visibleItems.value.find {
-                    it.index == currentLyricIndex.intValue + 1
+                    it.index == currentLyricIndex.value + 1
                 }
             }
         }
@@ -359,9 +359,9 @@ fun YosLyricView(
                     }
                     .nestedScroll(nestedScrollConnection)
                     .onSizeChanged {
-                        if (height.intValue == 0 && it.height != 0) {
-                            height.intValue = it.height
-                            //println("计算歌词视图高度：${height.intValue}")
+                        if (height.value == 0 && it.height != 0) {
+                            height.value = it.height
+                            //println("计算歌词视图高度：${height.value}")
                         }
                     }
             ) {
@@ -374,19 +374,19 @@ fun YosLyricView(
                 ) { index, lines ->
                     val isCurrent = remember(lines) {
                         derivedStateOf {
-                            index == currentLyricIndex.intValue
+                            index == currentLyricIndex.value
                         }
                     }
 
                     val isTop = remember(lines) {
                         derivedStateOf {
-                            index == (currentLyricIndex.intValue - 1)
+                            index == (currentLyricIndex.value - 1)
                         }
                     }
 
                     val showStateAnimation = remember(index) {
                         derivedStateOf {
-                            (currentLyricIndex.intValue in scrollState.layoutInfo.visibleItemsInfo.map { it.index - 1 } && currentLyricIndex.intValue >= 0) && enableLyricScroll.value
+                            (currentLyricIndex.value in scrollState.layoutInfo.visibleItemsInfo.map { it.index - 1 } && currentLyricIndex.value >= 0) && enableLyricScroll.value
                         }
                     }
 
@@ -404,10 +404,10 @@ fun YosLyricView(
 
                         val blur = remember(index) {
                             derivedStateOf {
-                                if (!showStateAnimation.value || index == currentLyricIndex.intValue || !blurLambda() || !supportBlur) {
+                                if (!showStateAnimation.value || index == currentLyricIndex.value || !blurLambda() || !supportBlur) {
                                     0f
                                 } else {
-                                    (abs(index - currentLyricIndex.intValue) * 2.5f).coerceAtMost(
+                                    (abs(index - currentLyricIndex.value) * 2.5f).coerceAtMost(
                                         8f
                                     )
                                 }
@@ -415,7 +415,7 @@ fun YosLyricView(
                         }
 
                         val otherSide = remember(index) {
-                            otherSideForLines.getOrElse(index) { false }
+                            otherSideForLines.value.getOrElse(index) { false }
                         }
 
                         YosWrapper {
@@ -446,8 +446,8 @@ fun YosLyricView(
                                     }
                                 }
                             ) {
-                                Vibrator.doubleClick(context)
-                                currentLyricIndex.intValue = index
+                                Haptics.click(context)
+                                currentLyricIndex.value = index
                                 mediaEvent.onSeek(lines.first().first.toInt())
                             }
                         }
@@ -482,7 +482,7 @@ fun YosLyricView(
                         visibleItems.value.size
                     }*/
 
-                            //val targetItem = visibleItems.value.find { it.index == currentLyricIndex.intValue /** 2*/ + 1 }
+                            //val targetItem = visibleItems.value.find { it.index == currentLyricIndex.value /** 2*/ + 1 }
 
 
                             val show = remember(index) {
@@ -500,13 +500,13 @@ fun YosLyricView(
                             }
 
                             YosWrapper {
-                                LaunchedEffect(currentLyricIndex.intValue) {
+                                LaunchedEffect(currentLyricIndex.value) {
                                     if (visibleItems.value.isEmpty()) {
                                         //println(mainLyric.value.text+" 未设置")
                                         return@LaunchedEffect
                                     }
-                                    //println(mainLyric.value.text+" "+(index >= currentLyricIndex.intValue && showStateAnimation.value && show.value))
-                                    if (index >= currentLyricIndex.intValue - 1 && showStateAnimation.value && show.value) {
+                                    //println(mainLyric.value.text+" "+(index >= currentLyricIndex.value && showStateAnimation.value && show.value))
+                                    if (index >= currentLyricIndex.value - 1 && showStateAnimation.value && show.value) {
                                         val weight =
                                             (1f - ((index - (nowFirst.value)) / visibleItems.value.size))
                                         delay((550 * (1f - weight)).toLong())
@@ -558,23 +558,23 @@ fun YosLyricView(
 
         YosWrapper {
             //val lifecycleState = LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
-            LaunchedEffect(currentLyricIndex.intValue, translationLambda()) {
+            LaunchedEffect(currentLyricIndex.value, translationLambda()) {
                 try {
                     if (enableLyricScroll.value) {
                         /*visibleItems = scrollState.layoutInfo.visibleItemsInfo
                         targetItem =
-                            visibleItems.find { it.index == currentLyricIndex.intValue */
+                            visibleItems.find { it.index == currentLyricIndex.value */
                         /** 2*/
                         /** 2*//* + 1 }*/
                         if (
                             try {
-                                if (currentLyricIndex.intValue - 1 < 0) false
+                                if (currentLyricIndex.value - 1 < 0) false
                                 else (
-                                        (lrcEntries[(currentLyricIndex.intValue - 1)][1].second.isBlank())
+                                        (lrcEntries[(currentLyricIndex.value - 1)][1].second.isBlank())
                                         /*&&
-                                        (lrcEntries[(currentLyricIndex.intValue).coerceAtLeast(
+                                        (lrcEntries[(currentLyricIndex.value).coerceAtLeast(
                                             0
-                                        )].first().first - lrcEntries[(currentLyricIndex.intValue - 1)].first().first > 900f)*/)
+                                        )].first().first - lrcEntries[(currentLyricIndex.value - 1)].first().first > 900f)*/)
                                 // 这里有一个特殊的更改，因为AppleMusic歌词转过来会有两个连续一样的时间轴，在LrcFactory有更改，下面的那个900不用管
                                 // 已经作了规范处理
 
@@ -608,7 +608,7 @@ fun YosLyricView(
                             )
                         } else {
                             scrollState.animateScrollToItem(
-                                index = (currentLyricIndex.intValue
+                                index = (currentLyricIndex.value
                                         /** 2*/
                                         /** 2*/
                                         + 1).coerceAtLeast(0),
@@ -629,10 +629,10 @@ fun YosLyricView(
                         line.first().first > liveTime
                     }
 
-                    if (nextIndex != -1 && nextIndex - 1 != currentLyricIndex.intValue) {
-                        currentLyricIndex.intValue = nextIndex - 1
-                    } else if (nextIndex == -1 && currentLyricIndex.intValue != lrcEntries.size - 1) {
-                        currentLyricIndex.intValue = lrcEntries.size - 1
+                    if (nextIndex != -1 && nextIndex - 1 != currentLyricIndex.value) {
+                        currentLyricIndex.value = nextIndex - 1
+                    } else if (nextIndex == -1 && currentLyricIndex.value != lrcEntries.size - 1) {
+                        currentLyricIndex.value = lrcEntries.size - 1
                     }
 
                     delay(100)
@@ -647,7 +647,7 @@ fun YosLyricView(
                     return@LaunchedEffect
                 }*/
                 try {
-                    if (currentLyricIndex.intValue != -1) {
+                    if (currentLyricIndex.value != -1) {
                         return@LaunchedEffect
                     }
                     val liveTime = liveTimeLambda()
@@ -655,18 +655,18 @@ fun YosLyricView(
                         line.first().first > liveTime
                     }
 
-                    if (nextIndex != -1 && nextIndex - 1 != currentLyricIndex.intValue) {
+                    if (nextIndex != -1 && nextIndex - 1 != currentLyricIndex.value) {
                         scrollState.scrollToItem(
                             index = (nextIndex).coerceAtLeast(0),
                             scrollOffset = -targetOffset.toInt()
                         )
-                        currentLyricIndex.intValue = nextIndex - 1
-                    } else if (nextIndex == -1 && currentLyricIndex.intValue != lrcEntries.size - 1) {
+                        currentLyricIndex.value = nextIndex - 1
+                    } else if (nextIndex == -1 && currentLyricIndex.value != lrcEntries.size - 1) {
                         scrollState.scrollToItem(
                             index = (lrcEntries.size).coerceAtLeast(0),
                             scrollOffset = -targetOffset.toInt()
                         )
-                        currentLyricIndex.intValue = lrcEntries.size - 1
+                        currentLyricIndex.value = lrcEntries.size - 1
                     }
                 } catch (_: Exception) {
                 }
@@ -905,7 +905,7 @@ fun LazyItemScope.LyricItem(
             LaunchedEffect(Unit) {
                 while (true) {
                     withContext(Dispatchers.Main) {
-                        liveTime.intValue = liveTimeLambda()
+                        liveTime.value = liveTimeLambda()
                     }
                     delay(10L)
                 }
@@ -978,7 +978,7 @@ fun LazyItemScope.LyricItem(
                             /*(if ((nextTime() - m) < 900f) {
                                 0f
                             } else {
-                                */((liveTime.intValue - m).coerceAtLeast(0f) / (nextTime() - m))
+                                */((liveTime.value - m).coerceAtLeast(0f) / (nextTime() - m))
                             /*})*/.coerceAtMost(1f)
                         }
                     }
@@ -1128,7 +1128,7 @@ fun LazyItemScope.LyricItem(
                                             if (isNotOneByOne.value) {
                                                 true
                                             } else {
-                                                liveTime.intValue >= mainLyric[mainLyric.size - (if (translation != null) 3 else 1)].first
+                                                liveTime.value >= mainLyric[mainLyric.size - (if (translation != null) 3 else 1)].first
                                             }
                                         }
                                     }
@@ -1255,7 +1255,7 @@ fun LazyItemScope.LyricItem(
                                                 if ((word.first - thisWordGroupLastTime) == 0f) {
                                                     0f
                                                 } else {
-                                                    ((liveTime.intValue - thisWordGroupLastTime).coerceAtLeast(
+                                                    ((liveTime.value - thisWordGroupLastTime).coerceAtLeast(
                                                         0f
                                                     ) / (word.first - thisWordGroupLastTime)).coerceIn(
                                                         0f,
@@ -1331,7 +1331,7 @@ fun LazyItemScope.LyricItem(
                                                             return@DrawWord 0f
                                                         }
 
-                                                        ((liveTime.intValue - thisWordLastTime) / thisWordAverageTime)
+                                                        ((liveTime.value - thisWordLastTime) / thisWordAverageTime)
 
                                                     }
                                                 ).also {

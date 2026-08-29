@@ -142,12 +142,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             refreshAudioMetadata()
         }
 
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            _progress.value = _progress.value.copy(
-                durationMs = controller?.duration?.coerceAtLeast(0L) ?: 0L
-            )
-        }
-
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
             _uiState.value = _uiState.value.copy(shuffleEnabled = shuffleModeEnabled)
         }

@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
@@ -51,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.view.WindowCompat
-import com.google.accompanist.insets.navigationBarsHeight
 import dev.shephard.player.R
 
 /**
@@ -102,7 +102,7 @@ fun RowScope.AirPlay() {
     Column(
         modifier = Modifier
             .heightIn(min = 53.dp)
-            .navigationBarsHeight(48.dp)
+            .padding(bottom = 48.dp)
             .weight(1f)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },

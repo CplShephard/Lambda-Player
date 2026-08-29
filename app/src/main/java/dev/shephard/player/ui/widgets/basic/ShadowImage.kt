@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Precision
+import coil.size.Size as CoilSize
 import dev.shephard.player.R
 import dev.shephard.player.ui.theme.YosRoundedCornerShape
 import dev.shephard.player.ui.widgets.effects.ShadowType
@@ -41,6 +42,39 @@ private fun getSizeFromQuality(quality: ImageQuality): Int {
     }
 }
 
+private fun buildRequest(
+    context: android.content.Context,
+    url: Any?,
+    imageQuality: ImageQuality,
+    withMemoryKey: Boolean,
+): ImageRequest {
+    val builder = ImageRequest.Builder(context)
+        .data(url)
+        .crossfade(true)
+        .error(R.drawable.placeholder_music_default_artwork)
+        .placeholder(R.drawable.placeholder_music_default_artwork)
+        .fallback(R.drawable.placeholder_music_default_artwork)
+        .allowHardware(true)
+    if (withMemoryKey) {
+        builder.memoryCacheKey(url?.toString())
+            .diskCacheKey(url?.toString())
+    } else {
+        builder.placeholderMemoryCacheKey(url?.toString())
+            .diskCacheKey(url?.toString())
+    }
+    if (imageQuality == ImageQuality.RAW) {
+        builder.precision(Precision.EXACT)
+        builder.size(CoilSize.ORIGINAL)
+    } else {
+        val s = getSizeFromQuality(imageQuality)
+        builder.size(s)
+        if (imageQuality == ImageQuality.LOW) {
+            builder.precision(Precision.INEXACT)
+        }
+    }
+    return builder.build()
+}
+
 @Composable
 fun ShadowImage(
     dataLambda: () -> Any?,
@@ -54,30 +88,10 @@ fun ShadowImage(
 ) = YosWrapper {
     val shape = YosRoundedCornerShape(cornerRadius)
     val density = LocalDensity.current
-    val shadowAlphaPx = remember(dataLambda()) {
-        with(density) { shadowAlpha.dp.toPx() }
-    }
     val url = dataLambda()
     AsyncImage(
-        model = ImageRequest.Builder(LocalContext.current).data(data = url).crossfade(true)
-            .error(R.drawable.placeholder_music_default_artwork)
-            .placeholder(R.drawable.placeholder_music_default_artwork)
-            .fallback(R.drawable.placeholder_music_default_artwork)
-            .placeholderMemoryCacheKey(url.toString())
-            .diskCacheKey(url.toString())
-            .allowHardware(true)
-            .crossfade(true)
-            .apply {
-                if (imageQuality != ImageQuality.RAW) {
-                    val size = getSizeFromQuality(imageQuality)
-                    this.size(size)
-                    if (imageQuality == ImageQuality.LOW) {
-                        this.precision(Precision.INEXACT)
-                    }
-                }
-            }
-            .build(),
-        contentDescription = contentDescription.toString(),
+        model = buildRequest(LocalContext.current, url, imageQuality, withMemoryKey = false),
+        contentDescription = contentDescription,
         contentScale = ContentScale.Crop,
         modifier = modifier
             .fillMaxWidth()
@@ -87,9 +101,6 @@ fun ShadowImage(
                 compositingStrategy = CompositingStrategy.Offscreen
                 clip = true
                 this.shape = shape
-                /*this.shape = shape
-                shadowElevation = shadowAlphaPx
-                spotShadowColor = Color.Black.copy(alpha = 0.8f)*/
             }
             .drawWithCache {
                 onDrawWithContent {
@@ -112,7 +123,6 @@ fun ShadowImage(
                     )
                 }
             }
-
     )
 }
 
@@ -131,28 +141,8 @@ fun ShadowImageWithCache(
     val url = dataLambda()
     val density = LocalDensity.current
     AsyncImage(
-        model = ImageRequest.Builder(LocalContext.current).data(data = url).crossfade(true)
-            .error(R.drawable.placeholder_music_default_artwork)
-            .placeholder(R.drawable.placeholder_music_default_artwork)
-            .fallback(R.drawable.placeholder_music_default_artwork)
-            .placeholderMemoryCacheKey(url.toString())
-            .memoryCacheKey(url.toString())
-            .allowHardware(true)
-            .crossfade(true)
-            .apply {
-                if (imageQuality != ImageQuality.RAW) {
-                    val size = getSizeFromQuality(imageQuality)
-                    this.size(size)
-                    if (imageQuality == ImageQuality.LOW) {
-                        this.precision(Precision.INEXACT)
-                    }
-                } else {
-                    this.precision(Precision.EXACT)
-                    this.size(coil.size.Size.ORIGINAL)
-                }
-            }
-            .build(),
-        contentDescription = contentDescription.toString(),
+        model = buildRequest(LocalContext.current, url, imageQuality, withMemoryKey = true),
+        contentDescription = contentDescription,
         contentScale = ContentScale.Crop,
         modifier = modifier
             .fillMaxWidth()
@@ -162,9 +152,6 @@ fun ShadowImageWithCache(
                 compositingStrategy = CompositingStrategy.Offscreen
                 clip = true
                 this.shape = shape
-                /*this.shape = shape
-                shadowElevation = shadowAlphaPx
-                spotShadowColor = Color.Black.copy(alpha = 0.8f)*/
             }
             .drawWithCache {
                 onDrawWithContent {
@@ -187,6 +174,5 @@ fun ShadowImageWithCache(
                     )
                 }
             }
-
     )
 }

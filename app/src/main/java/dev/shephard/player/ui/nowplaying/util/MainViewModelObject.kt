@@ -2,6 +2,7 @@
 // Copyright (C) 2026 InstallerX Revived contributors
 package dev.shephard.player.ui.nowplaying.util
 
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.media3.common.util.UnstableApi
 
@@ -19,5 +20,5 @@ object MainViewModelObject {
     val nowPage = mutableStateOf("Album")
     val translation = mutableStateOf(false)
     val blurred = mutableStateOf(true)
-    val syncLyricIndex = mutableStateOf(0)
+    val syncLyricIndex = mutableIntStateOf(0)
 }

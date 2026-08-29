@@ -48,7 +48,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ripple
+import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ProgressIndicatorDefaults
@@ -85,6 +85,7 @@ import androidx.compose.ui.graphics.PointMode
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -96,9 +97,6 @@ import androidx.compose.ui.util.fastMap
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.google.accompanist.insets.navigationBarsHeight
-import com.google.accompanist.insets.statusBarsHeight
-import com.google.accompanist.insets.statusBarsPadding
 import dev.shephard.player.R
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PlayerViewModel
@@ -123,8 +121,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-@ExperimentalSharedTransitionApi
-@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@OptIn(
+    androidx.compose.animation.ExperimentalSharedTransitionApi::class,
+    androidx.media3.common.util.UnstableApi::class,
+)
 @Composable
 fun NowPlayingSheet(
     playerViewModel: PlayerViewModel = viewModel(),
@@ -285,6 +285,7 @@ fun NowPlayingSheet(
                                     blurLambda = { SettingsLibrary.LyricBlurEffect },
                                     uiConfig = YosUIConfig(noLrcText = "No lyrics available"),
                                     weightLambda = { showControl.value },
+                                    modifier = Modifier.fillMaxSize(),
                                     onBackClick = {
                                         showControl.value = true
                                         lastClickTime.value = System.currentTimeMillis()
@@ -1078,7 +1079,7 @@ private fun PlayerControl(
                         .size(61.dp)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(bounded = false),
+                            indication = rememberRipple(bounded = false),
                             onClick = {
                                 Haptics.click(context)
                                 onPrevious()
@@ -1098,7 +1099,7 @@ private fun PlayerControl(
                         .size(58.5.dp)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(bounded = false),
+                            indication = rememberRipple(bounded = false),
                             onClick = {
                                 Haptics.click(context)
                                 onStatus(!isPlaying)
@@ -1132,7 +1133,7 @@ private fun PlayerControl(
                         .size(61.dp)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(bounded = false),
+                            indication = rememberRipple(bounded = false),
                             onClick = {
                                 Haptics.click(context)
                                 onNext()
@@ -1233,10 +1234,11 @@ private fun Track(
     modifier: Modifier = Modifier,
     height: Dp,
 ) = YosWrapper {
+    val density = LocalDensity.current
     val inactiveTrackColor = Color.White.copy(alpha = 0.5f)
     val activeTrackColor = Color.White
-    val tickSize = 2.0.dp.toPx()
-    val trackStrokeWidth = height.toPx()
+    val tickSize = with(density) { 2.0.dp.toPx() }
+    val trackStrokeWidth = with(density) { height.toPx() }
     Canvas(
         modifier
             .fillMaxWidth()
