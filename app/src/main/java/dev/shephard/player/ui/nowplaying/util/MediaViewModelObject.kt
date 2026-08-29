@@ -30,6 +30,6 @@ object MediaViewModelObject {
     val samplingRate: MutableIntState = mutableIntStateOf(0)
     val isDolby: MutableState<Boolean> = mutableStateOf(false)
 
-    val otherSideForLines: MutableState<List<String>> = mutableStateOf(emptyList())
+    val otherSideForLines: MutableState<List<Boolean>> = mutableStateOf(emptyList())
     val mainLyricLines: MutableState<List<String>> = mutableStateOf(emptyList())
 }

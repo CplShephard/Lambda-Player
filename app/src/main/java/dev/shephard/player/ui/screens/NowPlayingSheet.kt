@@ -48,7 +48,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ProgressIndicatorDefaults
@@ -1079,7 +1079,7 @@ private fun PlayerControl(
                         .size(61.dp)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = rememberRipple(bounded = false),
+                            indication = LocalIndication.current,
                             onClick = {
                                 Haptics.click(context)
                                 onPrevious()
@@ -1099,7 +1099,7 @@ private fun PlayerControl(
                         .size(58.5.dp)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = rememberRipple(bounded = false),
+                            indication = LocalIndication.current,
                             onClick = {
                                 Haptics.click(context)
                                 onStatus(!isPlaying)
@@ -1133,7 +1133,7 @@ private fun PlayerControl(
                         .size(61.dp)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = rememberRipple(bounded = false),
+                            indication = LocalIndication.current,
                             onClick = {
                                 Haptics.click(context)
                                 onNext()
