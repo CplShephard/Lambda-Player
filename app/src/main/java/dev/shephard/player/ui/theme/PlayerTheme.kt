@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2025-2026 InstallerX Revived contributors
 package dev.shephard.player.ui.theme
 
 import android.os.Build
@@ -29,10 +31,13 @@ import dev.shephard.player.theme.ThemeState
 import dev.shephard.player.ui.theme.material.animateAsState
 import dev.shephard.player.ui.theme.material.dynamicColorScheme
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
+import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeColorSpec as MiuixColorSpec
 import top.yukonga.miuix.kmp.theme.ThemeController
 import top.yukonga.miuix.kmp.theme.ThemePaletteStyle as MiuixPaletteStyle
+import top.yukonga.miuix.kmp.theme.darkColorScheme
+import top.yukonga.miuix.kmp.theme.lightColorScheme
 
 private val LocalIsDark = staticCompositionLocalOf { false }
 private val LocalPaletteStyle = staticCompositionLocalOf { PaletteStyle.Expressive }
@@ -173,6 +178,7 @@ fun PlayerTheme(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PlayerMaterialExpressiveTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -220,7 +226,17 @@ fun PlayerMiuixTheme(
         }
     }
 
-    val controller = if (useMiuixMonet) {
+    val accentLuminance = 0.2126f * seedColor.red + 0.7152f * seedColor.green + 0.0722f * seedColor.blue
+    val onAccent = if (accentLuminance > 0.35f) Color(0xFF111111) else Color.White
+
+    // In Miuix mode, the accent is supposed to be the fixed MIUI/HyperOS blue
+    // (Miuix's own default `keyColor` = #3482FF) whenever Monet is disabled.
+    // The user-picked `seedColor` only drives the accent inside Monet mode
+    // (useMiuixMonet = true) or in Material 3 mode — otherwise it must not
+    // override the Miuix native primary.
+    val miuixAccentColor = Color(0xFF3482FF)
+
+    if (useMiuixMonet) {
         val keyColor = if (useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             colorResource(id = android.R.color.system_accent1_500)
         } else {
@@ -250,7 +266,7 @@ fun PlayerMiuixTheme(
             ThemeColorSpec.SPEC_2021 -> MiuixColorSpec.Spec2021
         }
 
-        remember(colorSchemeMode, keyColor, paletteStyle, colorSpecVersion, darkTheme) {
+        val controller = remember(colorSchemeMode, keyColor, paletteStyle, colorSpecVersion, darkTheme) {
             ThemeController(
                 colorSchemeMode = colorSchemeMode,
                 keyColor = keyColor,
@@ -259,25 +275,50 @@ fun PlayerMiuixTheme(
                 isDark = darkTheme,
             )
         }
+
+        MiuixTheme(
+            controller = controller,
+            content = content,
+        )
     } else {
-        val colorSchemeMode = when (themeMode) {
-            ThemeMode.SYSTEM -> ColorSchemeMode.System
-            ThemeMode.LIGHT -> ColorSchemeMode.Light
-            ThemeMode.DARK -> ColorSchemeMode.Dark
+        // Exact 6.0 background and surface colors:
+        // Dark mode: pure black #000000, surface #101012, surfaceVariant #1C1C1E
+        // Light mode: background #F7F7F8 (not pure white), surface #FFFFFF
+        val colors = if (darkTheme) {
+            darkColorScheme(
+                primary = miuixAccentColor,
+                onPrimary = Color.White,
+                background = Color(0xFF000000),
+                onBackground = Color(0xFFF5F5F7),
+                surface = Color(0xFF101012),
+                onSurface = Color(0xFFF5F5F7),
+                surfaceVariant = Color(0xFF1C1C1E),
+                surfaceContainer = Color(0xFF1C1C1E),
+                surfaceContainerHigh = Color(0xFF222226),
+                surfaceContainerHighest = Color(0xFF2A2A2E),
+            )
+        } else {
+            lightColorScheme(
+                primary = miuixAccentColor,
+                onPrimary = Color.White,
+                background = Color(0xFFF7F7F8),
+                onBackground = Color(0xFF111113),
+                surface = Color(0xFFFFFFFF),
+                onSurface = Color(0xFF111113),
+                surfaceVariant = Color(0xFFFFFFFF),
+                surfaceContainer = Color(0xFFFFFFFF),
+                surfaceContainerHigh = Color(0xFFFFFFFF),
+                surfaceContainerHighest = Color(0xFFFFFFFF),
+            )
         }
 
-        remember(colorSchemeMode, darkTheme) {
-            ThemeController(
-                colorSchemeMode = colorSchemeMode,
-                isDark = darkTheme,
+        MiuixTheme(colors = colors) {
+            CompositionLocalProvider(
+                LocalContentColor provides colors.onBackground,
+                content = content
             )
         }
     }
-
-    MiuixTheme(
-        controller = controller,
-        content = content,
-    )
 }
 
 @RequiresApi(Build.VERSION_CODES.Q)

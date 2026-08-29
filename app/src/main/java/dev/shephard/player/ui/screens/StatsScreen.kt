@@ -51,6 +51,7 @@ import dev.shephard.player.data.StatsTrackEntry
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.captureForTopBarBlur
+import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.components.rememberCollapsingTopBarState
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.miuixBlurSurface
@@ -91,11 +92,13 @@ fun StatsScreen(
         SmallTopAppBar(
             title = strings.statsTitle,
             modifier = if (topBarState.pageBackdrop != null) {
+                // Match the mini player pop-up's blur/tint values for a
+                // consistent liquid-glass look across the app.
                 Modifier.miuixBlurSurface(
                     backdrop = topBarState.pageBackdrop,
                     shape = androidx.compose.ui.graphics.RectangleShape,
-                    blurRadius = 70f,
-                    tintAlpha = if (scrollProgress > 0.01f) (0.68f + scrollProgress * 0.27f).coerceIn(0f, 0.95f) else 0f,
+                    blurRadius = 28f,
+                    tintAlpha = 0.58f,
                     fallbackColor = Color.Transparent
                 )
             } else Modifier,
@@ -122,10 +125,17 @@ fun StatsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .then(topBarState.pageBackdrop?.let { Modifier.layerBackdrop(it) } ?: Modifier)
+                // overScrollVertical must come before verticalScroll so the
+                // NestedScrollConnection it installs can consume the overscroll
+                // delta before the inner scrollable reacts to it.
+                .overScrollVertical()
                 .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            // Extra top spacer so the miuix overscroll can fire even when the
+            // available content is shorter than the viewport (small library).
+            Spacer(Modifier.height(40.dp))
             StatsPeriodPills(selectedPeriod = selectedPeriod, onPeriodSelected = { selectedPeriod = it })
 
             StatsSummaryCard(
@@ -234,6 +244,8 @@ private fun StatsTrackList(entries: List<StatsTrackEntry>, tracks: List<AudioTra
                     ?: tracks.firstOrNull { it.title == entry.title && it.artist == entry.artistName }
             }
             val coverUri = track?.albumArtUri ?: entry.albumArtUri
+            val displayTitle = track?.title?.takeIf { it.isNotBlank() } ?: entry.title
+            val displayArtist = track?.artist?.takeIf { it.isNotBlank() } ?: entry.artistName
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -271,14 +283,14 @@ private fun StatsTrackList(entries: List<StatsTrackEntry>, tracks: List<AudioTra
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = entry.title,
+                        text = displayTitle,
                         style = MiuixAppTheme.typography.bodyMedium,
                         color = cs.onBackground,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = entry.artistName,
+                        text = displayArtist,
                         style = MiuixAppTheme.typography.labelSmall,
                         color = cs.onSurfaceVariant,
                         maxLines = 1,

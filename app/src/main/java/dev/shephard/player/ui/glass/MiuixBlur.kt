@@ -32,9 +32,41 @@ val isBlurSupported: Boolean
 val isLiquidGlassSupported: Boolean
     get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
+/**
+ * Remembers the global app blur backdrop.
+ *
+ * The backdrop's draw block paints a base surface fill followed by the captured
+ * content of the modifier that owns the backdrop (e.g. wallpaper, content pages,
+ * mini player, etc.). To make sure glass effects (Apple dock, mini player, top
+ * bars) actually see the wallpaper, callers should attach the resulting backdrop
+ * to a modifier that wraps both the wallpaper layer AND the content.
+ */
 @Composable
 fun rememberAppBlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
+    if (!enableBlur || !isLiquidGlassSupported || !isRenderEffectSupported()) return null
+    val useMiuix = LocalUseMiuix.current
+    val surfaceColor = if (useMiuix) {
+        top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.surface
+    } else {
+        androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer
+    }
+    return rememberLayerBackdrop {
+        drawRect(surfaceColor)
+        drawContent()
+    }
+}
 
+/**
+ * Remembers a dedicated wallpaper blur backdrop. The wallpaper itself is
+ * rendered by the caller as a normal composable (an `AsyncImage` in a `Box`)
+ * wrapped by `Modifier.layerBackdrop(<this>)`. By keeping the draw block here
+ * minimal (just the base surface + `drawContent()`) we let miuix's layer
+ * capture the wallpaper together with the darkening overlay so any
+ * liquid-glass surface (Apple dock, mini player pop-up) bound to the same
+ * backdrop can sample the wallpaper underneath.
+ */
+@Composable
+fun rememberWallpaperBlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
     if (!enableBlur || !isLiquidGlassSupported || !isRenderEffectSupported()) return null
     val useMiuix = LocalUseMiuix.current
     val surfaceColor = if (useMiuix) {

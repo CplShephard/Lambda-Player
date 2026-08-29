@@ -27,11 +27,11 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.Icon as M3Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar as M3NavigationBar
 import androidx.compose.material3.NavigationBarItem as M3NavigationBarItem
-import androidx.compose.material3.Icon as M3Icon
 import androidx.compose.material3.Text as M3Text
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -54,11 +54,6 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import coil.compose.AsyncImage
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.MiniPlayer
@@ -68,22 +63,28 @@ import dev.shephard.player.ui.glass.FloatingBottomBarDefaults
 import dev.shephard.player.ui.glass.FloatingBottomBarItem
 import dev.shephard.player.ui.glass.FloatingBottomBarMode
 import dev.shephard.player.ui.glass.LocalAppBackdrop
-import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.isLiquidGlassSupported
 import dev.shephard.player.ui.glass.rememberAppBlurBackdrop
+import dev.shephard.player.ui.glass.rememberWallpaperBlurBackdrop
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.i18n.stringsFor
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.screens.NowPlayingSheet
 import dev.shephard.player.ui.screens.NowPlayingSheetM3
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
+import top.yukonga.miuix.kmp.basic.NavigationBar
+import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurColors
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
-import top.yukonga.miuix.kmp.basic.NavigationBar
-import top.yukonga.miuix.kmp.basic.NavigationBarItem
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -99,15 +100,26 @@ fun MainContainer(
     val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = 0.55f)
 
     val blurEnabled = LocalBlurEnabled.current
-    // FIX: Read the persisted UI-engine preference synchronously ONCE so the first
-    // composition already uses the correct engine. Previously this started as `true`
-    // and flipped to the persisted value when DataStore loaded, which recreated
-    // NavDisplay mid-flight right after every launch (crash trigger, plus a visual flash).
     val initialUseMiuix = remember { runBlocking { prefs.useMiuix.first() } }
     val useMiuix by prefs.useMiuix.collectAsState(initial = initialUseMiuix)
     val appleFloatingBar by prefs.useAppleFloatingBar.collectAsState(initial = false)
-    val lastMainPage by prefs.lastMainPage.collectAsState(initial = 0)
 
+    // Resolve the persisted "last main page" synchronously on the very first
+    // composition so rememberPagerState is built with a stable initial value.
+    // We deliberately do NOT collect lastMainPage as state — doing so would
+    // cause a recomposition loop and re-create the pager state on every page
+    // change, which in turn causes a noticeable hitch when leaving Settings.
+    val initialLastMainPage = remember { runBlocking { prefs.lastMainPage.first() } }
+
+    // A dedicated backdrop whose layer captures the wallpaper. The Apple-style
+    // floating dock uses this so the wallpaper stays visible behind its
+    // liquid-glass surface (see rememberWallpaperBlurBackdrop). The wallpaper
+    // itself is rendered by the Box wrapped in Modifier.layerBackdrop(...)
+    // below — the drawContent() call inside the backdrop is what captures it.
+    val wallpaperBackdrop = rememberWallpaperBlurBackdrop(blurEnabled)
+    // Backdrop used by the top bars / content pages. We always create the
+    // standard one too, so screens that aren't bound to the wallpaper still
+    // get a glass surface.
     val backgroundBackdrop = rememberAppBlurBackdrop(blurEnabled)
     val contentBackdrop = rememberAppBlurBackdrop(blurEnabled)
 
@@ -119,18 +131,22 @@ fun MainContainer(
         val backStack = remember { mutableStateListOf<NavKey>(MainRoute) }
         var showNowPlaying by remember { mutableStateOf(false) }
 
+        // Build the pager state once with a stable initial value. The
+        // rememberPagerState factory is keyed only on pageCount, so this won't
+        // be rebuilt on subsequent recompositions.
         val pagerState = rememberPagerState(
-            initialPage = lastMainPage.coerceIn(0, bottomNavDestinations.size - 1),
+            initialPage = initialLastMainPage.coerceIn(0, bottomNavDestinations.size - 1),
             pageCount = { bottomNavDestinations.size },
         )
         val mainPagerState = rememberMainPagerState(pagerState)
-        val currentPage = mainPagerState.pagerState.currentPage
         val settledPage = mainPagerState.pagerState.settledPage
-        LaunchedEffect(currentPage) {
-            mainPagerState.syncPage()
-        }
+
+        // Persist the settled page, debounced so we don't write to DataStore on
+        // every intermediate frame of a swipe gesture. This is the main fix for
+        // the Settings -> Playlists transition hitch.
         LaunchedEffect(settledPage) {
-            if (lastMainPage != settledPage) {
+            if (initialLastMainPage != settledPage) {
+                delay(250)
                 prefs.setLastMainPage(settledPage)
             }
         }
@@ -169,16 +185,21 @@ fun MainContainer(
             }
         }
 
-        val containerBackground = if (useMiuix) {
+        // When the user has set a wallpaper we want the page content to sit on
+        // top of it rather than on a solid Miuix/MA3 background. Otherwise fall
+        // back to the theme's normal background so the dark/light theme still
+        // looks correct.
+        val themeBackground = if (useMiuix) {
             MiuixAppTheme.colorScheme.background
         } else {
             MaterialTheme.colorScheme.surfaceContainer
         }
+        val containerBackground = if (wallpaper.isNotEmpty()) Color.Transparent else themeBackground
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(containerBackground)
+                .background(themeBackground)
         ) {
             Box(
                 modifier = Modifier
@@ -188,23 +209,38 @@ fun MainContainer(
                         else Modifier
                     )
             ) {
+                // Solid base layer in the theme color. When a wallpaper is set
+                // we leave this opaque to avoid any flash of a wrong color, but
+                // the wallpaper layer below covers it completely.
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(containerBackground)
+                        .background(themeBackground)
                 )
                 if (wallpaper.isNotEmpty()) {
-                    AsyncImage(
-                        model = wallpaper,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    // The wallpaper layer is wrapped in a `layerBackdrop` so
+                    // any glass effect (Apple dock, mini player pop-up) bound
+                    // to the same backdrop will see the wallpaper underneath.
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 1f - wallpaperBrightness))
-                    )
+                            .then(
+                                if (wallpaperBackdrop != null) Modifier.layerBackdrop(wallpaperBackdrop)
+                                else Modifier
+                            )
+                    ) {
+                        AsyncImage(
+                            model = wallpaper,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 1f - wallpaperBrightness))
+                        )
+                    }
                 }
 
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -226,6 +262,7 @@ fun MainContainer(
                                 useMiuix = useMiuix,
                                 selectedIndex = { mainPagerState.selectedPage },
                                 onSelected = { index -> mainPagerState.animateToPage(index) },
+                                wallpaperBackdrop = wallpaperBackdrop,
                             )
                         }
 
@@ -236,6 +273,7 @@ fun MainContainer(
                             mainPagerState = mainPagerState,
                             modifier = Modifier
                                 .fillMaxSize()
+                                .background(containerBackground)
                                 .then(
                                     if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop)
                                     else Modifier
@@ -280,9 +318,15 @@ private fun MainDock(
     useMiuix: Boolean,
     selectedIndex: () -> Int,
     onSelected: (Int) -> Unit,
+    wallpaperBackdrop: top.yukonga.miuix.kmp.blur.LayerBackdrop? = null,
 ) {
     when {
-        appleStyle -> AppleFloatingDock(selectedIndex = selectedIndex, onSelected = onSelected)
+        appleStyle -> AppleFloatingDock(
+            useMiuix = useMiuix,
+            selectedIndex = selectedIndex,
+            onSelected = onSelected,
+            wallpaperBackdrop = wallpaperBackdrop,
+        )
         !useMiuix -> M3NavigationDock(selectedIndex = selectedIndex, onSelected = onSelected)
         else -> MiuixNavigationDock(selectedIndex = selectedIndex, onSelected = onSelected)
     }
@@ -382,19 +426,35 @@ private fun MiuixNavigationDock(
 
 @Composable
 private fun AppleFloatingDock(
+    useMiuix: Boolean,
     selectedIndex: () -> Int,
     onSelected: (Int) -> Unit,
+    wallpaperBackdrop: top.yukonga.miuix.kmp.blur.LayerBackdrop? = null,
 ) {
     val blurOn = LocalBlurEnabled.current
-    val backdrop = LocalContentBackdrop.current
+    // Prefer the wallpaper-aware backdrop so the liquid-glass surface
+    // actually shows the wallpaper behind it. Fall back to the content
+    // backdrop (which contains the page contents but not the wallpaper) and
+    // finally to a freshly created empty backdrop as a last resort.
+    val effectiveBackdrop: top.yukonga.miuix.kmp.blur.Backdrop = wallpaperBackdrop
+        ?: LocalContentBackdrop.current
+        ?: rememberLayerBackdrop()
     val mode = when {
-        blurOn && backdrop != null && isLiquidGlassSupported -> FloatingBottomBarMode.LiquidGlass
-        blurOn && backdrop != null -> FloatingBottomBarMode.Blur
+        useMiuix && blurOn && effectiveBackdrop != null && isLiquidGlassSupported -> FloatingBottomBarMode.LiquidGlass
+        useMiuix && blurOn && effectiveBackdrop != null -> FloatingBottomBarMode.Blur
         else -> FloatingBottomBarMode.None
     }
     val strings = LocalStrings.current
-    val dummyBackdrop = rememberLayerBackdrop()
-    val effectiveBackdrop = backdrop ?: dummyBackdrop
+
+    val barColors = if (useMiuix) {
+        FloatingBottomBarDefaults.colors()
+    } else {
+        FloatingBottomBarDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            indicatorColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -415,8 +475,9 @@ private fun AppleFloatingDock(
             onSelected = onSelected,
             backdrop = effectiveBackdrop,
             tabsCount = bottomNavDestinations.size,
-            isBlurEnabled = blurOn && backdrop != null,
-            mode = mode
+            isBlurEnabled = useMiuix && blurOn && effectiveBackdrop != null,
+            mode = mode,
+            colors = barColors,
         ) {
             bottomNavDestinations.forEachIndexed { index, dest ->
                 val selected = index == selectedIndex()
@@ -430,16 +491,29 @@ private fun AppleFloatingDock(
                     onClick = { onSelected(index) },
                     modifier = Modifier.defaultMinSize(minWidth = 76.dp)
                 ) {
-                    dev.shephard.player.ui.miuix.Icon(
-                        imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
-                        contentDescription = label
-                    )
-                    dev.shephard.player.ui.miuix.Text(
-                        text = label,
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Visible
-                    )
+                    if (useMiuix) {
+                        dev.shephard.player.ui.miuix.Icon(
+                            imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
+                            contentDescription = label
+                        )
+                        dev.shephard.player.ui.miuix.Text(
+                            text = label,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Visible
+                        )
+                    } else {
+                        M3Icon(
+                            imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
+                            contentDescription = label
+                        )
+                        M3Text(
+                            text = label,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Visible
+                        )
+                    }
                 }
             }
         }
@@ -483,3 +557,4 @@ private fun MiniPlayerHost(
         }
     }
 }
+

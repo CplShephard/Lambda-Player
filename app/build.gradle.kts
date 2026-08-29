@@ -13,9 +13,9 @@ android {
     defaultConfig {
         applicationId = "dev.shephard.player"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 8
-        versionName = "6.0"
+        versionName = "7.0"
     }
 
     signingConfigs {

@@ -47,7 +47,6 @@ fun MiuixDrawer(
     enableNestedScroll: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
 
@@ -65,7 +64,6 @@ fun MiuixDrawer(
         allowDismiss = allowDismiss,
         enableNestedScroll = enableNestedScroll,
         onDismissRequest = {
-
             if (allowDismiss) visible = false
         },
         onDismissFinished = { currentOnDismissRequest() },
@@ -89,8 +87,8 @@ fun MiuixDrawerActionHeader(
         MiuixDrawerCircleAction(
             imageVector = MiuixIcons.Close,
             contentDescription = "Cancel",
-            containerColor = MiuixTheme.colorScheme.surfaceVariant,
-            contentColor = MiuixTheme.colorScheme.onSurface,
+            containerColor = Color.Transparent,
+            contentColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             onClick = onCancel,
         )
         Text(
@@ -102,10 +100,9 @@ fun MiuixDrawerActionHeader(
         MiuixDrawerCircleAction(
             imageVector = MiuixIcons.Ok,
             contentDescription = "Apply",
-            containerColor = if (confirmEnabled) MiuixTheme.colorScheme.primary
-            else MiuixTheme.colorScheme.surfaceVariant,
-            contentColor = if (confirmEnabled) MiuixTheme.colorScheme.onPrimary
-            else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            containerColor = Color.Transparent,
+            contentColor = if (confirmEnabled) MiuixTheme.colorScheme.onBackground
+            else MiuixTheme.colorScheme.onSurface.copy(alpha = 0.38f),
             enabled = confirmEnabled,
             onClick = onConfirm,
         )
@@ -133,15 +130,13 @@ private fun MiuixDrawerCircleAction(
             imageVector = imageVector,
             contentDescription = contentDescription,
             tint = contentColor,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(22.dp),
         )
     }
 }
 
 object MiuixDrawerDefaults {
-
     val CornerRadius: Dp = BottomSheetDefaults.cornerRadius
-
     val InsideMargin: DpSize = DpSize(0.dp, 0.dp)
 
     @Composable

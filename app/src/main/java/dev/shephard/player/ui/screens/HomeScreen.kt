@@ -23,6 +23,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.draw.clip
+import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -145,6 +147,8 @@ fun HomeScreen(
         playlistDetailGuard.pop { openPlaylistIndex = null }
     }
 
+    val deviceCornerRadius = rememberDeviceCornerRadius()
+
     AnimatedContent(
         targetState = openPlaylistIndex,
         modifier = Modifier.fillMaxSize(),
@@ -165,93 +169,98 @@ fun HomeScreen(
         },
         label = "homePlaylistSubmenu"
     ) { idx ->
-        val selectedPl = idx?.let { featuredPlaylists.getOrNull(it) }
-        if (selectedPl != null) {
-        val plTracks = remember(selectedPl, tracks, likedIds) { resolvePlaylistTracks(selectedPl, tracks, likedIds) }
-        PlaylistDetailView(
-            playlist = selectedPl,
-            allTracks = tracks,
-            plTracks = plTracks,
-            strings = strings,
-            onBack = { playlistDetailGuard.pop { openPlaylistIndex = null } },
-            onTrackClick = { list, i -> onTrackClick(list, i, selectedPl.name) },
-            onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, selectedPl.name) },
-            onPlayRemix = { if (plTracks.isNotEmpty()) onTrackClick(plTracks.shuffled(), 0, selectedPl.name) },
-            onRemoveTrack = { trackId ->
-                val newTrackIds = selectedPl.trackIds - trackId
-                val rawIdx = rawPlaylists.indexOf(selectedPl)
-                if (rawIdx >= 0) {
-                    val next = rawPlaylists.toMutableList()
-                    next[rawIdx] = selectedPl.copy(trackIds = newTrackIds)
-                    scope.launch { prefs.setPlaylistsJson(encodePlaylists(next)) }
-                }
-            },
-            onAddTracks = { },
-            onPickCover = { },
-            onReorder = { },
-            onChangeSort = { }
-        )
-    } else {
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Transparent,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            topBar = {
-                InstallerXTopBar(
-                    title = strings.home,
-                    state = topBarState
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(deviceCornerRadius))
+        ) {
+            val selectedPl = idx?.let { featuredPlaylists.getOrNull(it) }
+            if (selectedPl != null) {
+                val plTracks = remember(selectedPl, tracks, likedIds) { resolvePlaylistTracks(selectedPl, tracks, likedIds) }
+                PlaylistDetailView(
+                    playlist = selectedPl,
+                    allTracks = tracks,
+                    plTracks = plTracks,
+                    strings = strings,
+                    onBack = { playlistDetailGuard.pop { openPlaylistIndex = null } },
+                    onTrackClick = { list, i -> onTrackClick(list, i, selectedPl.name) },
+                    onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, selectedPl.name) },
+                    onPlayRemix = { if (plTracks.isNotEmpty()) onTrackClick(plTracks.shuffled(), 0, selectedPl.name) },
+                    onRemoveTrack = { trackId ->
+                        val newTrackIds = selectedPl.trackIds - trackId
+                        val rawIdx = rawPlaylists.indexOf(selectedPl)
+                        if (rawIdx >= 0) {
+                            val next = rawPlaylists.toMutableList()
+                            next[rawIdx] = selectedPl.copy(trackIds = newTrackIds)
+                            scope.launch { prefs.setPlaylistsJson(encodePlaylists(next)) }
+                        }
+                    },
+                    onAddTracks = { },
+                    onPickCover = { },
+                    onReorder = { },
+                    onChangeSort = { }
                 )
-            }
-        ) { innerPadding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .captureForTopBarBlur(topBarState)
-                    .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                    .overScrollVertical()
-                    .verticalScroll(scrollState)
-                    .padding(
-                        top = innerPadding.calculateTopPadding() + 8.dp,
-                        bottom = if (hasMiniPlayer) 176.dp else 96.dp
-                    ),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-
-                if (featuredTracks.isNotEmpty()) {
-                    FeaturedSongsSection(
-                        title = strings.featuredSongs,
-                        tracks = featuredTracks,
-                        onTrackClick = { idx ->
-                            onTrackClick(featuredTracks, idx, strings.featuredSongs)
+            } else {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    containerColor = Color.Transparent,
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                    topBar = {
+                        InstallerXTopBar(
+                            title = strings.home,
+                            state = topBarState
+                        )
+                    }
+                ) { innerPadding ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .captureForTopBarBlur(topBarState)
+                            .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                            .overScrollVertical()
+                            .verticalScroll(scrollState)
+                            .padding(
+                                top = innerPadding.calculateTopPadding() + 8.dp,
+                                bottom = if (hasMiniPlayer) 176.dp else 96.dp
+                            ),
+                        verticalArrangement = Arrangement.spacedBy(24.dp)
+                    ) {
+                        if (featuredTracks.isNotEmpty()) {
+                            FeaturedSongsSection(
+                                title = strings.featuredSongs,
+                                tracks = featuredTracks,
+                                onTrackClick = { featuredIdx ->
+                                    onTrackClick(featuredTracks, featuredIdx, strings.featuredSongs)
+                                }
+                            )
                         }
-                    )
-                }
 
-                if (featuredPlaylists.isNotEmpty()) {
-                    FeaturedPlaylistsSection(
-                        title = strings.featuredPlaylists,
-                        playlists = featuredPlaylists,
-                        onPlaylistClick = { pl ->
-                            val i = featuredPlaylists.indexOf(pl)
-                            if (i >= 0) {
-                                playlistDetailGuard.push(openPlaylistIndex, i) { openPlaylistIndex = i }
-                            }
+                        if (featuredPlaylists.isNotEmpty()) {
+                            FeaturedPlaylistsSection(
+                                title = strings.featuredPlaylists,
+                                playlists = featuredPlaylists,
+                                onPlaylistClick = { pl ->
+                                    val i = featuredPlaylists.indexOf(pl)
+                                    if (i >= 0) {
+                                        playlistDetailGuard.push(openPlaylistIndex, i) { openPlaylistIndex = i }
+                                    }
+                                }
+                            )
                         }
-                    )
-                }
 
-                if (recentlyPlayedTracks.isNotEmpty()) {
-                    RecentlyPlayedSection(
-                        title = strings.recentlyPlayed,
-                        tracks = recentlyPlayedTracks,
-                        onTrackClick = { idx ->
-                            onTrackClick(recentlyPlayedTracks, idx, strings.recentlyPlayed)
+                        if (recentlyPlayedTracks.isNotEmpty()) {
+                            RecentlyPlayedSection(
+                                title = strings.recentlyPlayed,
+                                tracks = recentlyPlayedTracks,
+                                onTrackClick = { recentIdx ->
+                                    onTrackClick(recentlyPlayedTracks, recentIdx, strings.recentlyPlayed)
+                                }
+                            )
                         }
-                    )
+                    }
                 }
             }
         }
-    }
     }
 }
 

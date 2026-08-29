@@ -1,42 +1,52 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 InstallerX Revived contributors
+// Copyright (C) 2025-2026 InstallerX Revived contributors
 package dev.shephard.player.ui.screens
 
 import android.os.Build
-import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.ViewCarousel
+import androidx.compose.material.icons.twotone.ColorLens
+import androidx.compose.material.icons.twotone.InvertColors
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -44,32 +54,32 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.toPreferenceInt
 import dev.shephard.player.theme.PaletteStyle
 import dev.shephard.player.theme.ThemeColorSpec
 import dev.shephard.player.theme.ThemeMode
+import dev.shephard.player.ui.components.m3.BaseItemContainer
+import dev.shephard.player.ui.components.m3.BaseWidget
+import dev.shephard.player.ui.components.m3.ColorSwatchPreview
+import dev.shephard.player.ui.components.m3.RadioButtonWidget
+import dev.shephard.player.ui.components.m3.SegmentedColumn
+import dev.shephard.player.ui.components.m3.SwitchWidget
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.theme.material.PresetColors
-import kotlin.math.abs
 import kotlinx.coroutines.launch
-
-private val M3SeedPalette = PresetColors.map { it.color.toArgb() }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,16 +94,13 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
     val paletteStyle by prefs.paletteStyle.collectAsState(initial = PaletteStyle.TonalSpot)
     val colorSpec by prefs.colorSpec.collectAsState(initial = ThemeColorSpec.SPEC_2025)
     val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
-    val seedColor by prefs.seedColor.collectAsState(initial = M3SeedPalette.first())
+    val seedColor by prefs.seedColor.collectAsState(initial = PresetColors.first().color.toArgb())
     val blurEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
     val appleFloatingBar by prefs.useAppleFloatingBar.collectAsState(initial = false)
 
     var showThemeModeDialog by remember { mutableStateOf(false) }
     var showPaletteStyleDialog by remember { mutableStateOf(false) }
     var showColorSpecDialog by remember { mutableStateOf(false) }
-    var customPickerOpen by remember { mutableStateOf(false) }
-
-    val dynamicColorLocked = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     if (showThemeModeDialog) {
         AlertDialog(
@@ -173,17 +180,8 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
         )
     }
 
-    if (customPickerOpen && !dynamicColorLocked) {
-        CustomColorPickerDialogM3(
-            onDismiss = { customPickerOpen = false },
-            onColorPicked = { argb ->
-                scope.launch { prefs.setSeedColor(argb) }
-            },
-            initialArgb = seedColor,
-            title = strings.customColorTitle,
-            hexPlaceholder = strings.hexPlaceholder
-        )
-    }
+    val layoutDirection = LocalLayoutDirection.current
+    val horizontalSafeInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal).asPaddingValues()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -204,168 +202,165 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
         },
     ) { paddingValues ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = horizontalSafeInsets.calculateStartPadding(layoutDirection),
+                top = paddingValues.calculateTopPadding(),
+                end = horizontalSafeInsets.calculateEndPadding(layoutDirection),
+                bottom = paddingValues.calculateBottomPadding() + 40.dp
+            )
         ) {
-            item { M3SectionTitle(strings.uiEngine) }
+            // Group 1: UI Engine & Navigation Style
             item {
-                M3OptionRow(
-                    label = strings.miuixUi,
-                    selected = useMiuix,
-                    onClick = { scope.launch { prefs.setUseMiuix(true) } }
-                )
-                M3OptionRow(
-                    label = strings.googleUi,
-                    selected = !useMiuix,
-                    onClick = { scope.launch { prefs.setUseMiuix(false) } }
-                )
-            }
-
-            item { M3SectionTitle(strings.themeMode) }
-            item {
-                M3ClickRow(
-                    title = strings.themeMode,
-                    value = when (themeMode) {
-                        ThemeMode.LIGHT -> strings.lightMode
-                        ThemeMode.DARK -> strings.darkMode
-                        ThemeMode.SYSTEM -> strings.autoMode
-                    },
-                    onClick = { showThemeModeDialog = true }
-                )
-            }
-
-            item { M3SectionTitle(strings.appearance) }
-            item {
-                M3SwitchRow(strings.blurEffect, blurEnabled) { scope.launch { prefs.setLiquidGlassEnabled(it) } }
-                M3SwitchRow(strings.appleFloatingBar, appleFloatingBar) { scope.launch { prefs.setUseAppleFloatingBar(it) } }
-            }
-
-            item { M3SectionTitle(strings.paletteStyle) }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                item {
-                    M3SwitchRow(strings.dynamicColor, dynamicColor) { scope.launch { prefs.setDynamicColor(it) } }
+                SegmentedColumn(title = strings.uiEngine) {
+                    item {
+                        RadioButtonWidget(
+                            title = strings.googleUi,
+                            description = "Material 3 Expressive UI",
+                            iconPlaceholder = false,
+                            selected = !useMiuix,
+                            onClick = { scope.launch { prefs.setUseMiuix(false) } }
+                        )
+                    }
+                    item {
+                        RadioButtonWidget(
+                            title = strings.miuixUi,
+                            description = "Xiaomi HyperOS Miuix UI",
+                            iconPlaceholder = false,
+                            selected = useMiuix,
+                            onClick = { scope.launch { prefs.setUseMiuix(true) } }
+                        )
+                    }
+                    item {
+                        SwitchWidget(
+                            icon = Icons.Default.ViewCarousel,
+                            title = strings.appleFloatingBar,
+                            description = strings.appleFloatingBarDescription,
+                            checked = appleFloatingBar,
+                            onCheckedChange = { scope.launch { prefs.setUseAppleFloatingBar(it) } }
+                        )
+                    }
                 }
             }
+
+            // Group 2: Google UI / Material 3 Theme Options
             item {
-                M3ClickRow(
-                    title = strings.paletteStyle,
-                    value = paletteStyle.displayName,
-                    onClick = { showPaletteStyleDialog = true }
-                )
-            }
-            item {
-                M3ClickRow(
-                    title = strings.colorSpec,
-                    value = colorSpec.displayName,
-                    onClick = { showColorSpecDialog = true }
-                )
+                SegmentedColumn(title = strings.googleUi) {
+                    item {
+                        SwitchWidget(
+                            title = strings.blurEffect,
+                            description = strings.blurEffectDescription,
+                            checked = blurEnabled,
+                            onCheckedChange = { scope.launch { prefs.setLiquidGlassEnabled(it) } }
+                        )
+                    }
+                    item {
+                        BaseWidget(
+                            icon = Icons.Default.DarkMode,
+                            title = strings.themeMode,
+                            description = when (themeMode) {
+                                ThemeMode.LIGHT -> strings.lightMode
+                                ThemeMode.DARK -> strings.darkMode
+                                ThemeMode.SYSTEM -> strings.autoMode
+                            },
+                            onClick = { showThemeModeDialog = true }
+                        )
+                    }
+                    item {
+                        BaseWidget(
+                            icon = Icons.Default.Palette,
+                            title = strings.paletteStyle,
+                            description = paletteStyle.displayName,
+                            onClick = { showPaletteStyleDialog = true }
+                        )
+                    }
+                    item {
+                        BaseWidget(
+                            icon = Icons.Default.Tune,
+                            title = strings.colorSpec,
+                            description = colorSpec.displayName,
+                            onClick = { showColorSpecDialog = true }
+                        )
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        item {
+                            SwitchWidget(
+                                icon = Icons.TwoTone.InvertColors,
+                                title = strings.dynamicColor,
+                                description = strings.dynamicColorDescription,
+                                checked = dynamicColor,
+                                onCheckedChange = { scope.launch { prefs.setDynamicColor(it) } }
+                            )
+                        }
+                    }
+                }
             }
 
-            item { M3SectionTitle(strings.customColorTitle) }
+            // Group 3: Monet Theme Presets (18 Swatches)
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                AnimatedVisibility(
+                    visible = !dynamicColor || Build.VERSION.SDK_INT < Build.VERSION_CODES.S,
+                    enter = fadeIn(animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)) +
+                        expandVertically(animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing)),
+                    exit = fadeOut(animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing)) +
+                        shrinkVertically(animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing))
                 ) {
-                    M3SeedPalette.forEach { argb ->
-                        val selected = argb == seedColor
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(argb))
-                                .clickable(enabled = !dynamicColorLocked) {
-                                    scope.launch { prefs.setSeedColor(argb) }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (selected) {
-                                Box(
+                    SegmentedColumn(title = strings.accentColor) {
+                        item {
+                            BaseItemContainer {
+                                BoxWithConstraints(
                                     modifier = Modifier
-                                        .size(28.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.White.copy(alpha = 0.3f))
-                                )
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 16.dp)
+                                ) {
+                                    val itemMinWidth = 88.dp
+                                    val columns = (this.maxWidth / itemMinWidth).toInt().coerceAtLeast(1)
+                                    val chunkedColors = PresetColors.chunked(columns)
+
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        chunkedColors.forEach { rowItems ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.Center
+                                            ) {
+                                                rowItems.forEach { rawColor ->
+                                                    Box(
+                                                        modifier = Modifier.weight(1f),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        ColorSwatchPreview(
+                                                            rawColor = rawColor,
+                                                            currentStyle = paletteStyle,
+                                                            colorSpec = colorSpec,
+                                                            textStyle = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+                                                            textColor = MaterialTheme.colorScheme.onSurface,
+                                                            isSelected = seedColor == rawColor.color.toArgb() &&
+                                                                !(dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S),
+                                                        ) {
+                                                            scope.launch { prefs.setSeedColor(rawColor.color.toArgb()) }
+                                                        }
+                                                    }
+                                                }
+
+                                                val remaining = columns - rowItems.size
+                                                if (remaining > 0) {
+                                                    repeat(remaining) {
+                                                        Spacer(Modifier.weight(1f))
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.sweepGradient(
-                                    listOf(
-                                        Color(0xFFEF4444), Color(0xFFF59E0B), Color(0xFFFACC15),
-                                        Color(0xFF22C55E), Color(0xFF14B8A6), Color(0xFF3B82F6),
-                                        Color(0xFF8B5CF6), Color(0xFFEF4444)
-                                    )
-                                )
-                            )
-                            .clickable(enabled = !dynamicColorLocked) { customPickerOpen = true }
-                    )
                 }
             }
-
-            item { Spacer(Modifier.height(24.dp)) }
         }
-    }
-}
-
-@Composable
-private fun M3SectionTitle(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 4.dp),
-    )
-}
-
-@Composable
-private fun M3SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onChange(!checked) }
-            .padding(horizontal = 20.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-        Spacer(Modifier.width(12.dp))
-        Switch(checked = checked, onCheckedChange = onChange)
-    }
-}
-
-@Composable
-private fun M3ClickRow(title: String, value: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(horizontal = 20.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
@@ -387,162 +382,4 @@ private fun M3OptionRow(label: String, selected: Boolean, onClick: () -> Unit) {
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
         )
     }
-}
-
-@Composable
-fun CustomColorPickerDialogM3(
-    onDismiss: () -> Unit,
-    onColorPicked: (Int) -> Unit,
-    initialArgb: Int = 0xFF4A672D.toInt(),
-    title: String = "Pick a custom color",
-    hexPlaceholder: String = "#RRGGBB",
-) {
-    val strings = LocalStrings.current
-    val initialHsv = remember(initialArgb) { colorToHsv(Color(initialArgb)) }
-    var hue by remember { mutableFloatStateOf(initialHsv[0]) }
-    var sat by remember { mutableFloatStateOf(initialHsv[1]) }
-    var value by remember { mutableFloatStateOf(initialHsv[2]) }
-    var hexText by remember { mutableStateOf("") }
-
-    val currentColor = hsvToColor(hue, sat, value)
-    val hueColor = hsvToColor(hue, 1f, 1f)
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(currentColor)
-                )
-                Spacer(Modifier.height(16.dp))
-                GradientSlider(
-                    colors = listOf(
-                        Color(0xFFFF0000), Color(0xFFFFFF00), Color(0xFF00FF00),
-                        Color(0xFF00FFFF), Color(0xFF0000FF), Color(0xFFFF00FF), Color(0xFFFF0000),
-                    ),
-                    fraction = hue,
-                    onFractionChange = { hue = it }
-                )
-                Spacer(Modifier.height(12.dp))
-                GradientSlider(
-                    colors = listOf(Color.White, hueColor),
-                    fraction = sat,
-                    onFractionChange = { sat = it }
-                )
-                Spacer(Modifier.height(12.dp))
-                GradientSlider(
-                    colors = listOf(Color.Black, hsvToColor(hue, sat, 1f)),
-                    fraction = value,
-                    onFractionChange = { value = it }
-                )
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = hexText,
-                    onValueChange = { input ->
-                        val cleaned = input.filter { it in "0123456789abcdefABCDEF#" }.take(7)
-                        hexText = cleaned
-                        if (cleaned.length == 7 && cleaned[0] == '#') {
-                            runCatching {
-                                val rgb = Color(android.graphics.Color.parseColor(cleaned))
-                                val parsed = colorToHsv(rgb)
-                                hue = parsed[0]
-                                sat = parsed[1]
-                                value = parsed[2]
-                            }
-                        }
-                    },
-                    label = { Text(hexPlaceholder) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onColorPicked(currentColor.toArgb())
-                    onDismiss()
-                }
-            ) { Text(strings.apply) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(strings.close) }
-        },
-    )
-}
-
-@Composable
-private fun GradientSlider(
-    colors: List<Color>,
-    fraction: Float,
-    onFractionChange: (Float) -> Unit,
-) {
-    val thumbSize = 24.dp
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(28.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(Brush.horizontalGradient(colors))
-            .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    onFractionChange((offset.x / size.width).coerceIn(0f, 1f))
-                }
-            }
-            .pointerInput(Unit) {
-                detectDragGestures { change, _ ->
-                    change.consume()
-                    onFractionChange((change.position.x / size.width).coerceIn(0f, 1f))
-                }
-            }
-    ) {
-        Box(
-            modifier = Modifier
-                .offset(x = (maxWidth - thumbSize) * fraction.coerceIn(0f, 1f))
-                .size(thumbSize)
-                .clip(CircleShape)
-                .background(Color.White)
-        )
-    }
-}
-
-private fun hsvToColor(h: Float, s: Float, v: Float): Color {
-    val hue = h.coerceIn(0f, 1f)
-    val c = v * s
-    val x = c * (1f - abs((hue * 6f) % 2f - 1f))
-    val m = v - c
-    val (r, g, b) = when {
-        hue < 1f / 6f -> Triple(c, x, 0f)
-        hue < 2f / 6f -> Triple(x, c, 0f)
-        hue < 3f / 6f -> Triple(0f, c, x)
-        hue < 4f / 6f -> Triple(0f, x, c)
-        hue < 5f / 6f -> Triple(x, 0f, c)
-        else -> Triple(c, 0f, x)
-    }
-    return Color(r + m, g + m, b + m)
-}
-
-private fun colorToHsv(color: Color): FloatArray {
-    val r = color.red
-    val g = color.green
-    val b = color.blue
-    val maxV = maxOf(r, g, b)
-    val minV = minOf(r, g, b)
-    val d = maxV - minV
-    val h = if (d == 0f) {
-        0f
-    } else {
-        when (maxV) {
-            r -> (g - b) / d + if (g < b) 6f else 0f
-            g -> (b - r) / d + 2f
-            else -> (r - g) / d + 4f
-        } / 6f
-    }
-    val s = if (maxV == 0f) 0f else d / maxV
-    return floatArrayOf(h, s, maxV)
 }

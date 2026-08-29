@@ -1,5 +1,10 @@
 package dev.shephard.player.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,10 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -27,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -116,20 +118,35 @@ fun MiniPlayerM3(
 
                     IconButton(onClick = onPreviousClick) {
                         Icon(
-                            imageVector = Icons.Filled.SkipPrevious,
+                            painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_rewind),
                             contentDescription = "Previous",
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                     IconButton(onClick = onPlayPauseClick) {
-                        Icon(
-                            imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = if (state.isPlaying) "Pause" else "Play",
-                        )
+                        AnimatedContent(
+                            targetState = state.isPlaying,
+                            transitionSpec = {
+                                (fadeIn(animationSpec = tween(150)))
+                                    .togetherWith(fadeOut(animationSpec = tween(100)))
+                            },
+                            label = "miniM3PlayPauseIcon"
+                        ) { isPlaying ->
+                            Icon(
+                                painter = painterResource(
+                                    id = if (isPlaying) dev.shephard.player.R.drawable.ic_nowplaying_pause
+                                    else dev.shephard.player.R.drawable.ic_nowplaying_play
+                                ),
+                                contentDescription = if (isPlaying) "Pause" else "Play",
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                     IconButton(onClick = onNextClick) {
                         Icon(
-                            imageVector = Icons.Filled.SkipNext,
+                            painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_fforward),
                             contentDescription = "Next",
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 }

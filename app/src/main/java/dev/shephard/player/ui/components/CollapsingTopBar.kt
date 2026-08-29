@@ -58,6 +58,8 @@ fun CollapsingTopBar(
     modifier: Modifier = Modifier,
 ) {
     val scrollProgress = state.collapseFraction
+    // Use the same blur/tint configuration as the mini player pop-up so the
+    // glass surface feels visually consistent across the app.
     SmallTopAppBar(
         title = title,
 
@@ -67,8 +69,8 @@ fun CollapsingTopBar(
                     Modifier.miuixBlurSurface(
                         backdrop = state.pageBackdrop,
                         shape = androidx.compose.ui.graphics.RectangleShape,
-                        blurRadius = 70f,
-                        tintAlpha = if (scrollProgress > 0.01f) (0.68f + scrollProgress * 0.27f).coerceIn(0f, 0.95f) else 0f,
+                        blurRadius = 28f,
+                        tintAlpha = 0.58f,
                         fallbackColor = androidx.compose.ui.graphics.Color.Transparent
                     )
                 } else Modifier
@@ -127,11 +129,13 @@ fun InstallerXTopBar(
         modifier = modifier
             .then(
                 if (state.pageBackdrop != null) {
+                    // Match the mini player pop-up's blur/tint values for a
+                    // consistent liquid-glass look across the app.
                     Modifier.miuixBlurSurface(
                         backdrop = state.pageBackdrop,
                         shape = androidx.compose.ui.graphics.RectangleShape,
-                        blurRadius = 70f,
-                        tintAlpha = if (collapseFraction > 0.01f) (0.68f + collapseFraction * 0.27f).coerceIn(0f, 0.95f) else 0f,
+                        blurRadius = 28f,
+                        tintAlpha = 0.58f,
                         fallbackColor = androidx.compose.ui.graphics.Color.Transparent
                     )
                 } else Modifier
@@ -153,11 +157,13 @@ fun SubmenuTopBar(
         modifier = modifier
             .then(
                 if (state.pageBackdrop != null) {
+                    // Match the mini player pop-up's blur/tint values for a
+                    // consistent liquid-glass look across the app.
                     Modifier.miuixBlurSurface(
                         backdrop = state.pageBackdrop,
                         shape = androidx.compose.ui.graphics.RectangleShape,
-                        blurRadius = 70f,
-                        tintAlpha = if (collapseFraction > 0.01f) (0.68f + collapseFraction * 0.27f).coerceIn(0f, 0.95f) else 0f,
+                        blurRadius = 28f,
+                        tintAlpha = 0.58f,
                         fallbackColor = androidx.compose.ui.graphics.Color.Transparent
                     )
                 } else Modifier

@@ -1,3 +1,36 @@
 <resources>
     <string name="app_name">Lambda Player</string>
+
+    <!-- Strings imported from Flamingo Player for the now-playing sheet -->
+    <string name="tip_no_lyrics">Lyrics not ready</string>
+    <string name="playlist_unavailable_title">Unable to Display Playlist</string>
+    <string name="playlist_unavailable_desc">No items to play.</string>
+    <string name="playlist_shuffle_desc">Currently in shuffle play mode.</string>
+    <string name="page_library_playlists">Playlists</string>
+    <string name="page_library_playlists_music_total">%d Songs</string>
+    <string name="page_library_playlists_add_title">Create New Playlist…</string>
+    <string name="page_library_playlists_fav_title">Favorite Songs</string>
+    <string name="ic_nowplaying_airplay">ic_nowplaying_airplay</string>
+    <string name="ic_nowplaying_pause">ic_nowplaying_pause</string>
+    <string name="ic_nowplaying_play">ic_nowplaying_play</string>
+    <string name="ic_nowplaying_rewind">ic_nowplaying_rewind</string>
+    <string name="ic_nowplaying_fforward">ic_nowplaying_fforward</string>
+    <string name="ic_nowplaying_lyrics">ic_nowplaying_lyrics</string>
+    <string name="ic_nowplaying_lyricson">ic_nowplaying_lyricson</string>
+    <string name="ic_nowplaying_queue">ic_nowplaying_queue</string>
+    <string name="ic_nowplaying_queueon">ic_nowplaying_queueon</string>
+    <string name="ic_nowplaying_repeat">ic_nowplaying_repeat</string>
+    <string name="ic_nowplaying_repeatone">ic_nowplaying_repeatone</string>
+    <string name="ic_nowplaying_shuffle">ic_nowplaying_shuffle</string>
+    <string name="ic_nowplaying_favorite">ic_nowplaying_favorite</string>
+    <string name="ic_nowplaying_favorited">ic_nowplaying_favorited</string>
+    <string name="ic_nowplaying_more">ic_nowplaying_more</string>
+    <string name="ic_nowplaying_more_fill">ic_nowplaying_more_fill</string>
+    <string name="ic_nowplaying_translate">ic_nowplaying_translate</string>
+    <string name="ic_nowplaying_translateon">ic_nowplaying_translateon</string>
+    <string name="ic_nowplaying_volume">ic_nowplaying_volume</string>
+    <string name="ic_nowplaying_volume_full">ic_nowplaying_volume_full</string>
+    <string name="ic_earphone">ic_earphone</string>
+    <string name="ic_uitabbar_library">ic_uitabbar_library</string>
+    <string name="ic_uitabbar_search">ic_uitabbar_search</string>
 </resources>

@@ -44,6 +44,12 @@ object PrefsKeys {
     val USE_MIUIX_MONET = booleanPreferencesKey("use_miuix_monet")
     val USE_APPLE_FLOATING_BAR = booleanPreferencesKey("use_apple_floating_bar")
     val LAST_MAIN_PAGE = intPreferencesKey("last_main_page")
+
+    // Now-playing sheet toggles (Flamingo import)
+    val NOW_PLAYING_TRANSLATION = booleanPreferencesKey("now_playing_translation")
+    val LYRIC_BLUR_EFFECT = booleanPreferencesKey("lyric_blur_effect")
+    val NOW_PLAYING_SHOW_VOLUME_BAR = booleanPreferencesKey("now_playing_show_volume_bar")
+    val NOWPLAYING_BACKGROUND_EFFECT = booleanPreferencesKey("nowplaying_background_effect")
 }
 
 object ThemeModePreference {
@@ -149,6 +155,38 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setLastMainPage(index: Int) {
         context.dataStore.edit { it[PrefsKeys.LAST_MAIN_PAGE] = index }
+    }
+
+    val nowPlayingTranslation: Flow<Boolean> = context.dataStore.data.map {
+        it[PrefsKeys.NOW_PLAYING_TRANSLATION] ?: false
+    }
+
+    suspend fun setNowPlayingTranslation(enabled: Boolean) {
+        context.dataStore.edit { it[PrefsKeys.NOW_PLAYING_TRANSLATION] = enabled }
+    }
+
+    val lyricBlurEffect: Flow<Boolean> = context.dataStore.data.map {
+        it[PrefsKeys.LYRIC_BLUR_EFFECT] ?: true
+    }
+
+    suspend fun setLyricBlurEffect(enabled: Boolean) {
+        context.dataStore.edit { it[PrefsKeys.LYRIC_BLUR_EFFECT] = enabled }
+    }
+
+    val nowPlayingShowVolumeBar: Flow<Boolean> = context.dataStore.data.map {
+        it[PrefsKeys.NOW_PLAYING_SHOW_VOLUME_BAR] ?: false
+    }
+
+    suspend fun setNowPlayingShowVolumeBar(enabled: Boolean) {
+        context.dataStore.edit { it[PrefsKeys.NOW_PLAYING_SHOW_VOLUME_BAR] = enabled }
+    }
+
+    val nowplayingBackgroundEffect: Flow<Boolean> = context.dataStore.data.map {
+        it[PrefsKeys.NOWPLAYING_BACKGROUND_EFFECT] ?: true
+    }
+
+    suspend fun setNowplayingBackgroundEffect(enabled: Boolean) {
+        context.dataStore.edit { it[PrefsKeys.NOWPLAYING_BACKGROUND_EFFECT] = enabled }
     }
 
     val seedColor: Flow<Int> = accentColor

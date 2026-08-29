@@ -43,7 +43,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.shephard.player.ui.theme.miuixSheetCardColorDark
 import dev.shephard.player.ui.theme.miuixSheetColorDark
 import dev.shephard.player.ui.theme.miuixSheetColorLight
@@ -287,15 +286,14 @@ fun Checkbox(
     onCheckedChange: ((Boolean) -> Unit)?,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-) = Box(
-    modifier = modifier
-        .size(28.dp)
-        .clip(RoundedCornerShape(8.dp))
-        .background(if (checked) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.surfaceContainerHigh)
-        .clickable(enabled = enabled && onCheckedChange != null) { onCheckedChange?.invoke(!checked) },
-    contentAlignment = Alignment.Center,
 ) {
-    if (checked) Box(Modifier.size(12.dp).clip(CircleShape).background(MiuixAppTheme.colorScheme.onPrimary))
+    top.yukonga.miuix.kmp.basic.Checkbox(
+        state = androidx.compose.ui.state.ToggleableState(checked),
+        onClick = if (onCheckedChange != null) { { onCheckedChange(!checked) } } else null,
+        modifier = modifier,
+        enabled = enabled,
+        colors = top.yukonga.miuix.kmp.basic.CheckboxDefaults.checkboxColors()
+    )
 }
 
 class SwitchColors internal constructor(
@@ -453,6 +451,19 @@ fun MiuixDeleteConfirmationDialog(
     )
 }
 
+/**
+ * Generic confirm dialog backed by [top.yukonga.miuix.kmp.window.WindowDialog]
+ * so it matches the OS-level liquid-glass surface used by
+ * [MiuixDeleteConfirmationDialog] (rather than a plain Compose `Dialog`,
+ * which renders with the default Material 3 look and breaks the visual
+ * consistency in Miuix mode).
+ *
+ * The previous implementation used `androidx.compose.ui.window.Dialog`; that
+ * is what made the wallpaper / cover / playlist delete confirmations look
+ * like Material 3 popups while the track delete dialog (which goes through
+ * [MiuixDeleteConfirmationDialog]) rendered as Miuix. Routing this overload
+ * through `WindowDialog` fixes the inconsistency.
+ */
 @Composable
 fun MiuixDialog(
     onDismissRequest: () -> Unit,
@@ -460,28 +471,26 @@ fun MiuixDialog(
     text: @Composable () -> Unit,
     buttons: @Composable () -> Unit
 ) {
-    Dialog(
-        onDismissRequest = onDismissRequest
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(MiuixAppTheme.colorScheme.surface)
-                .padding(24.dp)
-        ) {
-            Text(
-                text = title,
-                style = MiuixAppTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MiuixAppTheme.colorScheme.onBackground
-            )
-            Box(modifier = Modifier.padding(top = 12.dp)) {
-                text()
-            }
-            Box(modifier = Modifier.padding(top = 16.dp)) {
-                buttons()
+    // Wrap the imperative `onDismissRequest` callback in a `show` state so we
+    // can drive the imperative `WindowDialog` API while keeping the existing
+    // call sites unchanged.
+    var show by remember { mutableStateOf(true) }
+    WindowDialog(
+        show = show,
+        onDismissRequest = {
+            show = false
+            onDismissRequest()
+        },
+        title = title,
+        content = {
+            Column {
+                Box(modifier = Modifier.padding(top = 12.dp)) {
+                    text()
+                }
+                Box(modifier = Modifier.padding(top = 20.dp)) {
+                    buttons()
+                }
             }
         }
-    }
+    )
 }

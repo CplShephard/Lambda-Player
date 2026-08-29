@@ -2,7 +2,9 @@
 // Copyright (C) 2025-2026 InstallerX Revived contributors
 package dev.shephard.player.ui.theme.material
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import dev.shephard.player.ui.i18n.LocalStrings
 
 data class RawColor(val key: String, val color: Color)
 
@@ -26,3 +28,28 @@ val PresetColors = listOf(
     RawColor("brown", Color(0xFF7D524A)),
     RawColor("grey", Color(0xFF5F6162))
 )
+
+@Composable
+fun RawColor.getDisplayName(): String {
+    return when (key) {
+        "default" -> "Default"
+        "pink" -> "Pink"
+        "red" -> "Red"
+        "orange" -> "Orange"
+        "amber" -> "Amber"
+        "yellow" -> "Yellow"
+        "lime" -> "Lime"
+        "green" -> "Green"
+        "cyan" -> "Cyan"
+        "teal" -> "Teal"
+        "light_blue" -> "Light Blue"
+        "blue" -> "Blue"
+        "indigo" -> "Indigo"
+        "purple" -> "Purple"
+        "deep_purple" -> "Deep Purple"
+        "blue_grey" -> "Blue Grey"
+        "brown" -> "Brown"
+        "grey" -> "Grey"
+        else -> key
+    }
+}
