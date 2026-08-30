@@ -784,10 +784,6 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
     val crossfade by prefs.crossfadeEnabled.collectAsState(initial = false)
     val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
     val playWith by prefs.playWithOthers.collectAsState(initial = false)
-    val translation by prefs.nowPlayingTranslation.collectAsState(initial = false)
-    val lyricBlur by prefs.lyricBlurEffect.collectAsState(initial = true)
-    val showVolumeBar by prefs.nowPlayingShowVolumeBar.collectAsState(initial = false)
-    val backgroundEffect by prefs.nowplayingBackgroundEffect.collectAsState(initial = true)
 
     SettingsPageScaffold(title = strings.playbackSettings, onBack = onBack) {
         SectionCard {
@@ -796,34 +792,6 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
             ToggleRow(label = strings.crossfade, checked = crossfade) { scope.launch { prefs.setCrossfadeEnabled(it) } }
             ToggleRow(label = strings.gapless, checked = gapless) { scope.launch { prefs.setGaplessEnabled(it) } }
             ToggleRow(label = strings.playWithOthers, checked = playWith) { scope.launch { prefs.setPlayWithOthers(it) } }
-        }
-        SectionCard {
-            Text(
-                "Now playing",
-                style = MiuixAppTheme.typography.titleMedium,
-                color = MiuixAppTheme.colorScheme.onBackground,
-            )
-            Spacer(Modifier.height(8.dp))
-            ToggleRow(
-                label = "Lyric translation",
-                description = "Show translated lyrics when available",
-                checked = translation,
-            ) { scope.launch { prefs.setNowPlayingTranslation(it) } }
-            ToggleRow(
-                label = "Lyric blur effect",
-                description = "Blur inactive lyric lines for a softer look",
-                checked = lyricBlur,
-            ) { scope.launch { prefs.setLyricBlurEffect(it) } }
-            ToggleRow(
-                label = "Show volume bar",
-                description = "Display a volume slider above the lyric page",
-                checked = showVolumeBar,
-            ) { scope.launch { prefs.setNowPlayingShowVolumeBar(it) } }
-            ToggleRow(
-                label = "Background effect",
-                description = "Animated colour wash behind the now-playing sheet",
-                checked = backgroundEffect,
-            ) { scope.launch { prefs.setNowplayingBackgroundEffect(it) } }
         }
         Spacer(Modifier.height(110.dp))
     }

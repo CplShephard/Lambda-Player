@@ -79,10 +79,18 @@ fun MainContainer(
     // itself is rendered by the Box wrapped in Modifier.layerBackdrop(...)
     // below — the drawContent() call inside the backdrop is what captures it.
     val wallpaperBackdrop = rememberWallpaperBlurBackdrop(blurEnabled)
-    // Backdrop used by the top bars / content pages. We always create the
-    // standard one too, so screens that aren't bound to the wallpaper still
-    // get a glass surface.
-    val backgroundBackdrop = rememberAppBlurBackdrop(blurEnabled)
+    // Backdrop used by the dock / mini player glass. Its layer records ONLY the
+    // pager (inside NavGraph), and every consumer of it lives OUTSIDE that
+    // recording, so it can never become self-referential.
+    //
+    // NOTE: we deliberately do NOT record a whole-app backdrop anymore. Wrapping
+    // the entire app in Modifier.layerBackdrop(...) while in-app glass surfaces
+    // (Apple dock, glass icon buttons) consume the same backdrop creates a
+    // self-referential RenderNode, which the RenderThread cannot terminate —
+    // prepareTreeImpl() recurses until the stack overflows and the app dies with
+    // SIGSEGV right after enabling blur. LocalAppBackdrop now points at the
+    // wallpaper-only backdrop (recorded from a sibling subtree), which is always
+    // safe.
     val contentBackdrop = rememberAppBlurBackdrop(blurEnabled)
 
     // Foreground colour for headings/text drawn directly on the wallpaper.
@@ -101,7 +109,12 @@ fun MainContainer(
 
     CompositionLocalProvider(
         LocalStrings provides strings,
-        LocalAppBackdrop provides backgroundBackdrop,
+        // The "app" backdrop for glass surfaces (Apple dock, glass icon buttons)
+        // is the wallpaper backdrop. It is only ever recorded from the wallpaper
+        // box below, which contains no consumers of it — so drawing from it is
+        // always safe. When no wallpaper is set we provide null so those surfaces
+        // fall back to their solid-colour paths.
+        LocalAppBackdrop provides if (wallpaper.isNotEmpty()) wallpaperBackdrop else null,
         LocalContentBackdrop provides contentBackdrop,
         LocalWallpaperContentColor provides wallpaperContentColor,
     ) {
@@ -116,13 +129,16 @@ fun MainContainer(
             pageCount = { bottomNavDestinations.size },
         )
         val mainPagerState = rememberMainPagerState(pagerState)
+        val currentPage = mainPagerState.pagerState.currentPage
         val settledPage = mainPagerState.pagerState.settledPage
 
-        // Keep the nav dock's selected page in sync with the pager when the
-        // user SWIPES between pages with their finger (as opposed to tapping a
-        // dock item). animateToPage() already updates selectedPage itself, and
+        // Keep the nav dock's selected page in sync with the pager the moment the
+        // current page changes (a swipe updates currentPage as soon as it crosses
+        // the halfway point), instead of waiting for the settle animation to end —
+        // that lag is what made the dock look like it refreshed "a bit after"
+        // entering the page. animateToPage() already sets selectedPage itself, and
         // syncPage() is guarded by isNavigating so it won't fight that animation.
-        LaunchedEffect(settledPage) {
+        LaunchedEffect(currentPage) {
             mainPagerState.syncPage()
         }
 
@@ -182,13 +198,12 @@ fun MainContainer(
                 .fillMaxSize()
                 .background(themeBackground)
         ) {
+            // No whole-app layerBackdrop here — see the comment on contentBackdrop
+            // above. Recording the entire app into a backdrop and then drawing from
+            // that backdrop inside the app crashes the RenderThread (self-referential
+            // RenderNode). This Box is just the plain layout container.
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(
-                        if (backgroundBackdrop != null) Modifier.layerBackdrop(backgroundBackdrop)
-                        else Modifier
-                    )
+                modifier = Modifier.fillMaxSize()
             ) {
                 // Solid base layer in the theme color. When a wallpaper is set
                 // we leave this opaque to avoid any flash of a wrong color, but
