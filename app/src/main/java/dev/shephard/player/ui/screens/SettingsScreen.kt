@@ -112,6 +112,7 @@ import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.bgeffect.BgEffectBackground
 import dev.shephard.player.ui.glass.miuixBlurSurface
+import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.Card
@@ -156,7 +157,7 @@ fun SettingsScreen(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            dev.shephard.player.ui.components.InstallerXTopBar(
+            dev.shephard.player.ui.components.MiuixTopBar(
                 title = strings.settings,
                 state = topBarState
             )
@@ -1054,7 +1055,7 @@ private fun SettingsPageScaffold(
                 )
             } else Modifier,
             color = if (pageBackdrop != null) Color.Transparent else MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
-            titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
+            titleColor = wallpaperAdaptiveTextColor().copy(alpha = scrollProgress),
             scrollBehavior = topAppBarScrollBehavior,
             defaultWindowInsetsPadding = false,
             navigationIcon = {
@@ -1085,7 +1086,7 @@ private fun SettingsPageScaffold(
                 text = title,
                 style = MiuixAppTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = MiuixAppTheme.colorScheme.onBackground,
+                color = wallpaperAdaptiveTextColor(),
                 modifier = Modifier
                     .padding(top = 4.dp)
                     .graphicsLayer {

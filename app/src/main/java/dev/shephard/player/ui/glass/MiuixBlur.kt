@@ -26,6 +26,27 @@ val LocalAppBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 
 val LocalContentBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 
+/**
+ * Foreground colour to use for text that is drawn *directly on top of the
+ * wallpaper* (headings, section titles, labels — anything without a card
+ * behind it). `MainContainer` provides a value derived from the wallpaper
+ * brightness whenever a wallpaper is set, so text stays readable whether the
+ * wallpaper is bright or dark. When no wallpaper is configured this stays
+ * [Color.Unspecified] and callers fall back to the theme's normal text colour.
+ */
+val LocalWallpaperContentColor = staticCompositionLocalOf<Color> { Color.Unspecified }
+
+/**
+ * Returns the wallpaper-aware foreground colour for text that sits directly on
+ * the wallpaper. Falls back to the theme's [MiuixAppTheme.colorScheme.onBackground]
+ * when no wallpaper is set.
+ */
+@Composable
+fun wallpaperAdaptiveTextColor(fallback: Color = MiuixAppTheme.colorScheme.onBackground): Color {
+    val wallpaperColor = LocalWallpaperContentColor.current
+    return if (wallpaperColor != Color.Unspecified) wallpaperColor else fallback
+}
+
 val isBlurSupported: Boolean
     get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 

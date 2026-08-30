@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.draw.clip
-import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -68,9 +67,10 @@ import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import kotlinx.coroutines.launch
-import dev.shephard.player.ui.components.InstallerXTopBar
+import dev.shephard.player.ui.components.MiuixTopBar
 import dev.shephard.player.ui.components.captureForTopBarBlur
 import dev.shephard.player.ui.components.rememberCollapsingTopBarState
+import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
@@ -147,8 +147,6 @@ fun HomeScreen(
         playlistDetailGuard.pop { openPlaylistIndex = null }
     }
 
-    val deviceCornerRadius = rememberDeviceCornerRadius()
-
     AnimatedContent(
         targetState = openPlaylistIndex,
         modifier = Modifier.fillMaxSize(),
@@ -172,7 +170,6 @@ fun HomeScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(deviceCornerRadius))
         ) {
             val selectedPl = idx?.let { featuredPlaylists.getOrNull(it) }
             if (selectedPl != null) {
@@ -206,60 +203,98 @@ fun HomeScreen(
                     containerColor = Color.Transparent,
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     topBar = {
-                        InstallerXTopBar(
+                        MiuixTopBar(
                             title = strings.home,
                             state = topBarState
                         )
                     }
                 ) { innerPadding ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .captureForTopBarBlur(topBarState)
-                            .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                            .overScrollVertical()
-                            .verticalScroll(scrollState)
-                            .padding(
-                                top = innerPadding.calculateTopPadding() + 8.dp,
-                                bottom = if (hasMiniPlayer) 176.dp else 96.dp
-                            ),
-                        verticalArrangement = Arrangement.spacedBy(24.dp)
-                    ) {
-                        if (featuredTracks.isNotEmpty()) {
-                            FeaturedSongsSection(
-                                title = strings.featuredSongs,
-                                tracks = featuredTracks,
-                                onTrackClick = { featuredIdx ->
-                                    onTrackClick(featuredTracks, featuredIdx, strings.featuredSongs)
-                                }
-                            )
-                        }
-
-                        if (featuredPlaylists.isNotEmpty()) {
-                            FeaturedPlaylistsSection(
-                                title = strings.featuredPlaylists,
-                                playlists = featuredPlaylists,
-                                onPlaylistClick = { pl ->
-                                    val i = featuredPlaylists.indexOf(pl)
-                                    if (i >= 0) {
-                                        playlistDetailGuard.push(openPlaylistIndex, i) { openPlaylistIndex = i }
+                    if (tracks.isEmpty()) {
+                        HomeEmptyState()
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .captureForTopBarBlur(topBarState)
+                                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                                .overScrollVertical()
+                                .verticalScroll(scrollState)
+                                .padding(
+                                    top = innerPadding.calculateTopPadding() + 8.dp,
+                                    bottom = if (hasMiniPlayer) 176.dp else 96.dp
+                                ),
+                            verticalArrangement = Arrangement.spacedBy(24.dp)
+                        ) {
+                            if (featuredTracks.isNotEmpty()) {
+                                FeaturedSongsSection(
+                                    title = strings.featuredSongs,
+                                    tracks = featuredTracks,
+                                    onTrackClick = { featuredIdx ->
+                                        onTrackClick(featuredTracks, featuredIdx, strings.featuredSongs)
                                     }
-                                }
-                            )
-                        }
+                                )
+                            }
 
-                        if (recentlyPlayedTracks.isNotEmpty()) {
-                            RecentlyPlayedSection(
-                                title = strings.recentlyPlayed,
-                                tracks = recentlyPlayedTracks,
-                                onTrackClick = { recentIdx ->
-                                    onTrackClick(recentlyPlayedTracks, recentIdx, strings.recentlyPlayed)
-                                }
-                            )
+                            if (featuredPlaylists.isNotEmpty()) {
+                                FeaturedPlaylistsSection(
+                                    title = strings.featuredPlaylists,
+                                    playlists = featuredPlaylists,
+                                    onPlaylistClick = { pl ->
+                                        val i = featuredPlaylists.indexOf(pl)
+                                        if (i >= 0) {
+                                            playlistDetailGuard.push(openPlaylistIndex, i) { openPlaylistIndex = i }
+                                        }
+                                    }
+                                )
+                            }
+
+                            if (recentlyPlayedTracks.isNotEmpty()) {
+                                RecentlyPlayedSection(
+                                    title = strings.recentlyPlayed,
+                                    tracks = recentlyPlayedTracks,
+                                    onTrackClick = { recentIdx ->
+                                        onTrackClick(recentlyPlayedTracks, recentIdx, strings.recentlyPlayed)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HomeEmptyState() {
+    val strings = LocalStrings.current
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier.padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.MusicNote,
+                contentDescription = null,
+                tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(56.dp)
+            )
+            Text(
+                text = strings.noSongsToPlay,
+                style = MiuixAppTheme.typography.titleLarge,
+                color = wallpaperAdaptiveTextColor(),
+                modifier = Modifier.padding(top = 16.dp)
+            )
+            Text(
+                text = "Add audio files to your device storage to see them here.",
+                style = MiuixAppTheme.typography.bodyMedium,
+                color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
         }
     }
 }

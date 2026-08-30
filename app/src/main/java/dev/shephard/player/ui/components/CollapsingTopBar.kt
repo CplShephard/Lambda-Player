@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.miuixBlurSurface
+import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.Text
@@ -79,7 +80,7 @@ fun CollapsingTopBar(
             androidx.compose.ui.graphics.Color.Transparent
         else
             MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
-        titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
+        titleColor = wallpaperAdaptiveTextColor().copy(alpha = scrollProgress),
         scrollBehavior = state.scrollBehavior,
 
         defaultWindowInsetsPadding = false,
@@ -97,14 +98,14 @@ fun CollapsingPageTitle(
         text = title,
         style = MiuixAppTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
-        color = MiuixAppTheme.colorScheme.onBackground,
+        color = wallpaperAdaptiveTextColor(),
 
         modifier = modifier.graphicsLayer { alpha = 1f - scrollProgress }
     )
 }
 
 @Composable
-fun InstallerXTopBar(
+fun MiuixTopBar(
     title: String,
     state: CollapsingTopBarState,
     modifier: Modifier = Modifier,
@@ -115,8 +116,8 @@ fun InstallerXTopBar(
     TopAppBar(
         title = title,
         largeTitle = title,
-        largeTitleColor = cs.onBackground,
-        titleColor = cs.onBackground.copy(alpha = collapseFraction),
+        largeTitleColor = wallpaperAdaptiveTextColor(),
+        titleColor = wallpaperAdaptiveTextColor().copy(alpha = collapseFraction),
         subtitle = subtitle,
         subtitleColor = cs.onSurfaceVariant,
 
@@ -172,7 +173,7 @@ fun SubmenuTopBar(
             androidx.compose.ui.graphics.Color.Transparent
         else
             cs.background.copy(alpha = collapseFraction),
-        titleColor = cs.onBackground.copy(alpha = collapseFraction),
+        titleColor = wallpaperAdaptiveTextColor().copy(alpha = collapseFraction),
         scrollBehavior = state.scrollBehavior,
         defaultWindowInsetsPadding = false,
         navigationIcon = {

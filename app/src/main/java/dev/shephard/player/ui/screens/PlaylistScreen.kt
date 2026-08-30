@@ -7,7 +7,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -435,8 +434,6 @@ androidx.activity.compose.BackHandler(enabled = openIndex != null) {
         playlistDetailGuard.pop { openIndex = null }
     }
 
-    val deviceCornerRadius = rememberDeviceCornerRadius()
-
     androidx.compose.animation.AnimatedContent(
         targetState = openIndex,
         transitionSpec = {
@@ -459,7 +456,6 @@ androidx.activity.compose.BackHandler(enabled = openIndex != null) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(deviceCornerRadius))
         ) {
             if (idx == null) {
                 PlaylistListView(
@@ -1087,7 +1083,7 @@ Scaffold(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            dev.shephard.player.ui.components.InstallerXTopBar(
+            dev.shephard.player.ui.components.MiuixTopBar(
                 title = strings.playlists,
                 state = topBarState
             )

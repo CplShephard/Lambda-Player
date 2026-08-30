@@ -17,11 +17,6 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- Bluetooth audio routing (used by the imported AirPlay receiver) -->
-    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-
     <!-- miuix-blur declares minSdk 33; the app guards every call behind an API check
          (isRuntimeShaderSupported / isRenderEffectSupported) and falls back to a plain
          opaque surface below Android 13, so it is safe to keep the app's own minSdk 26. -->

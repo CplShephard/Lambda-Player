@@ -82,6 +82,7 @@ import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.rememberAudioPermissionState
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
+import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
@@ -146,7 +147,7 @@ fun MusicScreen(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            dev.shephard.player.ui.components.InstallerXTopBar(
+            dev.shephard.player.ui.components.MiuixTopBar(
                 title = strings.music,
                 state = topBarState
             )
@@ -802,6 +803,7 @@ private fun LoadingState() {
 
 @Composable
 private fun EmptyState() {
+    val strings = LocalStrings.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -816,9 +818,9 @@ private fun EmptyState() {
             modifier = Modifier.size(56.dp)
         )
         Text(
-            text = "No music found",
+            text = strings.noSongsToPlay,
             style = MiuixAppTheme.typography.titleLarge,
-            color = MiuixAppTheme.colorScheme.onBackground,
+            color = wallpaperAdaptiveTextColor(),
             modifier = Modifier.padding(top = 16.dp)
         )
         Text(

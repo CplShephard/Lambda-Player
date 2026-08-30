@@ -10,7 +10,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
-import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -132,14 +131,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
             extractGlowColor(track)
             loadLyrics(track)
-            refreshAudioMetadata()
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             _progress.value = _progress.value.copy(
                 durationMs = controller?.duration?.coerceAtLeast(0L) ?: 0L
             )
-            refreshAudioMetadata()
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
@@ -853,35 +850,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 prefs.setLikedSongIds(json)
             }
         }
-    }
-
-    /**
-     * Pull the current track's bitrate / sample-rate / Dolby metadata
-     * from the Media3 player and push it into the
-     * `MediaViewModelObject` so the [dev.shephard.player.ui.widgets.audio
-     * .MusicQualityIndicator] pill in the now-playing sheet can render
-     * a "Lossless" / "Hi-Res" / "Dolby" badge.
-     *
-     * Most local file formats don't expose a real bitrate through
-     * Media3, so the indicator stays hidden in that case.
-     */
-    private fun refreshAudioMetadata() {
-        val c = controller ?: return
-        val trackGroups = c.currentTracks.groups
-        var bestBitrate = 0
-        var bestSampleRate = 0
-        for (group in trackGroups) {
-            for (i in 0 until group.length) {
-                val format: Format = group.getTrackFormat(i)
-                if (format.bitrate > bestBitrate) bestBitrate = format.bitrate
-                if (format.sampleRate > bestSampleRate) bestSampleRate = format.sampleRate
-            }
-        }
-        // bitrate is reported in bits/sec, convert to kbps
-        val bitrateKbps = if (bestBitrate > 0) bestBitrate / 1000 else 0
-        dev.shephard.player.ui.nowplaying.util.MediaViewModelObject.bitrate.value = bitrateKbps
-        dev.shephard.player.ui.nowplaying.util.MediaViewModelObject.samplingRate.value = bestSampleRate
-        dev.shephard.player.ui.nowplaying.util.MediaViewModelObject.isDolby.value = false
     }
 
     private fun extractGlowColor(track: AudioTrack?) {

@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 InstallerX Revived contributors
 package dev.shephard.player.ui.components
 
 import androidx.compose.animation.AnimatedContent
@@ -12,11 +10,9 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -24,8 +20,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import dev.shephard.player.ui.miuix.Icon
+import dev.shephard.player.ui.miuix.MiuixAppTheme
+import dev.shephard.player.ui.miuix.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -43,7 +40,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
-import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.slideForwardInQueue
 import dev.shephard.player.data.trackById
 import dev.shephard.player.player.PlaybackProgress
@@ -51,22 +47,8 @@ import dev.shephard.player.player.PlayerUiState
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.miuixBlurSurface
-import dev.shephard.player.ui.theme.PlayerTheme
 import kotlinx.coroutines.flow.StateFlow
 
-/**
- * Miuix mini player.
- *
- * Visual style is taken from the Flamingo Player now-playing pop-up:
- * a compact blurred card with a square album thumbnail on the left, the
- * title + artist in the middle, and a row of three controls (previous,
- * play/pause, next) on the right. A thin progress bar runs along the
- * bottom edge of the card.
- *
- * Designed to mirror the rest of the Miuix surface (status bar padding,
- * 14.dp card corners, Miuix theming) so it sits naturally above the
- * navigation bar without depending on any Flamingo-specific drawables.
- */
 @Composable
 fun MiniPlayer(
     state: PlayerUiState,
@@ -75,7 +57,7 @@ fun MiniPlayer(
     onPlayPauseClick: () -> Unit,
     onNextClick: () -> Unit,
     onPreviousClick: () -> Unit = {},
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
     val track = state.currentTrack ?: return
 
@@ -83,13 +65,12 @@ fun MiniPlayer(
     val contentBackdrop = LocalContentBackdrop.current
     val miniPlayerShape = RoundedCornerShape(14.dp)
 
-    val activeColor = PlayerTheme.colorScheme.primary
-    val inactiveColor = activeColor.copy(alpha = 0.22f)
+    val themeAccent = MiuixAppTheme.colorScheme.primary
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
         Box(
             modifier = Modifier
@@ -102,19 +83,19 @@ fun MiniPlayer(
                             shape = miniPlayerShape,
                             blurRadius = 28f,
                             tintAlpha = 0.58f,
-                            fallbackColor = PlayerTheme.colorScheme.surfaceVariant,
+                            fallbackColor = MiuixAppTheme.colorScheme.surfaceVariant
                         )
                     } else {
-                        Modifier.background(PlayerTheme.colorScheme.surfaceVariant)
+                        Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant)
                     }
                 )
-                .bounceClick(pressScale = 0.97f) { onClick() },
+                .bounceClick(pressScale = 0.97f) { onClick() }
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 10.dp, end = 8.dp, top = 8.dp, bottom = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 AnimatedContent(
                     targetState = track.id,
@@ -123,36 +104,83 @@ fun MiniPlayer(
                             AnimatedContentTransitionScope.SlideDirection.Left
                         else
                             AnimatedContentTransitionScope.SlideDirection.Right
-                        (slideIntoContainer(dir, tween(300)) + fadeIn() + scaleIn(initialScale = 0.92f))
-                            .togetherWith(slideOutOfContainer(dir, tween(300)) + fadeOut() + scaleOut(targetScale = 0.92f))
+                        (slideIntoContainer(dir, tween(300)) + fadeIn() + scaleIn(initialScale = 0.90f))
+                            .togetherWith(slideOutOfContainer(dir, tween(300)) + fadeOut() + scaleOut(targetScale = 0.90f))
                     },
                     label = "miniArtAndInfo",
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f)
                 ) { trackId ->
                     val displayTrack = state.queue.trackById(trackId) ?: track
-                    MiniPlayerArtAndTitle(displayTrack)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MiuixAppTheme.colorScheme.background),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            var artLoaded by remember(trackId) { mutableStateOf(false) }
+                            AsyncImage(
+                                model = displayTrack.albumArtUri,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop,
+                                onState = { imageState ->
+                                    artLoaded = imageState is AsyncImagePainter.State.Success
+                                }
+                            )
+                            if (!artLoaded) {
+                                Icon(
+                                    imageVector = Icons.Filled.MusicNote,
+                                    contentDescription = null,
+                                    tint = MiuixAppTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+                            Text(
+                                text = displayTrack.title,
+                                style = MiuixAppTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MiuixAppTheme.colorScheme.onBackground,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = displayTrack.artist,
+                                style = MiuixAppTheme.typography.bodyMedium,
+                                color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
 
                 Box(
                     modifier = Modifier
                         .size(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .bounceClick(pressScale = 0.92f) { onPreviousClick() },
-                    contentAlignment = Alignment.Center,
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_rewind),
                         contentDescription = "Previous",
-                        tint = PlayerTheme.colorScheme.onBackground,
-                        modifier = Modifier.size(22.dp),
+                        tint = MiuixAppTheme.colorScheme.onBackground,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
+
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(8.dp))
                         .bounceClick(pressScale = 0.92f) { onPlayPauseClick() },
-                    contentAlignment = Alignment.Center,
+                    contentAlignment = Alignment.Center
                 ) {
                     AnimatedContent(
                         targetState = state.isPlaying,
@@ -160,7 +188,7 @@ fun MiniPlayer(
                             (fadeIn(animationSpec = tween(150)))
                                 .togetherWith(fadeOut(animationSpec = tween(100)))
                         },
-                        label = "miniPlayPauseIcon",
+                        label = "miniPlayPauseIcon"
                     ) { isPlaying ->
                         Icon(
                             painter = painterResource(
@@ -168,87 +196,35 @@ fun MiniPlayer(
                                 else dev.shephard.player.R.drawable.ic_nowplaying_play
                             ),
                             contentDescription = if (isPlaying) "Pause" else "Play",
-                            tint = PlayerTheme.colorScheme.onBackground,
-                            modifier = Modifier.size(26.dp),
+                            tint = MiuixAppTheme.colorScheme.onBackground,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 }
+
                 Box(
                     modifier = Modifier
                         .size(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .bounceClick(pressScale = 0.92f) { onNextClick() },
-                    contentAlignment = Alignment.Center,
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_fforward),
                         contentDescription = "Next",
-                        tint = PlayerTheme.colorScheme.onBackground,
-                        modifier = Modifier.size(22.dp),
+                        tint = MiuixAppTheme.colorScheme.onBackground,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
 
-            // Thin progress bar at the bottom edge (overlayed on top of the
-            // card). Matches the Flamingo "playback indicator" look.
             MiniPlayerProgressBar(
                 progressFlow = progressFlow,
-                activeColor = activeColor,
-                inactiveColor = inactiveColor,
+                activeColor = themeAccent,
+                inactiveColor = themeAccent.copy(alpha = 0.18f),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .fillMaxWidth(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun MiniPlayerArtAndTitle(track: AudioTrack) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(PlayerTheme.colorScheme.background),
-            contentAlignment = Alignment.Center,
-        ) {
-            var artLoaded by remember(track.id) { mutableStateOf(false) }
-            AsyncImage(
-                model = track.albumArtUri,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(10.dp)),
-                contentScale = ContentScale.Crop,
-                onState = { imageState ->
-                    artLoaded = imageState is AsyncImagePainter.State.Success
-                },
-            )
-            if (!artLoaded) {
-                Icon(
-                    imageVector = Icons.Filled.MusicNote,
-                    contentDescription = null,
-                    tint = PlayerTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-        }
-        Column(modifier = Modifier.padding(horizontal = 12.dp)) {
-            androidx.compose.material3.Text(
-                text = track.title,
-                fontSize = androidx.compose.ui.unit.TextUnit(15f, androidx.compose.ui.unit.TextUnitType.Sp),
-                fontWeight = FontWeight.SemiBold,
-                color = PlayerTheme.colorScheme.onBackground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            androidx.compose.material3.Text(
-                text = track.artist,
-                fontSize = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp),
-                color = PlayerTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                    .fillMaxWidth()
             )
         }
     }
@@ -259,7 +235,7 @@ private fun MiniPlayerProgressBar(
     progressFlow: StateFlow<PlaybackProgress>,
     activeColor: Color,
     inactiveColor: Color,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
     val progress by progressFlow.collectAsState()
     val fraction = if (progress.durationMs > 0L)
@@ -268,21 +244,36 @@ private fun MiniPlayerProgressBar(
     val animatedFraction by animateFloatAsState(
         targetValue = fraction,
         animationSpec = tween(durationMillis = 250),
-        label = "miniProgress",
+        label = "miniProgress"
     )
+    BoldProgressBar(
+        fraction = animatedFraction,
+        activeColor = activeColor,
+        inactiveColor = inactiveColor,
+        modifier = modifier,
+        height = 3.dp
+    )
+}
+
+@Composable
+fun BoldProgressBar(
+    fraction: Float,
+    modifier: Modifier = Modifier,
+    height: androidx.compose.ui.unit.Dp = 4.dp,
+    activeColor: Color = MiuixAppTheme.colorScheme.primary,
+    inactiveColor: Color = MiuixAppTheme.colorScheme.surfaceVariant
+) {
     Box(
         modifier = modifier
-            .height(3.dp)
+            .height(height)
             .clip(RoundedCornerShape(50))
-            .background(inactiveColor),
+            .background(inactiveColor)
     ) {
-        androidx.compose.foundation.Canvas(
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            val w = size.width * animatedFraction.coerceIn(0f, 1f)
+        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxWidth().height(height)) {
+            val w = size.width * fraction.coerceIn(0f, 1f)
             drawRect(
                 color = activeColor,
-                size = androidx.compose.ui.geometry.Size(w, size.height),
+                size = androidx.compose.ui.geometry.Size(w, size.height)
             )
         }
     }
