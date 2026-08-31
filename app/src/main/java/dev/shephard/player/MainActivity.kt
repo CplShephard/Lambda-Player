@@ -64,7 +64,11 @@ class MainActivity : ComponentActivity() {
             val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
             val useMiuixMonet by prefs.useMiuixMonet.collectAsState(initial = false)
             val seedColor by prefs.seedColor.collectAsState(initial = 0xFF22C55E.toInt())
-            val blurEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
+            // Read the persisted blur toggle synchronously so glass surfaces (dock,
+            // top bars) don't render in their solid fallback state for a second on
+            // every launch while DataStore warms up.
+            val initialBlurEnabled = remember { runBlocking { prefs.liquidGlassEnabled.first() } }
+            val blurEnabled by prefs.liquidGlassEnabled.collectAsState(initial = initialBlurEnabled)
             val appleFloatingBar by prefs.useAppleFloatingBar.collectAsState(initial = false)
             val languageCode by prefs.language.collectAsState(initial = "en")
             val strings = remember(languageCode) { stringsFor(languageCode) }

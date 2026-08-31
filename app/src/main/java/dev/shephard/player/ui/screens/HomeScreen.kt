@@ -312,7 +312,7 @@ private fun FeaturedSongsSection(
             text = title,
             style = MiuixAppTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = MiuixAppTheme.colorScheme.onBackground,
+            color = wallpaperAdaptiveTextColor(),
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
         )
         Spacer(modifier = Modifier.height(10.dp))
@@ -415,7 +415,7 @@ private fun RecentlyPlayedSection(
             text = title,
             style = MiuixAppTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = MiuixAppTheme.colorScheme.onBackground,
+            color = wallpaperAdaptiveTextColor(),
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
         )
         Spacer(modifier = Modifier.height(10.dp))
@@ -552,7 +552,7 @@ private fun FeaturedPlaylistsSection(
             text = title,
             style = MiuixAppTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = MiuixAppTheme.colorScheme.onBackground,
+            color = wallpaperAdaptiveTextColor(),
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
         )
         Spacer(modifier = Modifier.height(10.dp))

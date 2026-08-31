@@ -1196,9 +1196,9 @@ private fun ToggleRow(label: String, checked: Boolean, description: String? = nu
             checked = checked,
             onCheckedChange = onChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                uncheckedThumbColor = Color.White,
-                checkedTrackColor = MiuixAppTheme.colorScheme.primary,
+                checkedThumbColor = MiuixAppTheme.colorScheme.primary,
+                uncheckedThumbColor = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                checkedTrackColor = MiuixAppTheme.colorScheme.primary.copy(alpha = 0.35f),
                 uncheckedTrackColor = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
             )
         )

@@ -65,6 +65,8 @@ import dev.shephard.player.ui.glass.LocalAppBackdrop
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.isLiquidGlassSupported
+import dev.shephard.player.ui.glass.rememberCombinedBackdrop
+import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.screens.AboutSettingsScreen
@@ -84,7 +86,9 @@ import dev.shephard.player.ui.screens.StatsScreenM3
 import dev.shephard.player.ui.screens.ThemeSettingsScreen
 import dev.shephard.player.ui.screens.ThemeSettingsScreenM3
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
@@ -313,7 +317,10 @@ private fun MainDock(
     // Read the Apple-style preference inside the dock so a change made in Settings
     // is picked up as soon as the user returns to the main page (values captured in
     // the navigation entry lambda are frozen, so we must collect the state here).
-    val appleStyle by preferences.useAppleFloatingBar.collectAsState(initial = false)
+    // The persisted value is also read synchronously once so the dock doesn't flash
+    // its fallback navbar form for a second on every launch while DataStore warms up.
+    val initialAppleStyle = remember { runBlocking { preferences.useAppleFloatingBar.first() } }
+    val appleStyle by preferences.useAppleFloatingBar.collectAsState(initial = initialAppleStyle)
     when {
         appleStyle -> AppleFloatingDock(
             useMiuix = useMiuix,
@@ -424,15 +431,23 @@ private fun AppleFloatingDock(
     onSelected: (Int) -> Unit,
 ) {
     val blurOn = LocalBlurEnabled.current
-    // Use the app-level backdrop (LocalAppBackdrop), which captures BOTH the
-    // wallpaper layer AND the page content that scrolls underneath the dock, so
-    // the liquid-glass surface shows the elements passing behind it — just like
-    // a real iOS dock. The previous code preferred the wallpaper-only backdrop,
-    // which is why only the wallpaper/background colour was visible through the
-    // blur and the page content behind the dock disappeared.
-    val effectiveBackdrop: top.yukonga.miuix.kmp.blur.Backdrop = LocalAppBackdrop.current
-        ?: LocalContentBackdrop.current
-        ?: rememberLayerBackdrop()
+    // The dock must blur what is actually BEHIND it: the wallpaper AND the live
+    // page content scrolling underneath (the music list, cards, etc.). The
+    // wallpaper is captured by LocalAppBackdrop (which now points at the
+    // wallpaper layer), while the pager content is captured by
+    // LocalContentBackdrop. We combine the two so the liquid-glass surface shows
+    // elements sliding past it — not a frozen wallpaper snapshot. Neither
+    // recording includes the dock itself (both recording nodes are siblings of
+    // this dock), so there is no self-referential RenderNode and no crash.
+    val wallpaperBackdrop = LocalAppBackdrop.current
+    val contentBackdrop = LocalContentBackdrop.current
+    val effectiveBackdrop: top.yukonga.miuix.kmp.blur.Backdrop = when {
+        wallpaperBackdrop != null && contentBackdrop != null ->
+            rememberCombinedBackdrop(wallpaperBackdrop, contentBackdrop)
+        wallpaperBackdrop != null -> wallpaperBackdrop
+        contentBackdrop != null -> contentBackdrop
+        else -> rememberLayerBackdrop()
+    }
     val mode = when {
         useMiuix && blurOn && effectiveBackdrop != null && isLiquidGlassSupported -> FloatingBottomBarMode.LiquidGlass
         useMiuix && blurOn && effectiveBackdrop != null -> FloatingBottomBarMode.Blur
@@ -440,13 +455,21 @@ private fun AppleFloatingDock(
     }
     val strings = LocalStrings.current
 
+    // The dock sits directly on the (possibly bright) wallpaper, so its item
+    // colour must adapt to the wallpaper like the top-bar titles do. Otherwise
+    // white items vanish against a bright wallpaper and the dock looks empty.
+    val contentColor = wallpaperAdaptiveTextColor(
+        fallback = if (useMiuix) MiuixAppTheme.colorScheme.onSurface
+        else MaterialTheme.colorScheme.onSurface
+    )
+
     val barColors = if (useMiuix) {
-        FloatingBottomBarDefaults.colors()
+        FloatingBottomBarDefaults.colors(contentColor = contentColor)
     } else {
         FloatingBottomBarDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             indicatorColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            contentColor = contentColor,
         )
     }
 
