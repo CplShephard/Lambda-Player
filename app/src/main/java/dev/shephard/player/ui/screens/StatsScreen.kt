@@ -53,8 +53,7 @@ import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.captureForTopBarBlur
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.components.rememberCollapsingTopBarState
-import dev.shephard.player.ui.glass.LocalBlurEnabled
-import dev.shephard.player.ui.glass.miuixBlurSurface
+import dev.shephard.player.ui.glass.miuixTopBarBlur
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
@@ -92,15 +91,9 @@ fun StatsScreen(
         SmallTopAppBar(
             title = strings.statsTitle,
             modifier = if (topBarState.pageBackdrop != null) {
-                // Match the mini player pop-up's blur/tint values for a
-                // consistent liquid-glass look across the app.
-                Modifier.miuixBlurSurface(
-                    backdrop = topBarState.pageBackdrop,
-                    shape = androidx.compose.ui.graphics.RectangleShape,
-                    blurRadius = 28f,
-                    tintAlpha = 0.58f,
-                    fallbackColor = Color.Transparent
-                )
+                // InstallerX Revived Miuix values: 25dp blur radius blended
+                // with the theme surface at 80% opacity.
+                Modifier.miuixTopBarBlur(backdrop = topBarState.pageBackdrop)
             } else Modifier,
             color = if (topBarState.pageBackdrop != null) Color.Transparent else cs.background.copy(alpha = scrollProgress),
             titleColor = cs.onBackground.copy(alpha = scrollProgress),
@@ -130,7 +123,7 @@ fun StatsScreen(
                 // delta before the inner scrollable reacts to it.
                 .overScrollVertical()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 20.dp, vertical = 12.dp),
+                .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             // Extra top spacer so the miuix overscroll can fire even when the

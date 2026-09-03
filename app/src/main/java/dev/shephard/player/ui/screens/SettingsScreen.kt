@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -111,7 +112,8 @@ import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.bgeffect.BgEffectBackground
-import dev.shephard.player.ui.glass.miuixBlurSurface
+import dev.shephard.player.ui.glass.miuixTopBarBlur
+import dev.shephard.player.ui.glass.rememberMiuixPageBackdrop
 import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -135,7 +137,6 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 
 @Composable
@@ -308,10 +309,12 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     }
 
     SettingsPageScaffold(title = strings.themeSettings, onBack = onBack) {
+        // ── Group 1: UI Style (identical to InstallerX Revived) ──────────────
+        SmallTitle(
+            text = strings.themeUiStyleSection,
+            insideMargin = PaddingValues(16.dp, 8.dp),
+        )
         SectionCard {
-            Text(strings.themeSettings, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
-            Spacer(Modifier.height(12.dp))
-
             val engineOptions = listOf(true to strings.miuixUi, false to strings.googleUi)
             val engineSelectedIndex = if (useMiuix) 0 else 1
             top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
@@ -326,6 +329,17 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             )
 
             Spacer(Modifier.height(8.dp))
+            ToggleRow(label = strings.appleFloatingBar, checked = appleFloatingBar, description = strings.appleFloatingBarDescription) { enabled ->
+                scope.launch { prefs.setUseAppleFloatingBar(enabled) }
+            }
+        }
+
+        // ── Group 2: Miuix UI + Miuix Custom Colors (InstallerX layout) ──────
+        SmallTitle(
+            text = strings.themeMiuixUiSection,
+            insideMargin = PaddingValues(16.dp, 8.dp),
+        )
+        SectionCard {
             val themeModeOptions = listOf(
                 ThemeModePreference.LIGHT to strings.lightMode,
                 ThemeModePreference.DARK to strings.darkMode,
@@ -341,14 +355,13 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                     scope.launch { prefs.setThemeMode(themeModeOptions[index].first) }
                 }
             )
-            Spacer(Modifier.height(8.dp))
-            ToggleRow(label = strings.blurEffect, checked = liquidGlassEnabled, description = strings.blurEffectDescription) { enabled ->
-                scope.launch { prefs.setLiquidGlassEnabled(enabled) }
-            }
 
-            Spacer(Modifier.height(8.dp))
-            ToggleRow(label = strings.appleFloatingBar, checked = appleFloatingBar, description = strings.appleFloatingBarDescription) { enabled ->
-                scope.launch { prefs.setUseAppleFloatingBar(enabled) }
+            // InstallerX only shows the blur switch on Android 13+.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                Spacer(Modifier.height(8.dp))
+                ToggleRow(label = strings.blurEffect, checked = liquidGlassEnabled, description = strings.blurEffectDescription) { enabled ->
+                    scope.launch { prefs.setLiquidGlassEnabled(enabled) }
+                }
             }
 
             Spacer(Modifier.height(8.dp))
@@ -419,7 +432,13 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         // Same trick for the accent color grid: seed the transition state from
         // the actual saved values, so re-entering the page does not replay the
         // expand animation when Monet is already on.
-        val accentGridTarget = useMiuixMonet && (!dynamicColor || Build.VERSION.SDK_INT < Build.VERSION_CODES.S)
+        //
+        // InstallerX behaviour + one exception: when the palette style is
+        // Monochrome there is no colored seed to pick (green/red/blue make no
+        // sense on a pure monochrome palette), so the color options disappear.
+        val accentGridTarget = useMiuixMonet &&
+            paletteStyle != PaletteStyle.Monochrome &&
+            (!dynamicColor || Build.VERSION.SDK_INT < Build.VERSION_CODES.S)
         val accentGridState = remember { MutableTransitionState(accentGridTarget) }
         LaunchedEffect(accentGridTarget) {
             accentGridState.targetState = accentGridTarget
@@ -431,49 +450,60 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             exit = fadeOut(animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing)) +
                 shrinkVertically(animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing))
         ) {
-            SectionCard {
-                Text(strings.accentColor, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
-                Spacer(Modifier.height(14.dp))
-                BoxWithConstraints(
+            Column {
+                SmallTitle(
+                    text = strings.accentColor,
+                    insideMargin = PaddingValues(16.dp, 8.dp),
+                )
+                // Miuix card exactly like InstallerX: no inner card padding,
+                // 12dp/16dp inner spacing, 88dp minimum swatch width.
+                MiuixNativeCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp)
+                        .padding(bottom = 12.dp)
                 ) {
-                    val itemMinWidth = 88.dp
-                    val columns = (this.maxWidth / itemMinWidth).toInt().coerceAtLeast(1)
-                    val chunkedColors = PresetColors.chunked(columns)
-
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    BoxWithConstraints(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 16.dp)
                     ) {
-                        chunkedColors.forEach { rowItems ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                rowItems.forEach { rawColor ->
-                                    Box(
-                                        modifier = Modifier.weight(1f),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        ColorSwatchPreview(
-                                            rawColor = rawColor,
-                                            currentStyle = paletteStyle,
-                                            colorSpec = colorSpec,
-                                            textColor = MiuixAppTheme.colorScheme.onBackground,
-                                            isSelected = seedColor == rawColor.color.toArgb() &&
-                                                !(dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S),
+                        val itemMinWidth = 88.dp
+                        val columns = (this.maxWidth / itemMinWidth).toInt().coerceAtLeast(1)
+                        val chunkedColors = PresetColors.chunked(columns)
+
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            chunkedColors.forEach { rowItems ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    rowItems.forEach { rawColor ->
+                                        Box(
+                                            modifier = Modifier.weight(1f),
+                                            contentAlignment = Alignment.Center
                                         ) {
-                                            scope.launch { prefs.setSeedColor(rawColor.color.toArgb()) }
+                                            ColorSwatchPreview(
+                                                rawColor = rawColor,
+                                                currentStyle = paletteStyle,
+                                                colorSpec = colorSpec,
+                                                textStyle = MiuixAppTheme.typography.labelSmall,
+                                                textColor = MiuixAppTheme.colorScheme.onSurface,
+                                                isSelected = seedColor == rawColor.color.toArgb() &&
+                                                    !(dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S),
+                                            ) {
+                                                scope.launch { prefs.setSeedColor(rawColor.color.toArgb()) }
+                                            }
                                         }
                                     }
-                                }
 
-                                val remaining = columns - rowItems.size
-                                if (remaining > 0) {
-                                    repeat(remaining) {
-                                        Spacer(Modifier.weight(1f))
+                                    val remaining = columns - rowItems.size
+                                    if (remaining > 0) {
+                                        repeat(remaining) {
+                                            Spacer(Modifier.weight(1f))
+                                        }
                                     }
                                 }
                             }
@@ -1001,7 +1031,10 @@ private fun SettingsPageScaffold(
     val topAppBarScrollBehavior = MiuixScrollBehavior()
     val liquidGlassOn = LocalBlurEnabled.current
 
-    val pageBackdrop = if (liquidGlassOn) rememberLayerBackdrop() else null
+    // InstallerX-style page backdrop: solid surface base + captured content,
+    // so the small top bar blurs cleanly (25dp / surface 80% tint) instead of
+    // smearing the page content while scrolling.
+    val pageBackdrop = rememberMiuixPageBackdrop(liquidGlassOn)
 
     val collapseRangePx = with(density) { 44.dp.toPx() }
     val scrollProgress by remember {
@@ -1012,15 +1045,9 @@ private fun SettingsPageScaffold(
         SmallTopAppBar(
             title = title,
             modifier = if (pageBackdrop != null) {
-                // Match the mini player pop-up's blur/tint values for a
-                // consistent liquid-glass look across the app.
-                Modifier.miuixBlurSurface(
-                    backdrop = pageBackdrop,
-                    shape = androidx.compose.ui.graphics.RectangleShape,
-                    blurRadius = 28f,
-                    tintAlpha = 0.58f,
-                    fallbackColor = Color.Transparent
-                )
+                // InstallerX Revived Miuix values: 25dp blur radius blended
+                // with the theme surface at 80% opacity.
+                Modifier.miuixTopBarBlur(backdrop = pageBackdrop)
             } else Modifier,
             color = if (pageBackdrop != null) Color.Transparent else MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
             titleColor = wallpaperAdaptiveTextColor().copy(alpha = scrollProgress),
@@ -1047,7 +1074,7 @@ private fun SettingsPageScaffold(
                 .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection)
                 .overScrollVertical()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
@@ -1195,12 +1222,9 @@ private fun ToggleRow(label: String, checked: Boolean, description: String? = nu
         Switch(
             checked = checked,
             onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = MiuixAppTheme.colorScheme.primary,
-                uncheckedThumbColor = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                checkedTrackColor = MiuixAppTheme.colorScheme.primary.copy(alpha = 0.35f),
-                uncheckedTrackColor = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-            )
+            // Real Miuix switch colors: white thumb, blue track when on,
+            // gray track when off — follows the custom colors in Monet mode.
+            colors = SwitchDefaults.colors()
         )
     }
 }

@@ -17,7 +17,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.glass.LocalBlurEnabled
-import dev.shephard.player.ui.glass.miuixBlurSurface
+import dev.shephard.player.ui.glass.miuixTopBarBlur
+import dev.shephard.player.ui.glass.rememberMiuixPageBackdrop
 import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
@@ -28,7 +29,6 @@ import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import androidx.compose.ui.text.font.FontWeight
 
 @Composable
@@ -36,7 +36,9 @@ fun rememberCollapsingTopBarState(): CollapsingTopBarState {
     val scrollBehavior = MiuixScrollBehavior()
 
     val liquidGlassOn = LocalBlurEnabled.current
-    val pageBackdrop = if (liquidGlassOn) rememberLayerBackdrop() else null
+    // InstallerX-style page backdrop: solid surface base + captured content,
+    // so small top bars blur cleanly instead of smearing the page.
+    val pageBackdrop = rememberMiuixPageBackdrop(liquidGlassOn)
     return remember(scrollBehavior, pageBackdrop) { CollapsingTopBarState(scrollBehavior, pageBackdrop) }
 }
 
@@ -59,23 +61,16 @@ fun CollapsingTopBar(
     modifier: Modifier = Modifier,
 ) {
     val scrollProgress = state.collapseFraction
-    // Use the same blur/tint configuration as the mini player pop-up so the
-    // glass surface feels visually consistent across the app.
+    // InstallerX Revived Miuix values: 25dp blur radius blended with the
+    // theme surface at 80% opacity.
     SmallTopAppBar(
         title = title,
 
-        modifier = modifier
-            .then(
-                if (state.pageBackdrop != null) {
-                    Modifier.miuixBlurSurface(
-                        backdrop = state.pageBackdrop,
-                        shape = androidx.compose.ui.graphics.RectangleShape,
-                        blurRadius = 28f,
-                        tintAlpha = 0.58f,
-                        fallbackColor = androidx.compose.ui.graphics.Color.Transparent
-                    )
-                } else Modifier
-            ),
+        modifier = modifier.then(
+            if (state.pageBackdrop != null) {
+                Modifier.miuixTopBarBlur(backdrop = state.pageBackdrop)
+            } else Modifier
+        ),
         color = if (state.pageBackdrop != null)
             androidx.compose.ui.graphics.Color.Transparent
         else
@@ -127,20 +122,11 @@ fun MiuixTopBar(
             cs.background.copy(alpha = collapseFraction),
         scrollBehavior = state.scrollBehavior,
         defaultWindowInsetsPadding = false,
-        modifier = modifier
-            .then(
-                if (state.pageBackdrop != null) {
-                    // Match the mini player pop-up's blur/tint values for a
-                    // consistent liquid-glass look across the app.
-                    Modifier.miuixBlurSurface(
-                        backdrop = state.pageBackdrop,
-                        shape = androidx.compose.ui.graphics.RectangleShape,
-                        blurRadius = 28f,
-                        tintAlpha = 0.58f,
-                        fallbackColor = androidx.compose.ui.graphics.Color.Transparent
-                    )
-                } else Modifier
-            ),
+        modifier = modifier.then(
+            if (state.pageBackdrop != null) {
+                Modifier.miuixTopBarBlur(backdrop = state.pageBackdrop)
+            } else Modifier
+        ),
     )
 }
 
@@ -155,20 +141,11 @@ fun SubmenuTopBar(
     val collapseFraction = state.collapseFraction
     SmallTopAppBar(
         title = title,
-        modifier = modifier
-            .then(
-                if (state.pageBackdrop != null) {
-                    // Match the mini player pop-up's blur/tint values for a
-                    // consistent liquid-glass look across the app.
-                    Modifier.miuixBlurSurface(
-                        backdrop = state.pageBackdrop,
-                        shape = androidx.compose.ui.graphics.RectangleShape,
-                        blurRadius = 28f,
-                        tintAlpha = 0.58f,
-                        fallbackColor = androidx.compose.ui.graphics.Color.Transparent
-                    )
-                } else Modifier
-            ),
+        modifier = modifier.then(
+            if (state.pageBackdrop != null) {
+                Modifier.miuixTopBarBlur(backdrop = state.pageBackdrop)
+            } else Modifier
+        ),
         color = if (state.pageBackdrop != null)
             androidx.compose.ui.graphics.Color.Transparent
         else

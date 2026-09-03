@@ -31,13 +31,10 @@ import dev.shephard.player.theme.ThemeState
 import dev.shephard.player.ui.theme.material.animateAsState
 import dev.shephard.player.ui.theme.material.dynamicColorScheme
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
-import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeColorSpec as MiuixColorSpec
 import top.yukonga.miuix.kmp.theme.ThemeController
 import top.yukonga.miuix.kmp.theme.ThemePaletteStyle as MiuixPaletteStyle
-import top.yukonga.miuix.kmp.theme.darkColorScheme
-import top.yukonga.miuix.kmp.theme.lightColorScheme
 
 private val LocalIsDark = staticCompositionLocalOf { false }
 private val LocalPaletteStyle = staticCompositionLocalOf { PaletteStyle.Expressive }
@@ -226,16 +223,6 @@ fun PlayerMiuixTheme(
         }
     }
 
-    val accentLuminance = 0.2126f * seedColor.red + 0.7152f * seedColor.green + 0.0722f * seedColor.blue
-    val onAccent = if (accentLuminance > 0.35f) Color(0xFF111111) else Color.White
-
-    // In Miuix mode, the accent is supposed to be the fixed MIUI/HyperOS blue
-    // (Miuix's own default `keyColor` = #3482FF) whenever Monet is disabled.
-    // The user-picked `seedColor` only drives the accent inside Monet mode
-    // (useMiuixMonet = true) or in Material 3 mode — otherwise it must not
-    // override the Miuix native primary.
-    val miuixAccentColor = Color(0xFF3482FF)
-
     if (useMiuixMonet) {
         val keyColor = if (useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             colorResource(id = android.R.color.system_accent1_500)
@@ -281,43 +268,29 @@ fun PlayerMiuixTheme(
             content = content,
         )
     } else {
-        // Exact 6.0 background and surface colors:
-        // Dark mode: pure black #000000, surface #101012, surfaceVariant #1C1C1E
-        // Light mode: background #F7F7F8 (not pure white), surface #FFFFFF
-        val colors = if (darkTheme) {
-            darkColorScheme(
-                primary = miuixAccentColor,
-                onPrimary = Color.White,
-                background = Color(0xFF000000),
-                onBackground = Color(0xFFF5F5F7),
-                surface = Color(0xFF101012),
-                onSurface = Color(0xFFF5F5F7),
-                surfaceVariant = Color(0xFF1C1C1E),
-                surfaceContainer = Color(0xFF1C1C1E),
-                surfaceContainerHigh = Color(0xFF222226),
-                surfaceContainerHighest = Color(0xFF2A2A2E),
-            )
-        } else {
-            lightColorScheme(
-                primary = miuixAccentColor,
-                onPrimary = Color.White,
-                background = Color(0xFFF7F7F8),
-                onBackground = Color(0xFF111113),
-                surface = Color(0xFFFFFFFF),
-                onSurface = Color(0xFF111113),
-                surfaceVariant = Color(0xFFFFFFFF),
-                surfaceContainer = Color(0xFFFFFFFF),
-                surfaceContainerHigh = Color(0xFFFFFFFF),
-                surfaceContainerHighest = Color(0xFFFFFFFF),
+        // --- Default Miuix Theme Path (identical to InstallerX Revived) ---
+        // When Miuix Custom Colors are disabled we hand the theme over to
+        // Miuix's own default scheme via ThemeController(System/Light/Dark)
+        // instead of a hand-rolled ColorScheme. This is what keeps the app
+        // looking exactly like stock Miuix: white switch thumbs, MIUI blue
+        // accent (#3482FF), stock backgrounds and surfaces, etc.
+        val colorSchemeMode = when (themeMode) {
+            ThemeMode.SYSTEM -> ColorSchemeMode.System
+            ThemeMode.LIGHT -> ColorSchemeMode.Light
+            ThemeMode.DARK -> ColorSchemeMode.Dark
+        }
+
+        val controller = remember(colorSchemeMode, darkTheme) {
+            ThemeController(
+                colorSchemeMode = colorSchemeMode,
+                isDark = darkTheme,
             )
         }
 
-        MiuixTheme(colors = colors) {
-            CompositionLocalProvider(
-                LocalContentColor provides colors.onBackground,
-                content = content
-            )
-        }
+        MiuixTheme(
+            controller = controller,
+            content = content,
+        )
     }
 }
 

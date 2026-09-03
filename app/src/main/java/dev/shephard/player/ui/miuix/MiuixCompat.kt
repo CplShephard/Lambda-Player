@@ -74,6 +74,8 @@ class MiuixColorScheme {
         @Composable get() = c.surface
     val onSurface: Color
         @Composable get() = c.onSurface
+    val onSecondary: Color
+        @Composable get() = c.onSecondary
     val surfaceVariant: Color
         @Composable get() = c.surfaceVariant
     val onSurfaceVariant: Color
@@ -301,11 +303,22 @@ class SwitchColors internal constructor(
 )
 
 object SwitchDefaults {
+    /**
+     * The real Miuix switch colors, exactly like the library's own
+     * `SwitchDefaults.switchColors()`: white thumb in both states, blue
+     * (primary) track when checked, gray (secondary) track when unchecked.
+     * When dynamic/Monet colors are active the library resolves these from
+     * the custom scheme, so the toggle follows the seed color too.
+     */
+    @Composable fun colors() = SwitchColors(
+        top.yukonga.miuix.kmp.basic.SwitchDefaults.switchColors()
+    )
+
     @Composable fun colors(
-        checkedThumbColor: Color = MiuixAppTheme.colorScheme.onPrimary,
-        checkedTrackColor: Color = MiuixAppTheme.colorScheme.primary,
-        uncheckedThumbColor: Color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-        uncheckedTrackColor: Color = MiuixAppTheme.colorScheme.surfaceVariant,
+        checkedThumbColor: Color,
+        checkedTrackColor: Color,
+        uncheckedThumbColor: Color,
+        uncheckedTrackColor: Color,
     ) = SwitchColors(
         top.yukonga.miuix.kmp.basic.SwitchDefaults.switchColors(
             checkedThumbColor = checkedThumbColor,

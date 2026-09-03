@@ -133,12 +133,9 @@ private fun SettingToggleRow(
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = MiuixAppTheme.colorScheme.primary,
-                uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-            )
+            // Real Miuix switch colors: white thumb, blue track when on,
+            // gray track when off — follows the custom colors in Monet mode.
+            colors = SwitchDefaults.colors()
         )
     }
 }

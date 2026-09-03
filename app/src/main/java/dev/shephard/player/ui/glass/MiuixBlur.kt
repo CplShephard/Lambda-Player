@@ -54,6 +54,55 @@ val isLiquidGlassSupported: Boolean
     get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
 /**
+ * Remembers a page-level backdrop for top-bar blur, using exactly the same
+ * recipe as InstallerX Revived's `rememberMiuixBlurBackdrop`: the backdrop
+ * paints a solid theme-surface base BEFORE capturing the page content. The
+ * base fill is what keeps small top bars from smearing/streaking the content
+ * while the page scrolls underneath the glass.
+ */
+@Composable
+fun rememberMiuixPageBackdrop(enableBlur: Boolean): LayerBackdrop? {
+    if (!enableBlur || !isRenderEffectSupported()) return null
+    val surfaceColor = MiuixAppTheme.colorScheme.surface
+    return rememberLayerBackdrop {
+        drawRect(surfaceColor)
+        drawContent()
+    }
+}
+
+/**
+ * Apply the InstallerX Revived Miuix top-bar blur to a SmallTopAppBar /
+ * TopAppBar modifier: InstallerX values — 25dp gaussian radius blended with
+ * the theme surface at 80% opacity (its `installerMiuixBlurEffect` defaults).
+ *
+ * @param backdrop The page backdrop captured from the content underneath.
+ * @param blurRadius Gaussian blur radius in pixels (25f = InstallerX default).
+ * @param tintAlpha Surface tint opacity (0.8f = InstallerX default).
+ */
+@Composable
+fun Modifier.miuixTopBarBlur(
+    backdrop: LayerBackdrop?,
+    blurRadius: Float = 25f,
+    tintAlpha: Float = 0.8f,
+): Modifier {
+    if (backdrop == null) return this
+
+    val blendColor = MiuixAppTheme.colorScheme.surface.copy(alpha = tintAlpha)
+    return this.then(
+        Modifier.textureBlur(
+            backdrop = backdrop,
+            shape = RectangleShape,
+            blurRadius = blurRadius,
+            colors = BlurColors(
+                blendColors = listOf(
+                    BlendColorEntry(color = blendColor),
+                ),
+            ),
+        ),
+    )
+}
+
+/**
  * Remembers the global app blur backdrop.
  *
  * The backdrop's draw block paints a base surface fill followed by the captured

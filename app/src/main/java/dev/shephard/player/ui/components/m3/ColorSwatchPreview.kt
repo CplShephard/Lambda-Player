@@ -95,7 +95,8 @@ fun ColorSwatchPreview(
         }
 
         if (rawColor.getDisplayName() != rawColor.key) {
-            Spacer(Modifier.height(8.dp))
+            // 12dp like InstallerX Revived's ColorSwatchPreview
+            Spacer(Modifier.height(12.dp))
             Text(
                 text = rawColor.getDisplayName(),
                 style = textStyle,

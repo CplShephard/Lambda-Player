@@ -117,10 +117,10 @@ import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.glass.blurSurfaceCompact
-import dev.shephard.player.ui.glass.miuixBlurSurface
+import dev.shephard.player.ui.glass.miuixTopBarBlur
+import dev.shephard.player.ui.glass.rememberMiuixPageBackdrop
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
@@ -1460,15 +1460,9 @@ private fun PlaylistDetailTopBar(
             .statusBarsPadding()
             .then(
                 if (pageBackdrop != null) {
-                    // Match the mini player pop-up's blur/tint values for a
-                    // consistent liquid-glass look across the app.
-                    Modifier.miuixBlurSurface(
-                        backdrop = pageBackdrop,
-                        shape = androidx.compose.ui.graphics.RectangleShape,
-                        blurRadius = 28f,
-                        tintAlpha = 0.58f,
-                        fallbackColor = androidx.compose.ui.graphics.Color.Transparent
-                    )
+                    // InstallerX Revived Miuix values: 25dp blur radius blended
+                    // with the theme surface at 80% opacity.
+                    Modifier.miuixTopBarBlur(backdrop = pageBackdrop)
                 } else {
                     Modifier.background(cs.background.copy(alpha = collapse))
                 }
@@ -1539,7 +1533,9 @@ internal fun PlaylistDetailView(
 ) {
     val liquidGlassOn = LocalBlurEnabled.current
 
-val detailPageBackdrop = if (liquidGlassOn) rememberLayerBackdrop() else null
+    // InstallerX-style page backdrop: solid surface base + captured content,
+    // so the playlist detail top bar blurs cleanly while scrolling.
+    val detailPageBackdrop = rememberMiuixPageBackdrop(liquidGlassOn)
 
 val reorderItems = remember { mutableStateListOf<AudioTrack>() }
     var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
