@@ -431,6 +431,10 @@ fun PlaylistScreenM3(
                                 writePlaylists(all)
                             }
                         },
+                        onAddTracks = {},
+                        onPickCover = {},
+                        onRename = {},
+                        onDelete = {},
                     )
                 }
             }

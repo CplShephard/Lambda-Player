@@ -90,7 +90,7 @@ fun HomeScreenM3(
     val strings = LocalStrings.current
     val tracks by libraryViewModel.tracks.collectAsState()
     val isLoading by libraryViewModel.isLoading.collectAsState()
-    val recentEvents by libraryViewModel.listenStatsEvents.collectAsState()
+    val recentEvents by playerViewModel.statsEventsFlow.collectAsState()
 
     val featuredTracks = remember(tracks) {
         if (tracks.isNotEmpty()) tracks.shuffled().take(5) else emptyList()

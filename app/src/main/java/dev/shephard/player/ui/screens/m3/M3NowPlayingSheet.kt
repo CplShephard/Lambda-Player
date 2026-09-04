@@ -545,7 +545,6 @@ fun M3NowPlayingSheet(
     }
 }
 
-@Composable
 /**
  * PixelPlayer-style progress: Material 3 expressive wavy slider + time labels.
  * While the user drags, the thumb stays where it was dropped until playback

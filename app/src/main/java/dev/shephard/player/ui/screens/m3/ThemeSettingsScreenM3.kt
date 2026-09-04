@@ -95,6 +95,7 @@ import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.PreferencesManager
+import dev.shephard.player.player.toPreferenceInt
 import dev.shephard.player.theme.PaletteStyle
 import dev.shephard.player.theme.PredictiveBackAnimation
 import dev.shephard.player.theme.PredictiveBackExitDirection
@@ -430,47 +431,49 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                             onCheckedChange = { scope.launch { prefs.setUseMiuixMonet(it) } }
                         )
                     }
-                    AnimatedVisibility(
-                        visibleState = monetMenuState,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically(),
-                    ) {
-                        Column {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                SwitchWidget(
-                                    icon = Icons.TwoTone.InvertColors,
-                                    title = strings.dynamicColor,
-                                    description = strings.dynamicColorDescription,
-                                    checked = dynamicColor,
-                                    onCheckedChange = { scope.launch { prefs.setDynamicColor(it) } }
+                    item {
+                        AnimatedVisibility(
+                            visibleState = monetMenuState,
+                            enter = fadeIn() + expandVertically(),
+                            exit = fadeOut() + shrinkVertically(),
+                        ) {
+                            Column {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                    SwitchWidget(
+                                        icon = Icons.TwoTone.InvertColors,
+                                        title = strings.dynamicColor,
+                                        description = strings.dynamicColorDescription,
+                                        checked = dynamicColor,
+                                        onCheckedChange = { scope.launch { prefs.setDynamicColor(it) } }
+                                    )
+                                }
+                                DropDownMenuWidget(
+                                    icon = Icons.Default.Palette,
+                                    title = strings.paletteStyle,
+                                    description = paletteStyle.displayName,
+                                    choice = paletteIndex,
+                                    data = paletteStyleOptions.map { it.displayName },
+                                    onChoiceChange = { index ->
+                                        val newStyle = paletteStyleOptions[index]
+                                        if (newStyle != paletteStyle) {
+                                            scope.launch { prefs.setPaletteStyle(newStyle) }
+                                        }
+                                    }
+                                )
+                                DropDownMenuWidget(
+                                    icon = Icons.Default.Tune,
+                                    title = strings.colorSpec,
+                                    description = if (!isSpec2025Supported) strings.colorSpecOnly2021 else colorSpec.displayName,
+                                    choice = specIndex,
+                                    data = availableSpecs.map { it.displayName },
+                                    onChoiceChange = { index ->
+                                        val selectedSpec = availableSpecs[index]
+                                        if (selectedSpec != colorSpec) {
+                                            scope.launch { prefs.setColorSpec(selectedSpec) }
+                                        }
+                                    }
                                 )
                             }
-                            DropDownMenuWidget(
-                                icon = Icons.Default.Palette,
-                                title = strings.paletteStyle,
-                                description = paletteStyle.displayName,
-                                choice = paletteIndex,
-                                data = paletteStyleOptions.map { it.displayName },
-                                onChoiceChange = { index ->
-                                    val newStyle = paletteStyleOptions[index]
-                                    if (newStyle != paletteStyle) {
-                                        scope.launch { prefs.setPaletteStyle(newStyle) }
-                                    }
-                                }
-                            )
-                            DropDownMenuWidget(
-                                icon = Icons.Default.Tune,
-                                title = strings.colorSpec,
-                                description = if (!isSpec2025Supported) strings.colorSpecOnly2021 else colorSpec.displayName,
-                                choice = specIndex,
-                                data = availableSpecs.map { it.displayName },
-                                onChoiceChange = { index ->
-                                    val selectedSpec = availableSpecs[index]
-                                    if (selectedSpec != colorSpec) {
-                                        scope.launch { prefs.setColorSpec(selectedSpec) }
-                                    }
-                                }
-                            )
                         }
                     }
                 }
