@@ -35,6 +35,7 @@ import dev.shephard.player.ui.glass.LocalAppBackdrop
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.LocalWallpaperContentColor
+import dev.shephard.player.ui.glass.LocalWallpaperEnabled
 import dev.shephard.player.ui.glass.rememberAppBlurBackdrop
 import dev.shephard.player.ui.glass.rememberWallpaperBlurBackdrop
 import dev.shephard.player.ui.i18n.LocalStrings
