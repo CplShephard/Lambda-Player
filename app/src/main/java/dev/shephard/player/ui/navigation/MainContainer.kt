@@ -41,7 +41,7 @@ import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.i18n.stringsFor
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.screens.NowPlayingSheet
-import dev.shephard.player.ui.screens.NowPlayingSheetM3
+import dev.shephard.player.ui.screens.m3.M3NowPlayingSheet
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -271,7 +271,7 @@ fun MainContainer(
                         onDismiss = { showNowPlaying = false }
                     )
                 } else {
-                    NowPlayingSheetM3(
+                    M3NowPlayingSheet(
                         playerViewModel = playerViewModel,
                         onDismiss = { showNowPlaying = false }
                     )

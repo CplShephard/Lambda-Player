@@ -102,6 +102,8 @@ import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
 import dev.shephard.player.theme.PaletteStyle
+import dev.shephard.player.theme.PredictiveBackAnimation
+import dev.shephard.player.theme.PredictiveBackExitDirection
 import dev.shephard.player.theme.ThemeColorSpec
 import dev.shephard.player.ui.components.MiuixDrawer
 import dev.shephard.player.ui.components.bounceClick
@@ -227,6 +229,8 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     val language by prefs.language.collectAsState(initial = "en")
     val playlistsLayout by prefs.playlistsLayout.collectAsState(initial = LayoutMode.LIST)
     val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
+    val predictiveBack by prefs.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
+    val predictiveBackDirection by prefs.predictiveBackExitDirection.collectAsState(initial = PredictiveBackExitDirection.FOLLOW_GESTURE)
 
     var langMenuOpen by remember { mutableStateOf(false) }
     var wallpaperBrightnessValue by remember { mutableFloatStateOf(PreferencesManager.cachedWallpaperBrightness) }
@@ -682,6 +686,66 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                     scope.launch { prefs.setPlaylistsLayout(layoutModeOptions[index].first) }
                 }
             )
+        }
+
+        // ── Predictive Back (exactly like InstallerX Revived Miuix page) ─────
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            SmallTitle(
+                text = strings.predictiveBackTitle,
+                insideMargin = PaddingValues(16.dp, 8.dp),
+            )
+            SectionCard {
+                val predictiveBackOptions = listOf(
+                    PredictiveBackAnimation.NONE to strings.predictiveBackNone,
+                    PredictiveBackAnimation.AOSP to strings.predictiveBackAosp,
+                    PredictiveBackAnimation.MIUIX to strings.predictiveBackMiuix,
+                    PredictiveBackAnimation.SCALE to strings.predictiveBackScale,
+                    PredictiveBackAnimation.CLASSIC to strings.predictiveBackClassic,
+                )
+                val predictiveBackIndex = predictiveBackOptions.indexOfFirst { it.first == predictiveBack }.coerceAtLeast(0)
+                top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+                    title = strings.predictiveBackTitle,
+                    summary = strings.predictiveBackDescription,
+                    items = predictiveBackOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
+                    selectedIndex = predictiveBackIndex,
+                    modifier = Modifier.clip(RoundedCornerShape(30.dp)),
+                    onSelectedIndexChange = { index ->
+                        val newAnimation = predictiveBackOptions[index].first
+                        if (newAnimation != predictiveBack) {
+                            scope.launch { prefs.setPredictiveBackAnimation(newAnimation) }
+                        }
+                    }
+                )
+                AnimatedVisibility(
+                    visible = predictiveBack == PredictiveBackAnimation.SCALE,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically(),
+                ) {
+                    Column {
+                        Spacer(Modifier.height(8.dp))
+                        val predictiveDirectionOptions = listOf(
+                            PredictiveBackExitDirection.FOLLOW_GESTURE to strings.predictiveBackFollowGesture,
+                            PredictiveBackExitDirection.ALWAYS_RIGHT to strings.predictiveBackAlwaysRight,
+                            PredictiveBackExitDirection.ALWAYS_LEFT to strings.predictiveBackAlwaysLeft,
+                        )
+                        val predictiveDirectionIndex = predictiveDirectionOptions
+                            .indexOfFirst { it.first == predictiveBackDirection }.coerceAtLeast(0)
+                        top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+                            title = strings.predictiveBackExitDirectionTitle,
+                            summary = strings.predictiveBackExitDirectionDescription,
+                            items = predictiveDirectionOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
+                            selectedIndex = predictiveDirectionIndex,
+                            modifier = Modifier.clip(RoundedCornerShape(30.dp)),
+                            onSelectedIndexChange = { index ->
+                                val newDirection = predictiveDirectionOptions[index].first
+                                if (newDirection != predictiveBackDirection) {
+                                    scope.launch { prefs.setPredictiveBackExitDirection(newDirection) }
+                                }
+                            }
+                        )
+                    }
+                }
+            }
         }
 
         SectionCard {

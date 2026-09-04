@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 InstallerX Revived contributors
-package dev.shephard.player.ui.screens
+package dev.shephard.player.ui.screens.m3
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
@@ -10,11 +10,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
@@ -82,7 +79,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
@@ -95,14 +91,13 @@ import coil.compose.AsyncImage
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.RepeatMode
+import dev.shephard.player.ui.components.m3.M3WavySlider
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
 
-private const val M3_WAVE_BAR_COUNT = 44
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NowPlayingSheetM3(
+fun M3NowPlayingSheet(
     playerViewModel: PlayerViewModel = viewModel(),
     onDismiss: () -> Unit
 ) {
@@ -331,9 +326,9 @@ fun NowPlayingSheetM3(
 
             Spacer(Modifier.weight(1f))
 
-            M3WaveformSeekBar(
+            M3NowPlayingProgress(
                 playerViewModel = playerViewModel,
-                trackId = track?.id ?: -1L,
+                isPlaying = state.isPlaying,
             )
 
             Row(
@@ -551,9 +546,15 @@ fun NowPlayingSheetM3(
 }
 
 @Composable
-private fun M3WaveformSeekBar(
+/**
+ * PixelPlayer-style progress: Material 3 expressive wavy slider + time labels.
+ * While the user drags, the thumb stays where it was dropped until playback
+ * catches up on its own.
+ */
+@Composable
+private fun M3NowPlayingProgress(
     playerViewModel: PlayerViewModel,
-    trackId: Long,
+    isPlaying: Boolean,
 ) {
     val progress by playerViewModel.progress.collectAsState()
     val durationMs = progress.durationMs
@@ -563,74 +564,42 @@ private fun M3WaveformSeekBar(
         0f
     }
 
-    var isDragging by remember { mutableStateOf(false) }
-    var dragFraction by remember { mutableFloatStateOf(0f) }
-    val shownFraction = if (isDragging) dragFraction else baseFraction
+    var seekFraction by remember { mutableStateOf<Float?>(null) }
+    LaunchedEffect(baseFraction, durationMs) {
+        val held = seekFraction ?: return@LaunchedEffect
+        if (kotlin.math.abs(held - baseFraction) < 0.03f || kotlin.math.abs(held - baseFraction) > 0.1f) {
+            seekFraction = null
+        }
+    }
 
-    val bars = remember(trackId) { generateWaveformBars(trackId, M3_WAVE_BAR_COUNT) }
-    val activeColor = MaterialTheme.colorScheme.primary
-    val inactiveColor = Color.White.copy(alpha = 0.32f)
+    val activeColor = Color.White
+    val inactiveColor = Color.White.copy(alpha = 0.25f)
+    val thumbColor = Color.White
+    val timeColor = Color.White.copy(alpha = 0.7f)
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .padding(horizontal = 20.dp)
-                .pointerInput(trackId) {
-                    detectTapGestures { offset ->
-                        val fraction = (offset.x / size.width).coerceIn(0f, 1f)
-                        if (durationMs > 0L) {
-                            playerViewModel.onSeekPreview((fraction * durationMs).toLong())
-                            playerViewModel.onSeekCommit((fraction * durationMs).toLong())
-                        }
-                    }
+        M3WavySlider(
+            value = { seekFraction ?: baseFraction },
+            onValueChange = { fraction ->
+                seekFraction = fraction
+                if (durationMs > 0L) {
+                    playerViewModel.onSeekPreview((fraction * durationMs).toLong())
                 }
-                .pointerInput(trackId) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            isDragging = true
-                            val fraction = (offset.x / size.width).coerceIn(0f, 1f)
-                            dragFraction = fraction
-                            if (durationMs > 0L) {
-                                playerViewModel.onSeekPreview((fraction * durationMs).toLong())
-                            }
-                        },
-                        onDrag = { change, _ ->
-                            change.consume()
-                            val fraction = (change.position.x / size.width).coerceIn(0f, 1f)
-                            dragFraction = fraction
-                            if (durationMs > 0L) {
-                                playerViewModel.onSeekPreview((fraction * durationMs).toLong())
-                            }
-                        },
-                        onDragEnd = {
-                            if (durationMs > 0L) {
-                                playerViewModel.onSeekCommit((dragFraction * durationMs).toLong())
-                            }
-                            isDragging = false
-                        },
-                        onDragCancel = {
-                            isDragging = false
-                        }
-                    )
+            },
+            onValueCommit = { fraction ->
+                if (durationMs > 0L) {
+                    playerViewModel.onSeekCommit((fraction * durationMs).toLong())
                 }
-        ) {
-            val slotWidth = size.width / M3_WAVE_BAR_COUNT
-            val barWidth = slotWidth * 0.62f
-            bars.forEachIndexed { index, normalized ->
-                val barHeight = normalized * size.height
-                val x = index * slotWidth + (slotWidth - barWidth) / 2f
-                val y = (size.height - barHeight) / 2f
-                val barFraction = (index.toFloat() + 1f) / M3_WAVE_BAR_COUNT
-                drawRoundRect(
-                    color = if (barFraction <= shownFraction) activeColor else inactiveColor,
-                    topLeft = Offset(x, y),
-                    size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f)
-                )
-            }
-        }
+            },
+            activeTrackColor = activeColor,
+            inactiveTrackColor = inactiveColor,
+            thumbColor = thumbColor,
+            isPlaying = isPlaying,
+            isVisible = true,
+            trackEdgePadding = 8.dp,
+            semanticsLabel = "Playback position",
+            modifier = Modifier.padding(horizontal = 20.dp)
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -638,25 +607,18 @@ private fun M3WaveformSeekBar(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = m3FormatMillis(if (isDragging) (dragFraction * durationMs).toLong() else progress.positionMs),
+                text = m3FormatMillis(
+                    if (seekFraction != null) (seekFraction!! * durationMs).toLong() else progress.positionMs
+                ),
                 style = MaterialTheme.typography.labelMedium,
-                color = Color.White.copy(alpha = 0.7f)
+                color = timeColor
             )
             Text(
                 text = m3FormatMillis(durationMs),
                 style = MaterialTheme.typography.labelMedium,
-                color = Color.White.copy(alpha = 0.7f)
+                color = timeColor
             )
         }
-    }
-}
-
-private fun generateWaveformBars(trackId: Long, count: Int): FloatArray {
-    val seed = (trackId * 31).toInt()
-    return FloatArray(count) { index ->
-        val hash = (seed xor (index * 2654435761L.toInt())).toLong().let { v -> ((v shl 13) xor v) }
-        val unit = ((hash ushr 1) and 0xFFFF).toFloat() / 0xFFFF.toFloat()
-        0.32f + 0.68f * unit
     }
 }
 

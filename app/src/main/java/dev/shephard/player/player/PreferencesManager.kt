@@ -9,6 +9,8 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.shephard.player.theme.PaletteStyle
+import dev.shephard.player.theme.PredictiveBackAnimation
+import dev.shephard.player.theme.PredictiveBackExitDirection
 import dev.shephard.player.theme.ThemeColorSpec
 import dev.shephard.player.theme.ThemeMode
 import kotlinx.coroutines.flow.Flow
@@ -44,6 +46,9 @@ object PrefsKeys {
     val USE_MIUIX_MONET = booleanPreferencesKey("use_miuix_monet")
     val USE_APPLE_FLOATING_BAR = booleanPreferencesKey("use_apple_floating_bar")
     val LAST_MAIN_PAGE = intPreferencesKey("last_main_page")
+    val PREDICTIVE_BACK_ANIMATION = stringPreferencesKey("predictive_back_animation")
+    val PREDICTIVE_BACK_EXIT_DIRECTION = stringPreferencesKey("predictive_back_exit_direction")
+    val M3_BLUR_BACKUP = intPreferencesKey("m3_blur_backup")
 }
 
 object ThemeModePreference {
@@ -141,6 +146,14 @@ class PreferencesManager(private val context: Context) {
 
     val useAppleFloatingBar: Flow<Boolean> = context.dataStore.data.map {
         it[PrefsKeys.USE_APPLE_FLOATING_BAR] ?: false
+    }
+
+    val predictiveBackAnimation: Flow<PredictiveBackAnimation> = context.dataStore.data.map {
+        PredictiveBackAnimation.fromValueOrDefault(it[PrefsKeys.PREDICTIVE_BACK_ANIMATION] ?: "")
+    }
+
+    val predictiveBackExitDirection: Flow<PredictiveBackExitDirection> = context.dataStore.data.map {
+        PredictiveBackExitDirection.fromValueOrDefault(it[PrefsKeys.PREDICTIVE_BACK_EXIT_DIRECTION] ?: "")
     }
 
     val lastMainPage: Flow<Int> = context.dataStore.data.map {
@@ -248,7 +261,36 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun setUseMiuix(useMiuix: Boolean) {
-        context.dataStore.edit { it[PrefsKeys.USE_MIUIX] = useMiuix }
+        context.dataStore.edit { prefs ->
+            val currentBlur = prefs[PrefsKeys.LIQUID_GLASS_ENABLED] ?: false
+            if (!useMiuix) {
+                // Switching to Material 3: blur is disabled automatically, but
+                // the previous state is backed up so returning to Miuix restores it.
+                if (currentBlur) {
+                    prefs[PrefsKeys.M3_BLUR_BACKUP] = 1
+                } else if (prefs[PrefsKeys.M3_BLUR_BACKUP] == null) {
+                    prefs[PrefsKeys.M3_BLUR_BACKUP] = 0
+                }
+                prefs[PrefsKeys.LIQUID_GLASS_ENABLED] = false
+            } else {
+                // Switching back to Miuix: restore the backup if one exists,
+                // then forget it.
+                val backup = prefs[PrefsKeys.M3_BLUR_BACKUP]
+                if (backup != null) {
+                    prefs[PrefsKeys.LIQUID_GLASS_ENABLED] = backup == 1
+                }
+                prefs.remove(PrefsKeys.M3_BLUR_BACKUP)
+            }
+            prefs[PrefsKeys.USE_MIUIX] = useMiuix
+        }
+    }
+
+    suspend fun setPredictiveBackAnimation(animation: PredictiveBackAnimation) {
+        context.dataStore.edit { it[PrefsKeys.PREDICTIVE_BACK_ANIMATION] = animation.value }
+    }
+
+    suspend fun setPredictiveBackExitDirection(direction: PredictiveBackExitDirection) {
+        context.dataStore.edit { it[PrefsKeys.PREDICTIVE_BACK_EXIT_DIRECTION] = direction.value }
     }
 
     suspend fun setPaletteStyle(style: PaletteStyle) {

@@ -3,44 +3,67 @@
 package dev.shephard.player.ui.navigation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon as M3Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar as M3NavigationBar
 import androidx.compose.material3.NavigationBarItem as M3NavigationBarItem
+import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text as M3Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import dev.shephard.player.theme.PredictiveBackAnimation
+import dev.shephard.player.theme.PredictiveBackExitDirection
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,7 +79,7 @@ import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.MiniPlayer
-import dev.shephard.player.ui.components.MiniPlayerM3
+import dev.shephard.player.ui.components.M3MiniPlayer
 import dev.shephard.player.ui.glass.FloatingBottomBar
 import dev.shephard.player.ui.glass.FloatingBottomBarDefaults
 import dev.shephard.player.ui.glass.FloatingBottomBarItem
@@ -70,21 +93,21 @@ import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.screens.AboutSettingsScreen
-import dev.shephard.player.ui.screens.AboutSettingsScreenM3
+import dev.shephard.player.ui.screens.m3.AboutSettingsScreenM3
 import dev.shephard.player.ui.screens.HomeScreen
-import dev.shephard.player.ui.screens.HomeScreenM3
+import dev.shephard.player.ui.screens.m3.HomeScreenM3
 import dev.shephard.player.ui.screens.MusicScreen
-import dev.shephard.player.ui.screens.MusicScreenM3
+import dev.shephard.player.ui.screens.m3.MusicScreenM3
 import dev.shephard.player.ui.screens.PlayerSettingsScreen
-import dev.shephard.player.ui.screens.PlayerSettingsScreenM3
+import dev.shephard.player.ui.screens.m3.PlayerSettingsScreenM3
 import dev.shephard.player.ui.screens.PlaylistScreen
-import dev.shephard.player.ui.screens.PlaylistScreenM3
+import dev.shephard.player.ui.screens.m3.PlaylistScreenM3
 import dev.shephard.player.ui.screens.SettingsScreen
-import dev.shephard.player.ui.screens.SettingsScreenM3
+import dev.shephard.player.ui.screens.m3.SettingsScreenM3
 import dev.shephard.player.ui.screens.StatsScreen
-import dev.shephard.player.ui.screens.StatsScreenM3
+import dev.shephard.player.ui.screens.m3.StatsScreenM3
 import dev.shephard.player.ui.screens.ThemeSettingsScreen
-import dev.shephard.player.ui.screens.ThemeSettingsScreenM3
+import dev.shephard.player.ui.screens.m3.ThemeSettingsScreenM3
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -126,6 +149,23 @@ fun NavGraph(
         )
     }
 
+    // Predictive back animations (shared setting used by both UI engines).
+    val predictiveBackAnimation by preferences.predictiveBackAnimation
+        .collectAsState(initial = PredictiveBackAnimation.MIUIX)
+    val predictiveBackExitDirection by preferences.predictiveBackExitDirection
+        .collectAsState(initial = PredictiveBackExitDirection.FOLLOW_GESTURE)
+
+    // Submenu transitions: Miuix gets the Miuix slide, Material 3 gets the
+    // Material 3 fade-through motion; both carry the chosen predictive back
+    // pop specification.
+    val submenuMetadata = remember(useMiuix, predictiveBackAnimation, predictiveBackExitDirection) {
+        val base = if (useMiuix) PageTransitions.submenuMetadata else PageTransitions.m3SubmenuMetadata
+        base + PageTransitions.predictiveBackSubmenuMetadata(
+            animation = predictiveBackAnimation,
+            exitDirection = predictiveBackExitDirection,
+        )
+    }
+
     fun pop() {
         if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
     }
@@ -152,6 +192,17 @@ fun NavGraph(
                             userScrollEnabled = true,
                             beyondViewportPageCount = 1,
                         ) { page ->
+                            // Miuix engine: plain slide (Miuix behaviour).
+                            // Material 3 engine: M3 crossfade+depth page motion.
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .then(
+                                        if (!useMiuix) {
+                                            Modifier.m3PagerPageTransition(mainPagerState.pagerState, page)
+                                        } else Modifier
+                                    )
+                            ) {
                             when (page) {
                                 0 -> if (useMiuix) {
                                     HomeScreen(
@@ -219,6 +270,7 @@ fun NavGraph(
                                     )
                                 }
                             }
+                            }
                         }
                     }
 
@@ -249,28 +301,28 @@ fun NavGraph(
                 }
             }
 
-            entry<ThemeRoute>(metadata = PageTransitions.submenuMetadata) {
+            entry<ThemeRoute>(metadata = submenuMetadata) {
                 if (useMiuix) {
                     ThemeSettingsScreen(onBack = ::pop)
                 } else {
                     ThemeSettingsScreenM3(onBack = ::pop)
                 }
             }
-            entry<PlayerRoute>(metadata = PageTransitions.submenuMetadata) {
+            entry<PlayerRoute>(metadata = submenuMetadata) {
                 if (useMiuix) {
                     PlayerSettingsScreen(onBack = ::pop)
                 } else {
                     PlayerSettingsScreenM3(onBack = ::pop)
                 }
             }
-            entry<AboutRoute>(metadata = PageTransitions.submenuMetadata) {
+            entry<AboutRoute>(metadata = submenuMetadata) {
                 if (useMiuix) {
                     AboutSettingsScreen(onBack = ::pop)
                 } else {
                     AboutSettingsScreenM3(onBack = ::pop)
                 }
             }
-            entry<StatsRoute>(metadata = PageTransitions.submenuMetadata) {
+            entry<StatsRoute>(metadata = submenuMetadata) {
                 if (useMiuix) {
                     StatsScreen(
                         playerViewModel = playerViewModel,
@@ -322,16 +374,26 @@ private fun MainDock(
     val initialAppleStyle = remember { runBlocking { preferences.useAppleFloatingBar.first() } }
     val appleStyle by preferences.useAppleFloatingBar.collectAsState(initial = initialAppleStyle)
     when {
-        appleStyle -> AppleFloatingDock(
-            useMiuix = useMiuix,
+        // Miuix engine: the Apple option still means the Apple-style floating
+        // pill dock (unchanged behaviour).
+        appleStyle && useMiuix -> AppleFloatingDock(
+            useMiuix = true,
             selectedIndex = selectedIndex,
             onSelected = onSelected,
         )
+        // Material 3: the Apple dock is no longer available. The same option
+        // toggles the M3 floating bar instead: ON -> M3 floating bar
+        // (PixelPlayer-style), OFF -> the classic Material 3 navigation bar.
+        appleStyle -> M3FloatingDock(selectedIndex = selectedIndex, onSelected = onSelected)
         !useMiuix -> M3NavigationDock(selectedIndex = selectedIndex, onSelected = onSelected)
         else -> MiuixNavigationDock(selectedIndex = selectedIndex, onSelected = onSelected)
     }
 }
 
+/**
+ * Classic Material 3 navigation bar — the pre-PixelPlayer M3 dock, still used
+ * when the "floating bar" option is OFF.
+ */
 @Composable
 private fun M3NavigationDock(
     selectedIndex: () -> Int,
@@ -370,6 +432,192 @@ private fun M3NavigationDock(
                     )
                 },
             )
+        }
+    }
+}
+
+/**
+ * Material 3 floating bottom bar, ported from PixelPlayer's
+ * [pixelplay.presentation.components.PlayerInternalNavigationBar]:
+ * a floating rounded surface with a spring "pill" indicator per item
+ * (secondaryContainer pill that fades/scales in behind the icon, which
+ * scales to 1.1x), icon in primary when selected and a 13sp label below.
+ * Used when the (M3-only) "floating bar" setting is ON, so M3 gets
+ * Material 3's own floating bar instead of the Apple dock.
+ */
+@Composable
+private fun M3FloatingDock(
+    selectedIndex: () -> Int,
+    onSelected: (Int) -> Unit,
+) {
+    val strings = LocalStrings.current
+    val navBarInset = WindowInsets.navigationBars.asPaddingValues()
+        .calculateBottomPadding()
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp + navBarInset)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(32.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            shadowElevation = 3.dp,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(90.dp)
+                    .padding(horizontal = 10.dp),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                bottomNavDestinations.forEachIndexed { index, dest ->
+                    val selected = index == selectedIndex()
+                    val label = when (dest) {
+                        Destination.Home -> strings.home
+                        Destination.Music -> strings.music
+                        Destination.Playlists -> strings.playlists
+                        Destination.Settings -> strings.settings
+                    }
+                    M3FloatingNavItem(
+                        selected = selected,
+                        onClick = { onSelected(index) },
+                        icon = {
+                            M3Icon(
+                                imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
+                                contentDescription = label,
+                            )
+                        },
+                        label = label,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Port of PixelPlayer's CustomNavigationBarItem: 64x32dp secondaryContainer
+ * pill indicator (spring fade/scale), 48x24dp icon slot clipped to 12dp
+ * corners with a bouncy 1.1x scale when selected, and the 13sp label that
+ * fades in below.
+ */
+@Composable
+private fun RowScope.M3FloatingNavItem(
+    selected: Boolean,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    label: String = "",
+) {
+    val iconColor by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = tween(durationMillis = 150),
+        label = "m3FloatingIconColor",
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = tween(durationMillis = 150),
+        label = "m3FloatingTextColor",
+    )
+    val iconScale by animateFloatAsState(
+        targetValue = if (selected) 1.1f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium,
+        ),
+        label = "m3FloatingIconScale",
+    )
+    val interactionSource = remember { MutableInteractionSource() }
+
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(
+                onClick = onClick,
+                role = Role.Tab,
+                interactionSource = interactionSource,
+                indication = null,
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        // Indicator pill + icon slot
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.size(width = 64.dp, height = 32.dp),
+        ) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = selected,
+                enter = fadeIn(animationSpec = tween(100)) +
+                    scaleIn(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow,
+                        ),
+                    ),
+                exit = fadeOut(animationSpec = tween(100)) +
+                    scaleOut(animationSpec = tween(100)),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 4.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = RoundedCornerShape(16.dp),
+                        )
+                )
+            }
+
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(width = 48.dp, height = 24.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .graphicsLayer {
+                        scaleX = iconScale
+                        scaleY = iconScale
+                    }
+            ) {
+                CompositionLocalProvider(LocalContentColor provides iconColor) {
+                    icon()
+                }
+            }
+        }
+
+        androidx.compose.animation.AnimatedVisibility(
+            visible = true,
+            enter = fadeIn(animationSpec = tween(200, delayMillis = 50)),
+            exit = fadeOut(animationSpec = tween(100)),
+        ) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Box(modifier = Modifier.padding(top = 4.dp)) {
+                ProvideTextStyle(
+                    value = MaterialTheme.typography.labelMedium.copy(
+                        color = textColor,
+                        fontSize = 13.sp,
+                        fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                    )
+                ) {
+                    M3Text(
+                        text = label,
+                        maxLines = 1,
+                        overflow = TextOverflow.Visible,
+                    )
+                }
+            }
         }
     }
 }
@@ -571,7 +819,7 @@ private fun MiniPlayerHost(
                 onPreviousClick = { playerViewModel.skipToPrevious() }
             )
         } else {
-            MiniPlayerM3(
+            M3MiniPlayer(
                 state = playerState,
                 progressFlow = playerViewModel.progress,
                 onClick = onOpenNowPlaying,

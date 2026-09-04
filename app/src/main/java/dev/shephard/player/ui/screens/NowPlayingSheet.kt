@@ -122,7 +122,7 @@ import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.glass.blurSurfaceCompact
-import dev.shephard.player.ui.components.MinimalSeekBar
+import top.yukonga.miuix.kmp.basic.Slider as MiuixSlider
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -664,7 +664,7 @@ Row(
                     onClick = { playerViewModel.remixQueue() },
                     icon = Icons.Filled.Shuffle,
                     contentDescription = strings.remix,
-                    tint = Color.White,
+                    tint = if (isRemixed) MiuixAppTheme.colorScheme.primary else Color.White,
                     iconSize = 28.dp
                 )
                 BouncyIconButton(
@@ -721,7 +721,7 @@ Box(
                     onClick = { playerViewModel.cycleRepeatMode() },
                     icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                     contentDescription = strings.repeat,
-                    tint = Color.White,
+                    tint = if (state.repeatMode != RepeatMode.OFF) MiuixAppTheme.colorScheme.primary else Color.White,
                     iconSize = 28.dp
                 )
             }
@@ -781,15 +781,21 @@ Box(
 @Composable
 private fun SeekBarRow(playerViewModel: PlayerViewModel) {
     val progress by playerViewModel.progress.collectAsState()
+    val fraction = if (progress.durationMs > 0)
+        progress.positionMs.toFloat() / progress.durationMs.toFloat() else 0f
+    var seekFraction by remember { mutableStateOf<Float?>(null) }
     Column(modifier = Modifier.fillMaxWidth()) {
-        MinimalSeekBar(
-            progress = if (progress.durationMs > 0)
-                progress.positionMs.toFloat() / progress.durationMs.toFloat() else 0f,
-            onSeekPreview = { fraction ->
-                playerViewModel.onSeekPreview((fraction * progress.durationMs).toLong())
+        MiuixSlider(
+            value = seekFraction ?: fraction,
+            onValueChange = { newFraction ->
+                seekFraction = newFraction
+                playerViewModel.onSeekPreview((newFraction * progress.durationMs).toLong())
             },
-            onSeekFinished = { fraction ->
-                playerViewModel.onSeekCommit((fraction * progress.durationMs).toLong())
+            onValueChangeFinished = {
+                seekFraction?.let {
+                    playerViewModel.onSeekCommit((it * progress.durationMs).toLong())
+                }
+                seekFraction = null
             },
             modifier = Modifier.padding(horizontal = 20.dp)
         )

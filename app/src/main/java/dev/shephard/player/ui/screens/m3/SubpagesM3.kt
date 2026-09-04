@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2025-2026 InstallerX Revived contributors
-package dev.shephard.player.ui.screens
+package dev.shephard.player.ui.screens.m3
 
 import android.content.pm.PackageManager
 import androidx.compose.foundation.Image
@@ -297,9 +297,9 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = 16.dp,
+                start = 12.dp,
                 top = padding.calculateTopPadding() + 8.dp,
-                end = 16.dp,
+                end = 12.dp,
                 bottom = padding.calculateBottomPadding() + 40.dp
             ),
         ) {
@@ -384,9 +384,9 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = 16.dp,
+                start = 12.dp,
                 top = padding.calculateTopPadding() + 8.dp,
-                end = 16.dp,
+                end = 12.dp,
                 bottom = padding.calculateBottomPadding() + 40.dp
             ),
             horizontalAlignment = Alignment.CenterHorizontally,

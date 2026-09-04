@@ -35,6 +35,8 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeColorSpec as MiuixColorSpec
 import top.yukonga.miuix.kmp.theme.ThemeController
 import top.yukonga.miuix.kmp.theme.ThemePaletteStyle as MiuixPaletteStyle
+import top.yukonga.miuix.kmp.theme.darkColorScheme
+import top.yukonga.miuix.kmp.theme.lightColorScheme
 
 private val LocalIsDark = staticCompositionLocalOf { false }
 private val LocalPaletteStyle = staticCompositionLocalOf { PaletteStyle.Expressive }
@@ -273,16 +275,32 @@ fun PlayerMiuixTheme(
         // Miuix's own default scheme via ThemeController(System/Light/Dark)
         // instead of a hand-rolled ColorScheme. This is what keeps the app
         // looking exactly like stock Miuix: white switch thumbs, MIUI blue
-        // accent (#3482FF), stock backgrounds and surfaces, etc.
+        // accent (#3482FF), stock cards/surfaces, etc.
+        //
+        // Only the page background is overridden back to Lambda's original
+        // colors so the cards keep their contrast against the page:
+        //   dark  -> pure black  #000000
+        //   light -> #F7F7F8 (not pure white)
         val colorSchemeMode = when (themeMode) {
             ThemeMode.SYSTEM -> ColorSchemeMode.System
             ThemeMode.LIGHT -> ColorSchemeMode.Light
             ThemeMode.DARK -> ColorSchemeMode.Dark
         }
 
+        val lightColors = lightColorScheme(
+            background = Color(0xFFF7F7F8),
+            onBackground = Color(0xFF111113),
+        )
+        val darkColors = darkColorScheme(
+            background = Color(0xFF000000),
+            onBackground = Color(0xFFF5F5F7),
+        )
+
         val controller = remember(colorSchemeMode, darkTheme) {
             ThemeController(
                 colorSchemeMode = colorSchemeMode,
+                lightColors = lightColors,
+                darkColors = darkColors,
                 isDark = darkTheme,
             )
         }

@@ -48,6 +48,8 @@ import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.miuixBlurSurface
 import kotlinx.coroutines.flow.StateFlow
+import top.yukonga.miuix.kmp.basic.LinearProgressIndicator as MiuixLinearProgressIndicator
+import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults as MiuixProgressIndicatorDefaults
 
 @Composable
 fun MiniPlayer(
@@ -246,35 +248,13 @@ private fun MiniPlayerProgressBar(
         animationSpec = tween(durationMillis = 250),
         label = "miniProgress"
     )
-    BoldProgressBar(
-        fraction = animatedFraction,
-        activeColor = activeColor,
-        inactiveColor = inactiveColor,
+    MiuixLinearProgressIndicator(
+        progress = animatedFraction,
         modifier = modifier,
-        height = 3.dp
+        height = 3.dp,
+        colors = MiuixProgressIndicatorDefaults.progressIndicatorColors(
+            foregroundColor = activeColor,
+            backgroundColor = inactiveColor,
+        )
     )
-}
-
-@Composable
-fun BoldProgressBar(
-    fraction: Float,
-    modifier: Modifier = Modifier,
-    height: androidx.compose.ui.unit.Dp = 4.dp,
-    activeColor: Color = MiuixAppTheme.colorScheme.primary,
-    inactiveColor: Color = MiuixAppTheme.colorScheme.surfaceVariant
-) {
-    Box(
-        modifier = modifier
-            .height(height)
-            .clip(RoundedCornerShape(50))
-            .background(inactiveColor)
-    ) {
-        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxWidth().height(height)) {
-            val w = size.width * fraction.coerceIn(0f, 1f)
-            drawRect(
-                color = activeColor,
-                size = androidx.compose.ui.geometry.Size(w, size.height)
-            )
-        }
-    }
 }
