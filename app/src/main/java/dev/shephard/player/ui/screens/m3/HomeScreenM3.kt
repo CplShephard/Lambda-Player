@@ -58,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +70,8 @@ import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
+import dev.shephard.player.ui.glass.LocalWallpaperEnabled
+import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.navigation.PageTransitions
 import dev.shephard.player.ui.navigation.SubmenuNavGuard
@@ -217,12 +220,14 @@ private fun M3HomeRoot(
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
         topBar = {
             TopAppBar(
                 title = { Text(strings.home) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
+                    titleContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
+                    navigationIconContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
                 ),
             )
         },
@@ -358,7 +363,7 @@ private fun M3FeaturedSongCard(track: AudioTrack, onClick: () -> Unit) {
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
                     .background(
-                        MaterialTheme.colorScheme.scrim.copy(alpha = 0.35f),
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
                         RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
                     )
                     .padding(16.dp),
@@ -367,14 +372,14 @@ private fun M3FeaturedSongCard(track: AudioTrack, onClick: () -> Unit) {
                     text = track.title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = track.artist,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -479,11 +484,17 @@ private fun M3FeaturedPlaylistCard(playlist: LocalPlaylist, onClick: () -> Unit)
                     )
                 }
             }
-            Column(modifier = Modifier.padding(12.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .padding(12.dp)
+            ) {
                 Text(
                     text = playlist.name,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

@@ -73,13 +73,16 @@ class MainActivity : ComponentActivity() {
             val languageCode by prefs.language.collectAsState(initial = "en")
             val strings = remember(languageCode) { stringsFor(languageCode) }
 
+            // Material 3 always uses the Monet (wallpaper-dynamic) palette — the
+            // M3 UI has no "Miuix custom colors" switch. The setting is only
+            // honoured by the Miuix engine.
             val themeState = ThemeState(
                 useMiuix = useMiuix,
                 themeMode = themeMode,
                 paletteStyle = paletteStyle,
                 colorSpec = colorSpec,
                 useDynamicColor = dynamicColor,
-                useMiuixMonet = useMiuixMonet,
+                useMiuixMonet = if (useMiuix) useMiuixMonet else true,
                 seedColor = seedColor,
                 useBlur = blurEnabled,
                 useAppleFloatingBar = appleFloatingBar,

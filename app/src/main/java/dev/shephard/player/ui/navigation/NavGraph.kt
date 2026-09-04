@@ -51,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.State
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -75,6 +76,9 @@ import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import androidx.navigation3.ui.NavDisplayTransitionEffects
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
@@ -150,8 +154,12 @@ fun NavGraph(
     }
 
     // Predictive back animations (shared setting used by both UI engines).
-    val predictiveBackAnimation by preferences.predictiveBackAnimation
+    // The raw State is passed into the entry content lambdas (which live inside a
+    // remembered entryProvider) so the current value is always read at composition
+    // time instead of being captured stale at remember() time.
+    val predictiveBackState = preferences.predictiveBackAnimation
         .collectAsState(initial = PredictiveBackAnimation.MIUIX)
+    val predictiveBackAnimation by predictiveBackState
     val predictiveBackExitDirection by preferences.predictiveBackExitDirection
         .collectAsState(initial = PredictiveBackExitDirection.FOLLOW_GESTURE)
 
@@ -302,37 +310,61 @@ fun NavGraph(
             }
 
             entry<ThemeRoute>(metadata = submenuMetadata) {
-                if (useMiuix) {
-                    ThemeSettingsScreen(onBack = ::pop)
-                } else {
-                    ThemeSettingsScreenM3(onBack = ::pop)
+                PredictiveBackInterceptor(
+                    animation = predictiveBackState,
+                    canPop = backStack.size > 1,
+                    onPop = ::pop,
+                ) {
+                    if (useMiuix) {
+                        ThemeSettingsScreen(onBack = ::pop)
+                    } else {
+                        ThemeSettingsScreenM3(onBack = ::pop)
+                    }
                 }
             }
             entry<PlayerRoute>(metadata = submenuMetadata) {
-                if (useMiuix) {
-                    PlayerSettingsScreen(onBack = ::pop)
-                } else {
-                    PlayerSettingsScreenM3(onBack = ::pop)
+                PredictiveBackInterceptor(
+                    animation = predictiveBackState,
+                    canPop = backStack.size > 1,
+                    onPop = ::pop,
+                ) {
+                    if (useMiuix) {
+                        PlayerSettingsScreen(onBack = ::pop)
+                    } else {
+                        PlayerSettingsScreenM3(onBack = ::pop)
+                    }
                 }
             }
             entry<AboutRoute>(metadata = submenuMetadata) {
-                if (useMiuix) {
-                    AboutSettingsScreen(onBack = ::pop)
-                } else {
-                    AboutSettingsScreenM3(onBack = ::pop)
+                PredictiveBackInterceptor(
+                    animation = predictiveBackState,
+                    canPop = backStack.size > 1,
+                    onPop = ::pop,
+                ) {
+                    if (useMiuix) {
+                        AboutSettingsScreen(onBack = ::pop)
+                    } else {
+                        AboutSettingsScreenM3(onBack = ::pop)
+                    }
                 }
             }
             entry<StatsRoute>(metadata = submenuMetadata) {
-                if (useMiuix) {
-                    StatsScreen(
-                        playerViewModel = playerViewModel,
-                        onBack = ::pop,
-                    )
-                } else {
-                    StatsScreenM3(
-                        playerViewModel = playerViewModel,
-                        onBack = ::pop,
-                    )
+                PredictiveBackInterceptor(
+                    animation = predictiveBackState,
+                    canPop = backStack.size > 1,
+                    onPop = ::pop,
+                ) {
+                    if (useMiuix) {
+                        StatsScreen(
+                            playerViewModel = playerViewModel,
+                            onBack = ::pop,
+                        )
+                    } else {
+                        StatsScreenM3(
+                            playerViewModel = playerViewModel,
+                            onBack = ::pop,
+                        )
+                    }
                 }
             }
         }
@@ -357,6 +389,35 @@ fun NavGraph(
             )
         }
     }
+}
+
+/**
+ * InstallerX Revived parity wrapper for submenu entries.
+ *
+ * When the predictive-back animation is set to NONE the entry has no predictive
+ * pop transition spec, so NavDisplay would otherwise fall back to its generic
+ * predictive slide while the gesture is in flight. Here we intercept the system
+ * gesture with an inert [NavigationEventInfo.None] (no finger-following motion)
+ * and simply pop the submenu when the gesture completes — exactly the "None"
+ * behaviour of InstallerX Revived. For every other animation this wrapper
+ * disables itself ([NavigationBackHandler] not enabled) and lets NavDisplay's
+ * built-in back handler drive the finger-following drag-to-close with the
+ * predictive pop spec chosen in the theme settings.
+ */
+@Composable
+private fun PredictiveBackInterceptor(
+    animation: State<PredictiveBackAnimation>,
+    canPop: Boolean,
+    onPop: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val navigationEventState = rememberNavigationEventState(NavigationEventInfo.None)
+    NavigationBackHandler(
+        state = navigationEventState,
+        isBackEnabled = animation.value == PredictiveBackAnimation.NONE && canPop,
+        onBackCompleted = onPop,
+    )
+    content()
 }
 
 @Composable

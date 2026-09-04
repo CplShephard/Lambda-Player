@@ -30,6 +30,7 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import androidx.compose.ui.text.font.FontWeight
+import dev.shephard.player.ui.i18n.LocalStrings
 
 @Composable
 fun rememberCollapsingTopBarState(): CollapsingTopBarState {
@@ -165,7 +166,7 @@ fun SubmenuTopBar(
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = LocalStrings.current.backContentDescription,
                     tint = cs.onBackground
                 )
             }

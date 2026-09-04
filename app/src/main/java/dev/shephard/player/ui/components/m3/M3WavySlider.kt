@@ -87,7 +87,7 @@ fun M3WavySlider(
     thumbRadius: Dp = 8.dp,
     trackEdgePadding: Dp = thumbRadius,
     wavelength: Dp = WavyProgressIndicatorDefaults.LinearDeterminateWavelength,
-    waveSpeed: Dp = WavyProgressIndicatorDefaults.LinearDeterminateWavelength / 2f,
+    waveSpeed: Dp = WavyProgressIndicatorDefaults.LinearDeterminateWavelength,
 
     waveAmplitudeWhenPlaying: Dp = 4.dp,
     thumbLineHeightWhenInteracting: Dp = 24.dp,

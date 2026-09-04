@@ -1327,7 +1327,7 @@ Column(modifier = Modifier.weight(1f)) {
             BouncyIconButton(
                 onClick = onMenu,
                 icon = Icons.Filled.MoreVert,
-                contentDescription = "Menu",
+                contentDescription = strings.menu,
                 tint = MiuixAppTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -1401,7 +1401,7 @@ Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
             BouncyIconButton(
                 onClick = onMenu,
                 icon = Icons.Filled.MoreVert,
-                contentDescription = "Menu",
+                contentDescription = strings.menu,
                 tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -1453,6 +1453,7 @@ private fun PlaylistDetailTopBar(
     collapse: Float,
     pageBackdrop: top.yukonga.miuix.kmp.blur.LayerBackdrop?
 ) {
+    val strings = LocalStrings.current
     val cs = MiuixAppTheme.colorScheme
     Box(
         modifier = Modifier
@@ -1483,7 +1484,7 @@ Box(
         ) {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
+                contentDescription = strings.backContentDescription,
                 tint = cs.onBackground
             )
         }
@@ -1922,6 +1923,7 @@ private fun DraggablePlaylistTrackRow(
     onRemove: () -> Unit,
     dragHandleModifier: Modifier
 ) {
+    val strings = LocalStrings.current
     val elevation by androidx.compose.animation.core.animateDpAsState(
         targetValue = if (isDragged) 6.dp else 0.dp,
         label = "playlistItemElevation"
@@ -1975,7 +1977,7 @@ val rowShape = RoundedCornerShape(20.dp)
         Spacer(Modifier.width(4.dp))
         Icon(
             imageVector = Icons.Filled.DragHandle,
-            contentDescription = "Reorder",
+            contentDescription = strings.reorder,
             tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
                 .size(28.dp)

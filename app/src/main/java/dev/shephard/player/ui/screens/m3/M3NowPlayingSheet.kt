@@ -66,7 +66,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -549,6 +551,11 @@ fun M3NowPlayingSheet(
  * PixelPlayer-style progress: Material 3 expressive wavy slider + time labels.
  * While the user drags, the thumb stays where it was dropped until playback
  * catches up on its own.
+ *
+ * The position stream from the player updates every 500 ms, which makes the
+ * wavy bar look frozen between ticks. We extrapolate between samples at frame
+ * rate (PixelPlayer's rememberSmoothProgress feeds the same idea) so the wave
+ * and thumb glide continuously.
  */
 @Composable
 private fun M3NowPlayingProgress(
@@ -557,11 +564,11 @@ private fun M3NowPlayingProgress(
 ) {
     val progress by playerViewModel.progress.collectAsState()
     val durationMs = progress.durationMs
-    val baseFraction = if (durationMs > 0L) {
-        (progress.positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
+    val baseFraction = rememberSmoothFraction(
+        positionMs = progress.positionMs,
+        durationMs = durationMs,
+        isPlaying = isPlaying,
+    )
 
     var seekFraction by remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(baseFraction, durationMs) {
@@ -596,7 +603,7 @@ private fun M3NowPlayingProgress(
             isPlaying = isPlaying,
             isVisible = true,
             trackEdgePadding = 8.dp,
-            semanticsLabel = "Playback position",
+            semanticsLabel = LocalStrings.current.playbackPosition,
             modifier = Modifier.padding(horizontal = 20.dp)
         )
         Row(
@@ -619,6 +626,43 @@ private fun M3NowPlayingProgress(
             )
         }
     }
+}
+
+/**
+ * Frame-clock smoothed playback fraction. The player emits a new position every
+ * ~500 ms; while playing we extrapolate from the last sample with the elapsed
+ * time (capped at one extra tick so a stalled stream cannot run ahead) which
+ * produces a genuinely continuous 60 fps progress for the wavy bar.
+ */
+@Composable
+private fun rememberSmoothFraction(
+    positionMs: Long,
+    durationMs: Long,
+    isPlaying: Boolean,
+): Float {
+    var smooth by remember { mutableFloatStateOf(0f) }
+    var lastSamplePosMs by remember { mutableLongStateOf(0L) }
+    var lastSampleAtMs by remember { mutableLongStateOf(0L) }
+    val durMs = durationMs.coerceAtLeast(1L)
+
+    LaunchedEffect(positionMs, durationMs, isPlaying) {
+        val pos = positionMs.coerceAtLeast(0L)
+        val now = android.os.SystemClock.elapsedRealtime()
+        lastSamplePosMs = pos
+        lastSampleAtMs = now
+        smooth = (pos.toFloat() / durMs).coerceIn(0f, 1f)
+        while (true) {
+            withFrameNanos { }
+            val elapsed = (android.os.SystemClock.elapsedRealtime() - lastSampleAtMs).coerceAtLeast(0L)
+            val displayedPos = if (isPlaying) {
+                (lastSamplePosMs + elapsed).coerceAtMost(pos + 500L)
+            } else {
+                lastSamplePosMs
+            }
+            smooth = (displayedPos.toFloat() / durMs).coerceIn(0f, 1f)
+        }
+    }
+    return smooth
 }
 
 private fun m3FormatMillis(ms: Long): String {

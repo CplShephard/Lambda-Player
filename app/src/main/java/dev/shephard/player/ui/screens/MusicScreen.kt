@@ -757,6 +757,7 @@ private fun EditMusicDrawer(
 
 @Composable
 private fun PermissionRequest(onRequest: () -> Unit) {
+    val strings = LocalStrings.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -771,13 +772,13 @@ private fun PermissionRequest(onRequest: () -> Unit) {
             modifier = Modifier.size(56.dp)
         )
         Text(
-            text = "Access your music",
+            text = strings.accessYourMusic,
             style = MiuixAppTheme.typography.titleLarge,
             color = MiuixAppTheme.colorScheme.onBackground,
             modifier = Modifier.padding(top = 16.dp)
         )
         Text(
-            text = "Lambda Player needs permission to read audio files stored on this device.",
+            text = strings.permissionDescription,
             style = MiuixAppTheme.typography.bodyMedium,
             color = MiuixAppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp)
@@ -786,7 +787,7 @@ private fun PermissionRequest(onRequest: () -> Unit) {
             onClick = onRequest,
             modifier = Modifier.padding(top = 24.dp)
         ) {
-            Text("Grant Access")
+            Text(strings.grantAccess)
         }
     }
 }
@@ -824,7 +825,7 @@ private fun EmptyState() {
             modifier = Modifier.padding(top = 16.dp)
         )
         Text(
-            text = "Add audio files to your device storage to see them here.",
+            text = strings.emptyLibraryHint,
             style = MiuixAppTheme.typography.bodyMedium,
             color = MiuixAppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp)

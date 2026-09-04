@@ -59,6 +59,7 @@ import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PlaybackProgress
 import dev.shephard.player.player.PlayerUiState
 import kotlinx.coroutines.flow.StateFlow
+import dev.shephard.player.ui.i18n.LocalStrings
 
 /** PixelPlayer MiniPlayerHeight. */
 private val MiniPlayerM3Height = 64.dp
@@ -198,7 +199,7 @@ private fun MiniPlayerM3Row(
         ) {
             Icon(
                 imageVector = Icons.Rounded.SkipPrevious,
-                contentDescription = "Previous",
+                contentDescription = LocalStrings.current.previous,
                 modifier = Modifier.size(22.dp),
             )
         }
@@ -221,7 +222,7 @@ private fun MiniPlayerM3Row(
             ) { playing ->
                 Icon(
                     imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = if (playing) "Pause" else "Play",
+                    contentDescription = if (playing) LocalStrings.current.pause else LocalStrings.current.play,
                     modifier = Modifier.size(22.dp),
                 )
             }
@@ -237,7 +238,7 @@ private fun MiniPlayerM3Row(
         ) {
             Icon(
                 imageVector = Icons.Rounded.SkipNext,
-                contentDescription = "Next",
+                contentDescription = LocalStrings.current.next,
                 modifier = Modifier.size(22.dp),
             )
         }

@@ -117,6 +117,7 @@ fun MainContainer(
         LocalAppBackdrop provides if (wallpaper.isNotEmpty()) wallpaperBackdrop else null,
         LocalContentBackdrop provides contentBackdrop,
         LocalWallpaperContentColor provides wallpaperContentColor,
+        LocalWallpaperEnabled provides wallpaper.isNotEmpty(),
     ) {
         val backStack = remember { mutableStateListOf<NavKey>(MainRoute) }
         var showNowPlaying by remember { mutableStateOf(false) }

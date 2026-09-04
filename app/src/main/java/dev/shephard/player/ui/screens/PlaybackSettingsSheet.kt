@@ -56,7 +56,7 @@ fun PlaybackSettingsSheet(
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = strings.backContentDescription,
                     tint = MiuixAppTheme.colorScheme.onBackground
                 )
             }

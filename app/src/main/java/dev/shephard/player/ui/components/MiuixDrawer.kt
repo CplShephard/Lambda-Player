@@ -32,6 +32,7 @@ import top.yukonga.miuix.kmp.layout.BottomSheetDefaults
 import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import dev.shephard.player.ui.i18n.LocalStrings
 
 @Composable
 fun MiuixDrawer(
@@ -86,7 +87,7 @@ fun MiuixDrawerActionHeader(
     ) {
         MiuixDrawerCircleAction(
             imageVector = MiuixIcons.Close,
-            contentDescription = "Cancel",
+            contentDescription = LocalStrings.current.cancel,
             containerColor = Color.Transparent,
             contentColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             onClick = onCancel,
@@ -99,7 +100,7 @@ fun MiuixDrawerActionHeader(
         )
         MiuixDrawerCircleAction(
             imageVector = MiuixIcons.Ok,
-            contentDescription = "Apply",
+            contentDescription = LocalStrings.current.apply,
             containerColor = Color.Transparent,
             contentColor = if (confirmEnabled) MiuixTheme.colorScheme.onBackground
             else MiuixTheme.colorScheme.onSurface.copy(alpha = 0.38f),

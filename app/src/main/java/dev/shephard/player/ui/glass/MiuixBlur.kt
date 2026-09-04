@@ -37,6 +37,13 @@ val LocalContentBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 val LocalWallpaperContentColor = staticCompositionLocalOf<Color> { Color.Unspecified }
 
 /**
+ * True when the user has configured a custom wallpaper. Material 3 screens use
+ * it to switch their Scaffold container colour to transparent so the wallpaper
+ * layer behind the NavGraph stays visible (the Miuix engine already does this).
+ */
+val LocalWallpaperEnabled = staticCompositionLocalOf { false }
+
+/**
  * Returns the wallpaper-aware foreground colour for text that sits directly on
  * the wallpaper. Falls back to the theme's [MiuixAppTheme.colorScheme.onBackground]
  * when no wallpaper is set.

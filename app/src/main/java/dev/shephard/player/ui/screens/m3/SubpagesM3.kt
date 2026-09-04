@@ -43,15 +43,13 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.QueryStats
-import androidx.compose.material.icons.filled.Translate
-import androidx.compose.material3.AlertDialog
+
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -69,6 +67,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -93,7 +92,8 @@ import dev.shephard.player.ui.components.m3.BaseWidget
 import dev.shephard.player.ui.components.m3.NavigationItemWidget
 import dev.shephard.player.ui.components.m3.SegmentedColumn
 import dev.shephard.player.ui.components.m3.SwitchWidget
-import dev.shephard.player.ui.i18n.AllLanguages
+import dev.shephard.player.ui.glass.LocalWallpaperEnabled
+import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -113,62 +113,22 @@ fun SettingsScreenM3(
     val prefs = remember { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
     val strings = LocalStrings.current
-    val language by prefs.language.collectAsState(initial = "en")
-    var showLanguageDialog by remember { mutableStateOf(false) }
 
     val totalMs by playerViewModel.totalListeningMsLive.collectAsState()
-
-    if (showLanguageDialog) {
-        AlertDialog(
-            onDismissRequest = { showLanguageDialog = false },
-            title = { Text(strings.language) },
-            text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    AllLanguages.forEach { lang ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    scope.launch { prefs.setLanguage(lang.code) }
-                                    showLanguageDialog = false
-                                }
-                                .padding(vertical = 10.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = lang.code == language,
-                                onClick = {
-                                    scope.launch { prefs.setLanguage(lang.code) }
-                                    showLanguageDialog = false
-                                }
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = lang.displayName,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = if (lang.code == language) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showLanguageDialog = false }) { Text(strings.close) }
-            }
-        )
-    }
 
     val layoutDirection = LocalLayoutDirection.current
     val horizontalSafeInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal).asPaddingValues()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
         topBar = {
             TopAppBar(
                 title = { Text(strings.settings) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
+                    titleContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
+                    navigationIconContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
                 ),
             )
         },
@@ -176,12 +136,12 @@ fun SettingsScreenM3(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = horizontalSafeInsets.calculateStartPadding(layoutDirection) + 12.dp,
-                top = padding.calculateTopPadding() + 8.dp,
-                end = horizontalSafeInsets.calculateEndPadding(layoutDirection) + 12.dp,
-                bottom = padding.calculateBottomPadding() + 100.dp
+                start = horizontalSafeInsets.calculateStartPadding(layoutDirection) + 20.dp,
+                top = padding.calculateTopPadding() + 16.dp,
+                end = horizontalSafeInsets.calculateEndPadding(layoutDirection) + 20.dp,
+                bottom = padding.calculateBottomPadding() + 16.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
                 Card(
@@ -250,18 +210,6 @@ fun SettingsScreenM3(
                 }
             }
 
-            item {
-                SegmentedColumn(title = strings.language) {
-                    item {
-                        BaseWidget(
-                            icon = Icons.Filled.Translate,
-                            title = strings.language,
-                            description = AllLanguages.firstOrNull { it.code == language }?.displayName ?: language,
-                            onClick = { showLanguageDialog = true },
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -279,7 +227,7 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
         topBar = {
             TopAppBar(
                 title = { Text(strings.playbackSettings) },
@@ -289,7 +237,9 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
+                    titleContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
+                    navigationIconContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
                 ),
             )
         },
@@ -297,10 +247,10 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = 12.dp,
-                top = padding.calculateTopPadding() + 8.dp,
-                end = 12.dp,
-                bottom = padding.calculateBottomPadding() + 40.dp
+                start = 20.dp,
+                top = padding.calculateTopPadding() + 16.dp,
+                end = 20.dp,
+                bottom = padding.calculateBottomPadding() + 16.dp
             ),
         ) {
             item {
@@ -366,7 +316,7 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
         topBar = {
             TopAppBar(
                 title = { Text(strings.aboutSectionTitle) },
@@ -376,7 +326,9 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
+                    titleContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
+                    navigationIconContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
                 ),
             )
         },
@@ -384,10 +336,10 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = 12.dp,
-                top = padding.calculateTopPadding() + 8.dp,
-                end = 12.dp,
-                bottom = padding.calculateBottomPadding() + 40.dp
+                start = 20.dp,
+                top = padding.calculateTopPadding() + 16.dp,
+                end = 20.dp,
+                bottom = padding.calculateBottomPadding() + 16.dp
             ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -506,7 +458,7 @@ fun StatsScreenM3(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
         topBar = {
             TopAppBar(
                 title = { Text(strings.statsTitle) },
@@ -516,7 +468,9 @@ fun StatsScreenM3(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
+                    titleContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
+                    navigationIconContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
                 ),
             )
         },

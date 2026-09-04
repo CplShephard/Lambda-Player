@@ -62,6 +62,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -78,6 +79,8 @@ import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.rememberAudioPermissionState
+import dev.shephard.player.ui.glass.LocalWallpaperEnabled
+import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -137,12 +140,14 @@ fun MusicScreenM3(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
         topBar = {
             TopAppBar(
                 title = { Text(strings.music) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
+                    titleContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
+                    navigationIconContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
                 ),
             )
         },
@@ -496,6 +501,7 @@ private fun M3TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -
 
 @Composable
 private fun M3PermissionRequest(onRequest: () -> Unit) {
+    val strings = LocalStrings.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -510,13 +516,13 @@ private fun M3PermissionRequest(onRequest: () -> Unit) {
             modifier = Modifier.size(56.dp)
         )
         Text(
-            text = "Access your music",
+            text = strings.accessYourMusic,
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(top = 16.dp)
         )
         Text(
-            text = "Lambda Player needs permission to read audio files stored on this device.",
+            text = strings.permissionDescription,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp)
@@ -525,7 +531,7 @@ private fun M3PermissionRequest(onRequest: () -> Unit) {
             onClick = onRequest,
             modifier = Modifier.padding(top = 24.dp)
         ) {
-            Text("Grant Access")
+            Text(strings.grantAccess)
         }
     }
 }
@@ -552,7 +558,7 @@ private fun M3EmptyState(strings: dev.shephard.player.ui.i18n.Strings) {
             modifier = Modifier.padding(top = 16.dp)
         )
         Text(
-            text = "Add audio files to your device storage to see them here.",
+            text = strings.emptyLibraryHint,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp)

@@ -290,7 +290,7 @@ private fun HomeEmptyState() {
                 modifier = Modifier.padding(top = 16.dp)
             )
             Text(
-                text = "Add audio files to your device storage to see them here.",
+                text = strings.emptyLibraryHint,
                 style = MiuixAppTheme.typography.bodyMedium,
                 color = MiuixAppTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)

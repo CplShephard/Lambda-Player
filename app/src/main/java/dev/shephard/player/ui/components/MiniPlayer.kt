@@ -50,6 +50,7 @@ import dev.shephard.player.ui.glass.miuixBlurSurface
 import kotlinx.coroutines.flow.StateFlow
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator as MiuixLinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults as MiuixProgressIndicatorDefaults
+import dev.shephard.player.ui.i18n.LocalStrings
 
 @Composable
 fun MiniPlayer(
@@ -171,7 +172,7 @@ fun MiniPlayer(
                 ) {
                     Icon(
                         painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_rewind),
-                        contentDescription = "Previous",
+                        contentDescription = LocalStrings.current.previous,
                         tint = MiuixAppTheme.colorScheme.onBackground,
                         modifier = Modifier.size(24.dp)
                     )
@@ -197,7 +198,7 @@ fun MiniPlayer(
                                 id = if (isPlaying) dev.shephard.player.R.drawable.ic_nowplaying_pause
                                 else dev.shephard.player.R.drawable.ic_nowplaying_play
                             ),
-                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            contentDescription = if (isPlaying) LocalStrings.current.pause else LocalStrings.current.play,
                             tint = MiuixAppTheme.colorScheme.onBackground,
                             modifier = Modifier.size(24.dp)
                         )
@@ -213,7 +214,7 @@ fun MiniPlayer(
                 ) {
                     Icon(
                         painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_fforward),
-                        contentDescription = "Next",
+                        contentDescription = LocalStrings.current.next,
                         tint = MiuixAppTheme.colorScheme.onBackground,
                         modifier = Modifier.size(24.dp)
                     )

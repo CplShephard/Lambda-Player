@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.ViewCarousel
@@ -107,6 +108,9 @@ import dev.shephard.player.ui.components.m3.DropDownMenuWidget
 import dev.shephard.player.ui.components.m3.RadioButtonWidget
 import dev.shephard.player.ui.components.m3.SegmentedColumn
 import dev.shephard.player.ui.components.m3.SwitchWidget
+import dev.shephard.player.ui.i18n.AllLanguages
+import dev.shephard.player.ui.glass.LocalWallpaperEnabled
+import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.theme.material.PresetColors
 import kotlinx.coroutines.launch
@@ -123,7 +127,10 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
     val useMiuix by prefs.useMiuix.collectAsState(initial = true)
     val paletteStyle by prefs.paletteStyle.collectAsState(initial = PaletteStyle.TonalSpot)
     val colorSpec by prefs.colorSpec.collectAsState(initial = ThemeColorSpec.SPEC_2025)
-    val useMiuixMonet by prefs.useMiuixMonet.collectAsState(initial = false)
+    // Material 3 always uses the Monet (wallpaper-dynamic) palette — there is
+    // no "Miuix custom colors" switch in the M3 settings (as in the original
+    // M3 theme settings file).
+    val useMiuixMonet = true
     val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
     val seedColor by prefs.seedColor.collectAsState(initial = PresetColors.first().color.toArgb())
     val blurEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
@@ -136,6 +143,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
     val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = PreferencesManager.cachedWallpaperBrightness)
     val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
     val playlistsLayout by prefs.playlistsLayout.collectAsState(initial = LayoutMode.LIST)
+    val language by prefs.language.collectAsState(initial = "en")
 
     var showRemoveWallpaperConfirm by remember { mutableStateOf(false) }
     var wallpaperBrightnessValue by remember { mutableFloatStateOf(PreferencesManager.cachedWallpaperBrightness) }
@@ -143,13 +151,8 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
         wallpaperBrightnessValue = wallpaperBrightness
     }
 
-    // Keep the expanded state in sync with the setting so the custom-colors
-    // block does not replay its animation on every page re-entry.
-    val monetMenuState = remember { MutableTransitionState(useMiuixMonet) }
-    LaunchedEffect(useMiuixMonet) { monetMenuState.targetState = useMiuixMonet }
-
     // Monochrome has no coloured seed to pick — hide the grid (same as the
-    // Miuix engine fix).
+    // Miuix engine fix). Monet is always on for Material 3.
     val accentGridTarget = useMiuixMonet &&
         paletteStyle != PaletteStyle.Monochrome &&
         (!dynamicColor || Build.VERSION.SDK_INT < Build.VERSION_CODES.S)
@@ -159,6 +162,9 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
     val themeModeList: List<String> = listOf(strings.lightMode, strings.darkMode, strings.autoMode)
     val themeModeOptions = listOf(ThemeMode.LIGHT, ThemeMode.DARK, ThemeMode.SYSTEM)
     val themeModeIndex = themeModeOptions.indexOf(themeMode).coerceAtLeast(0)
+
+    val languageList = AllLanguages.map { it.displayName }
+    val languageIndex = AllLanguages.indexOfFirst { it.code == language }.coerceAtLeast(0)
 
     val paletteStyleOptions = PaletteStyle.entries
     val paletteIndex = paletteStyleOptions.indexOf(paletteStyle).coerceAtLeast(0)
@@ -337,7 +343,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
         topBar = {
             TopAppBar(
                 title = { Text(strings.themeSettings) },
@@ -347,8 +353,9 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
+                    titleContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
+                    navigationIconContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
                 ),
             )
         },
@@ -356,10 +363,10 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = horizontalSafeInsets.calculateStartPadding(layoutDirection) + 12.dp,
-                top = paddingValues.calculateTopPadding() + 8.dp,
-                end = horizontalSafeInsets.calculateEndPadding(layoutDirection) + 12.dp,
-                bottom = paddingValues.calculateBottomPadding() + 40.dp
+                start = horizontalSafeInsets.calculateStartPadding(layoutDirection) + 20.dp,
+                top = paddingValues.calculateTopPadding() + 16.dp,
+                end = horizontalSafeInsets.calculateEndPadding(layoutDirection) + 20.dp,
+                bottom = paddingValues.calculateBottomPadding() + 16.dp
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -396,9 +403,9 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                 }
             }
 
-            // ── Group 2: Miuix UI / Custom Colors ────────────────────────────
+            // ── Group 2: Material 3 UI (Monet colors / theme mode) ─────────────
             item {
-                SegmentedColumn(title = strings.themeMiuixUiSection) {
+                SegmentedColumn(title = strings.themeM3UiSection) {
                     item {
                         DropDownMenuWidget(
                             icon = Icons.Default.DarkMode,
@@ -422,58 +429,46 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                             )
                         }
                     }
+                    // Monet (wallpaper-dynamic colours) is always on for the
+                    // Material 3 engine — the custom-colours toggle is a Miuix
+                    // setting and is not shown here.
                     item {
-                        SwitchWidget(
-                            icon = Icons.TwoTone.ColorLens,
-                            title = strings.miuixCustomColors,
-                            description = strings.miuixCustomColorsDescription,
-                            checked = useMiuixMonet,
-                            onCheckedChange = { scope.launch { prefs.setUseMiuixMonet(it) } }
-                        )
-                    }
-                    item {
-                        AnimatedVisibility(
-                            visibleState = monetMenuState,
-                            enter = fadeIn() + expandVertically(),
-                            exit = fadeOut() + shrinkVertically(),
-                        ) {
-                            Column {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                    SwitchWidget(
-                                        icon = Icons.TwoTone.InvertColors,
-                                        title = strings.dynamicColor,
-                                        description = strings.dynamicColorDescription,
-                                        checked = dynamicColor,
-                                        onCheckedChange = { scope.launch { prefs.setDynamicColor(it) } }
-                                    )
-                                }
-                                DropDownMenuWidget(
-                                    icon = Icons.Default.Palette,
-                                    title = strings.paletteStyle,
-                                    description = paletteStyle.displayName,
-                                    choice = paletteIndex,
-                                    data = paletteStyleOptions.map { it.displayName },
-                                    onChoiceChange = { index ->
-                                        val newStyle = paletteStyleOptions[index]
-                                        if (newStyle != paletteStyle) {
-                                            scope.launch { prefs.setPaletteStyle(newStyle) }
-                                        }
-                                    }
-                                )
-                                DropDownMenuWidget(
-                                    icon = Icons.Default.Tune,
-                                    title = strings.colorSpec,
-                                    description = if (!isSpec2025Supported) strings.colorSpecOnly2021 else colorSpec.displayName,
-                                    choice = specIndex,
-                                    data = availableSpecs.map { it.displayName },
-                                    onChoiceChange = { index ->
-                                        val selectedSpec = availableSpecs[index]
-                                        if (selectedSpec != colorSpec) {
-                                            scope.launch { prefs.setColorSpec(selectedSpec) }
-                                        }
-                                    }
+                        Column {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                SwitchWidget(
+                                    icon = Icons.TwoTone.InvertColors,
+                                    title = strings.dynamicColor,
+                                    description = strings.dynamicColorDescription,
+                                    checked = dynamicColor,
+                                    onCheckedChange = { scope.launch { prefs.setDynamicColor(it) } }
                                 )
                             }
+                            DropDownMenuWidget(
+                                icon = Icons.Default.Palette,
+                                title = strings.paletteStyle,
+                                description = paletteStyle.displayName,
+                                choice = paletteIndex,
+                                data = paletteStyleOptions.map { it.displayName },
+                                onChoiceChange = { index ->
+                                    val newStyle = paletteStyleOptions[index]
+                                    if (newStyle != paletteStyle) {
+                                        scope.launch { prefs.setPaletteStyle(newStyle) }
+                                    }
+                                }
+                            )
+                            DropDownMenuWidget(
+                                icon = Icons.Default.Tune,
+                                title = strings.colorSpec,
+                                description = if (!isSpec2025Supported) strings.colorSpecOnly2021 else colorSpec.displayName,
+                                choice = specIndex,
+                                data = availableSpecs.map { it.displayName },
+                                onChoiceChange = { index ->
+                                    val selectedSpec = availableSpecs[index]
+                                    if (selectedSpec != colorSpec) {
+                                        scope.launch { prefs.setColorSpec(selectedSpec) }
+                                    }
+                                }
+                            )
                         }
                     }
                 }
@@ -752,6 +747,27 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                                 onClick = { showPredictiveBackExitDirectionDialog = true },
                             )
                         }
+                    }
+                }
+            }
+
+            // ── Group 7: Language (switcher popup like the other options) ────
+            item {
+                SegmentedColumn(title = strings.language) {
+                    item {
+                        DropDownMenuWidget(
+                            icon = Icons.Filled.Translate,
+                            title = strings.language,
+                            description = AllLanguages.firstOrNull { it.code == language }?.displayName ?: language,
+                            choice = languageIndex,
+                            data = languageList,
+                            onChoiceChange = { index ->
+                                val lang = AllLanguages[index]
+                                if (lang.code != language) {
+                                    scope.launch { prefs.setLanguage(lang.code) }
+                                }
+                            },
+                        )
                     }
                 }
             }

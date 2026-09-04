@@ -122,7 +122,7 @@ import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.glass.blurSurfaceCompact
-import top.yukonga.miuix.kmp.basic.Slider as MiuixSlider
+import dev.shephard.player.ui.components.MinimalSeekBar
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -781,21 +781,15 @@ Box(
 @Composable
 private fun SeekBarRow(playerViewModel: PlayerViewModel) {
     val progress by playerViewModel.progress.collectAsState()
-    val fraction = if (progress.durationMs > 0)
-        progress.positionMs.toFloat() / progress.durationMs.toFloat() else 0f
-    var seekFraction by remember { mutableStateOf<Float?>(null) }
     Column(modifier = Modifier.fillMaxWidth()) {
-        MiuixSlider(
-            value = seekFraction ?: fraction,
-            onValueChange = { newFraction ->
-                seekFraction = newFraction
-                playerViewModel.onSeekPreview((newFraction * progress.durationMs).toLong())
+        MinimalSeekBar(
+            progress = if (progress.durationMs > 0)
+                progress.positionMs.toFloat() / progress.durationMs.toFloat() else 0f,
+            onSeekPreview = { fraction ->
+                playerViewModel.onSeekPreview((fraction * progress.durationMs).toLong())
             },
-            onValueChangeFinished = {
-                seekFraction?.let {
-                    playerViewModel.onSeekCommit((it * progress.durationMs).toLong())
-                }
-                seekFraction = null
+            onSeekFinished = { fraction ->
+                playerViewModel.onSeekCommit((fraction * progress.durationMs).toLong())
             },
             modifier = Modifier.padding(horizontal = 20.dp)
         )
@@ -1045,6 +1039,7 @@ private fun QueueTrackItem(
     onRemove: () -> Unit,
     dragHandleModifier: Modifier,
 ) {
+    val strings = LocalStrings.current
     val density = LocalDensity.current
     val swipeThresholdPx = with(density) { 120.dp.toPx() }
     var offsetX by remember { mutableFloatStateOf(0f) }
@@ -1178,7 +1173,7 @@ Row(
             if (!isPlaying) {
                 Icon(
                     imageVector = Icons.Filled.DragHandle,
-                    contentDescription = "Reorder",
+                    contentDescription = strings.reorder,
                     tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .size(28.dp)
