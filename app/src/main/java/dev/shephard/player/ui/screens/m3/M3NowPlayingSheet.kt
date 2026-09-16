@@ -329,7 +329,7 @@ fun M3NowPlayingSheet(
                         Icon(Icons.Filled.Lyrics, strings.lyrics)
                     }
                     IconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Filled.Info, strings.audioInformation)
+                        Icon(Icons.Filled.Info, strings.songInfo)
                     }
                     IconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Filled.GraphicEq, "EQ")

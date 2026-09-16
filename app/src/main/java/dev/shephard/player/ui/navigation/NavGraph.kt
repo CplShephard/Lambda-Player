@@ -330,19 +330,16 @@ fun NavGraph(
             NavigationBackHandler(
                 state = gestureState,
                 isBackEnabled = backStack.size > 1,
-                onBackCompleted = { callBack ->
+                onBackCompleted = {
                     navigationScope.launch {
                         handler.onBackPressed(
                             transitionState = gestureState?.transitionState,
                             currentPageKey = backStack.lastOrNull()
                         )
-                        callBack()
                         pop()
                     }
                 },
-                onBackCancelled = { callBack ->
-                    callBack()
-                }
+                onBackCancelled = {}
             )
 
             NavDisplay(
