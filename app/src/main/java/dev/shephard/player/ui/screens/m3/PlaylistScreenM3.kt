@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 InstallerX Revived contributors
-@file:OptIn(ExperimentalMaterial3Api::class)
-
+// LineageOS Twelve 1:1 - Playlists Screen
 package dev.shephard.player.ui.screens.m3
 
 import android.content.Intent
@@ -10,33 +8,22 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -48,10 +35,9 @@ import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -71,20 +57,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PreferencesManager
+import dev.shephard.player.ui.components.m3.LineageGridMediaItem
+import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
+import dev.shephard.player.ui.components.m3.LineageNoElements
+import dev.shephard.player.ui.components.m3.LineageSortingChip
 import dev.shephard.player.ui.glass.LocalWallpaperEnabled
 import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -95,16 +80,12 @@ import dev.shephard.player.ui.screens.encodePlaylists
 import dev.shephard.player.ui.screens.ensureLikedSongsPlaylist
 import dev.shephard.player.ui.screens.parsePlaylists
 import dev.shephard.player.ui.screens.resolvePlaylistTracks
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-/**
- * Material 3 Playlists page. Content mirrors the Miuix PlaylistScreen with M3
- * components only, including the grid/list switcher from preferences.
- */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlaylistScreenM3(
-    libraryViewModel: LibraryViewModel = viewModel(),
+    libraryViewModel: LibraryViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     hasMiniPlayer: Boolean = false,
     onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
     onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> }
@@ -154,7 +135,6 @@ fun PlaylistScreenM3(
         if (openIndex == rawPlaylists.indexOf(pl)) openIndex = null
     }
 
-    // ── New playlist cover crop (same flow as Miuix page) ────────────────────
     val newCoverCropLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -197,11 +177,7 @@ fun PlaylistScreenM3(
         for (info in resolvedActivities) {
             val packageName = info.activityInfo?.packageName ?: continue
             try {
-                context.grantUriPermission(
-                    packageName,
-                    outputUri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                )
+                context.grantUriPermission(packageName, outputUri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             } catch (_: SecurityException) { }
         }
         if (resolvedActivities.isNotEmpty()) {
@@ -225,7 +201,6 @@ fun PlaylistScreenM3(
         }
     }
 
-    // ── Create dialogue ──────────────────────────────────────────────────────
     if (showCreate) {
         AlertDialog(
             onDismissRequest = { showCreate = false },
@@ -233,37 +208,16 @@ fun PlaylistScreenM3(
             text = {
                 Column {
                     Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .size(96.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                            .clickable { newCoverPicker.launch(arrayOf("image/*")) },
+                        modifier = Modifier.size(96.dp).align(Alignment.CenterHorizontally),
                         contentAlignment = Alignment.Center
                     ) {
                         if (newCoverUri != null) {
-                            AsyncImage(
-                                model = newCoverUri,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
-                            )
+                            AsyncImage(model = newCoverUri, contentDescription = null, modifier = Modifier.fillMaxSize())
                         } else {
-                            Icon(
-                                imageVector = Icons.Filled.QueueMusic,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(36.dp),
-                            )
+                            Icon(Icons.Filled.QueueMusic, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
                         }
                     }
-                    OutlinedTextField(
-                        value = newName,
-                        onValueChange = { newName = it },
-                        singleLine = true,
-                        label = { Text(strings.playlistName) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    OutlinedTextField(value = newName, onValueChange = { newName = it }, singleLine = true, label = { Text(strings.playlistName) }, modifier = Modifier.fillMaxWidth())
                 }
             },
             confirmButton = {
@@ -271,11 +225,7 @@ fun PlaylistScreenM3(
                     onClick = {
                         val name = newName.trim()
                         if (name.isNotEmpty()) {
-                            val newPl = LocalPlaylist(
-                                name = name,
-                                trackIds = emptyList(),
-                                coverUri = newCoverUri?.toString(),
-                            )
+                            val newPl = LocalPlaylist(name = name, trackIds = emptyList(), coverUri = newCoverUri?.toString())
                             writePlaylists(rawPlaylists + newPl)
                             showCreate = false
                             newName = ""
@@ -290,7 +240,6 @@ fun PlaylistScreenM3(
         )
     }
 
-    // ── Edit name dialogue ───────────────────────────────────────────────────
     if (editPlaylistIndex != null) {
         val editingPl = playlists.getOrNull(editPlaylistIndex ?: -1)
         if (editingPl != null) {
@@ -298,21 +247,16 @@ fun PlaylistScreenM3(
                 onDismissRequest = { editPlaylistIndex = null },
                 title = { Text(strings.editPlaylist) },
                 text = {
-                    OutlinedTextField(
-                        value = editPlaylistName,
-                        onValueChange = { editPlaylistName = it },
-                        singleLine = true,
-                        label = { Text(strings.playlistName) },
-                    )
+                    OutlinedTextField(value = editPlaylistName, onValueChange = { editPlaylistName = it }, singleLine = true, label = { Text(strings.playlistName) })
                 },
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            val newName = editPlaylistName.trim()
-                            if (newName.isNotEmpty()) {
+                            val newNameTrim = editPlaylistName.trim()
+                            if (newNameTrim.isNotEmpty()) {
                                 val all = rawPlaylists.toMutableList()
                                 val idx = all.indexOfFirst { it.name == editingPl.name && it.createdAt == editingPl.createdAt }
-                                if (idx >= 0) all[idx] = all[idx].copy(name = newName)
+                                if (idx >= 0) all[idx] = all[idx].copy(name = newNameTrim)
                                 writePlaylists(all)
                             }
                             editPlaylistIndex = null
@@ -328,15 +272,12 @@ fun PlaylistScreenM3(
         }
     }
 
-    // ── Delete confirmation ──────────────────────────────────────────────────
     if (showDeletePlaylistConfirm) {
         val pl = playlistToDelete
         AlertDialog(
             onDismissRequest = { showDeletePlaylistConfirm = false; playlistToDelete = null },
             title = { Text(strings.delete) },
-            text = {
-                Text(strings.removePlaylistConfirm, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            },
+            text = { Text(strings.removePlaylistConfirm, color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -347,9 +288,7 @@ fun PlaylistScreenM3(
                 ) { Text(strings.delete) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeletePlaylistConfirm = false; playlistToDelete = null }) {
-                    Text(strings.cancel)
-                }
+                TextButton(onClick = { showDeletePlaylistConfirm = false; playlistToDelete = null }) { Text(strings.cancel) }
             },
         )
     }
@@ -382,31 +321,117 @@ fun PlaylistScreenM3(
     ) { idx ->
         Box(modifier = Modifier.fillMaxSize()) {
             if (idx == null) {
-                M3PlaylistListView(
-                    playlists = playlists,
-                    tracks = tracks,
-                    strings = strings,
-                    likedIds = likedIds,
-                    layout = playlistsLayout,
-                    hasMiniPlayer = hasMiniPlayer,
-                    onOpen = { openIdx -> playlistDetailGuard.push(openIndex, openIdx) { openIndex = openIdx } },
-                    onPlay = { pl ->
-                        val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
-                        if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name)
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+                    topBar = {
+                        TopAppBar(
+                            title = { Text(strings.playlists) },
+                            actions = {
+                                IconButton(onClick = { showCreate = true }) {
+                                    Icon(Icons.Filled.Add, contentDescription = strings.createPlaylist)
+                                }
+                            },
+                            colors = TopAppBarDefaults.topAppBarColors(
+                                containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+                                titleContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
+                            ),
+                        )
                     },
-                    onRemix = { pl ->
-                        val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
-                        if (plTracks.isNotEmpty()) {
-                            if (pl.isSystem) {
-                                onPlaylistRemixClick(plTracks.shuffled(), strings.likedSongs)
+                    floatingActionButton = {
+                        ExtendedFloatingActionButton(
+                            onClick = { showCreate = true },
+                            icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                            text = { Text(strings.createPlaylist) },
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                            expanded = true,
+                            modifier = Modifier.padding(bottom = if (hasMiniPlayer) 80.dp else 0.dp)
+                        )
+                    }
+                ) { innerPadding ->
+                    if (playlists.isEmpty()) {
+                        Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
+                            LineageNoElements(
+                                icon = Icons.Filled.LibraryMusic,
+                                message = strings.noPlaylistsYet,
+                                actionLabel = strings.createPlaylist,
+                                onAction = { showCreate = true }
+                            )
+                        }
+                    } else {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            // Sorting chip row like Twelve
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .padding(top = innerPadding.calculateTopPadding()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                LineageSortingChip(
+                                    label = strings.list,
+                                    selected = playlistsLayout == LayoutMode.LIST,
+                                    onClick = { scope.launch { prefs.setPlaylistsLayout(LayoutMode.LIST) } }
+                                )
+                                LineageSortingChip(
+                                    label = strings.grid,
+                                    selected = playlistsLayout == LayoutMode.GRID,
+                                    onClick = { scope.launch { prefs.setPlaylistsLayout(LayoutMode.GRID) } }
+                                )
+                            }
+
+                            val sortedPlaylists = remember(playlists) {
+                                val (pinned, unpinned) = playlists.partition { it.pinned }
+                                pinned + unpinned
+                            }
+
+                            if (playlistsLayout == LayoutMode.GRID) {
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(2),
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(
+                                        start = 8.dp,
+                                        end = 8.dp,
+                                        bottom = if (hasMiniPlayer) 160.dp else 80.dp
+                                    )
+                                ) {
+                                    gridItems(sortedPlaylists, key = { it.name + "_" + it.createdAt }) { pl ->
+                                        val realIdx = playlists.indexOf(pl)
+                                        val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+                                        LineageGridMediaItem(
+                                            headline = pl.name,
+                                            subhead = "${plTracks.size} tracks",
+                                            thumbnailModel = pl.coverUri,
+                                            placeholderIcon = Icons.Filled.QueueMusic,
+                                            onClick = { playlistDetailGuard.push(openIndex, realIdx) { openIndex = realIdx } }
+                                        )
+                                    }
+                                }
                             } else {
-                                onPlaylistRemixClick(plTracks.shuffled(), pl.name)
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(bottom = if (hasMiniPlayer) 160.dp else 80.dp)
+                                ) {
+                                    items(sortedPlaylists.size, key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }) { i ->
+                                        val pl = sortedPlaylists[i]
+                                        val realIdx = playlists.indexOf(pl)
+                                        val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+                                        LineageListItemWithThumbnail(
+                                            headline = pl.name,
+                                            supporting = "${plTracks.size} ${strings.trackCount}",
+                                            thumbnailModel = pl.coverUri,
+                                            placeholderIcon = Icons.Filled.QueueMusic,
+                                            trailingIcon = Icons.Filled.MoreVert,
+                                            onClick = { playlistDetailGuard.push(openIndex, realIdx) { openIndex = realIdx } },
+                                            onTrailingClick = { playlistMenuIndex = realIdx }
+                                        )
+                                    }
+                                }
                             }
                         }
-                    },
-                    onMenu = { realIdx -> playlistMenuIndex = realIdx },
-                    onCreate = { showCreate = true },
-                )
+                    }
+                }
             } else {
                 val selectedPl = playlists.getOrNull(idx)
                 if (selectedPl != null) {
@@ -444,7 +469,6 @@ fun PlaylistScreenM3(
         }
     }
 
-    // ── Playlist menu (rename / pin / delete / cover) ───────────────────────
     playlistMenuIndex?.let { menuIdx ->
         val pl = playlists.getOrNull(menuIdx)
         if (pl != null) {
@@ -453,12 +477,12 @@ fun PlaylistScreenM3(
                 title = { Text(pl.name) },
                 text = {
                     Column {
-                        MenuRow(Icons.Filled.PlayArrow, strings.play) {
+                        MenuRowLineage(Icons.Filled.PlayArrow, strings.play) {
                             playlistMenuIndex = null
                             val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
                             if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name)
                         }
-                        MenuRow(Icons.Filled.Shuffle, strings.remix) {
+                        MenuRowLineage(Icons.Filled.Shuffle, strings.remix) {
                             playlistMenuIndex = null
                             val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
                             if (plTracks.isNotEmpty()) {
@@ -467,19 +491,19 @@ fun PlaylistScreenM3(
                             }
                         }
                         if (!pl.isSystem) {
-                            MenuRow(Icons.Filled.Edit, strings.editPlaylist) {
+                            MenuRowLineage(Icons.Filled.Edit, strings.editPlaylist) {
                                 playlistMenuIndex = null
                                 editPlaylistName = pl.name
                                 editPlaylistIndex = menuIdx
                             }
-                            MenuRow(if (pl.pinned) Icons.Filled.Pin else Icons.Filled.PushPin, if (pl.pinned) strings.unpinPlaylist else strings.pinPlaylist) {
+                            MenuRowLineage(if (pl.pinned) Icons.Filled.Pin else Icons.Filled.PushPin, if (pl.pinned) strings.unpinPlaylist else strings.pinPlaylist) {
                                 playlistMenuIndex = null
                                 val all = rawPlaylists.toMutableList()
                                 val rawIdx = all.indexOfFirst { it.name == pl.name && it.createdAt == pl.createdAt }
                                 if (rawIdx >= 0) all[rawIdx] = all[rawIdx].copy(pinned = !pl.pinned)
                                 writePlaylists(all)
                             }
-                            MenuRow(Icons.Filled.Delete, strings.delete) {
+                            MenuRowLineage(Icons.Filled.Delete, strings.delete) {
                                 playlistMenuIndex = null
                                 playlistToDelete = pl
                                 showDeletePlaylistConfirm = true
@@ -497,342 +521,18 @@ fun PlaylistScreenM3(
 }
 
 @Composable
-private fun MenuRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+private fun MenuRowLineage(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.width(12.dp))
-        Text(label)
-    }
-}
-
-@Composable
-private fun M3PlaylistListView(
-    playlists: List<LocalPlaylist>,
-    tracks: List<AudioTrack>,
-    strings: dev.shephard.player.ui.i18n.Strings,
-    likedIds: List<Long>,
-    layout: Int,
-    hasMiniPlayer: Boolean,
-    onOpen: (Int) -> Unit,
-    onPlay: (LocalPlaylist) -> Unit,
-    onRemix: (LocalPlaylist) -> Unit,
-    onMenu: (Int) -> Unit,
-    onCreate: () -> Unit,
-) {
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
-        topBar = {
-            TopAppBar(
-                title = { Text(strings.playlists) },
-                actions = {
-                    IconButton(onClick = onCreate) {
-                        Icon(Icons.Filled.Add, contentDescription = strings.createPlaylist)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
-                    titleContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
-                    navigationIconContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
-                ),
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = onCreate) {
-                Icon(Icons.Filled.Add, contentDescription = strings.createPlaylist)
-            }
-        },
-    ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (playlists.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.LibraryMusic,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(56.dp)
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = strings.noPlaylistsYet,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                val sortedPlaylists = remember(playlists) {
-                    val (pinned, unpinned) = playlists.partition { it.pinned }
-                    pinned + unpinned
-                }
-                val hasPinned = playlists.any { it.pinned }
-                if (layout == LayoutMode.GRID) {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(
-                            start = 12.dp,
-                            top = innerPadding.calculateTopPadding() + 8.dp,
-                            end = 12.dp,
-                            bottom = if (hasMiniPlayer) 200.dp else 96.dp
-                        ),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        item(key = "pinned_header", span = { GridItemSpan(2) }) {
-                            AnimatedVisibility(
-                                visible = hasPinned,
-                                enter = fadeIn() + expandVertically(),
-                                exit = fadeOut() + shrinkVertically()
-                            ) {
-                                Text(
-                                    text = strings.pinnedPlaylists,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                            }
-                        }
-                        items(
-                            count = sortedPlaylists.size,
-                            key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }
-                        ) { i ->
-                            val pl = sortedPlaylists[i]
-                            val realIdx = playlists.indexOf(pl)
-                            val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                            M3PlaylistGridCard(
-                                playlist = pl,
-                                plTracks = plTracks,
-                                strings = strings,
-                                onClick = { onOpen(realIdx) },
-                                onMenu = { onMenu(realIdx) },
-                                onPlay = { onPlay(pl) },
-                                onRemix = { onRemix(pl) },
-                            )
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(
-                            start = 12.dp,
-                            top = innerPadding.calculateTopPadding() + 8.dp,
-                            end = 12.dp,
-                            bottom = if (hasMiniPlayer) 200.dp else 96.dp
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        item(key = "pinned_header") {
-                            AnimatedVisibility(
-                                visible = hasPinned,
-                                enter = fadeIn() + expandVertically(),
-                                exit = fadeOut() + shrinkVertically()
-                            ) {
-                                Text(
-                                    text = strings.pinnedPlaylists,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                            }
-                        }
-                        items(
-                            count = sortedPlaylists.size,
-                            key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }
-                        ) { i ->
-                            val pl = sortedPlaylists[i]
-                            val realIdx = playlists.indexOf(pl)
-                            val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                            M3PlaylistListCard(
-                                playlist = pl,
-                                plTracks = plTracks,
-                                strings = strings,
-                                onClick = { onOpen(realIdx) },
-                                onMenu = { onMenu(realIdx) },
-                                onPlay = { onPlay(pl) },
-                                onRemix = { onRemix(pl) },
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun M3PlaylistListCard(
-    playlist: LocalPlaylist,
-    plTracks: List<AudioTrack>,
-    strings: dev.shephard.player.ui.i18n.Strings,
-    onClick: () -> Unit,
-    onMenu: () -> Unit,
-    onPlay: () -> Unit,
-    onRemix: () -> Unit,
-) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                contentAlignment = Alignment.Center
-            ) {
-                if (playlist.coverUri != null) {
-                    AsyncImage(
-                        model = playlist.coverUri,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Filled.QueueMusic,
-                        contentDescription = null,
-                        modifier = Modifier.size(28.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = playlist.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = "${plTracks.size} ${strings.trackCount}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            IconButton(onClick = onPlay) {
-                Icon(
-                    imageVector = Icons.Filled.PlayArrow,
-                    contentDescription = strings.play,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-            IconButton(onClick = onRemix) {
-                Icon(
-                    imageVector = Icons.Filled.Shuffle,
-                    contentDescription = strings.remix,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-            IconButton(onClick = onMenu) {
-                Icon(Icons.Filled.MoreVert, contentDescription = null)
-            }
-        }
-    }
-}
-
-@Composable
-private fun M3PlaylistGridCard(
-    playlist: LocalPlaylist,
-    plTracks: List<AudioTrack>,
-    strings: dev.shephard.player.ui.i18n.Strings,
-    onClick: () -> Unit,
-    onMenu: () -> Unit,
-    onPlay: () -> Unit,
-    onRemix: () -> Unit,
-) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                contentAlignment = Alignment.Center
-            ) {
-                if (playlist.coverUri != null) {
-                    AsyncImage(
-                        model = playlist.coverUri,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Filled.QueueMusic,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = playlist.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = "${plTracks.size} ${strings.trackCount}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onPlay, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            imageVector = Icons.Filled.PlayArrow,
-                            contentDescription = strings.play,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                    IconButton(onClick = onRemix, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            imageVector = Icons.Filled.Shuffle,
-                            contentDescription = strings.remix,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                    IconButton(onClick = onMenu, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            imageVector = Icons.Filled.MoreVert,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-            }
+        Text(label, modifier = Modifier.weight(1f))
+        IconButton(onClick = onClick) {
+            Icon(Icons.Filled.PlayArrow, null)
         }
     }
 }

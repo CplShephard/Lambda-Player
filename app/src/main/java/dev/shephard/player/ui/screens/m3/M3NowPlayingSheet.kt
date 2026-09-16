@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 InstallerX Revived contributors
+// LineageOS Twelve 1:1 - Now Playing Screen
 package dev.shephard.player.ui.screens.m3
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -34,15 +33,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
@@ -51,10 +51,8 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -68,18 +66,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -90,10 +84,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.RepeatMode
-import dev.shephard.player.ui.components.m3.M3WavySlider
+import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.launch
 
@@ -112,19 +105,13 @@ fun M3NowPlayingSheet(
 
     val density = LocalDensity.current
     val dismissThresholdPx = with(density) { 140.dp.toPx() }
-
     val configuration = LocalConfiguration.current
     val dragOffsetInitialHeight = with(density) { configuration.screenHeightDp.dp.toPx() }
     val dragOffset = remember { Animatable(dragOffsetInitialHeight) }
     val dragScope = rememberCoroutineScope()
 
     var hasEnteredRest by remember { mutableStateOf(false) }
-    val enterSpring = remember {
-        spring<Float>(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = 180f
-        )
-    }
+    val enterSpring = remember { spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 180f) }
 
     LaunchedEffect(Unit) {
         hasEnteredRest = false
@@ -136,15 +123,10 @@ fun M3NowPlayingSheet(
     val screenHeightPx = measuredHeightPx
 
     var isInteractingWithSheet by remember { mutableStateOf(false) }
-    val isFullyExpanded by remember {
-        derivedStateOf { hasEnteredRest && !isInteractingWithSheet && dragOffset.value <= 0.5f }
-    }
+    val isFullyExpanded by remember { derivedStateOf { hasEnteredRest && !isInteractingWithSheet && dragOffset.value <= 0.5f } }
     val sheetCornerRadius by animateDpAsState(
         targetValue = if (isFullyExpanded) 0.dp else 28.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "sheetCornerRadiusM3"
     )
 
@@ -152,20 +134,12 @@ fun M3NowPlayingSheet(
         dragScope.launch {
             val remaining = (screenHeightPx - dragOffset.value).coerceAtLeast(0f)
             val duration = (remaining / screenHeightPx * 220).toLong().coerceIn(120L, 220L)
-            dragOffset.animateTo(
-                targetValue = screenHeightPx,
-                animationSpec = tween(
-                    durationMillis = duration.toInt(),
-                    easing = FastOutLinearInEasing
-                )
-            )
+            dragOffset.animateTo(targetValue = screenHeightPx, animationSpec = tween(durationMillis = duration.toInt(), easing = FastOutLinearInEasing))
             onDismiss()
         }
     }
 
-    BackHandler(enabled = !showQueue && !showLyrics) {
-        dismissWithAnimation()
-    }
+    BackHandler(enabled = !showQueue && !showLyrics) { dismissWithAnimation() }
 
     Box(
         modifier = Modifier
@@ -173,7 +147,7 @@ fun M3NowPlayingSheet(
             .onSizeChanged { measuredHeightPx = it.height.toFloat() }
             .graphicsLayer { translationY = dragOffset.value.coerceAtLeast(0f) }
             .clip(RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .background(MaterialTheme.colorScheme.surface)
             .draggable(
                 orientation = Orientation.Vertical,
                 state = rememberDraggableState { delta ->
@@ -183,185 +157,139 @@ fun M3NowPlayingSheet(
                 onDragStarted = { isInteractingWithSheet = true },
                 onDragStopped = { velocity ->
                     isInteractingWithSheet = false
-                    if (dragOffset.value > dismissThresholdPx || velocity > 2000f) {
-                        dismissWithAnimation()
-                    } else {
-                        dragScope.launch {
-                            dragOffset.animateTo(0f, animationSpec = enterSpring)
-                        }
-                    }
+                    if (dragOffset.value > dismissThresholdPx || velocity > 2000f) dismissWithAnimation()
+                    else dragScope.launch { dragOffset.animateTo(0f, animationSpec = enterSpring) }
                 }
             )
     ) {
-        if (track?.albumArtUri != null) {
-            AsyncImage(
-                model = track.albumArtUri,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                colorFilter = ColorFilter.colorMatrix(
-                    ColorMatrix().apply { setToSaturation(1.35f) }
-                ),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX = 1.15f
-                        scaleY = 1.15f
-                    }
-                    .blur(60.dp)
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.55f))
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            )
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            // Drag indicator handle
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp, bottom = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(width = 36.dp, height = 4.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.4f))
-                )
+            // Drag handle
+            Box(modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.size(width = 36.dp, height = 4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
             }
 
-            // Header info
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = strings.nowPlaying,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White.copy(alpha = 0.85f)
-                    )
-                    if (state.currentPlaylistName != null) {
+            // Toolbar like Twelve's NowPlaying toolbar - centered title, down arrow
+            androidx.compose.material3.TopAppBar(
+                title = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = state.currentPlaylistName.orEmpty(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.6f),
+                            text = track?.title ?: strings.nowPlaying,
+                            style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        if (state.currentPlaylistName != null) {
+                            Text(
+                                text = state.currentPlaylistName.orEmpty(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
-                }
-            }
+                },
+                navigationIcon = {
+                    IconButton(onClick = { dismissWithAnimation() }) {
+                        Icon(Icons.Filled.MusicNote, contentDescription = null)
+                    }
+                },
+                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent
+                )
+            )
 
+            // Album art card - 16dp radius, margin 40dp like Twelve
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp),
+                    .padding(horizontal = 40.dp)
+                    .padding(top = 8.dp, bottom = 16.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .width(280.dp)
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                    contentAlignment = Alignment.Center
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
                 ) {
-                    if (track?.albumArtUri != null) {
-                        AsyncImage(
-                            model = track.albumArtUri,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)),
-                            contentScale = ContentScale.Crop,
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Filled.MusicNote,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(72.dp)
-                        )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (track?.albumArtUri != null) {
+                            AsyncImage(
+                                model = track.albumArtUri,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                            )
+                        } else {
+                            Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(72.dp))
+                        }
                     }
                 }
             }
 
+            // Labels - margin 40dp bottom 20dp like Twelve
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 24.dp),
+                    .padding(horizontal = 40.dp)
+                    .padding(bottom = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = track?.title.orEmpty(),
+                    text = track?.title ?: "",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 24.dp)
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = track?.artist.orEmpty(),
+                    text = track?.artist ?: "",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 24.dp)
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = track?.album ?: "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
-            Spacer(Modifier.weight(1f))
+            // Progress slider
+            M3NowPlayingProgressLineage(playerViewModel = playerViewModel, isPlaying = state.isPlaying)
 
-            M3NowPlayingProgress(
-                playerViewModel = playerViewModel,
-                isPlaying = state.isPlaying,
-            )
-
+            // Media controls - 22dp horizontal margin, like Twelve
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 20.dp, start = 24.dp, end = 24.dp),
+                    .padding(horizontal = 22.dp)
+                    .padding(top = 8.dp, bottom = 24.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { playerViewModel.toggleShuffle() }) {
-                    Icon(
-                        imageVector = Icons.Filled.Shuffle,
-                        contentDescription = strings.shuffle,
-                        tint = if (state.shuffleEnabled) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.7f)
-                    )
+                IconButton(onClick = { playerViewModel.toggleShuffle() }, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Filled.Shuffle, strings.shuffle, tint = if (state.shuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                IconButton(onClick = { playerViewModel.skipToPrevious() }) {
-                    Icon(
-                        imageVector = Icons.Filled.SkipPrevious,
-                        contentDescription = strings.previous,
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp)
-                    )
+                IconButton(onClick = { playerViewModel.skipToPrevious() }, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Filled.SkipPrevious, strings.previous, modifier = Modifier.size(24.dp))
                 }
-                FilledIconButton(
+                // Primary 72dp like Twelve
+                androidx.compose.material3.FilledIconButton(
                     onClick = { playerViewModel.togglePlayPause() },
-                    modifier = Modifier.size(68.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
+                    modifier = Modifier.size(72.dp),
                 ) {
                     Icon(
                         imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -369,87 +297,63 @@ fun M3NowPlayingSheet(
                         modifier = Modifier.size(36.dp)
                     )
                 }
-                IconButton(onClick = { playerViewModel.skipToNext() }) {
-                    Icon(
-                        imageVector = Icons.Filled.SkipNext,
-                        contentDescription = strings.next,
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp)
-                    )
+                IconButton(onClick = { playerViewModel.skipToNext() }, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Filled.SkipNext, strings.next, modifier = Modifier.size(24.dp))
                 }
-                IconButton(onClick = { playerViewModel.cycleRepeatMode() }) {
+                IconButton(onClick = { playerViewModel.cycleRepeatMode() }, modifier = Modifier.size(48.dp)) {
                     val icon = when (state.repeatMode) {
                         RepeatMode.ONE -> Icons.Filled.RepeatOne
                         else -> Icons.Filled.Repeat
                     }
-                    val tint = if (state.repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.7f)
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = strings.repeat,
-                        tint = tint
-                    )
+                    Icon(icon, strings.repeat, tint = if (state.repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
-            Row(
+            // Bottom bar card - secondaryContainer, 12dp radius, tonal buttons
+            Card(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 28.dp, start = 32.dp, end = 32.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 24.dp)
+                    .align(Alignment.CenterHorizontally),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
             ) {
-                IconButton(onClick = { showQueue = true }) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.QueueMusic,
-                        contentDescription = strings.queue,
-                        tint = Color.White.copy(alpha = 0.8f)
-                    )
-                }
-                IconButton(onClick = { showLyrics = true }) {
-                    Icon(
-                        imageVector = Icons.Filled.Lyrics,
-                        contentDescription = strings.lyrics,
-                        tint = Color.White.copy(alpha = 0.8f)
-                    )
-                }
-                val trackId = track?.id ?: -1L
-                val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
-                IconButton(onClick = { if (trackId > 0) playerViewModel.toggleLike(trackId) }) {
-                    Icon(
-                        imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                        contentDescription = strings.likedSongs,
-                        tint = if (isLiked) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.8f)
-                    )
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    IconButton(onClick = { showQueue = true }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.QueueMusic, strings.queue)
+                    }
+                    IconButton(onClick = { showLyrics = true }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Filled.Lyrics, strings.lyrics)
+                    }
+                    IconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Filled.Info, strings.audioInformation)
+                    }
+                    IconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Filled.GraphicEq, "EQ")
+                    }
+                    val trackId = track?.id ?: -1L
+                    val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
+                    IconButton(onClick = { if (trackId > 0) playerViewModel.toggleLike(trackId) }, modifier = Modifier.size(48.dp)) {
+                        Icon(if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, strings.likedSongs, tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer)
+                    }
                 }
             }
+
+            Spacer(Modifier.height(16.dp))
         }
     }
 
     if (showQueue) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { showQueue = false },
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ) {
-            Text(
-                text = strings.queue,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
-            )
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp)
-            ) {
+        ModalBottomSheet(onDismissRequest = { showQueue = false }, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
+            Text(strings.queue, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+            LazyColumn(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
                 items(state.queue) { queueTrack ->
                     val isCurrent = queueTrack.id == state.currentTrack?.id
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         TextButton(
                             onClick = {
                                 val index = state.queue.indexOfFirst { it.id == queueTrack.id }
@@ -457,37 +361,16 @@ fun M3NowPlayingSheet(
                             },
                             modifier = Modifier.weight(1f),
                         ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalAlignment = Alignment.Start
-                            ) {
-                                Text(
-                                    text = queueTrack.title,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    text = queueTrack.artist,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
+                            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
+                                Text(queueTrack.title, style = MaterialTheme.typography.bodyLarge, color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(queueTrack.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
-                        IconButton(
-                            onClick = {
-                                val index = state.queue.indexOfFirst { it.id == queueTrack.id }
-                                if (index >= 0) playerViewModel.removeFromQueue(index)
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Delete,
-                                contentDescription = strings.removeFromQueue,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                        IconButton(onClick = {
+                            val index = state.queue.indexOfFirst { it.id == queueTrack.id }
+                            if (index >= 0) playerViewModel.removeFromQueue(index)
+                        }) {
+                            Icon(Icons.Filled.Delete, strings.removeFromQueue, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -499,44 +382,19 @@ fun M3NowPlayingSheet(
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         val progress by playerViewModel.progress.collectAsState()
         val syncedLyrics = state.syncedLyrics
-        val activeIndex = if (syncedLyrics.isNotEmpty()) {
-            syncedLyrics.indexOfLast { it.timeMs <= progress.positionMs }.coerceAtLeast(0)
-        } else {
-            -1
-        }
-        ModalBottomSheet(
-            onDismissRequest = { showLyrics = false },
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ) {
-            Text(
-                text = strings.lyrics,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
-            )
+        val activeIndex = if (syncedLyrics.isNotEmpty()) syncedLyrics.indexOfLast { it.timeMs <= progress.positionMs }.coerceAtLeast(0) else -1
+        ModalBottomSheet(onDismissRequest = { showLyrics = false }, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
+            Text(strings.lyrics, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
             if (syncedLyrics.isEmpty()) {
-                Text(
-                    text = strings.noLyricsFound,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(24.dp)
-                )
+                Text(strings.noLyricsFound, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(24.dp))
             } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(420.dp)
-                ) {
+                LazyColumn(modifier = Modifier.fillMaxWidth().height(420.dp)) {
                     items(syncedLyrics) { line ->
                         val index = syncedLyrics.indexOf(line)
                         Text(
                             text = line.text,
                             style = MaterialTheme.typography.bodyLarge,
-                            color = if (index == activeIndex) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
+                            color = if (index == activeIndex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = if (index == activeIndex) FontWeight.Bold else FontWeight.Normal,
                             modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
                         )
@@ -547,99 +405,49 @@ fun M3NowPlayingSheet(
     }
 }
 
-/**
- * PixelPlayer-style progress: Material 3 expressive wavy slider + time labels.
- * While the user drags, the thumb stays where it was dropped until playback
- * catches up on its own.
- *
- * The position stream from the player updates every 500 ms, which makes the
- * wavy bar look frozen between ticks. We extrapolate between samples at frame
- * rate (PixelPlayer's rememberSmoothProgress feeds the same idea) so the wave
- * and thumb glide continuously.
- */
 @Composable
-private fun M3NowPlayingProgress(
+private fun M3NowPlayingProgressLineage(
     playerViewModel: PlayerViewModel,
     isPlaying: Boolean,
 ) {
     val progress by playerViewModel.progress.collectAsState()
     val durationMs = progress.durationMs
-    val baseFraction = rememberSmoothFraction(
-        positionMs = progress.positionMs,
-        durationMs = durationMs,
-        isPlaying = isPlaying,
-    )
+    val baseFraction = rememberSmoothFractionLineage(positionMs = progress.positionMs, durationMs = durationMs, isPlaying = isPlaying)
 
     var seekFraction by remember { mutableStateOf<Float?>(null) }
-    LaunchedEffect(baseFraction, durationMs) {
+    androidx.compose.runtime.LaunchedEffect(baseFraction, durationMs) {
         val held = seekFraction ?: return@LaunchedEffect
         if (kotlin.math.abs(held - baseFraction) < 0.03f || kotlin.math.abs(held - baseFraction) > 0.1f) {
             seekFraction = null
         }
     }
 
-    val activeColor = Color.White
-    val inactiveColor = Color.White.copy(alpha = 0.25f)
-    val thumbColor = Color.White
-    val timeColor = Color.White.copy(alpha = 0.7f)
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        M3WavySlider(
-            value = { seekFraction ?: baseFraction },
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+        androidx.compose.material3.Slider(
+            value = seekFraction ?: baseFraction,
             onValueChange = { fraction ->
                 seekFraction = fraction
-                if (durationMs > 0L) {
-                    playerViewModel.onSeekPreview((fraction * durationMs).toLong())
-                }
+                if (durationMs > 0L) playerViewModel.onSeekPreview((fraction * durationMs).toLong())
             },
-            onValueCommit = { fraction ->
-                if (durationMs > 0L) {
-                    playerViewModel.onSeekCommit((fraction * durationMs).toLong())
-                }
+            onValueChangeFinished = {
+                val fraction = seekFraction ?: baseFraction
+                if (durationMs > 0L) playerViewModel.onSeekCommit((fraction * durationMs).toLong())
             },
-            activeTrackColor = activeColor,
-            inactiveTrackColor = inactiveColor,
-            thumbColor = thumbColor,
-            isPlaying = isPlaying,
-            isVisible = true,
-            trackEdgePadding = 8.dp,
-            semanticsLabel = LocalStrings.current.playbackPosition,
-            modifier = Modifier.padding(horizontal = 20.dp)
+            modifier = Modifier.fillMaxWidth()
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp, start = 20.dp, end = 20.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
-                text = m3FormatMillis(
-                    if (seekFraction != null) (seekFraction!! * durationMs).toLong() else progress.positionMs
-                ),
+                text = m3FormatMillisLineage(if (seekFraction != null) (seekFraction!! * durationMs).toLong() else progress.positionMs),
                 style = MaterialTheme.typography.labelMedium,
-                color = timeColor
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(
-                text = m3FormatMillis(durationMs),
-                style = MaterialTheme.typography.labelMedium,
-                color = timeColor
-            )
+            Text(text = m3FormatMillisLineage(durationMs), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
-/**
- * Frame-clock smoothed playback fraction. The player emits a new position every
- * ~500 ms; while playing we extrapolate from the last sample with the elapsed
- * time (capped at one extra tick so a stalled stream cannot run ahead) which
- * produces a genuinely continuous 60 fps progress for the wavy bar.
- */
 @Composable
-private fun rememberSmoothFraction(
-    positionMs: Long,
-    durationMs: Long,
-    isPlaying: Boolean,
-): Float {
+private fun rememberSmoothFractionLineage(positionMs: Long, durationMs: Long, isPlaying: Boolean): Float {
     var smooth by remember { mutableFloatStateOf(0f) }
     var lastSamplePosMs by remember { mutableLongStateOf(0L) }
     var lastSampleAtMs by remember { mutableLongStateOf(0L) }
@@ -654,18 +462,14 @@ private fun rememberSmoothFraction(
         while (true) {
             withFrameNanos { }
             val elapsed = (android.os.SystemClock.elapsedRealtime() - lastSampleAtMs).coerceAtLeast(0L)
-            val displayedPos = if (isPlaying) {
-                (lastSamplePosMs + elapsed).coerceAtMost(pos + 500L)
-            } else {
-                lastSamplePosMs
-            }
+            val displayedPos = if (isPlaying) (lastSamplePosMs + elapsed).coerceAtMost(pos + 500L) else lastSamplePosMs
             smooth = (displayedPos.toFloat() / durMs).coerceIn(0f, 1f)
         }
     }
     return smooth
 }
 
-private fun m3FormatMillis(ms: Long): String {
+private fun m3FormatMillisLineage(ms: Long): String {
     val totalSec = (ms / 1000L).coerceAtLeast(0L)
     val m = totalSec / 60
     val s = totalSec % 60

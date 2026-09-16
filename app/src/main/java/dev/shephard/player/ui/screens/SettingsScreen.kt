@@ -717,7 +717,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                     }
                 )
                 AnimatedVisibility(
-                    visible = predictiveBack == PredictiveBackAnimation.SCALE,
+                    visible = predictiveBack == PredictiveBackAnimation.SCALE || predictiveBack == PredictiveBackAnimation.AOSP,
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically(),
                 ) {
