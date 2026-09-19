@@ -10,12 +10,14 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -29,13 +31,18 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lyrics
@@ -50,11 +57,13 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -66,6 +75,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -73,22 +83,32 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.i18n.LocalStrings
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.draggableHandle
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -249,6 +269,7 @@ fun M3NowPlayingSheet(
                     text = track?.title ?: "",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -271,7 +292,7 @@ fun M3NowPlayingSheet(
             // Progress slider
             M3NowPlayingProgressLineage(playerViewModel = playerViewModel, isPlaying = state.isPlaying)
 
-            // Media controls - 22dp horizontal margin, like Twelve
+            // Media controls - 22dp horizontal margin, like Twelve - fixed colors #3
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -281,15 +302,19 @@ fun M3NowPlayingSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { playerViewModel.toggleShuffle() }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Filled.Shuffle, strings.shuffle, tint = if (state.shuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Icons.Filled.Shuffle, strings.shuffle, tint = if (state.shuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                 }
                 IconButton(onClick = { playerViewModel.skipToPrevious() }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Filled.SkipPrevious, strings.previous, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Filled.SkipPrevious, strings.previous, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurface)
                 }
                 // Primary 72dp like Twelve
                 androidx.compose.material3.FilledIconButton(
                     onClick = { playerViewModel.togglePlayPause() },
                     modifier = Modifier.size(72.dp),
+                    colors = androidx.compose.material3.FilledIconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 ) {
                     Icon(
                         imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -298,18 +323,18 @@ fun M3NowPlayingSheet(
                     )
                 }
                 IconButton(onClick = { playerViewModel.skipToNext() }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Filled.SkipNext, strings.next, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Filled.SkipNext, strings.next, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurface)
                 }
                 IconButton(onClick = { playerViewModel.cycleRepeatMode() }, modifier = Modifier.size(48.dp)) {
                     val icon = when (state.repeatMode) {
                         RepeatMode.ONE -> Icons.Filled.RepeatOne
                         else -> Icons.Filled.Repeat
                     }
-                    Icon(icon, strings.repeat, tint = if (state.repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(icon, strings.repeat, tint = if (state.repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                 }
             }
 
-            // Bottom bar card - secondaryContainer, 12dp radius, tonal buttons
+            // Bottom bar card - fixed colors and removed non-working buttons #3
             Card(
                 modifier = Modifier
                     .padding(horizontal = 24.dp)
@@ -319,25 +344,24 @@ fun M3NowPlayingSheet(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = { showQueue = true }, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.AutoMirrored.Filled.QueueMusic, strings.queue)
+                        Icon(Icons.AutoMirrored.Filled.QueueMusic, strings.queue, tint = MaterialTheme.colorScheme.onSecondaryContainer)
                     }
                     IconButton(onClick = { showLyrics = true }, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Filled.Lyrics, strings.lyrics)
-                    }
-                    IconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Filled.Info, strings.songInfo)
-                    }
-                    IconButton(onClick = {}, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Filled.GraphicEq, "EQ")
+                        Icon(Icons.Filled.Lyrics, strings.lyrics, tint = MaterialTheme.colorScheme.onSecondaryContainer)
                     }
                     val trackId = track?.id ?: -1L
                     val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
                     IconButton(onClick = { if (trackId > 0) playerViewModel.toggleLike(trackId) }, modifier = Modifier.size(48.dp)) {
-                        Icon(if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, strings.likedSongs, tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer)
+                        Icon(
+                            if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            strings.likedSongs,
+                            tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer
+                        )
                     }
                 }
             }
@@ -348,29 +372,90 @@ fun M3NowPlayingSheet(
 
     if (showQueue) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val queue = state.queue
+        val currentStartIndex = remember(queue, state.currentTrack?.id) {
+            queue.indexOfFirst { it.id == state.currentTrack?.id }.coerceAtLeast(0)
+        }
+        val items = remember { mutableStateListOf<dev.shephard.player.data.AudioTrack>() }
+        LaunchedEffect(queue, currentStartIndex) {
+            val sliced = queue.drop(currentStartIndex)
+            if (items.map { it.id } != sliced.map { it.id }) {
+                items.clear(); items.addAll(sliced)
+            }
+        }
+        val listState = rememberLazyListState()
+        var dragInfo by remember { mutableStateOf<Pair<Int,Int>?>(null) }
+        val reorderableState = rememberReorderableLazyListState(lazyListState = listState) { from, to ->
+            val cur = dragInfo
+            dragInfo = if (cur == null) from.index to to.index else cur.first to to.index
+            items.add(to.index, items.removeAt(from.index))
+        }
+        LaunchedEffect(reorderableState.isAnyItemDragging) {
+            if (!reorderableState.isAnyItemDragging) {
+                dragInfo?.let { (from,to) ->
+                    dragInfo=null
+                    if (from!=to) {
+                        val f = from+currentStartIndex; val t = to+currentStartIndex
+                        if (f!=t) playerViewModel.moveQueueItem(f,t)
+                    }
+                }
+            }
+        }
         ModalBottomSheet(onDismissRequest = { showQueue = false }, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
             Text(strings.queue, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
-            LazyColumn(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-                items(state.queue) { queueTrack ->
-                    val isCurrent = queueTrack.id == state.currentTrack?.id
-                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(
-                            onClick = {
-                                val index = state.queue.indexOfFirst { it.id == queueTrack.id }
-                                if (index >= 0) playerViewModel.playQueueItem(index)
-                            },
-                            modifier = Modifier.weight(1f),
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                itemsIndexed(items, key = { _, t -> t.id }) { idx, queueTrack ->
+                    ReorderableItem(state = reorderableState, key = queueTrack.id) { isDragging ->
+                        val isCurrent = queueTrack.id == state.currentTrack?.id
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .shadow(if (isDragging) 8.dp else 0.dp, RoundedCornerShape(12.dp))
+                                .zIndex(if (isDragging) 1f else 0f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (isCurrent) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                )
+                                .clickable {
+                                    val index = queue.indexOfFirst { it.id == queueTrack.id }
+                                    if (index>=0) playerViewModel.playQueueItem(index)
+                                }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
-                                Text(queueTrack.title, style = MaterialTheme.typography.bodyLarge, color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                                if (queueTrack.albumArtUri != null) {
+                                    AsyncImage(model = queueTrack.albumArtUri, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                } else {
+                                    Icon(Icons.Filled.MusicNote, null, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(queueTrack.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(queueTrack.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
-                        }
-                        IconButton(onClick = {
-                            val index = state.queue.indexOfFirst { it.id == queueTrack.id }
-                            if (index >= 0) playerViewModel.removeFromQueue(index)
-                        }) {
-                            Icon(Icons.Filled.Delete, strings.removeFromQueue, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            // trash then drag handle per spec
+                            IconButton(onClick = {
+                                val index = queue.indexOfFirst { it.id == queueTrack.id }
+                                if (index>=0) playerViewModel.removeFromQueue(index)
+                            }, modifier = Modifier.size(36.dp)) {
+                                Icon(Icons.Filled.Delete, strings.removeFromQueue, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                            }
+                            if (!isCurrent) {
+                                Icon(
+                                    Icons.Filled.DragHandle,
+                                    contentDescription = strings.reorder,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(28.dp).draggableHandle()
+                                )
+                            }
                         }
                     }
                 }
@@ -382,22 +467,167 @@ fun M3NowPlayingSheet(
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         val progress by playerViewModel.progress.collectAsState()
         val syncedLyrics = state.syncedLyrics
+        val allLyrics = state.lyrics
         val activeIndex = if (syncedLyrics.isNotEmpty()) syncedLyrics.indexOfLast { it.timeMs <= progress.positionMs }.coerceAtLeast(0) else -1
-        ModalBottomSheet(onDismissRequest = { showLyrics = false }, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
-            Text(strings.lyrics, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
-            if (syncedLyrics.isEmpty()) {
-                Text(strings.noLyricsFound, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(24.dp))
+        val context = LocalContext.current
+        val lyricsScope = rememberCoroutineScope()
+        var lyricsEditMode by remember { mutableStateOf(false) }
+        var editedLyricsText by remember(allLyrics, syncedLyrics) {
+            mutableStateOf(
+                if (syncedLyrics.isNotEmpty()) syncedLyrics.joinToString("\n") { "[${"%02d".format(it.timeMs/60000)}:${"%02d".format((it.timeMs%60000)/1000)}.${"%02d".format((it.timeMs%1000)/10)}]${it.text}" }
+                else allLyrics.joinToString("\n")
+            )
+        }
+        var isFetchingLyrics by remember { mutableStateOf(false) }
+        fun applyLyricsText(raw: String) {
+            // parseLrcPublic sets syncedLyrics as side effect and returns plain lines
+            val lines = playerViewModel.parseLrcPublic(raw)
+            if (lines.isNotEmpty()) {
+                playerViewModel.setManualLyrics(lines)
             } else {
-                LazyColumn(modifier = Modifier.fillMaxWidth().height(420.dp)) {
-                    items(syncedLyrics) { line ->
-                        val index = syncedLyrics.indexOf(line)
-                        Text(
-                            text = line.text,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (index == activeIndex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (index == activeIndex) FontWeight.Bold else FontWeight.Normal,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
-                        )
+                val plainLines = raw.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
+                if (plainLines.isNotEmpty()) playerViewModel.setManualLyrics(plainLines)
+            }
+        }
+        val lrcLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let {
+                lyricsScope.launch(Dispatchers.IO) {
+                    try {
+                        val text = context.contentResolver.openInputStream(it)?.bufferedReader()?.readText() ?: return@launch
+                        withContext(Dispatchers.Main) {
+                            editedLyricsText = text
+                            lyricsEditMode = true
+                        }
+                    } catch(_:Exception){}
+                }
+            }
+        }
+        fun httpGet(urlStr: String, timeoutMs: Int = 8000): String? = try {
+            val conn = java.net.URL(urlStr).openConnection() as java.net.HttpURLConnection
+            conn.connectTimeout = timeoutMs
+            conn.readTimeout = timeoutMs
+            conn.setRequestProperty("Accept", "application/json")
+            conn.setRequestProperty("User-Agent", "LambdaPlayer/2.5")
+            if (conn.responseCode == 200) conn.inputStream.bufferedReader().readText() else null
+        } catch (_: Exception) { null }
+
+        suspend fun fetchLyrics(): String? = withContext(Dispatchers.IO) {
+            val t = track ?: return@withContext null
+            val enc = { s: String -> java.net.URLEncoder.encode(s, "UTF-8") }
+            try {
+                var body = httpGet("https://lrclib.net/api/get?artist_name=${enc(t.artist)}&track_name=${enc(t.title)}")
+                if (body != null) {
+                    val obj = runCatching { org.json.JSONObject(body) }.getOrNull()
+                    if (obj != null) {
+                        val synced = obj.optString("syncedLyrics")
+                        if (synced.isNotBlank()) return@withContext synced
+                        val plain = obj.optString("plainLyrics")
+                        if (plain.isNotBlank()) return@withContext plain
+                    }
+                }
+                body = httpGet("https://api.lyrics.ovh/v1/${enc(t.artist)}/${enc(t.title)}")
+                if (body != null) {
+                    val obj = runCatching { org.json.JSONObject(body) }.getOrNull()
+                    val lyrics = obj?.optString("lyrics")
+                    if (!lyrics.isNullOrBlank()) return@withContext lyrics
+                }
+            } catch(_:Exception){}
+            null
+        }
+
+        ModalBottomSheet(onDismissRequest = { showLyrics = false }, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(strings.lyrics, style = MaterialTheme.typography.titleMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { lrcLauncher.launch(arrayOf("*/*")) }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Filled.FolderOpen, contentDescription = "Import", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = {
+                        if (!lyricsEditMode) {
+                            editedLyricsText = if (syncedLyrics.isNotEmpty()) syncedLyrics.joinToString("\n"){ it.text } else allLyrics.joinToString("\n")
+                        }
+                        lyricsEditMode = !lyricsEditMode
+                    }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit", tint = if (lyricsEditMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TextButton(onClick = {
+                        if (!isFetchingLyrics) {
+                            isFetchingLyrics = true
+                            lyricsScope.launch {
+                                val fetched = fetchLyrics()
+                                isFetchingLyrics = false
+                                if (!fetched.isNullOrBlank()) {
+                                    applyLyricsText(fetched)
+                                    editedLyricsText = fetched
+                                }
+                            }
+                        }
+                    }) {
+                        if (isFetchingLyrics) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp) else Text("Download")
+                    }
+                }
+            }
+            if (lyricsEditMode) {
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    OutlinedTextField(
+                        value = editedLyricsText,
+                        onValueChange = { editedLyricsText = it },
+                        modifier = Modifier.fillMaxWidth().height(300.dp),
+                        label = { Text(strings.lyrics) }
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { lyricsEditMode = false }) { Text("Cancel") }
+                        TextButton(onClick = {
+                            applyLyricsText(editedLyricsText)
+                            lyricsEditMode = false
+                        }) { Text("Save") }
+                    }
+                }
+            } else {
+                val hasLyrics = allLyrics.isNotEmpty() || syncedLyrics.isNotEmpty()
+                if (!hasLyrics) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(strings.noLyricsFound, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(12.dp))
+                        TextButton(onClick = {
+                            isFetchingLyrics = true
+                            lyricsScope.launch {
+                                val fetched = fetchLyrics()
+                                isFetchingLyrics = false
+                                if (!fetched.isNullOrBlank()) applyLyricsText(fetched)
+                            }
+                        }) { Text("Download lyrics") }
+                    }
+                } else {
+                    // Show synced if available else plain lyrics, with click to seek
+                    if (syncedLyrics.isNotEmpty()) {
+                        LazyColumn(modifier = Modifier.fillMaxWidth().height(420.dp)) {
+                            items(syncedLyrics) { line ->
+                                val index = syncedLyrics.indexOf(line)
+                                Text(
+                                    text = line.text,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (index == activeIndex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = if (index == activeIndex) FontWeight.Bold else FontWeight.Normal,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { playerViewModel.seekTo(line.timeMs) }
+                                        .padding(horizontal = 24.dp, vertical = 8.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxWidth().height(420.dp)) {
+                            items(allLyrics) { line ->
+                                Text(
+                                    text = line,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }

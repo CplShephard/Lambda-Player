@@ -111,6 +111,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.draggableHandle
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.formattedDuration
@@ -953,7 +954,7 @@ private fun QueueList(
         queue.indexOfFirst { it.id == currentTrackId }.coerceAtLeast(0)
     }
 
-val items = remember { mutableStateListOf<AudioTrack>() }
+    val items = remember { mutableStateListOf<AudioTrack>() }
     LaunchedEffect(queue, currentStartIndex) {
         if (items.map { it.id } != queue.drop(currentStartIndex).map { it.id }) {
             items.clear()
@@ -961,9 +962,8 @@ val items = remember { mutableStateListOf<AudioTrack>() }
         }
     }
 
-val listState = rememberLazyListState()
-
-var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    val listState = rememberLazyListState()
+    var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val reorderableState = rememberReorderableLazyListState(
         lazyListState = listState
     ) { from, to ->
@@ -987,9 +987,7 @@ var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
         }
     }
 
-val queueLiquidGlassOn = LocalBlurEnabled.current
-
-Column(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight(0.66f)
@@ -1006,7 +1004,9 @@ Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .overScrollVertical()
+                .overScrollVertical(),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = PaddingValues(bottom = 8.dp)
         ) {
             itemsIndexed(items, key = { _, t -> t.id }) { index, track ->
                 ReorderableItem(
@@ -1040,146 +1040,89 @@ private fun QueueTrackItem(
     dragHandleModifier: Modifier,
 ) {
     val strings = LocalStrings.current
-    val density = LocalDensity.current
-    val swipeThresholdPx = with(density) { 120.dp.toPx() }
-    var offsetX by remember { mutableFloatStateOf(0f) }
     val duration = remember(track.id) { track.formattedDuration() }
     val elevation by androidx.compose.animation.core.animateDpAsState(
         targetValue = if (isDragged) 8.dp else 0.dp,
         label = "queueItemElevation"
     )
-
-Box(
+    val rowShape = RoundedCornerShape(12.dp)
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .shadow(elevation, rowShape)
+            .zIndex(if (isDragged) 1f else 0f)
+            .clip(rowShape)
+            .background(
+                when {
+                    isDragged -> MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
+                    isPlaying -> MiuixAppTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    else -> MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                },
+                rowShape
+            )
+            .clickable { onPlay() }
+            .padding(vertical = 6.dp, horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        val absOffset = kotlin.math.abs(offsetX)
-        val progress = (absOffset / swipeThresholdPx).coerceIn(0f, 1f)
-        if (absOffset > 10f) {
-            val isSwipeRight = offsetX > 0f
-            val isSwipeLeft = offsetX < 0f
-            val isThresholdReached = absOffset >= swipeThresholdPx
-
-Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        when {
-                            isSwipeRight -> Color(0xFFE53935).copy(alpha = 0.16f * progress)
-                            isSwipeLeft -> MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f * progress)
-                            else -> Color.Transparent
-                        },
-                        RoundedCornerShape(12.dp)
-                    )
-                    .padding(horizontal = 20.dp),
-                contentAlignment = if (isSwipeRight) Alignment.CenterStart else Alignment.CenterEnd
-            ) {
-                val iconScale by animateFloatAsState(
-                    targetValue = if (isThresholdReached) 1.25f else (0.8f + 0.2f * progress),
-                    label = "swipeIconScale"
-                )
-                Icon(
-                    imageVector = if (isSwipeRight) Icons.Filled.Delete else Icons.AutoMirrored.Filled.QueueMusic,
-                    contentDescription = if (isSwipeRight) "Remove" else "Pin to play next",
-                    tint = if (isSwipeRight) Color(0xFFE53935) else MiuixAppTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .size(26.dp)
-                        .graphicsLayer {
-                            scaleX = iconScale
-                            scaleY = iconScale
-                            alpha = progress
-                        }
-                )
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(MiuixAppTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            var loaded by remember { mutableStateOf(false) }
+            AsyncImage(
+                model = track.albumArtUri,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp)),
+                contentScale = ContentScale.Crop,
+                onSuccess = { loaded = true }
+            )
+            if (!loaded) {
+                Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             }
         }
-
-Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .offset(x = with(density) { offsetX.toDp() })
-                .shadow(elevation, RoundedCornerShape(12.dp))
-                .zIndex(if (isDragged) 1f else 0f)
-                .clip(RoundedCornerShape(12.dp))
-                .background(
-                    when {
-                        isDragged -> MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
-                        isPlaying -> MiuixAppTheme.colorScheme.primary.copy(alpha = 0.08f)
-                        else -> MiuixAppTheme.colorScheme.background
-                    }
-                )
-                .clickable { onPlay() }
-                .pointerInput(track.id) {
-                    detectHorizontalDragGestures(
-                        onDragEnd = {
-                            when {
-                                offsetX < -swipeThresholdPx -> onPlayNext()
-                                offsetX > swipeThresholdPx -> onRemove()
-                            }
-                            offsetX = 0f
-                        }
-                    ) { change, dragAmount ->
-                        change.consume()
-                        offsetX += dragAmount
-                    }
-                }
-                .padding(vertical = 6.dp, horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(MiuixAppTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                var loaded by remember { mutableStateOf(false) }
-                AsyncImage(
-                    model = track.albumArtUri,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp)),
-                    contentScale = ContentScale.Crop,
-                    onSuccess = { loaded = true }
-                )
-                if (!loaded) {
-                    Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                }
-            }
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    track.title,
-                    color = if (isPlaying) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onBackground,
-                    style = MiuixAppTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    track.artist,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                    style = MiuixAppTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                duration,
-                style = MiuixAppTheme.typography.labelSmall,
-                color = MiuixAppTheme.colorScheme.onSurfaceVariant
+                track.title,
+                color = if (isPlaying) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onBackground,
+                style = MiuixAppTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-            Spacer(Modifier.width(4.dp))
-            if (!isPlaying) {
+            Text(
+                track.artist,
+                color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                style = MiuixAppTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Text(duration, style = MiuixAppTheme.typography.labelSmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(6.dp))
+        // Red trash button left of drag handle
+        if (!isPlaying) {
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.size(36.dp)
+            ) {
                 Icon(
-                    imageVector = Icons.Filled.DragHandle,
-                    contentDescription = strings.reorder,
-                    tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .then(dragHandleModifier)
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = strings.removeFromQueue,
+                    tint = Color(0xFFE53935),
+                    modifier = Modifier.size(20.dp)
                 )
             }
+            Icon(
+                imageVector = Icons.Filled.DragHandle,
+                contentDescription = strings.reorder,
+                tint = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(28.dp).then(dragHandleModifier)
+            )
         }
     }
 }

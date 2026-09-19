@@ -106,6 +106,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.draggableHandle
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.formattedDuration
@@ -1450,20 +1451,18 @@ private fun PlaylistDetailTopBar(
     title: String,
     cover: android.net.Uri?,
     onBack: () -> Unit,
-    collapse: Float,
-    pageBackdrop: top.yukonga.miuix.kmp.blur.LayerBackdrop?
+    topBarState: dev.shephard.player.ui.components.CollapsingTopBarState
 ) {
     val strings = LocalStrings.current
     val cs = MiuixAppTheme.colorScheme
+    val collapse = topBarState.collapseFraction
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
             .then(
-                if (pageBackdrop != null) {
-                    // InstallerX Revived Miuix values: 25dp blur radius blended
-                    // with the theme surface at 80% opacity.
-                    Modifier.miuixTopBarBlur(backdrop = pageBackdrop)
+                if (topBarState.pageBackdrop != null) {
+                    Modifier.miuixTopBarBlur(backdrop = topBarState.pageBackdrop)
                 } else {
                     Modifier.background(cs.background.copy(alpha = collapse))
                 }
@@ -1471,8 +1470,7 @@ private fun PlaylistDetailTopBar(
             .height(52.dp),
         contentAlignment = Alignment.Center
     ) {
-
-Box(
+        Box(
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .padding(start = 12.dp)
@@ -1488,8 +1486,7 @@ Box(
                 tint = cs.onBackground
             )
         }
-
-Row(
+        Row(
             modifier = Modifier.graphicsLayer { alpha = collapse },
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1530,40 +1527,40 @@ internal fun PlaylistDetailView(
     onAddTracks: () -> Unit,
     onPickCover: () -> Unit = {},
     onReorder: (List<AudioTrack>) -> Unit = {},
-    onChangeSort: (String) -> Unit = {}
+    onChangeSort: (String) -> Unit = {},
+    isHomeSimplified: Boolean = false
 ) {
-    val liquidGlassOn = LocalBlurEnabled.current
-
-    // InstallerX-style page backdrop: solid surface base + captured content,
-    // so the playlist detail top bar blurs cleanly while scrolling.
-    val detailPageBackdrop = rememberMiuixPageBackdrop(liquidGlassOn)
-
-val reorderItems = remember { mutableStateListOf<AudioTrack>() }
+    // Fixed blur: use same CollapsingTopBarState pattern as other pages
+    val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
+    val reorderItems = remember { mutableStateListOf<AudioTrack>() }
     var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var isReordering by remember { mutableStateOf(false) }
+    var pendingCommittedOrder by remember { mutableStateOf<List<Long>?>(null) }
 
-var pendingCommittedOrder by remember { mutableStateOf<List<Long>?>(null) }
+    // Home simplified: random order each time (like featured songs)
+    val displayTracks = if (isHomeSimplified) {
+        remember(plTracks) { plTracks.shuffled() }
+    } else {
+        plTracks
+    }
 
-LaunchedEffect(plTracks, isReordering) {
+    LaunchedEffect(displayTracks, isReordering) {
         if (isReordering) return@LaunchedEffect
         val pending = pendingCommittedOrder
         if (pending != null) {
-            if (plTracks.map { it.id } == pending) {
-
-pendingCommittedOrder = null
+            if (displayTracks.map { it.id } == pending) {
+                pendingCommittedOrder = null
             }
-
-return@LaunchedEffect
+            return@LaunchedEffect
         }
-        if (reorderItems.map { it.id } != plTracks.map { it.id }) {
+        if (reorderItems.map { it.id } != displayTracks.map { it.id }) {
             reorderItems.clear()
-            reorderItems.addAll(plTracks)
+            reorderItems.addAll(displayTracks)
         }
     }
 
-val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-
-val reorderableHeaderItemCount = 2
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val reorderableHeaderItemCount = 2
     val reorderableState = rememberReorderableLazyListState(
         lazyListState = listState
     ) { from, to ->
@@ -1582,13 +1579,12 @@ val reorderableHeaderItemCount = 2
     LaunchedEffect(reorderableState.isAnyItemDragging) {
         isReordering = reorderableState.isAnyItemDragging
         if (reorderableState.isAnyItemDragging) {
-
-pendingCommittedOrder = null
+            pendingCommittedOrder = null
         }
         if (!reorderableState.isAnyItemDragging) {
             dragInfo?.let { (from, to) ->
                 dragInfo = null
-                if (from != to && reorderItems.map { it.id } != plTracks.map { it.id }) {
+                if (from != to && reorderItems.map { it.id } != displayTracks.map { it.id }) {
                     pendingCommittedOrder = reorderItems.map { it.id }
                     onReorder(reorderItems.toList())
                 }
@@ -1596,39 +1592,30 @@ pendingCommittedOrder = null
         }
     }
 
-val detailTitle = if (playlist.isSystem) strings.likedSongs else playlist.name
-    val detailCollapse by remember {
-        derivedStateOf {
-            val index = listState.firstVisibleItemIndex
-            val offset = listState.firstVisibleItemScrollOffset
-            if (index > 0) 1f else (offset.toFloat() / 120f).coerceIn(0f, 1f)
-        }
-    }
+    val detailTitle = if (playlist.isSystem) strings.likedSongs else playlist.name
+    val detailCollapse = topBarState.collapseFraction
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MiuixAppTheme.colorScheme.background)
     ) {
-
-PlaylistDetailTopBar(
+        PlaylistDetailTopBar(
             title = detailTitle,
             cover = playlist.coverUri?.let { Uri.parse(it) }
-                ?: plTracks.firstOrNull()?.albumArtUri,
+                ?: displayTracks.firstOrNull()?.albumArtUri,
             onBack = onBack,
-            collapse = detailCollapse,
-            pageBackdrop = detailPageBackdrop
+            topBarState = topBarState
         )
         LazyColumn(
             state = listState,
             modifier = Modifier
-                .then(
-                    detailPageBackdrop?.let { Modifier.layerBackdrop(it) } ?: Modifier
-                )
+                .captureForTopBarBlur(topBarState)
+                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                 .fillMaxSize()
                 .overScrollVertical(),
             contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
-
-verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             item {
                 Text(
@@ -1649,6 +1636,7 @@ verticalArrangement = Arrangement.spacedBy(6.dp)
             }
 
 item {
+                // Home simplified: no cover change button, no add tracks, no sort chips, random order
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1656,7 +1644,7 @@ item {
                         .aspectRatio(1f)
                         .clip(RoundedCornerShape(20.dp))
                         .background(MiuixAppTheme.colorScheme.surfaceVariant)
-                        .then(if (!playlist.isSystem) Modifier.clickable { onPickCover() } else Modifier),
+                        .then(if (!playlist.isSystem && !isHomeSimplified) Modifier.clickable { onPickCover() } else Modifier),
                     contentAlignment = Alignment.Center
                 ) {
                     if (playlist.isSystem) {
@@ -1673,41 +1661,31 @@ item {
                             Icon(Icons.Filled.Favorite, null, tint = Color.White, modifier = Modifier.size(80.dp))
                         }
                     } else {
-                    val coverUri = playlist.coverUri?.let { Uri.parse(it) }
-                    val displayArt = coverUri ?: plTracks.firstOrNull()?.albumArtUri
-                    if (displayArt != null) {
-                        AsyncImage(
-                            model = displayArt,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Filled.LibraryMusic,
-                            contentDescription = null,
-                            tint = MiuixAppTheme.colorScheme.primary,
-                            modifier = Modifier.size(48.dp)
-                        )
-                    }
-                    if (!playlist.isSystem) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(12.dp)
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MiuixAppTheme.colorScheme.surface.copy(alpha = 0.6f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Edit,
-                            contentDescription = null,
-                            tint = MiuixAppTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    }
+                        val coverUri = playlist.coverUri?.let { Uri.parse(it) }
+                        val displayArt = coverUri ?: displayTracks.firstOrNull()?.albumArtUri
+                        if (displayArt != null) {
+                            AsyncImage(
+                                model = displayArt,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(Icons.Filled.LibraryMusic, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+                        }
+                        if (!playlist.isSystem && !isHomeSimplified) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(12.dp)
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MiuixAppTheme.colorScheme.surface.copy(alpha = 0.6f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Filled.Edit, null, tint = MiuixAppTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
+                            }
+                        }
                     }
                 }
                 Row(
@@ -1715,52 +1693,35 @@ item {
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-
-Row(
+                    Row(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(14.dp))
                             .background(MiuixAppTheme.colorScheme.primary)
-                            .clickable(enabled = plTracks.isNotEmpty()) { onPlayAll() }
+                            .clickable(enabled = displayTracks.isNotEmpty()) { onPlayAll() }
                             .padding(vertical = 12.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.Filled.PlayArrow,
-                            contentDescription = strings.play,
-                            tint = Color.White
-                        )
+                        Icon(Icons.Filled.PlayArrow, contentDescription = strings.play, tint = Color.White)
                         Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = strings.play,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Text(text = strings.play, color = Color.White, fontWeight = FontWeight.SemiBold)
                     }
                     Row(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(14.dp))
                             .background(MiuixAppTheme.colorScheme.surfaceVariant)
-                            .clickable(enabled = plTracks.isNotEmpty()) { onPlayRemix() }
+                            .clickable(enabled = displayTracks.isNotEmpty()) { onPlayRemix() }
                             .padding(vertical = 12.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.Filled.Shuffle,
-                            contentDescription = strings.remix,
-                            tint = MiuixAppTheme.colorScheme.onBackground
-                        )
+                        Icon(Icons.Filled.Shuffle, contentDescription = strings.remix, tint = MiuixAppTheme.colorScheme.onBackground)
                         Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = strings.remix,
-                            color = MiuixAppTheme.colorScheme.onBackground,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Text(text = strings.remix, color = MiuixAppTheme.colorScheme.onBackground, fontWeight = FontWeight.SemiBold)
                     }
-                    if (!playlist.isSystem) {
+                    if (!playlist.isSystem && !isHomeSimplified) {
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(14.dp))
@@ -1769,21 +1730,13 @@ Row(
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                Icons.Filled.Add,
-                                contentDescription = strings.addTracks,
-                                tint = MiuixAppTheme.colorScheme.onBackground
-                            )
+                            Icon(Icons.Filled.Add, contentDescription = strings.addTracks, tint = MiuixAppTheme.colorScheme.onBackground)
                             Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = strings.addTracks,
-                                color = MiuixAppTheme.colorScheme.onBackground
-                            )
+                            Text(text = strings.addTracks, color = MiuixAppTheme.colorScheme.onBackground)
                         }
                     }
                 }
-
-if (!playlist.isSystem) {
+                if (!playlist.isSystem && !isHomeSimplified) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1812,7 +1765,7 @@ if (!playlist.isSystem) {
                 }
             }
 
-if (plTracks.isEmpty()) {
+            if (displayTracks.isEmpty()) {
                 item {
                     Text(
                         text = if (playlist.isSystem) "No liked songs yet" else "No tracks yet. Tap \"${strings.addTracks}\".",
@@ -1822,28 +1775,34 @@ if (plTracks.isEmpty()) {
                     )
                 }
             } else {
-                if (playlist.sortMode == "custom" && !playlist.isSystem) {
+                if (playlist.sortMode == "custom" && !playlist.isSystem && !isHomeSimplified) {
                     itemsIndexed(reorderItems, key = { _, t -> t.id }) { i, t ->
-                        ReorderableItem(
-                            state = reorderableState,
-                            key = t.id
-                        ) { isDragging ->
-                            DraggablePlaylistTrackRow(
-                                track = t,
-                                isDragged = isDragging,
-                                onTrackClick = { onTrackClick(reorderItems.toList(), i) },
-                                onRemove = { onRemoveTrack(t.id) },
-                                dragHandleModifier = Modifier.draggableHandle()
-                            )
+                        ReorderableItem(state = reorderableState, key = t.id) { isDragging ->
+                            Box(modifier = Modifier.animateItem()) {
+                                DraggablePlaylistTrackRow(
+                                    track = t,
+                                    isDragged = isDragging,
+                                    onTrackClick = { onTrackClick(reorderItems.toList(), i) },
+                                    onRemove = { onRemoveTrack(t.id) },
+                                    dragHandleModifier = Modifier.draggableHandle()
+                                )
+                            }
                         }
                     }
                 } else {
-                    itemsIndexed(plTracks) { i, t ->
-                        PlaylistTrackRow(
-                            track = t,
-                            onClick = { onTrackClick(plTracks, i) },
-                            onRemove = { onRemoveTrack(t.id) }
-                        )
+                    // Sliding animation like StatsScreen when sort changes
+                    itemsIndexed(displayTracks, key = { _, t -> t.id }) { i, t ->
+                        Box(modifier = Modifier.animateItem(
+                            fadeInSpec = androidx.compose.animation.core.tween(250),
+                            fadeOutSpec = androidx.compose.animation.core.tween(200),
+                            placementSpec = androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 380f)
+                        )) {
+                            PlaylistTrackRow(
+                                track = t,
+                                onClick = { onTrackClick(displayTracks, i) },
+                                onRemove = { onRemoveTrack(t.id) }
+                            )
+                        }
                     }
                 }
             }

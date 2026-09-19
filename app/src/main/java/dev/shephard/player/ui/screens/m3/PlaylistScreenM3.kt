@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// LineageOS Twelve 1:1 - Playlists Screen
+// LineageOS Twelve 1:1 + M3 padding/radius + grid 3-dot
 package dev.shephard.player.ui.screens.m3
 
 import android.content.Intent
@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -35,18 +36,21 @@ import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -66,12 +70,12 @@ import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PreferencesManager
+import dev.shephard.player.ui.components.m3.BaseWidget
 import dev.shephard.player.ui.components.m3.LineageGridMediaItem
 import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.components.m3.LineageNoElements
 import dev.shephard.player.ui.components.m3.LineageSortingChip
-import dev.shephard.player.ui.glass.LocalWallpaperEnabled
-import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
+import dev.shephard.player.ui.components.m3.SegmentedColumn
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.navigation.PageTransitions
 import dev.shephard.player.ui.navigation.SubmenuNavGuard
@@ -323,7 +327,7 @@ fun PlaylistScreenM3(
             if (idx == null) {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+                    containerColor = MaterialTheme.colorScheme.surface,
                     topBar = {
                         TopAppBar(
                             title = { Text(strings.playlists) },
@@ -332,10 +336,7 @@ fun PlaylistScreenM3(
                                     Icon(Icons.Filled.Add, contentDescription = strings.createPlaylist)
                                 }
                             },
-                            colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
-                                titleContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
-                            ),
+                            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
                         )
                     },
                     floatingActionButton = {
@@ -361,7 +362,6 @@ fun PlaylistScreenM3(
                         }
                     } else {
                         Column(modifier = Modifier.fillMaxSize()) {
-                            // Sorting chip row like Twelve
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -404,6 +404,8 @@ fun PlaylistScreenM3(
                                             subhead = "${plTracks.size} tracks",
                                             thumbnailModel = pl.coverUri,
                                             placeholderIcon = Icons.Filled.QueueMusic,
+                                            trailingIcon = Icons.Filled.MoreVert,
+                                            onTrailingClick = { playlistMenuIndex = realIdx },
                                             onClick = { playlistDetailGuard.push(openIndex, realIdx) { openIndex = realIdx } }
                                         )
                                     }
@@ -411,21 +413,27 @@ fun PlaylistScreenM3(
                             } else {
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(bottom = if (hasMiniPlayer) 160.dp else 80.dp)
+                                    contentPadding = PaddingValues(bottom = if (hasMiniPlayer) 160.dp else 80.dp, top = 4.dp)
                                 ) {
                                     items(sortedPlaylists.size, key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }) { i ->
                                         val pl = sortedPlaylists[i]
                                         val realIdx = playlists.indexOf(pl)
                                         val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                                        LineageListItemWithThumbnail(
-                                            headline = pl.name,
-                                            supporting = "${plTracks.size} ${strings.trackCount}",
-                                            thumbnailModel = pl.coverUri,
-                                            placeholderIcon = Icons.Filled.QueueMusic,
-                                            trailingIcon = Icons.Filled.MoreVert,
-                                            onClick = { playlistDetailGuard.push(openIndex, realIdx) { openIndex = realIdx } },
-                                            onTrailingClick = { playlistMenuIndex = realIdx }
-                                        )
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                                            shape = RoundedCornerShape(20.dp),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                                        ) {
+                                            LineageListItemWithThumbnail(
+                                                headline = pl.name,
+                                                supporting = "${plTracks.size} ${strings.trackCount}",
+                                                thumbnailModel = pl.coverUri,
+                                                placeholderIcon = Icons.Filled.QueueMusic,
+                                                trailingIcon = Icons.Filled.MoreVert,
+                                                onClick = { playlistDetailGuard.push(openIndex, realIdx) { openIndex = realIdx } },
+                                                onTrailingClick = { playlistMenuIndex = realIdx }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -472,67 +480,61 @@ fun PlaylistScreenM3(
     playlistMenuIndex?.let { menuIdx ->
         val pl = playlists.getOrNull(menuIdx)
         if (pl != null) {
-            AlertDialog(
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ModalBottomSheet(
                 onDismissRequest = { playlistMenuIndex = null },
-                title = { Text(pl.name) },
-                text = {
-                    Column {
-                        MenuRowLineage(Icons.Filled.PlayArrow, strings.play) {
-                            playlistMenuIndex = null
-                            val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
-                            if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name)
+                sheetState = sheetState,
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                    Text(pl.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                    SegmentedColumn {
+                        item {
+                            BaseWidget(icon = Icons.Filled.PlayArrow, title = strings.play, onClick = {
+                                playlistMenuIndex = null
+                                val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
+                                if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name)
+                            })
                         }
-                        MenuRowLineage(Icons.Filled.Shuffle, strings.remix) {
-                            playlistMenuIndex = null
-                            val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
-                            if (plTracks.isNotEmpty()) {
-                                if (pl.isSystem) onPlaylistRemixClick(plTracks.shuffled(), strings.likedSongs)
-                                else onPlaylistRemixClick(plTracks.shuffled(), pl.name)
-                            }
+                        item {
+                            BaseWidget(icon = Icons.Filled.Shuffle, title = strings.remix, onClick = {
+                                playlistMenuIndex = null
+                                val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
+                                if (plTracks.isNotEmpty()) {
+                                    if (pl.isSystem) onPlaylistRemixClick(plTracks.shuffled(), strings.likedSongs)
+                                    else onPlaylistRemixClick(plTracks.shuffled(), pl.name)
+                                }
+                            })
                         }
                         if (!pl.isSystem) {
-                            MenuRowLineage(Icons.Filled.Edit, strings.editPlaylist) {
-                                playlistMenuIndex = null
-                                editPlaylistName = pl.name
-                                editPlaylistIndex = menuIdx
+                            item {
+                                BaseWidget(icon = Icons.Filled.Edit, title = strings.editPlaylist, onClick = {
+                                    playlistMenuIndex = null
+                                    editPlaylistName = pl.name
+                                    editPlaylistIndex = menuIdx
+                                })
                             }
-                            MenuRowLineage(if (pl.pinned) Icons.Filled.Pin else Icons.Filled.PushPin, if (pl.pinned) strings.unpinPlaylist else strings.pinPlaylist) {
-                                playlistMenuIndex = null
-                                val all = rawPlaylists.toMutableList()
-                                val rawIdx = all.indexOfFirst { it.name == pl.name && it.createdAt == pl.createdAt }
-                                if (rawIdx >= 0) all[rawIdx] = all[rawIdx].copy(pinned = !pl.pinned)
-                                writePlaylists(all)
+                            item {
+                                BaseWidget(icon = if (pl.pinned) Icons.Filled.Pin else Icons.Filled.PushPin, title = if (pl.pinned) strings.unpinPlaylist else strings.pinPlaylist, onClick = {
+                                    playlistMenuIndex = null
+                                    val all = rawPlaylists.toMutableList()
+                                    val rawIdx = all.indexOfFirst { it.name == pl.name && it.createdAt == pl.createdAt }
+                                    if (rawIdx >= 0) all[rawIdx] = all[rawIdx].copy(pinned = !pl.pinned)
+                                    writePlaylists(all)
+                                })
                             }
-                            MenuRowLineage(Icons.Filled.Delete, strings.delete) {
-                                playlistMenuIndex = null
-                                playlistToDelete = pl
-                                showDeletePlaylistConfirm = true
+                            item {
+                                BaseWidget(icon = Icons.Filled.Delete, title = strings.delete, onClick = {
+                                    playlistMenuIndex = null
+                                    playlistToDelete = pl
+                                    showDeletePlaylistConfirm = true
+                                })
                             }
                         }
                     }
-                },
-                confirmButton = {},
-                dismissButton = {
-                    TextButton(onClick = { playlistMenuIndex = null }) { Text(strings.cancel) }
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun MenuRowLineage(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(12.dp))
-        Text(label, modifier = Modifier.weight(1f))
-        IconButton(onClick = onClick) {
-            Icon(Icons.Filled.PlayArrow, null)
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
         }
     }
 }

@@ -82,17 +82,13 @@ fun StatsScreen(
         ListenStatsCalculator.buildSnapshot(periodEvents)
     }
 
-    val collapseRangePx = with(density) { 44.dp.toPx() }
-    val scrollProgress by remember {
-        derivedStateOf { (scrollState.value / collapseRangePx).coerceIn(0f, 1f) }
-    }
+    // Use collapseFraction from topBarState for consistent blur behavior like other pages
+    val scrollProgress = topBarState.collapseFraction
 
     Column(modifier = Modifier.fillMaxSize().background(cs.background)) {
         SmallTopAppBar(
             title = strings.statsTitle,
             modifier = if (topBarState.pageBackdrop != null) {
-                // InstallerX Revived Miuix values: 25dp blur radius blended
-                // with the theme surface at 80% opacity.
                 Modifier.miuixTopBarBlur(backdrop = topBarState.pageBackdrop)
             } else Modifier,
             color = if (topBarState.pageBackdrop != null) Color.Transparent else cs.background.copy(alpha = scrollProgress),
@@ -117,10 +113,8 @@ fun StatsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .then(topBarState.pageBackdrop?.let { Modifier.layerBackdrop(it) } ?: Modifier)
-                // overScrollVertical must come before verticalScroll so the
-                // NestedScrollConnection it installs can consume the overscroll
-                // delta before the inner scrollable reacts to it.
+                .captureForTopBarBlur(topBarState)
+                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                 .overScrollVertical()
                 .verticalScroll(scrollState)
                 .padding(horizontal = 12.dp, vertical = 12.dp),

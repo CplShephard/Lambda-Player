@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// LineageOS Twelve 1:1 - Music Screen
+// LineageOS Twelve 1:1 + M3 Switchers + Miuix padding/radius
 package dev.shephard.player.ui.screens.m3
 
 import android.content.Intent
@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -31,17 +32,21 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -66,12 +71,12 @@ import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.rememberAudioPermissionState
+import dev.shephard.player.ui.components.m3.BaseWidget
 import dev.shephard.player.ui.components.m3.LineageGridMediaItem
 import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.components.m3.LineageNoElements
 import dev.shephard.player.ui.components.m3.LineageSortingChip
-import dev.shephard.player.ui.glass.LocalWallpaperEnabled
-import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
+import dev.shephard.player.ui.components.m3.SegmentedColumn
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -126,13 +131,12 @@ fun MusicScreenM3(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
                 title = { Text(strings.music) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
-                    titleContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
+                    containerColor = MaterialTheme.colorScheme.surface,
                 ),
             )
         },
@@ -165,7 +169,6 @@ fun MusicScreenM3(
                 }
                 else -> {
                     Column(modifier = Modifier.fillMaxSize()) {
-                        // Sorting chip row like Twelve's SortingChip
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -194,8 +197,6 @@ fun MusicScreenM3(
                                     end = 8.dp,
                                     bottom = if (hasMiniPlayer) 160.dp else 80.dp
                                 ),
-                                horizontalArrangement = Arrangement.spacedBy(0.dp),
-                                verticalArrangement = Arrangement.spacedBy(0.dp)
                             ) {
                                 gridItems(tracks, key = { it.id }) { track ->
                                     LineageGridMediaItem(
@@ -203,6 +204,8 @@ fun MusicScreenM3(
                                         subhead = track.artist,
                                         thumbnailModel = track.albumArtUri,
                                         placeholderIcon = Icons.Filled.MusicNote,
+                                        trailingIcon = Icons.Filled.MoreVert,
+                                        onTrailingClick = { selectedTrackForMenu = track },
                                         onClick = {
                                             val idx = tracks.indexOf(track)
                                             if (idx >= 0) onTrackClick(tracks, idx)
@@ -214,20 +217,29 @@ fun MusicScreenM3(
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(
-                                    bottom = if (hasMiniPlayer) 160.dp else 80.dp
+                                    bottom = if (hasMiniPlayer) 160.dp else 80.dp,
+                                    top = 4.dp
                                 ),
                             ) {
                                 itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
-                                    LineageListItemWithThumbnail(
-                                        headline = track.title,
-                                        supporting = "${track.artist} • ${track.album}",
-                                        thumbnailModel = track.albumArtUri,
-                                        placeholderIcon = Icons.Filled.MusicNote,
-                                        trailingText = track.formattedDuration(),
-                                        trailingIcon = Icons.Filled.MoreVert,
-                                        onClick = { onTrackClick(tracks, index) },
-                                        onTrailingClick = { selectedTrackForMenu = track }
-                                    )
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                                    ) {
+                                        LineageListItemWithThumbnail(
+                                            headline = track.title,
+                                            supporting = "${track.artist} • ${track.album}",
+                                            thumbnailModel = track.albumArtUri,
+                                            placeholderIcon = Icons.Filled.MusicNote,
+                                            trailingText = track.formattedDuration(),
+                                            trailingIcon = Icons.Filled.MoreVert,
+                                            onClick = { onTrackClick(tracks, index) },
+                                            onTrailingClick = { selectedTrackForMenu = track }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -237,45 +249,41 @@ fun MusicScreenM3(
         }
     }
 
+    // Bottom sheet with M3 switcher style #7 instead of popup
     selectedTrackForMenu?.let { track ->
-        AlertDialog(
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
             onDismissRequest = { selectedTrackForMenu = null },
-            text = {
-                Column {
-                    LineageListItemWithThumbnail(
-                        headline = track.title,
-                        supporting = track.artist,
-                        thumbnailModel = track.albumArtUri,
-                        placeholderIcon = Icons.Filled.MusicNote
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = { trackToEdit = track; selectedTrackForMenu = null }) {
-                            Icon(Icons.Filled.Edit, null, tint = MaterialTheme.colorScheme.primary)
-                        }
-                        Text(strings.editMusic, modifier = Modifier.padding(start = 8.dp))
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                LineageListItemWithThumbnail(
+                    headline = track.title,
+                    supporting = track.artist,
+                    thumbnailModel = track.albumArtUri,
+                    placeholderIcon = Icons.Filled.MusicNote
+                )
+                Spacer(Modifier.height(8.dp))
+                SegmentedColumn {
+                    item {
+                        BaseWidget(
+                            icon = Icons.Filled.Edit,
+                            title = strings.editMusic,
+                            onClick = { trackToEdit = track; selectedTrackForMenu = null }
+                        )
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = { trackToDelete = track; selectedTrackForMenu = null }) {
-                            Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error)
-                        }
-                        Text(strings.delete, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 8.dp))
+                    item {
+                        BaseWidget(
+                            icon = Icons.Filled.Delete,
+                            title = strings.delete,
+                            onClick = { trackToDelete = track; selectedTrackForMenu = null }
+                        )
                     }
                 }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { selectedTrackForMenu = null }) { Text(strings.cancel) }
-            },
-        )
+                Spacer(Modifier.height(12.dp))
+            }
+        }
     }
 
     trackToDelete?.let { track ->

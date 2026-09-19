@@ -15,10 +15,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -34,6 +37,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -240,16 +244,24 @@ fun HomeScreenM3(
                                     LineageSectionHeader(title = strings.recentlyPlayed)
                                 }
                                 items(recentlyPlayedTracks, key = { it.id }) { track ->
-                                    LineageListItemWithThumbnail(
-                                        headline = track.title,
-                                        supporting = "${track.artist} • ${track.album}",
-                                        thumbnailModel = track.albumArtUri,
-                                        placeholderIcon = Icons.Filled.MusicNote,
-                                        onClick = {
-                                            val idx = recentlyPlayedTracks.indexOf(track)
-                                            if (idx >= 0) onTrackClick(recentlyPlayedTracks, idx, strings.recentlyPlayed)
-                                        }
-                                    )
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                                    ) {
+                                        LineageListItemWithThumbnail(
+                                            headline = track.title,
+                                            supporting = "${track.artist} • ${track.album}",
+                                            thumbnailModel = track.albumArtUri,
+                                            placeholderIcon = Icons.Filled.MusicNote,
+                                            onClick = {
+                                                val idx = recentlyPlayedTracks.indexOf(track)
+                                                if (idx >= 0) onTrackClick(recentlyPlayedTracks, idx, strings.recentlyPlayed)
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }

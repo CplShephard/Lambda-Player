@@ -128,9 +128,8 @@ object PageTransitions {
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Builds the predictive-pop metadata map for a submenu entry. When the
-     * animation is NONE the spec returns null so NavDisplay falls back to its
-     * normal (non-predictive) pop transition.
+     * Builds the predictive-pop metadata map for a submenu entry.
+     * Fixed: NONE must still return a close animation (was returning null -> missing animation).
      */
     fun predictiveBackSubmenuMetadata(
         animation: PredictiveBackAnimation,
@@ -148,7 +147,10 @@ object PageTransitions {
             @androidx.navigationevent.NavigationEvent.SwipeEdge Int,
         ) -> ContentTransform? = { edge ->
             when (animation) {
-                PredictiveBackAnimation.NONE -> null
+                PredictiveBackAnimation.NONE -> ContentTransform(
+                    targetContentEnter = popEnterSubmenu,
+                    initialContentExit = popExitSubmenu
+                )
 
                 PredictiveBackAnimation.AOSP,
                 PredictiveBackAnimation.SCALE,

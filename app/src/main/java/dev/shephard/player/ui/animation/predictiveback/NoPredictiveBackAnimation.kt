@@ -64,7 +64,9 @@ class NoPredictiveBackAnimation(
 
 /**
  * Simpler No animation for use in entryProvider where we don't have composition local.
- * Uses NavigationEvent None interception like original Lambda code.
+ * Fixed: must still show submenu close animation when going back (NONE should disable
+ * predictive gesture, not disable close animation). Previously used defaultPopTransitionSpec
+ * which on some Navigation3 versions returns None, causing missing close animation.
  */
 class NoPredictiveBackAnimationSimple : PredictiveBackAnimationHandler {
     override suspend fun onBackPressed(
@@ -88,9 +90,19 @@ class NoPredictiveBackAnimationSimple : PredictiveBackAnimationHandler {
         sizeTransform = null
     )
 
-    override fun AnimatedContentTransitionScope<Scene<NavKey>>.onPopTransitionSpec(): ContentTransform =
-        defaultPopTransitionSpec<NavKey>().invoke(this)
+    override fun AnimatedContentTransitionScope<Scene<NavKey>>.onPopTransitionSpec(): ContentTransform {
+        // Ensure close animation always shows even when predictive = NONE
+        // Use same animation as normal submenu pop (InstallerX Revived style)
+        return ContentTransform(
+            targetContentEnter = dev.shephard.player.ui.navigation.PageTransitions.popEnterSubmenu,
+            initialContentExit = dev.shephard.player.ui.navigation.PageTransitions.popExitSubmenu
+        )
+    }
 
-    override fun AnimatedContentTransitionScope<Scene<NavKey>>.onTransitionSpec(): ContentTransform =
-        defaultTransitionSpec<NavKey>().invoke(this)
+    override fun AnimatedContentTransitionScope<Scene<NavKey>>.onTransitionSpec(): ContentTransform {
+        return ContentTransform(
+            targetContentEnter = dev.shephard.player.ui.navigation.PageTransitions.enterSubmenu,
+            initialContentExit = dev.shephard.player.ui.navigation.PageTransitions.exitSubmenu
+        )
+    }
 }

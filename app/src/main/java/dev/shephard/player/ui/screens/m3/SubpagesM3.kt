@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// LineageOS Twelve 1:1 - Subpages (Settings, Player, About, Stats)
+// LineageOS Twelve 1:1 - Subpages with M3 padding/radius + solid background
 package dev.shephard.player.ui.screens.m3
 
-import android.content.pm.PackageManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,20 +16,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ColorLens
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.QueryStats
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,31 +49,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
-import coil.compose.AsyncImagePainter
 import dev.shephard.player.R
-import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.ListenStatsCalculator
 import dev.shephard.player.data.StatsPeriod
-import dev.shephard.player.data.StatsTrackEntry
 import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.m3.LineageListItem
 import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.components.m3.LineageSectionHeader
-import dev.shephard.player.ui.glass.LocalWallpaperEnabled
-import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -98,52 +88,73 @@ fun SettingsScreenM3(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
                 title = { Text(strings.settings) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
-                    titleContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
-                ),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 80.dp)
+            contentPadding = PaddingValues(top = padding.calculateTopPadding() + 4.dp, bottom = padding.calculateBottomPadding() + 80.dp)
         ) {
             item {
-                LineageListItem(
-                    headline = strings.totalListeningTime,
-                    supporting = formatListeningTimeM3Lineage(totalMs, strings),
-                    onClick = onOpenStats
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                ) {
+                    LineageListItem(
+                        headline = strings.totalListeningTime,
+                        supporting = formatListeningTimeM3Lineage(totalMs, strings),
+                        onClick = onOpenStats
+                    )
+                }
             }
             item { LineageSectionHeader(title = strings.settings) }
             item {
-                LineageListItem(
-                    headline = strings.themeSettings,
-                    supporting = strings.themeSettingsSummary,
-                    leadingContent = { Icon(Icons.Filled.ColorLens, null, tint = MaterialTheme.colorScheme.primary) },
-                    onClick = onOpenThemeSettings
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                ) {
+                    LineageListItem(
+                        headline = strings.themeSettings,
+                        supporting = strings.themeSettingsSummary,
+                        leadingContent = { Icon(Icons.Filled.ColorLens, null, tint = MaterialTheme.colorScheme.primary) },
+                        onClick = onOpenThemeSettings
+                    )
+                }
             }
             item {
-                LineageListItem(
-                    headline = strings.playbackSettings,
-                    supporting = strings.playbackSettingsSummary,
-                    leadingContent = { Icon(Icons.Filled.Headphones, null, tint = MaterialTheme.colorScheme.primary) },
-                    onClick = onOpenPlayerSettings
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                ) {
+                    LineageListItem(
+                        headline = strings.playbackSettings,
+                        supporting = strings.playbackSettingsSummary,
+                        leadingContent = { Icon(Icons.Filled.Headphones, null, tint = MaterialTheme.colorScheme.primary) },
+                        onClick = onOpenPlayerSettings
+                    )
+                }
             }
             item {
-                LineageListItem(
-                    headline = strings.aboutLambdaPlayerTitle,
-                    supporting = strings.aboutLambdaPlayerSummary,
-                    leadingContent = { Icon(Icons.Filled.Info, null, tint = MaterialTheme.colorScheme.primary) },
-                    onClick = onOpenAbout
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                ) {
+                    LineageListItem(
+                        headline = strings.aboutLambdaPlayerTitle,
+                        supporting = strings.aboutLambdaPlayerSummary,
+                        leadingContent = { Icon(Icons.Filled.Info, null, tint = MaterialTheme.colorScheme.primary) },
+                        onClick = onOpenAbout
+                    )
+                }
             }
         }
     }
@@ -162,48 +173,63 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
                 title = { Text(strings.playbackSettings) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
-                    titleContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
-                ),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding())
+            contentPadding = PaddingValues(top = padding.calculateTopPadding() + 4.dp, bottom = padding.calculateBottomPadding())
         ) {
             item { LineageSectionHeader(title = strings.playbackSettings) }
             item {
-                LineageListItem(
-                    headline = strings.crossfade,
-                    trailingContent = {
-                        androidx.compose.material3.Switch(checked = crossfade, onCheckedChange = { scope.launch { prefs.setCrossfadeEnabled(it) } })
-                    }
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                ) {
+                    LineageListItem(
+                        headline = strings.crossfade,
+                        trailingContent = {
+                            androidx.compose.material3.Switch(checked = crossfade, onCheckedChange = { scope.launch { prefs.setCrossfadeEnabled(it) } })
+                        }
+                    )
+                }
             }
             item {
-                LineageListItem(
-                    headline = strings.gapless,
-                    trailingContent = {
-                        androidx.compose.material3.Switch(checked = gapless, onCheckedChange = { scope.launch { prefs.setGaplessEnabled(it) } })
-                    }
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                ) {
+                    LineageListItem(
+                        headline = strings.gapless,
+                        trailingContent = {
+                            androidx.compose.material3.Switch(checked = gapless, onCheckedChange = { scope.launch { prefs.setGaplessEnabled(it) } })
+                        }
+                    )
+                }
             }
             item {
-                LineageListItem(
-                    headline = strings.playWithOthers,
-                    trailingContent = {
-                        androidx.compose.material3.Switch(checked = playWith, onCheckedChange = { scope.launch { prefs.setPlayWithOthers(it) } })
-                    }
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                ) {
+                    LineageListItem(
+                        headline = strings.playWithOthers,
+                        trailingContent = {
+                            androidx.compose.material3.Switch(checked = playWith, onCheckedChange = { scope.launch { prefs.setPlayWithOthers(it) } })
+                        }
+                    )
+                }
             }
         }
     }
@@ -233,14 +259,12 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
                 title = { Text(strings.aboutSectionTitle) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
-                ),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
     ) { padding ->
@@ -253,7 +277,7 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(16.dp))
-            Box(modifier = Modifier.size(88.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.size(88.dp).clip(RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
                 val bitmap = appIconBitmap
                 if (bitmap != null) {
                     Image(bitmap = bitmap.asImageBitmap(), contentDescription = strings.appName, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -268,30 +292,35 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
             Spacer(Modifier.height(28.dp))
 
             LineageSectionHeader(title = strings.aboutSectionTitle, modifier = Modifier.fillMaxWidth())
-            LineageListItem(
-                headline = strings.github,
-                supporting = "CplShephard",
-                leadingContent = { Icon(Icons.Filled.Code, null) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.OpenInNew, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                onClick = { uriHandler.openUri("https://github.com/CplShephard") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            LineageListItem(
-                headline = strings.sourceCode,
-                supporting = "github.com/CplShephard/Lambda-Player",
-                leadingContent = { Icon(Icons.Filled.Info, null) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.OpenInNew, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                onClick = { uriHandler.openUri("https://github.com/CplShephard/Lambda-Player") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            LineageListItem(
-                headline = "Miuix",
-                supporting = strings.miuixDescription,
-                leadingContent = { Icon(Icons.Filled.Layers, null) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.OpenInNew, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                onClick = { uriHandler.openUri("https://github.com/miuix-project/miuix") },
-                modifier = Modifier.fillMaxWidth()
-            )
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+            ) {
+                LineageListItem(
+                    headline = strings.github,
+                    supporting = "CplShephard",
+                    leadingContent = { Icon(Icons.Filled.Code, null) },
+                    trailingContent = { Icon(Icons.AutoMirrored.Filled.OpenInNew, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    onClick = { uriHandler.openUri("https://github.com/CplShephard") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+            ) {
+                LineageListItem(
+                    headline = strings.sourceCode,
+                    supporting = "github.com/CplShephard/Lambda-Player",
+                    leadingContent = { Icon(Icons.Filled.Info, null) },
+                    trailingContent = { Icon(Icons.AutoMirrored.Filled.OpenInNew, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    onClick = { uriHandler.openUri("https://github.com/CplShephard/Lambda-Player") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            // Miuix removed from M3 about section #3
         }
     }
 }
@@ -315,12 +344,12 @@ fun StatsScreenM3(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
                 title = { Text(strings.statsTitle) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
     ) { padding ->
@@ -332,7 +361,6 @@ fun StatsScreenM3(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Period chips like SortingChip
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 val periods = listOf(StatsPeriod.Today to strings.statsPeriodToday, StatsPeriod.ThisWeek to strings.statsPeriodThisWeek, StatsPeriod.ThisMonth to strings.statsPeriodThisMonth, StatsPeriod.AllTime to strings.statsPeriodAllTime)
                 periods.forEach { (period, label) ->
@@ -363,12 +391,18 @@ fun StatsScreenM3(
                     val displayTitle = track?.title?.takeIf { it.isNotBlank() } ?: entry.title
                     val displayArtist = track?.artist?.takeIf { it.isNotBlank() } ?: entry.artistName
 
-                    LineageListItemWithThumbnail(
-                        headline = "${index + 1}. $displayTitle",
-                        supporting = "$displayArtist • ${formatListeningTimeM3Lineage(entry.listenedMs, strings)}",
-                        thumbnailModel = coverUri,
-                        placeholderIcon = Icons.Filled.MusicNote
-                    )
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                    ) {
+                        LineageListItemWithThumbnail(
+                            headline = "${index + 1}. $displayTitle",
+                            supporting = "$displayArtist • ${formatListeningTimeM3Lineage(entry.listenedMs, strings)}",
+                            thumbnailModel = coverUri,
+                            placeholderIcon = Icons.Filled.MusicNote
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(60.dp))

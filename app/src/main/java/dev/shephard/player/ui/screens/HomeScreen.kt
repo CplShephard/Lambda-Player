@@ -195,7 +195,8 @@ fun HomeScreen(
                     onAddTracks = { },
                     onPickCover = { },
                     onReorder = { },
-                    onChangeSort = { }
+                    onChangeSort = { },
+                    isHomeSimplified = true
                 )
             } else {
                 Scaffold(

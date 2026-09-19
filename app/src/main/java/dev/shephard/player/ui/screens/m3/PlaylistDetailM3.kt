@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// LineageOS Twelve 1:1 - Playlist Detail (Album fragment style)
+// LineageOS Twelve 1:1 + M3 padding/radius + bottom sheet menu
 package dev.shephard.player.ui.screens.m3
 
 import android.content.Intent
@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -42,12 +43,14 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,9 +70,9 @@ import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PreferencesManager
+import dev.shephard.player.ui.components.m3.BaseWidget
 import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
-import dev.shephard.player.ui.glass.LocalWallpaperEnabled
-import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
+import dev.shephard.player.ui.components.m3.SegmentedColumn
 import dev.shephard.player.ui.i18n.Strings
 import dev.shephard.player.ui.screens.LocalPlaylist
 import dev.shephard.player.ui.screens.encodePlaylists
@@ -268,7 +271,7 @@ internal fun M3PlaylistDetail(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
                 title = { Text(text = playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -288,10 +291,7 @@ internal fun M3PlaylistDetail(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
-                    titleContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
-                ),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
         floatingActionButton = {
@@ -318,15 +318,13 @@ internal fun M3PlaylistDetail(
                 bottom = padding.calculateBottomPadding() + 80.dp,
             ),
         ) {
-            // Header like Twelve's album_labels + thumbnail
             item {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    // Thumbnail like fragment_album thumbnailImageView 1:1 ratio with scrim
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 24.dp)
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(16.dp))
                             .background(MaterialTheme.colorScheme.secondaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
@@ -362,32 +360,51 @@ internal fun M3PlaylistDetail(
             }
 
             items(plTracks, key = { it.id }) { track ->
-                LineageListItemWithThumbnail(
-                    headline = track.title,
-                    supporting = track.artist,
-                    thumbnailModel = track.albumArtUri,
-                    placeholderIcon = Icons.Filled.MusicNote,
-                    trailingIcon = Icons.Filled.MoreVert,
-                    onClick = { onTrackClick(listOf(track), 0) },
-                    onTrailingClick = { trackMenuTrack = track }
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                ) {
+                    LineageListItemWithThumbnail(
+                        headline = track.title,
+                        supporting = track.artist,
+                        thumbnailModel = track.albumArtUri,
+                        placeholderIcon = Icons.Filled.MusicNote,
+                        trailingIcon = Icons.Filled.MoreVert,
+                        onClick = { onTrackClick(listOf(track), 0) },
+                        onTrailingClick = { trackMenuTrack = track }
+                    )
+                }
             }
         }
     }
 
     trackMenuTrack?.let { menuTrack ->
-        AlertDialog(
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
             onDismissRequest = { trackMenuTrack = null },
-            title = { Text(menuTrack.title) },
-            text = {
-                Column {
-                    TextButton(onClick = { trackMenuTrack = null; onRemoveTrack(menuTrack.id) }) {
-                        Text(strings.removeFromPlaylist)
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                LineageListItemWithThumbnail(
+                    headline = menuTrack.title,
+                    supporting = menuTrack.artist,
+                    thumbnailModel = menuTrack.albumArtUri,
+                    placeholderIcon = Icons.Filled.MusicNote
+                )
+                Spacer(Modifier.height(8.dp))
+                SegmentedColumn {
+                    item {
+                        BaseWidget(
+                            icon = Icons.Filled.Delete,
+                            title = strings.removeFromPlaylist,
+                            onClick = { trackMenuTrack = null; onRemoveTrack(menuTrack.id) }
+                        )
                     }
                 }
-            },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = { trackMenuTrack = null }) { Text(strings.cancel) } }
-        )
+                Spacer(Modifier.height(12.dp))
+            }
+        }
     }
 }

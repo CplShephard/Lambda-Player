@@ -321,12 +321,11 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         SectionCard {
             val engineOptions = listOf(true to strings.miuixUi, false to strings.googleUi)
             val engineSelectedIndex = if (useMiuix) 0 else 1
-            top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+            MiuixSpinnerRow(
                 title = strings.uiEngine,
                 summary = strings.uiEngineDescription,
-                items = engineOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
+                items = engineOptions.map { it.second },
                 selectedIndex = engineSelectedIndex,
-                modifier = Modifier.clip(RoundedCornerShape(30.dp)),
                 onSelectedIndexChange = { index ->
                     scope.launch { prefs.setUseMiuix(engineOptions[index].first) }
                 }
@@ -350,18 +349,17 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 ThemeModePreference.AUTO to strings.autoMode,
             )
             val themeModeSelectedIndex = themeModeOptions.indexOfFirst { it.first == themeMode }.coerceAtLeast(0)
-            top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+            MiuixSpinnerRow(
                 title = strings.themeMode,
-                items = themeModeOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
+                items = themeModeOptions.map { it.second },
                 selectedIndex = themeModeSelectedIndex,
-                modifier = Modifier.clip(RoundedCornerShape(30.dp)),
                 onSelectedIndexChange = { index ->
                     scope.launch { prefs.setThemeMode(themeModeOptions[index].first) }
                 }
             )
 
-            // InstallerX only shows the blur switch on Android 13+.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Hide blur toggle on < Android 12 (S) per spec
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 Spacer(Modifier.height(8.dp))
                 ToggleRow(label = strings.blurEffect, checked = liquidGlassEnabled, description = strings.blurEffectDescription) { enabled ->
                     scope.launch { prefs.setLiquidGlassEnabled(enabled) }
@@ -398,11 +396,10 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                     Spacer(Modifier.height(8.dp))
                     val paletteStyleOptions = PaletteStyle.entries
                     val paletteSelectedIndex = paletteStyleOptions.indexOf(paletteStyle).coerceAtLeast(0)
-                    top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+                    MiuixSpinnerRow(
                         title = strings.paletteStyle,
-                        items = paletteStyleOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.displayName) },
+                        items = paletteStyleOptions.map { it.displayName },
                         selectedIndex = paletteSelectedIndex,
-                        modifier = Modifier.clip(RoundedCornerShape(30.dp)),
                         onSelectedIndexChange = { index ->
                             val newStyle = paletteStyleOptions[index]
                             if (newStyle != paletteStyle) {
@@ -416,12 +413,11 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                     val availableSpecs = if (isSpec2025Supported) ThemeColorSpec.entries else listOf(ThemeColorSpec.SPEC_2021)
                     val activeSpec = if (!isSpec2025Supported) ThemeColorSpec.SPEC_2021 else colorSpec
                     val specSelectedIndex = availableSpecs.indexOf(activeSpec).coerceAtLeast(0)
-                    top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+                    MiuixSpinnerRow(
                         title = strings.colorSpec,
                         summary = if (!isSpec2025Supported) strings.colorSpecOnly2021 else null,
-                        items = availableSpecs.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.displayName) },
+                        items = availableSpecs.map { it.displayName },
                         selectedIndex = specSelectedIndex,
-                        modifier = Modifier.clip(RoundedCornerShape(30.dp)),
                         onSelectedIndexChange = { index ->
                             val selectedSpec = availableSpecs[index]
                             if (selectedSpec != colorSpec) {
@@ -666,22 +662,20 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 LayoutMode.GRID to strings.grid,
             )
             val musicsLayoutIndex = layoutModeOptions.indexOfFirst { it.first == musicsLayout }.coerceAtLeast(0)
-            top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+            MiuixSpinnerRow(
                 title = strings.musicsLayout,
-                items = layoutModeOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
+                items = layoutModeOptions.map { it.second },
                 selectedIndex = musicsLayoutIndex,
-                modifier = Modifier.clip(RoundedCornerShape(30.dp)),
                 onSelectedIndexChange = { index ->
                     scope.launch { prefs.setMusicsLayout(layoutModeOptions[index].first) }
                 }
             )
             Spacer(Modifier.height(4.dp))
             val playlistsLayoutIndex = layoutModeOptions.indexOfFirst { it.first == playlistsLayout }.coerceAtLeast(0)
-            top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+            MiuixSpinnerRow(
                 title = strings.playlistsLayout,
-                items = layoutModeOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
+                items = layoutModeOptions.map { it.second },
                 selectedIndex = playlistsLayoutIndex,
-                modifier = Modifier.clip(RoundedCornerShape(30.dp)),
                 onSelectedIndexChange = { index ->
                     scope.launch { prefs.setPlaylistsLayout(layoutModeOptions[index].first) }
                 }
@@ -703,12 +697,11 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                     PredictiveBackAnimation.CLASSIC to strings.predictiveBackClassic,
                 )
                 val predictiveBackIndex = predictiveBackOptions.indexOfFirst { it.first == predictiveBack }.coerceAtLeast(0)
-                top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+                MiuixSpinnerRow(
                     title = strings.predictiveBackTitle,
                     summary = strings.predictiveBackDescription,
-                    items = predictiveBackOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
+                    items = predictiveBackOptions.map { it.second },
                     selectedIndex = predictiveBackIndex,
-                    modifier = Modifier.clip(RoundedCornerShape(30.dp)),
                     onSelectedIndexChange = { index ->
                         val newAnimation = predictiveBackOptions[index].first
                         if (newAnimation != predictiveBack) {
@@ -730,18 +723,22 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                         )
                         val predictiveDirectionIndex = predictiveDirectionOptions
                             .indexOfFirst { it.first == predictiveBackDirection }.coerceAtLeast(0)
-                        top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+                        MiuixSpinnerRow(
                             title = strings.predictiveBackExitDirectionTitle,
                             summary = strings.predictiveBackExitDirectionDescription,
-                            items = predictiveDirectionOptions.map { top.yukonga.miuix.kmp.basic.DropdownItem(text = it.second) },
+                            items = predictiveDirectionOptions.map { it.second },
                             selectedIndex = predictiveDirectionIndex,
-                            modifier = Modifier.clip(RoundedCornerShape(30.dp)),
                             onSelectedIndexChange = { index ->
                                 val newDirection = predictiveDirectionOptions[index].first
                                 if (newDirection != predictiveBackDirection) {
                                     scope.launch { prefs.setPredictiveBackExitDirection(newDirection) }
                                 }
                             }
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        MiuixPredictiveBackDirectionBottomSwitcher(
+                            selectedDirection = predictiveBackDirection,
+                            onSelect = { dir -> scope.launch { prefs.setPredictiveBackExitDirection(dir) } }
                         )
                     }
                 }
@@ -937,13 +934,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
     }
 
     val isDarkTheme = MiuixAppTheme.colorScheme.background.luminance() < 0.5f
-    BgEffectBackground(
-        isDarkTheme = isDarkTheme,
-        modifier = Modifier.fillMaxSize(),
-        isFullSize = true,
-        surface = Color.Black,
-        alpha = { 1f - scrollProgress * 0.85f }
-    ) {
+    val aboutContent: @Composable () -> Unit = {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1081,6 +1072,27 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
             }
         )
     }
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        BgEffectBackground(
+            isDarkTheme = isDarkTheme,
+            modifier = Modifier.fillMaxSize(),
+            isFullSize = true,
+            surface = Color.Black,
+            alpha = { 1f - scrollProgress * 0.85f }
+        ) {
+            aboutContent()
+        }
+    } else {
+        // Solid fallback on <13: gradient fails, use black/white per dark mode
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(if (isDarkTheme) Color.Black else Color.White)
+        ) {
+            aboutContent()
+        }
+    }
 }
 
 @Composable
@@ -1090,32 +1102,23 @@ private fun SettingsPageScaffold(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val strings = LocalStrings.current
-    val density = LocalDensity.current
+    val cs = MiuixAppTheme.colorScheme
+    // Use same pattern as other working pages (Home, Music, Playlists list)
+    // – CollapsingTopBarState provides both scrollBehavior and pageBackdrop,
+    // and captureForTopBarBlur correctly wires layerBackdrop.
+    val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
     val scrollState = rememberScrollState()
-    val topAppBarScrollBehavior = MiuixScrollBehavior()
-    val liquidGlassOn = LocalBlurEnabled.current
+    val scrollProgress = topBarState.collapseFraction
 
-    // InstallerX-style page backdrop: solid surface base + captured content,
-    // so the small top bar blurs cleanly (25dp / surface 80% tint) instead of
-    // smearing the page content while scrolling.
-    val pageBackdrop = rememberMiuixPageBackdrop(liquidGlassOn)
-
-    val collapseRangePx = with(density) { 44.dp.toPx() }
-    val scrollProgress by remember {
-        derivedStateOf { (scrollState.value / collapseRangePx).coerceIn(0f, 1f) }
-    }
-
-    Column(modifier = Modifier.fillMaxSize().background(MiuixAppTheme.colorScheme.background)) {
+    Column(modifier = Modifier.fillMaxSize().background(cs.background)) {
         SmallTopAppBar(
             title = title,
-            modifier = if (pageBackdrop != null) {
-                // InstallerX Revived Miuix values: 25dp blur radius blended
-                // with the theme surface at 80% opacity.
-                Modifier.miuixTopBarBlur(backdrop = pageBackdrop)
+            modifier = if (topBarState.pageBackdrop != null) {
+                Modifier.miuixTopBarBlur(backdrop = topBarState.pageBackdrop)
             } else Modifier,
-            color = if (pageBackdrop != null) Color.Transparent else MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
-            titleColor = wallpaperAdaptiveTextColor().copy(alpha = scrollProgress),
-            scrollBehavior = topAppBarScrollBehavior,
+            color = if (topBarState.pageBackdrop != null) Color.Transparent else cs.background.copy(alpha = scrollProgress),
+            titleColor = cs.onBackground.copy(alpha = scrollProgress),
+            scrollBehavior = topBarState.scrollBehavior,
             defaultWindowInsetsPadding = false,
             navigationIcon = {
                 Box(
@@ -1123,19 +1126,19 @@ private fun SettingsPageScaffold(
                         .padding(start = 12.dp)
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
+                        .background(cs.surfaceVariant.copy(alpha = 0.75f))
                         .bounceClick { onBack() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription, tint = MiuixAppTheme.colorScheme.onBackground)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription, tint = cs.onBackground)
                 }
             }
         )
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .then(pageBackdrop?.let { Modifier.layerBackdrop(it) } ?: Modifier)
-                .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection)
+                .captureForTopBarBlur(topBarState)
+                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                 .overScrollVertical()
                 .verticalScroll(scrollState)
                 .padding(horizontal = 12.dp),
@@ -1286,10 +1289,152 @@ private fun ToggleRow(label: String, checked: Boolean, description: String? = nu
         Switch(
             checked = checked,
             onCheckedChange = onChange,
-            // Real Miuix switch colors: white thumb, blue track when on,
-            // gray track when off — follows the custom colors in Monet mode.
             colors = SwitchDefaults.colors()
         )
+    }
+}
+
+@Composable
+private fun MiuixSpinnerRow(
+    title: String,
+    summary: String? = null,
+    items: List<String>,
+    selectedIndex: Int,
+    onSelectedIndexChange: (Int) -> Unit
+) {
+    var showDrawer by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .miuixWidgetClick(pressScale = 0.97f, maxTiltDegrees = 3f) { showDrawer = true }
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 16.dp)
+        ) {
+            Text(
+                text = title,
+                color = MiuixAppTheme.colorScheme.onBackground,
+                style = MiuixAppTheme.typography.bodyLarge
+            )
+            if (summary != null) {
+                Text(
+                    text = summary,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixAppTheme.typography.bodySmall
+                )
+            }
+            Text(
+                text = items.getOrNull(selectedIndex) ?: "",
+                color = MiuixAppTheme.colorScheme.primary,
+                style = MiuixAppTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        Icon(
+            imageVector = Icons.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+            modifier = Modifier.size(20.dp)
+        )
+    }
+
+    if (showDrawer) {
+        MiuixDrawer(onDismissRequest = { showDrawer = false }) {
+            val dismissDrawer = rememberDrawerDismiss()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.6f)
+                    .padding(20.dp)
+            ) {
+                Text(title, style = MiuixAppTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MiuixAppTheme.colorScheme.onBackground)
+                if (summary != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(summary, style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(Modifier.height(12.dp))
+                LazyColumn(
+                    modifier = Modifier.weight(1f).overScrollVertical(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(items.size) { idx ->
+                        val selected = idx == selectedIndex
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    if (selected) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                    else MiuixAppTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.58f)
+                                )
+                                .miuixWidgetClick(pressScale = 0.97f, maxTiltDegrees = 3f) {
+                                    onSelectedIndexChange(idx)
+                                    dismissDrawer()
+                                }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = items[idx],
+                                color = if (selected) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onBackground,
+                                style = MiuixAppTheme.typography.bodyLarge,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                            )
+                            if (selected) {
+                                Icon(Icons.Filled.KeyboardArrowRight, contentDescription = null, tint = MiuixAppTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiuixPredictiveBackDirectionBottomSwitcher(
+    selectedDirection: PredictiveBackExitDirection,
+    onSelect: (PredictiveBackExitDirection) -> Unit
+) {
+    val options = listOf(
+        PredictiveBackExitDirection.FOLLOW_GESTURE to "Follow",
+        PredictiveBackExitDirection.ALWAYS_RIGHT to "Right",
+        PredictiveBackExitDirection.ALWAYS_LEFT to "Left"
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        options.forEach { (dir, label) ->
+            val isSelected = dir == selectedDirection
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        if (isSelected) MiuixAppTheme.colorScheme.primary
+                        else MiuixAppTheme.colorScheme.surfaceContainerHighest
+                    )
+                    .miuixWidgetClick(pressScale = 0.96f, maxTiltDegrees = 3f) { onSelect(dir) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    color = if (isSelected) MiuixAppTheme.colorScheme.onPrimary else MiuixAppTheme.colorScheme.onSurface,
+                    style = MiuixAppTheme.typography.labelMedium,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+        }
     }
 }
 
