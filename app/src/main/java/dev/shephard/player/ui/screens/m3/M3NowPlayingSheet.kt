@@ -107,7 +107,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.draggableHandle
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -311,7 +310,7 @@ fun M3NowPlayingSheet(
                 androidx.compose.material3.FilledIconButton(
                     onClick = { playerViewModel.togglePlayPause() },
                     modifier = Modifier.size(72.dp),
-                    colors = androidx.compose.material3.FilledIconButtonDefaults.filledIconButtonColors(
+                    colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     )

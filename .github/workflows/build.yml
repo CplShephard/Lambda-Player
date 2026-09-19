@@ -26,10 +26,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Release APK
-        env:
-          GRADLE_OPTS: -Xmx4096m -Dfile.encoding=UTF-8
-          JAVA_OPTS: -Xmx4096m
-        run: ./gradlew --no-daemon -Dorg.gradle.jvmargs=\"-Xmx4096m -XX:MaxMetaspaceSize=1024m\" assembleRelease
+        run: ./gradlew --no-daemon assembleRelease
 
       - name: Upload APK
         uses: actions/upload-artifact@v6

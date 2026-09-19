@@ -934,7 +934,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
     }
 
     val isDarkTheme = MiuixAppTheme.colorScheme.background.luminance() < 0.5f
-    val aboutContent: @Composable () -> Unit = {
+    val aboutContent: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit = {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
