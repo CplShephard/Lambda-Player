@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Custom predictive back that works from anywhere – rewritten with InstallerX exact logic
 // Uses draggable Orientation.Horizontal to avoid blocking vertical scroll (fixes PlaylistDetailView)
-// Implements damped translation, BackGestureEasing, velocity threshold like InstallerX Revived
+// Implements damped translation, AnywhereBackGestureEasing, velocity threshold like InstallerX Revived
 package dev.shephard.player.ui.components
 
 import androidx.compose.animation.core.Animatable
@@ -34,8 +34,8 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 // InstallerX exact easings
-private val BackGestureEasing = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
-private val FastOutExtraSlowIn = CubicBezierEasing(0.05f, 0f, 0.133333f, 0.06f) // simplified, actual InstallerX uses compound but this matches
+private val AnywhereBackGestureEasing = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
+private val AnywhereAnywhereFastOutExtraSlowIn = CubicBezierEasing(0.2f, 0f, 0f, 1f) // simplified, actual InstallerX uses compound but this matches
 
 /**
  * Wraps content with anywhere-drag predictive back.
@@ -94,7 +94,7 @@ fun PredictiveBackAnywhereWrapper(
 
             // InstallerX damped translation: scale down drag for predictive effect
             // AOSP and SCALE have resistance, MIUIX/CLASSIC have full translation with easing
-            val easedProgress = BackGestureEasing.transform(dragProgress)
+            val easedProgress = AnywhereBackGestureEasing.transform(dragProgress)
             val damped = when (predictiveBack) {
                 PredictiveBackAnimation.SCALE -> {
                     // Scale animation: translation smaller, scale based on eased progress
@@ -146,7 +146,7 @@ fun PredictiveBackAnywhereWrapper(
                                 }
                                 offsetX.animateTo(
                                     target,
-                                    animationSpec = tween(durationMillis = duration, easing = FastOutExtraSlowIn)
+                                    animationSpec = tween(durationMillis = duration, easing = AnywhereFastOutExtraSlowIn)
                                 )
                                 onBack()
                                 offsetX.snapTo(0f)
@@ -168,7 +168,7 @@ fun PredictiveBackAnywhereWrapper(
                     when (predictiveBack) {
                         PredictiveBackAnimation.SCALE -> {
                             // From ScaleNavTransition: 0.85f + 0.15f * easedProgress
-                            val eased = 1f - BackGestureEasing.transform((1f - dragProgress).coerceIn(0f, 1f))
+                            val eased = 1f - AnywhereBackGestureEasing.transform((1f - dragProgress).coerceIn(0f, 1f))
                             val scale = 0.85f + 0.15f * eased
                             scaleX = scale
                             scaleY = scale
@@ -176,7 +176,7 @@ fun PredictiveBackAnywhereWrapper(
                         }
                         PredictiveBackAnimation.AOSP -> {
                             // AOSP: scale 0.9 + 0.1 * eased, alpha slight fade
-                            val eased = 1f - BackGestureEasing.transform((1f - dragProgress).coerceIn(0f, 1f))
+                            val eased = 1f - AnywhereBackGestureEasing.transform((1f - dragProgress).coerceIn(0f, 1f))
                             val scale = 0.9f + 0.1f * eased
                             scaleX = scale
                             scaleY = scale

@@ -334,14 +334,15 @@ fun NavGraph(
                 )
             } else null
 
-            if (isPredictiveEnabled && gestureState != null) {
+            val nonNullGestureState = gestureState
+            if (isPredictiveEnabled && nonNullGestureState != null) {
                 NavigationBackHandler(
-                    state = gestureState,
+                    state = nonNullGestureState,
                     isBackEnabled = backStack.size > 1,
                     onBackCompleted = {
                         navigationScope.launch {
                             handler.onBackPressed(
-                                transitionState = gestureState?.transitionState,
+                                transitionState = nonNullGestureState.transitionState,
                                 currentPageKey = backStack.lastOrNull()
                             )
                             pop()

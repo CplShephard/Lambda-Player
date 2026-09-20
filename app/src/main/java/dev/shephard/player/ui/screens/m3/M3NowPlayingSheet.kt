@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 // SPDX-License-Identifier: GPL-3.0-only
 // LineageOS Twelve 1:1 - Now Playing Screen
 package dev.shephard.player.ui.screens.m3
@@ -734,6 +735,7 @@ private fun m3FormatMillisLineage(ms: Long): String {
     return "%d:%02d".format(m, s)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun M3AddToPlaylistDrawer(
     trackId: Long,

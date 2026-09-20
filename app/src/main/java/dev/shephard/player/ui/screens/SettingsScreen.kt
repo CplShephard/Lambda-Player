@@ -376,15 +376,12 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
 
             // Fixed re-animation: snap to target on first load to avoid enter animation on re-enter
             if (useMiuixMonetNullable != null) {
-                val monetMenuState = remember(useMiuixMonetNullable) { MutableTransitionState(useMiuixMonet).apply { targetState = useMiuixMonet } }
+                val monetMenuState = remember(useMiuixMonetNullable) { MutableTransitionState(useMiuixMonet) }
                 LaunchedEffect(useMiuixMonet) {
-                    if (monetMenuState.currentState != useMiuixMonet) {
-                        monetMenuState.targetState = useMiuixMonet
-                    }
+                    monetMenuState.targetState = useMiuixMonet
                 }
-                // Snap currentState to target immediately when data first loads to prevent re-animation
+                // Snap immediately on first load – use targetState only, initial state already equals useMiuixMonet
                 LaunchedEffect(useMiuixMonetNullable) {
-                    monetMenuState.currentState = useMiuixMonet
                     monetMenuState.targetState = useMiuixMonet
                 }
                 AnimatedVisibility(
@@ -442,14 +439,8 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             paletteStyle != PaletteStyle.Monochrome &&
             (!dynamicColor || Build.VERSION.SDK_INT < Build.VERSION_CODES.S)
         val accentGridVisible = useMiuixMonetNullable != null && dynamicColorNullable != null && accentGridTarget
-        val accentGridState = remember(useMiuixMonetNullable, dynamicColorNullable) { MutableTransitionState(accentGridVisible).apply { targetState = accentGridVisible } }
+        val accentGridState = remember(useMiuixMonetNullable, dynamicColorNullable) { MutableTransitionState(accentGridVisible) }
         LaunchedEffect(accentGridVisible) {
-            if (accentGridState.currentState != accentGridVisible) {
-                accentGridState.targetState = accentGridVisible
-            }
-        }
-        LaunchedEffect(useMiuixMonetNullable, dynamicColorNullable) {
-            accentGridState.currentState = accentGridVisible
             accentGridState.targetState = accentGridVisible
         }
         AnimatedVisibility(

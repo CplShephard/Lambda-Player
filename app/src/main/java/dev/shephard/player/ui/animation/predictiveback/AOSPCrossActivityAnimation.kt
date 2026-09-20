@@ -52,8 +52,8 @@ private const val BOUNCE_MAX_KICK = 1000f
 private const val BOUNCE_MIN_KICK = 120f
 private val CrossActivityDrift = 96.dp
 private val CrossActivityEdgeMargin = 8.dp
-private val BackGestureEasing = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
-private val FastOutExtraSlowIn = CubicBezierEasing(0.05f, 0f, 0.133333f, 0.06f)
+private val AospBackGestureEasing = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
+private val AospFastOutExtraSlowIn = CubicBezierEasing(0.05f, 0f, 0.133333f, 0.06f)
 
 class AOSPCrossActivityAnimation(
     private val exitDirection: PredictiveBackExitDirection = PredictiveBackExitDirection.FOLLOW_GESTURE
@@ -72,7 +72,7 @@ class AOSPCrossActivityAnimation(
         exitingPageKey = currentPageKey.toString()
         exitAnimatable.animateTo(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 450, easing = FastOutExtraSlowIn)
+            animationSpec = tween(durationMillis = 450, easing = AospFastOutExtraSlowIn)
         )
     }
 
@@ -191,7 +191,7 @@ class AOSPCrossActivityAnimation(
                         val post = (1f - linearProgress / releaseProgress).coerceIn(0f, 1f).let { 1f - it } // simplified post
                         // Actually InstallerX: post = (1 - progress / releaseProgress)
                         // For Navigation3 we use linearProgress as commit progress
-                        val easedRelease = 1f - BackGestureEasing.transform((1f - gestureProgress).coerceIn(0f, 1f))
+                        val easedRelease = 1f - AospBackGestureEasing.transform((1f - gestureProgress).coerceIn(0f, 1f))
                         val committedScale = CROSS_ACTIVITY_MIN_SCALE + (1f - CROSS_ACTIVITY_MIN_SCALE) * easedRelease
                         val grown = committedScale + (1f - committedScale) * linearProgress
                         val finalScale = grown * bounceScale
@@ -205,7 +205,7 @@ class AOSPCrossActivityAnimation(
                     }
                     isCurrentNavTarget && isGestureActiveNow -> {
                         // During gesture – exact InstallerX predictive
-                        val easedProgress = 1f - BackGestureEasing.transform((1f - gestureProgress).coerceIn(0f, 1f))
+                        val easedProgress = 1f - AospBackGestureEasing.transform((1f - gestureProgress).coerceIn(0f, 1f))
                         val scale = (CROSS_ACTIVITY_MIN_SCALE + (1f - CROSS_ACTIVITY_MIN_SCALE) * easedProgress) * bounceScale
                         scaleX = scale
                         scaleY = scale
@@ -222,7 +222,7 @@ class AOSPCrossActivityAnimation(
                     else -> {
                         // Underlying page
                         if (exitingPageKey != null) {
-                            val eased = BackGestureEasing.transform(gestureProgress.coerceIn(0f, 1f))
+                            val eased = AospBackGestureEasing.transform(gestureProgress.coerceIn(0f, 1f))
                             val liveScale = CROSS_ACTIVITY_MIN_SCALE + (1f - CROSS_ACTIVITY_MIN_SCALE) * (1f - eased)
                             val post = exitAnimatable.value
                             val finalScale = (liveScale + (1f - liveScale) * post) * bounceScale
@@ -231,7 +231,7 @@ class AOSPCrossActivityAnimation(
                             translationX = -(1f - post) * driftPx * directionMultiplier
                             translationY = yShift(finalScale)
                         } else if (isGestureActiveNow) {
-                            val eased = BackGestureEasing.transform(gestureProgress.coerceIn(0f, 1f))
+                            val eased = AospBackGestureEasing.transform(gestureProgress.coerceIn(0f, 1f))
                             val liveScale = CROSS_ACTIVITY_MIN_SCALE + (1f - CROSS_ACTIVITY_MIN_SCALE) * (1f - eased)
                             scaleX = liveScale
                             scaleY = liveScale

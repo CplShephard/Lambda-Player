@@ -40,7 +40,7 @@ import dev.shephard.player.theme.PredictiveBackExitDirection
 import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import kotlinx.coroutines.CoroutineScope
 
-private val BackGestureEasing = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
+private val ScaleBackGestureEasing = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
 
 class ScalePredictiveBackAnimation(
     private val exitDirection: PredictiveBackExitDirection = PredictiveBackExitDirection.FOLLOW_GESTURE
@@ -122,7 +122,7 @@ class ScalePredictiveBackAnimation(
 
                 // Exact InstallerX scale formula: 0.85 + 0.15 * easedProgress
                 // easedProgress = shapedTopProgress = 1 - BackGestureEasing(1 - progress)
-                fun shapedTopProgress(progress: Float): Float = 1f - BackGestureEasing.transform((1f - progress).coerceIn(0f, 1f))
+                fun shapedTopProgress(progress: Float): Float = 1f - ScaleBackGestureEasing.transform((1f - progress).coerceIn(0f, 1f))
 
                 val gestureScale = if (isGestureActiveNow) {
                     val eased = shapedTopProgress(gestureProgress)
