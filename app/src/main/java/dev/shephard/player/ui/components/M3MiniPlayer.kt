@@ -64,7 +64,7 @@ import dev.shephard.player.ui.i18n.LocalStrings
 /** PixelPlayer MiniPlayerHeight. */
 private val MiniPlayerM3Height = 64.dp
 /** PixelPlayer corner radius for the player/nav bar surfaces. */
-private val MiniPlayerM3CornerRadius = 32.dp
+private val MiniPlayerM3CornerRadius = 20.dp
 
 @Composable
 fun M3MiniPlayer(

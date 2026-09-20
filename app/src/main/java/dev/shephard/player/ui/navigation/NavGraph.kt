@@ -56,6 +56,7 @@ import androidx.navigation3.scene.SinglePaneSceneStrategy
 import androidx.navigation3.scene.rememberSceneState
 import androidx.navigation3.ui.NavDisplay
 import androidx.navigation3.ui.NavDisplayTransitionEffects
+import androidx.activity.compose.BackHandler
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.NavigationEventState
 import androidx.navigationevent.compose.rememberNavigationEventState
@@ -132,6 +133,8 @@ fun NavGraph(
         .collectAsState(initial = PredictiveBackAnimation.MIUIX)
     val predictiveBackExitDirection by preferences.predictiveBackExitDirection
         .collectAsState(initial = PredictiveBackExitDirection.FOLLOW_GESTURE)
+
+    val isPredictiveEnabled = predictiveBackAnimation != PredictiveBackAnimation.NONE
 
     val handler = remember(predictiveBackAnimation, predictiveBackExitDirection) {
         predictiveBackHandler(predictiveBackAnimation, predictiveBackExitDirection)
@@ -275,7 +278,7 @@ fun NavGraph(
     }
 
     Box(modifier = modifier) {
-        key(useMiuix, predictiveBackAnimation, predictiveBackExitDirection) {
+        key(useMiuix) {
             var gestureState: NavigationEventState<androidx.navigation3.scene.SceneInfo<NavKey>>? = null
 
             val entries = rememberDecoratedNavEntries(
@@ -311,10 +314,12 @@ fun NavGraph(
                 sceneStrategies = listOf(SinglePaneSceneStrategy()),
                 onBack = {
                     navigationScope.launch {
-                        handler.onBackPressed(
-                            transitionState = gestureState?.transitionState,
-                            currentPageKey = backStack.lastOrNull()
-                        )
+                        if (isPredictiveEnabled) {
+                            handler.onBackPressed(
+                                transitionState = gestureState?.transitionState,
+                                currentPageKey = backStack.lastOrNull()
+                            )
+                        }
                         pop()
                     }
                 }
@@ -322,25 +327,34 @@ fun NavGraph(
 
             val currentScene = sceneState.currentScene
             val previousScenes = sceneState.previousScenes
-            gestureState = rememberNavigationEventState(
-                currentInfo = SceneInfo(currentScene),
-                backInfo = previousScenes.map { SceneInfo(it) }
-            )
+            gestureState = if (isPredictiveEnabled) {
+                rememberNavigationEventState(
+                    currentInfo = SceneInfo(currentScene),
+                    backInfo = previousScenes.map { SceneInfo(it) }
+                )
+            } else null
 
-            NavigationBackHandler(
-                state = gestureState,
-                isBackEnabled = backStack.size > 1,
-                onBackCompleted = {
-                    navigationScope.launch {
-                        handler.onBackPressed(
-                            transitionState = gestureState?.transitionState,
-                            currentPageKey = backStack.lastOrNull()
-                        )
-                        pop()
-                    }
-                },
-                onBackCancelled = {}
-            )
+            if (isPredictiveEnabled && gestureState != null) {
+                NavigationBackHandler(
+                    state = gestureState,
+                    isBackEnabled = backStack.size > 1,
+                    onBackCompleted = {
+                        navigationScope.launch {
+                            handler.onBackPressed(
+                                transitionState = gestureState?.transitionState,
+                                currentPageKey = backStack.lastOrNull()
+                            )
+                            pop()
+                        }
+                    },
+                    onBackCancelled = {}
+                )
+            } else {
+                // NONE: predictive back fully disabled, use simple BackHandler
+                if (backStack.size > 1) {
+                    BackHandler { pop() }
+                }
+            }
 
             NavDisplay(
                 sceneState = sceneState,
@@ -350,13 +364,41 @@ fun NavGraph(
                     blockInputDuringTransition = true
                 ),
                 predictivePopTransitionSpec = { swipeEdge ->
-                    with(handler) { onPredictivePopTransitionSpec(swipeEdge) }
+                    if (!isPredictiveEnabled) {
+                        // NONE: no predictive preview at all
+                        androidx.compose.animation.ContentTransform(
+                            targetContentEnter = androidx.compose.animation.EnterTransition.None,
+                            initialContentExit = androidx.compose.animation.ExitTransition.None
+                        )
+                    } else if (useMiuix) {
+                        with(handler) { onPredictivePopTransitionSpec(swipeEdge) }
+                    } else {
+                        // M3 uses its own PlaylistDetailView animation (m3Enter/m3Exit) for all submenus
+                        androidx.compose.animation.ContentTransform(
+                            targetContentEnter = dev.shephard.player.ui.navigation.PageTransitions.m3PopEnterSubmenu,
+                            initialContentExit = dev.shephard.player.ui.navigation.PageTransitions.m3PopExitSubmenu
+                        )
+                    }
                 },
                 popTransitionSpec = {
-                    with(handler) { onPopTransitionSpec() }
+                    if (useMiuix) {
+                        with(handler) { onPopTransitionSpec() }
+                    } else {
+                        androidx.compose.animation.ContentTransform(
+                            targetContentEnter = dev.shephard.player.ui.navigation.PageTransitions.m3PopEnterSubmenu,
+                            initialContentExit = dev.shephard.player.ui.navigation.PageTransitions.m3PopExitSubmenu
+                        )
+                    }
                 },
                 transitionSpec = {
-                    with(handler) { onTransitionSpec() }
+                    if (useMiuix) {
+                        with(handler) { onTransitionSpec() }
+                    } else {
+                        androidx.compose.animation.ContentTransform(
+                            targetContentEnter = dev.shephard.player.ui.navigation.PageTransitions.m3EnterSubmenu,
+                            initialContentExit = dev.shephard.player.ui.navigation.PageTransitions.m3ExitSubmenu
+                        )
+                    }
                 }
             )
         }

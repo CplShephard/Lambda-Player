@@ -654,7 +654,7 @@ if (showPlaylists) {
 Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 32.dp, start = 20.dp, end = 20.dp)
+                    .padding(top = 8.dp, bottom = 32.dp, start = 22.dp, end = 22.dp)
                     .pointerInput(Unit) { detectHorizontalDragGestures { _, _ -> } },
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
@@ -781,24 +781,41 @@ Box(
 @Composable
 private fun SeekBarRow(playerViewModel: PlayerViewModel) {
     val progress by playerViewModel.progress.collectAsState()
+    val state by playerViewModel.uiState.collectAsState()
+    val smoothFraction = dev.shephard.player.ui.components.rememberSmoothProgressFraction(
+        positionMs = progress.positionMs,
+        durationMs = progress.durationMs,
+        isPlaying = state.isPlaying
+    )
+    var seekFraction by remember { mutableStateOf<Float?>(null) }
+    androidx.compose.runtime.LaunchedEffect(smoothFraction, progress.durationMs) {
+        val held = seekFraction ?: return@LaunchedEffect
+        if (kotlin.math.abs(held - smoothFraction) < 0.03f || kotlin.math.abs(held - smoothFraction) > 0.1f) {
+            seekFraction = null
+        }
+    }
     Column(modifier = Modifier.fillMaxWidth()) {
         MinimalSeekBar(
-            progress = if (progress.durationMs > 0)
-                progress.positionMs.toFloat() / progress.durationMs.toFloat() else 0f,
+            progress = seekFraction ?: smoothFraction,
             onSeekPreview = { fraction ->
-                playerViewModel.onSeekPreview((fraction * progress.durationMs).toLong())
+                seekFraction = fraction
+                if (progress.durationMs > 0) playerViewModel.onSeekPreview((fraction * progress.durationMs).toLong())
             },
             onSeekFinished = { fraction ->
-                playerViewModel.onSeekCommit((fraction * progress.durationMs).toLong())
+                seekFraction = fraction
+                if (progress.durationMs > 0) playerViewModel.onSeekCommit((fraction * progress.durationMs).toLong())
             },
-            modifier = Modifier.padding(horizontal = 20.dp)
+            modifier = Modifier.padding(horizontal = 22.dp),
+            trackHeight = 6.dp,
+            activeColor = Color.White,
+            inactiveColor = Color.White.copy(alpha = 0.3f)
         )
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, start = 20.dp, end = 20.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, start = 22.dp, end = 22.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                formatMillis(progress.positionMs),
+                formatMillis(if (seekFraction != null) (seekFraction!! * progress.durationMs).toLong() else progress.positionMs),
                 style = MiuixAppTheme.typography.labelMedium,
                 color = Color.White.copy(alpha = 0.75f)
             )

@@ -1,14 +1,22 @@
 package dev.shephard.player.ui.components
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,10 +27,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import dev.shephard.player.player.PreferencesManager
+import dev.shephard.player.theme.PredictiveBackAnimation
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -48,6 +61,68 @@ fun MiuixDrawer(
     enableNestedScroll: Boolean = true,
     content: @Composable () -> Unit,
 ) {
+    val context = LocalContext.current
+    val prefs = remember { PreferencesManager(context) }
+    val predictiveBack by prefs.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
+    val isPredictiveEnabled = predictiveBack != PredictiveBackAnimation.NONE
+
+    if (!isPredictiveEnabled) {
+        // NONE: predictive back fully disabled – use non-predictive Dialog bottom sheet
+        var visible by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) { visible = true }
+        val currentOnDismissRequest by rememberUpdatedState(onDismissRequest)
+
+        // Use legacy BackHandler (non-predictive) when predictive is disabled
+        BackHandler(enabled = visible && allowDismiss) {
+            visible = false
+        }
+
+        Dialog(
+            onDismissRequest = {
+                if (allowDismiss) {
+                    visible = false
+                }
+            },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.32f)),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(300)),
+                    exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(250))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius))
+                            .background(backgroundColor)
+                    ) {
+                        androidx.compose.runtime.CompositionLocalProvider(
+                            LocalDismissState provides {
+                                visible = false
+                            }
+                        ) {
+                            // Handle dismiss finished
+                            LaunchedEffect(visible) {
+                                if (!visible) {
+                                    kotlinx.coroutines.delay(260)
+                                    currentOnDismissRequest()
+                                }
+                            }
+                            content()
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
+
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
 

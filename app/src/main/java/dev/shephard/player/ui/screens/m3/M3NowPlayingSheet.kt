@@ -11,6 +11,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -62,7 +63,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import dev.shephard.player.ui.components.M3BottomSheetWrapper
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -192,19 +193,19 @@ fun M3NowPlayingSheet(
                 Box(modifier = Modifier.size(width = 36.dp, height = 4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
             }
 
-            // Toolbar like Twelve's NowPlaying toolbar - centered title, down arrow
+            // Fixed: top-left says Now Playing instead of song name
             androidx.compose.material3.TopAppBar(
                 title = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(horizontalAlignment = Alignment.Start) {
                         Text(
-                            text = track?.title ?: strings.nowPlaying,
+                            text = strings.nowPlaying,
                             style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        if (state.currentPlaylistName != null) {
+                        if (track != null) {
                             Text(
-                                text = state.currentPlaylistName.orEmpty(),
+                                text = "${track.title} • ${track.artist}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -291,7 +292,7 @@ fun M3NowPlayingSheet(
             // Progress slider
             M3NowPlayingProgressLineage(playerViewModel = playerViewModel, isPlaying = state.isPlaying)
 
-            // Media controls - 22dp horizontal margin, like Twelve - fixed colors #3
+            // Fixed: prev/next have squircle background smaller like pause
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -303,13 +304,21 @@ fun M3NowPlayingSheet(
                 IconButton(onClick = { playerViewModel.toggleShuffle() }, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Filled.Shuffle, strings.shuffle, tint = if (state.shuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                 }
-                IconButton(onClick = { playerViewModel.skipToPrevious() }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Filled.SkipPrevious, strings.previous, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurface)
+                androidx.compose.material3.FilledTonalIconButton(
+                    onClick = { playerViewModel.skipToPrevious() },
+                    modifier = Modifier.size(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    Icon(Icons.Filled.SkipPrevious, strings.previous, modifier = Modifier.size(28.dp))
                 }
-                // Primary 72dp like Twelve
                 androidx.compose.material3.FilledIconButton(
                     onClick = { playerViewModel.togglePlayPause() },
                     modifier = Modifier.size(72.dp),
+                    shape = RoundedCornerShape(20.dp),
                     colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary
@@ -321,8 +330,16 @@ fun M3NowPlayingSheet(
                         modifier = Modifier.size(36.dp)
                     )
                 }
-                IconButton(onClick = { playerViewModel.skipToNext() }, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Filled.SkipNext, strings.next, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurface)
+                androidx.compose.material3.FilledTonalIconButton(
+                    onClick = { playerViewModel.skipToNext() },
+                    modifier = Modifier.size(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    Icon(Icons.Filled.SkipNext, strings.next, modifier = Modifier.size(28.dp))
                 }
                 IconButton(onClick = { playerViewModel.cycleRepeatMode() }, modifier = Modifier.size(48.dp)) {
                     val icon = when (state.repeatMode) {
@@ -355,11 +372,31 @@ fun M3NowPlayingSheet(
                     }
                     val trackId = track?.id ?: -1L
                     val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
-                    IconButton(onClick = { if (trackId > 0) playerViewModel.toggleLike(trackId) }, modifier = Modifier.size(48.dp)) {
+                    var showAddToPlaylist by remember { mutableStateOf(false) }
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { if (trackId > 0) playerViewModel.toggleLike(trackId) }
+                            .combinedClickable(
+                                onClick = { if (trackId > 0) playerViewModel.toggleLike(trackId) },
+                                onLongClick = { showAddToPlaylist = true }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Icon(
                             if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                             strings.likedSongs,
                             tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                    if (showAddToPlaylist && track != null) {
+                        M3AddToPlaylistDrawer(
+                            trackId = trackId,
+                            track = track,
+                            playerViewModel = playerViewModel,
+                            onDismiss = { showAddToPlaylist = false },
+                            strings = strings
                         )
                     }
                 }
@@ -400,7 +437,8 @@ fun M3NowPlayingSheet(
                 }
             }
         }
-        ModalBottomSheet(onDismissRequest = { showQueue = false }, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
+        M3BottomSheetWrapper(
+            onDismissRequest = { showQueue = false }, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
             Text(strings.queue, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
             LazyColumn(
                 state = listState,
@@ -534,7 +572,8 @@ fun M3NowPlayingSheet(
             null
         }
 
-        ModalBottomSheet(onDismissRequest = { showLyrics = false }, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
+        M3BottomSheetWrapper(
+            onDismissRequest = { showLyrics = false }, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(strings.lyrics, style = MaterialTheme.typography.titleMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -703,4 +742,56 @@ private fun m3FormatMillisLineage(ms: Long): String {
     val m = totalSec / 60
     val s = totalSec % 60
     return "%d:%02d".format(m, s)
+}
+
+@Composable
+private fun M3AddToPlaylistDrawer(
+    trackId: Long,
+    track: dev.shephard.player.data.AudioTrack?,
+    playerViewModel: PlayerViewModel,
+    onDismiss: () -> Unit,
+    strings: dev.shephard.player.ui.i18n.Strings
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs = remember { PreferencesManager(context) }
+    val json by prefs.playlistsJson.collectAsState(initial = "[]")
+    val playlists = remember(json) { dev.shephard.player.ui.screens.parsePlaylists(json) }
+    val likedJson by prefs.likedSongIds.collectAsState(initial = "[]")
+    val likedIds = remember(likedJson) {
+        try { org.json.JSONArray(likedJson).let { arr -> (0 until arr.length()).map { arr.getLong(it) } } }
+        catch (_: Exception) { emptyList() }
+    }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    M3BottomSheetWrapper(
+            onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+            Text(strings.addToPlaylist, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                items(playlists.filterNot { it.isSystem }) { pl ->
+                    val contains = trackId in pl.trackIds
+                    androidx.compose.material3.ListItem(
+                        headlineContent = { Text(pl.name) },
+                        supportingContent = { Text("${pl.trackIds.size} tracks") },
+                        trailingContent = {
+                            if (contains) Icon(Icons.Filled.Favorite, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        },
+                        modifier = Modifier.clickable {
+                            scope.launch {
+                                val all = playlists.toMutableList()
+                                val idx = all.indexOf(pl)
+                                if (idx >= 0) {
+                                    val current = all[idx]
+                                    val newIds = if (contains) current.trackIds - trackId else current.trackIds + trackId
+                                    all[idx] = current.copy(trackIds = newIds)
+                                    prefs.setPlaylistsJson(dev.shephard.player.ui.screens.encodePlaylists(all))
+                                }
+                            }
+                            onDismiss()
+                        }
+                    )
+                }
+            }
+        }
+    }
 }

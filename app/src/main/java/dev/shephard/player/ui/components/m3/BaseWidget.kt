@@ -69,10 +69,11 @@ fun BaseWidget(
 
     val baseShape = LocalSegmentedItemShape.current
 
+    // Fixed light-mode invisibility: use surfaceContainerHigh for better contrast
     val backgroundColor = if (selected) {
         MaterialTheme.colorScheme.primaryContainer
     } else {
-        MaterialTheme.colorScheme.surfaceBright
+        MaterialTheme.colorScheme.surfaceContainerHigh
     }
 
     val baseContentColor = if (selected) {

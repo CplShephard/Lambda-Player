@@ -1529,14 +1529,12 @@ internal fun PlaylistDetailView(
     onChangeSort: (String) -> Unit = {},
     isHomeSimplified: Boolean = false
 ) {
-    // Fixed blur: use same CollapsingTopBarState pattern as other pages
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
     val reorderItems = remember { mutableStateListOf<AudioTrack>() }
     var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var isReordering by remember { mutableStateOf(false) }
     var pendingCommittedOrder by remember { mutableStateOf<List<Long>?>(null) }
 
-    // Home simplified: random order each time (like featured songs)
     val displayTracks = if (isHomeSimplified) {
         remember(plTracks) { plTracks.shuffled() }
     } else {
@@ -1592,31 +1590,42 @@ internal fun PlaylistDetailView(
     }
 
     val detailTitle = if (playlist.isSystem) strings.likedSongs else playlist.name
-    val detailCollapse = topBarState.collapseFraction
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MiuixAppTheme.colorScheme.background)
+    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(
+        onBack = onBack,
+        modifier = Modifier.fillMaxSize()
     ) {
-        PlaylistDetailTopBar(
-            title = detailTitle,
-            cover = playlist.coverUri?.let { Uri.parse(it) }
-                ?: displayTracks.firstOrNull()?.albumArtUri,
-            onBack = onBack,
-            topBarState = topBarState
-        )
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            topBar = {
+                PlaylistDetailTopBar(
+                    title = detailTitle,
+                    cover = playlist.coverUri?.let { Uri.parse(it) }
+                        ?: displayTracks.firstOrNull()?.albumArtUri,
+                    onBack = onBack,
+                    topBarState = topBarState
+                )
+            }
+        ) { innerPadding ->
         LazyColumn(
             state = listState,
             modifier = Modifier
+                .fillMaxSize()
                 .captureForTopBarBlur(topBarState)
                 .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                .fillMaxSize()
                 .overScrollVertical(),
-            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 200.dp),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = innerPadding.calculateTopPadding() + 8.dp,
+                end = 16.dp,
+                bottom = 200.dp
+            ),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             item {
+                val detailCollapse = topBarState.collapseFraction
                 Text(
                     text = detailTitle,
                     style = MiuixAppTheme.typography.headlineSmall,
@@ -1634,8 +1643,7 @@ internal fun PlaylistDetailView(
                 )
             }
 
-item {
-                // Home simplified: no cover change button, no add tracks, no sort chips, random order
+            item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1789,7 +1797,6 @@ item {
                         }
                     }
                 } else {
-                    // Sliding animation like StatsScreen when sort changes
                     itemsIndexed(displayTracks, key = { _, t -> t.id }) { i, t ->
                         Box(modifier = Modifier.animateItem(
                             fadeInSpec = androidx.compose.animation.core.tween(250),
@@ -1805,6 +1812,7 @@ item {
                     }
                 }
             }
+        }
         }
     }
 }

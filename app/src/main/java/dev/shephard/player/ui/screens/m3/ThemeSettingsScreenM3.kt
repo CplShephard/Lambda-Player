@@ -62,6 +62,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import dev.shephard.player.ui.glass.LocalWallpaperEnabled
+import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -185,17 +187,21 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
         }
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surface,
-        topBar = {
-            TopAppBar(
-                title = { Text(strings.themeSettings) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-            )
-        },
-    ) { paddingValues ->
+    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(
+        onBack = onBack,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+            topBar = {
+                TopAppBar(
+                    title = { Text(strings.themeSettings, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
+                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface),
+                )
+            },
+        ) { paddingValues ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), bottom = paddingValues.calculateBottomPadding() + 80.dp)
@@ -227,17 +233,6 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                             data = themeModeList,
                             onChoiceChange = { idx -> scope.launch { prefs.setThemeMode(themeModeOptions[idx].toPreferenceInt()) } }
                         )
-                    }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        item {
-                            SwitchWidget(
-                                icon = Icons.TwoTone.InvertColors,
-                                title = strings.blurEffect,
-                                description = strings.blurEffectDescription,
-                                checked = blurEnabled,
-                                onCheckedChange = { scope.launch { prefs.setLiquidGlassEnabled(it) } }
-                            )
-                        }
                     }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         item {
@@ -393,10 +388,6 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                                     data = PredictiveBackExitDirection.entries.map { predictiveDirectionDisplayName(it, strings) },
                                     onChoiceChange = { idx -> scope.launch { prefs.setPredictiveBackExitDirection(PredictiveBackExitDirection.entries[idx]) } }
                                 )
-                                M3PredictiveBackDirectionBottomSwitcher(
-                                    selectedDirection = predictiveBackDirection,
-                                    onSelect = { dir -> scope.launch { prefs.setPredictiveBackExitDirection(dir) } }
-                                )
                             }
                         }
                     }
@@ -418,6 +409,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                     }
                 }
             }
+        }
         }
     }
 
@@ -446,39 +438,3 @@ private fun predictiveDirectionDisplayName(direction: PredictiveBackExitDirectio
     PredictiveBackExitDirection.ALWAYS_LEFT -> strings.predictiveBackAlwaysLeft
 }
 
-@Composable
-private fun M3PredictiveBackDirectionBottomSwitcher(
-    selectedDirection: PredictiveBackExitDirection,
-    onSelect: (PredictiveBackExitDirection) -> Unit
-) {
-    val options = listOf(
-        PredictiveBackExitDirection.FOLLOW_GESTURE,
-        PredictiveBackExitDirection.ALWAYS_RIGHT,
-        PredictiveBackExitDirection.ALWAYS_LEFT
-    )
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        options.forEach { dir ->
-            val isSelected = dir == selectedDirection
-            androidx.compose.material3.FilterChip(
-                selected = isSelected,
-                onClick = { onSelect(dir) },
-                label = {
-                    Text(
-                        text = when (dir) {
-                            PredictiveBackExitDirection.FOLLOW_GESTURE -> "Follow"
-                            PredictiveBackExitDirection.ALWAYS_RIGHT -> "Right"
-                            PredictiveBackExitDirection.ALWAYS_LEFT -> "Left"
-                        },
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                },
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}

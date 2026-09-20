@@ -241,18 +241,27 @@ private fun MiniPlayerProgressBar(
     modifier: Modifier = Modifier
 ) {
     val progress by progressFlow.collectAsState()
-    val fraction = if (progress.durationMs > 0L)
-        (progress.positionMs.toFloat() / progress.durationMs.toFloat()).coerceIn(0f, 1f)
-    else 0f
-    val animatedFraction by animateFloatAsState(
-        targetValue = fraction,
-        animationSpec = tween(durationMillis = 250),
-        label = "miniProgress"
-    )
+    // Use smooth fraction like M3 for tick-free progress
+    var smooth by remember { mutableStateOf(0f) }
+    var lastPos by remember { mutableStateOf(0L) }
+    var lastTime by remember { mutableStateOf(0L) }
+    val dur = progress.durationMs.coerceAtLeast(1L)
+    LaunchedEffect(progress.positionMs, progress.durationMs) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        lastPos = progress.positionMs
+        lastTime = now
+        smooth = (progress.positionMs.toFloat() / dur).coerceIn(0f, 1f)
+        while (true) {
+            withFrameNanos { }
+            val elapsed = (android.os.SystemClock.elapsedRealtime() - lastTime).coerceAtLeast(0L)
+            val displayed = (lastPos + elapsed).coerceAtMost(progress.positionMs + 500L)
+            smooth = (displayed.toFloat() / dur).coerceIn(0f, 1f)
+        }
+    }
     MiuixLinearProgressIndicator(
-        progress = animatedFraction,
+        progress = smooth,
         modifier = modifier,
-        height = 3.dp,
+        height = 6.dp,
         colors = MiuixProgressIndicatorDefaults.progressIndicatorColors(
             foregroundColor = activeColor,
             backgroundColor = inactiveColor,

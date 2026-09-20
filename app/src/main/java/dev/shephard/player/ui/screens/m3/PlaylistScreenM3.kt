@@ -44,7 +44,7 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import dev.shephard.player.ui.components.M3BottomSheetWrapper
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -77,6 +77,8 @@ import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.components.m3.LineageNoElements
 import dev.shephard.player.ui.components.m3.LineageSortingChip
 import dev.shephard.player.ui.components.m3.SegmentedColumn
+import dev.shephard.player.ui.glass.LocalWallpaperEnabled
+import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.navigation.PageTransitions
 import dev.shephard.player.ui.navigation.SubmenuNavGuard
@@ -328,16 +330,16 @@ fun PlaylistScreenM3(
             if (idx == null) {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
                     topBar = {
                         TopAppBar(
-                            title = { Text(strings.playlists) },
+                            title = { Text(strings.playlists, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
                             actions = {
                                 IconButton(onClick = { showCreate = true }) {
                                     Icon(Icons.Filled.Add, contentDescription = strings.createPlaylist)
                                 }
                             },
-                            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+                            colors = TopAppBarDefaults.topAppBarColors(containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface),
                         )
                     },
                     floatingActionButton = {
@@ -403,7 +405,7 @@ fun PlaylistScreenM3(
                                         LineageGridMediaItem(
                                             headline = pl.name,
                                             subhead = "${plTracks.size} tracks",
-                                            thumbnailModel = pl.coverUri,
+                                            thumbnailModel = pl.coverUri ?: plTracks.firstOrNull()?.albumArtUri,
                                             placeholderIcon = Icons.Filled.QueueMusic,
                                             trailingIcon = Icons.Filled.MoreVert,
                                             onTrailingClick = { playlistMenuIndex = realIdx },
@@ -428,7 +430,7 @@ fun PlaylistScreenM3(
                                             LineageListItemWithThumbnail(
                                                 headline = pl.name,
                                                 supporting = "${plTracks.size} ${strings.trackCount}",
-                                                thumbnailModel = pl.coverUri,
+                                                thumbnailModel = pl.coverUri ?: plTracks.firstOrNull()?.albumArtUri,
                                                 placeholderIcon = Icons.Filled.QueueMusic,
                                                 trailingIcon = Icons.Filled.MoreVert,
                                                 onClick = { playlistDetailGuard.push(openIndex, realIdx) { openIndex = realIdx } },
@@ -482,8 +484,8 @@ fun PlaylistScreenM3(
         val pl = playlists.getOrNull(menuIdx)
         if (pl != null) {
             val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-            ModalBottomSheet(
-                onDismissRequest = { playlistMenuIndex = null },
+            M3BottomSheetWrapper(
+            onDismissRequest = { playlistMenuIndex = null },
                 sheetState = sheetState,
                 containerColor = MaterialTheme.colorScheme.surfaceContainer
             ) {

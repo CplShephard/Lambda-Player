@@ -84,15 +84,16 @@ class NoPredictiveBackAnimationSimple : PredictiveBackAnimationHandler {
 
     override fun AnimatedContentTransitionScope<Scene<NavKey>>.onPredictivePopTransitionSpec(
         swipeEdge: Int
-    ): ContentTransform = ContentTransform(
-        targetContentEnter = EnterTransition.None,
-        initialContentExit = ExitTransition.None,
-        sizeTransform = null
-    )
+    ): ContentTransform {
+        // NONE disables predictive preview, but must still show close animation on gesture.
+        // Return same pop animation so full-screen gesture also animates.
+        return ContentTransform(
+            targetContentEnter = dev.shephard.player.ui.navigation.PageTransitions.popEnterSubmenu,
+            initialContentExit = dev.shephard.player.ui.navigation.PageTransitions.popExitSubmenu
+        )
+    }
 
     override fun AnimatedContentTransitionScope<Scene<NavKey>>.onPopTransitionSpec(): ContentTransform {
-        // Ensure close animation always shows even when predictive = NONE
-        // Use same animation as normal submenu pop (InstallerX Revived style)
         return ContentTransform(
             targetContentEnter = dev.shephard.player.ui.navigation.PageTransitions.popEnterSubmenu,
             initialContentExit = dev.shephard.player.ui.navigation.PageTransitions.popExitSubmenu

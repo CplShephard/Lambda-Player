@@ -8,11 +8,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -27,8 +30,8 @@ fun MinimalSeekBar(
     onSeekPreview: (Float) -> Unit,
     onSeekFinished: (Float) -> Unit,
     modifier: Modifier = Modifier,
-    trackHeight: Dp = 3.dp,
-    thumbRadius: Dp = 7.dp,
+    trackHeight: Dp = 6.dp,
+    thumbRadius: Dp = 0.dp,
     activeColor: Color = MiuixAppTheme.colorScheme.primary,
     inactiveColor: Color = MiuixAppTheme.colorScheme.surfaceVariant
 ) {
@@ -40,7 +43,7 @@ fun MinimalSeekBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(thumbRadius * 2)
+            .height(24.dp)
             .pointerInput(Unit) {
                 detectTapGestures { offset ->
                     val fraction = (offset.x / size.width).coerceIn(0f, 1f)
@@ -72,13 +75,12 @@ fun MinimalSeekBar(
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(thumbRadius * 2)
+                .height(24.dp)
         ) {
             val centerY = size.height / 2f
-            val thumbRadiusPx = thumbRadius.toPx()
             val trackHeightPx = trackHeight.toPx()
-            val startX = thumbRadiusPx
-            val endX = size.width - thumbRadiusPx
+            val startX = 0f
+            val endX = size.width
             val activeX = startX + (endX - startX) * displayedFraction
 
             drawLine(
@@ -96,12 +98,29 @@ fun MinimalSeekBar(
                 strokeWidth = trackHeightPx,
                 cap = StrokeCap.Round
             )
-
-            drawCircle(
-                color = activeColor,
-                radius = thumbRadiusPx,
-                center = Offset(activeX, centerY)
-            )
         }
     }
+}
+
+@Composable
+fun rememberSmoothProgressFraction(positionMs: Long, durationMs: Long, isPlaying: Boolean): Float {
+    var smooth by remember { mutableFloatStateOf(0f) }
+    var lastSamplePosMs by remember { mutableLongStateOf(0L) }
+    var lastSampleAtMs by remember { mutableLongStateOf(0L) }
+    val durMs = durationMs.coerceAtLeast(1L)
+
+    LaunchedEffect(positionMs, durationMs, isPlaying) {
+        val pos = positionMs.coerceAtLeast(0L)
+        val now = android.os.SystemClock.elapsedRealtime()
+        lastSamplePosMs = pos
+        lastSampleAtMs = now
+        smooth = (pos.toFloat() / durMs).coerceIn(0f, 1f)
+        while (true) {
+            withFrameNanos { }
+            val elapsed = (android.os.SystemClock.elapsedRealtime() - lastSampleAtMs).coerceAtLeast(0L)
+            val displayedPos = if (isPlaying) (lastSamplePosMs + elapsed).coerceAtMost(pos + 500L) else lastSamplePosMs
+            smooth = (displayedPos.toFloat() / durMs).coerceIn(0f, 1f)
+        }
+    }
+    return smooth
 }

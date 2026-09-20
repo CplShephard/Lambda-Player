@@ -66,6 +66,9 @@ import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.m3.LineageListItem
 import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.components.m3.LineageSectionHeader
+import androidx.compose.ui.graphics.Color
+import dev.shephard.player.ui.glass.LocalWallpaperEnabled
+import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -88,11 +91,11 @@ fun SettingsScreenM3(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text(strings.settings) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+                title = { Text(strings.settings, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface),
             )
         },
     ) { padding ->
@@ -102,15 +105,18 @@ fun SettingsScreenM3(
         ) {
             item {
                 Card(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
-                    LineageListItem(
-                        headline = strings.totalListeningTime,
-                        supporting = formatListeningTimeM3Lineage(totalMs, strings),
-                        onClick = onOpenStats
-                    )
+                    Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+                        Text(strings.totalListeningTime, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Spacer(Modifier.height(8.dp))
+                        Text(formatListeningTimeM3Lineage(totalMs, strings), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Spacer(Modifier.height(4.dp))
+                        Text(strings.statsTopTracks, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                    }
                 }
             }
             item { LineageSectionHeader(title = strings.settings) }
@@ -171,16 +177,17 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
     val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
     val playWith by prefs.playWithOthers.collectAsState(initial = false)
 
-    Scaffold(
+    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(onBack = onBack, modifier = Modifier.fillMaxSize()) {
+        Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text(strings.playbackSettings) },
+                title = { Text(strings.playbackSettings, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface),
             )
         },
     ) { padding ->
@@ -231,6 +238,7 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
                     )
                 }
             }
+            }
         }
     }
 }
@@ -257,22 +265,23 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
         }
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surface,
-        topBar = {
-            TopAppBar(
-                title = { Text(strings.aboutSectionTitle) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(padding)
+    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(onBack = onBack, modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+            topBar = {
+                TopAppBar(
+                    title = { Text(strings.aboutSectionTitle, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
+                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface),
+                )
+            },
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(padding)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -321,6 +330,7 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
                 )
             }
             // Miuix removed from M3 about section #3
+            }
         }
     }
 }
@@ -342,33 +352,47 @@ fun StatsScreenM3(
         ListenStatsCalculator.buildSnapshot(periodEvents)
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surface,
-        topBar = {
-            TopAppBar(
-                title = { Text(strings.statsTitle) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(padding)
+    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(onBack = onBack, modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+            topBar = {
+                TopAppBar(
+                    title = { Text(strings.statsTitle, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
+                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface),
+                )
+            },
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(padding)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            // Sliding animation like Miuix for Today/ThisMonth filters
+            androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxWidth()) {
                 val periods = listOf(StatsPeriod.Today to strings.statsPeriodToday, StatsPeriod.ThisWeek to strings.statsPeriodThisWeek, StatsPeriod.ThisMonth to strings.statsPeriodThisMonth, StatsPeriod.AllTime to strings.statsPeriodAllTime)
-                periods.forEach { (period, label) ->
-                    androidx.compose.material3.FilterChip(
-                        selected = period == selectedPeriod,
-                        onClick = { selectedPeriod = period },
-                        label = { Text(label) }
-                    )
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(end = 16.dp)
+                ) {
+                    items(periods.size) { idx ->
+                        val (period, label) = periods[idx]
+                        androidx.compose.foundation.layout.Box(modifier = Modifier.animateItem(
+                            fadeInSpec = androidx.compose.animation.core.tween(250),
+                            fadeOutSpec = androidx.compose.animation.core.tween(200),
+                            placementSpec = androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 380f)
+                        )) {
+                            androidx.compose.material3.FilterChip(
+                                selected = period == selectedPeriod,
+                                onClick = { selectedPeriod = period },
+                                label = { Text(label) }
+                            )
+                        }
+                    }
                 }
             }
 
@@ -406,6 +430,7 @@ fun StatsScreenM3(
                 }
             }
             Spacer(Modifier.height(60.dp))
+            }
         }
     }
 }

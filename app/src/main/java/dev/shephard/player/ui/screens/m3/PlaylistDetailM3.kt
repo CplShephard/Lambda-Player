@@ -43,7 +43,7 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import dev.shephard.player.ui.components.M3BottomSheetWrapper
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -73,6 +73,8 @@ import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.m3.BaseWidget
 import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.components.m3.SegmentedColumn
+import dev.shephard.player.ui.glass.LocalWallpaperEnabled
+import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.Strings
 import dev.shephard.player.ui.screens.LocalPlaylist
 import dev.shephard.player.ui.screens.encodePlaylists
@@ -269,12 +271,16 @@ internal fun M3PlaylistDetail(
         )
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surface,
-        topBar = {
+    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(
+        onBack = onBack,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+            topBar = {
             TopAppBar(
-                title = { Text(text = playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = { Text(text = playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription)
@@ -291,7 +297,7 @@ internal fun M3PlaylistDetail(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface),
             )
         },
         floatingActionButton = {
@@ -328,9 +334,10 @@ internal fun M3PlaylistDetail(
                             .background(MaterialTheme.colorScheme.secondaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (playlist.coverUri != null) {
+                        val displayCover = playlist.coverUri ?: plTracks.firstOrNull()?.albumArtUri?.toString()
+                        if (displayCover != null) {
                             AsyncImage(
-                                model = playlist.coverUri,
+                                model = displayCover,
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxWidth(),
@@ -363,7 +370,7 @@ internal fun M3PlaylistDetail(
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
                 ) {
                     LineageListItemWithThumbnail(
                         headline = track.title,
@@ -377,11 +384,12 @@ internal fun M3PlaylistDetail(
                 }
             }
         }
+        }
     }
 
     trackMenuTrack?.let { menuTrack ->
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
+        M3BottomSheetWrapper(
             onDismissRequest = { trackMenuTrack = null },
             sheetState = sheetState,
             containerColor = MaterialTheme.colorScheme.surfaceContainer

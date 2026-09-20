@@ -50,14 +50,12 @@ class AOSPCrossActivityAnimation(
         transitionState: NavigationEventTransitionState?,
         currentPageKey: NavKey?,
     ) {
-        val isInterruptingEnter = transitionState is InProgress && !inPredictiveBackAnimation
-        if (!isInterruptingEnter) {
-            exitingPageKey = currentPageKey.toString()
-            exitAnimatable.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 150, easing = LinearEasing)
-            )
-        }
+        // Allow exit animation even during gesture - don't block on inPredictiveBackAnimation
+        exitingPageKey = currentPageKey.toString()
+        exitAnimatable.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 150, easing = LinearEasing)
+        )
     }
 
     override fun onPagePop(contentPageKey: Any, animationScope: CoroutineScope) {
@@ -103,8 +101,9 @@ class AOSPCrossActivityAnimation(
             }
         }
 
+        val isGestureActiveNow = transitionState is InProgress
         if (pageKey == currentPageKey.toString()) {
-            inPredictiveBackAnimation = animatedScale != 1f
+            inPredictiveBackAnimation = isGestureActiveNow || animatedScale != 1f || exitingPageKey != null
         }
 
         val directionMultiplier = when (exitDirection) {
@@ -124,18 +123,14 @@ class AOSPCrossActivityAnimation(
         } else 0.5f
         val currentPivotX = if (edge == EDGE_LEFT) 0.8f else 0.2f
 
-        val isGestureActive = transitionState is InProgress && inPredictiveBackAnimation
         val isExitAnimationRunning = exitingPageKey != null
-        val needsClip = isGestureActive || isExitAnimationRunning
+        val needsClip = isGestureActiveNow || isExitAnimationRunning || animatedScale != 1f
 
         this
             .graphicsLayer {
-                if (transitionState is InProgress && !inPredictiveBackAnimation && exitingPageKey == null) {
-                    return@graphicsLayer
-                }
-
-                if (transitionState is InProgress)
+                if (isGestureActiveNow) {
                     transformOrigin = TransformOrigin(currentPivotX, currentPivotY)
+                }
 
                 when {
                     isExitingPage -> {
@@ -150,10 +145,15 @@ class AOSPCrossActivityAnimation(
                     }
 
                     isCurrentNavTarget -> {
-                        scaleX = dragScale
-                        scaleY = dragScale
-                        translationX = 0f
-                        alpha = 1f
+                        if (isGestureActiveNow) {
+                            scaleX = dragScale
+                            scaleY = dragScale
+                            translationX = 0f
+                            alpha = 1f
+                        } else if (animatedScale != 1f) {
+                            scaleX = animatedScale
+                            scaleY = animatedScale
+                        }
                     }
 
                     else -> {
@@ -164,7 +164,7 @@ class AOSPCrossActivityAnimation(
                             scaleY = dragScale + (1f - dragScale) * emphasizedProgress
                             translationX = initialTranslationX * (1f - emphasizedProgress)
                             alpha = 1f
-                        } else if (transitionState is InProgress) {
+                        } else if (isGestureActiveNow) {
                             scaleX = dragScale
                             scaleY = dragScale
                             translationX = initialTranslationX

@@ -70,7 +70,6 @@ fun StatsScreen(
 ) {
     val strings = LocalStrings.current
     val cs = MiuixAppTheme.colorScheme
-    val density = LocalDensity.current
     val scrollState = rememberScrollState()
     val topBarState = rememberCollapsingTopBarState()
 
@@ -83,34 +82,19 @@ fun StatsScreen(
         ListenStatsCalculator.buildSnapshot(periodEvents)
     }
 
-    // Use collapseFraction from topBarState for consistent blur behavior like other pages
-    val scrollProgress = topBarState.collapseFraction
-
-    Column(modifier = Modifier.fillMaxSize().background(cs.background)) {
-        SmallTopAppBar(
-            title = strings.statsTitle,
-            modifier = if (topBarState.pageBackdrop != null) {
-                Modifier.miuixTopBarBlur(backdrop = topBarState.pageBackdrop)
-            } else Modifier,
-            color = if (topBarState.pageBackdrop != null) Color.Transparent else cs.background.copy(alpha = scrollProgress),
-            titleColor = cs.onBackground.copy(alpha = scrollProgress),
-            scrollBehavior = topBarState.scrollBehavior,
-            defaultWindowInsetsPadding = false,
-            navigationIcon = {
-                Box(
-                    modifier = Modifier
-                        .padding(start = 12.dp)
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(cs.surfaceVariant.copy(alpha = 0.75f))
-                        .bounceClick { onBack() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription, tint = cs.onBackground)
-                }
+    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(onBack = onBack, modifier = Modifier.fillMaxSize()) {
+        top.yukonga.miuix.kmp.basic.Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent,
+            contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+            topBar = {
+                dev.shephard.player.ui.components.SubmenuTopBar(
+                    title = strings.statsTitle,
+                    state = topBarState,
+                    onBack = onBack
+                )
             }
-        )
-
+        ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -118,12 +102,10 @@ fun StatsScreen(
                 .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                 .overScrollVertical()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 12.dp, vertical = 12.dp),
+                .padding(horizontal = 12.dp)
+                .padding(top = innerPadding.calculateTopPadding() + 8.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Extra top spacer so the miuix overscroll can fire even when the
-            // available content is shorter than the viewport (small library).
-            Spacer(Modifier.height(40.dp))
             StatsPeriodPills(selectedPeriod = selectedPeriod, onPeriodSelected = { selectedPeriod = it })
 
             StatsSummaryCard(
@@ -140,6 +122,7 @@ fun StatsScreen(
             }
 
             Spacer(Modifier.height(90.dp))
+            }
         }
     }
 }

@@ -249,7 +249,7 @@ fun HomeScreenM3(
                                             .fillMaxWidth()
                                             .padding(horizontal = 12.dp, vertical = 2.dp),
                                         shape = RoundedCornerShape(20.dp),
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
                                     ) {
                                         LineageListItemWithThumbnail(
                                             headline = track.title,

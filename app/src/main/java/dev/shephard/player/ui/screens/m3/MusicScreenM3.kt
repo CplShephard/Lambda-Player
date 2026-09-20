@@ -39,7 +39,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import dev.shephard.player.ui.components.M3BottomSheetWrapper
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -77,6 +77,8 @@ import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.components.m3.LineageNoElements
 import dev.shephard.player.ui.components.m3.LineageSortingChip
 import dev.shephard.player.ui.components.m3.SegmentedColumn
+import dev.shephard.player.ui.glass.LocalWallpaperEnabled
+import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -131,12 +133,12 @@ fun MusicScreenM3(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text(strings.music) },
+                title = { Text(strings.music, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
                 ),
             )
         },
@@ -252,18 +254,25 @@ fun MusicScreenM3(
     // Bottom sheet with M3 switcher style #7 instead of popup
     selectedTrackForMenu?.let { track ->
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
+        M3BottomSheetWrapper(
             onDismissRequest = { selectedTrackForMenu = null },
             sheetState = sheetState,
             containerColor = MaterialTheme.colorScheme.surfaceContainer
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-                LineageListItemWithThumbnail(
-                    headline = track.title,
-                    supporting = track.artist,
-                    thumbnailModel = track.albumArtUri,
-                    placeholderIcon = Icons.Filled.MusicNote
-                )
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                ) {
+                    LineageListItemWithThumbnail(
+                        headline = track.title,
+                        supporting = track.artist,
+                        thumbnailModel = track.albumArtUri,
+                        placeholderIcon = Icons.Filled.MusicNote,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
                 SegmentedColumn {
                     item {

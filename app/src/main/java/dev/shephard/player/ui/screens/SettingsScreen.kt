@@ -218,8 +218,11 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     val liquidGlassEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
     val appleFloatingBar by prefs.useAppleFloatingBar.collectAsState(initial = false)
 
-    val useMiuixMonet by prefs.useMiuixMonet.collectAsState(initial = false)
-    val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
+    // Fix custom colors re-animation: use nullable initial to avoid false->true flicker on enter
+    val useMiuixMonetNullable by prefs.useMiuixMonet.collectAsState(initial = null as Boolean?)
+    val useMiuixMonet = useMiuixMonetNullable ?: false
+    val dynamicColorNullable by prefs.dynamicColor.collectAsState(initial = null as Boolean?)
+    val dynamicColor = dynamicColorNullable ?: false
     val paletteStyle by prefs.paletteStyle.collectAsState(initial = PaletteStyle.TonalSpot)
     val colorSpec by prefs.colorSpec.collectAsState(initial = ThemeColorSpec.SPEC_2025)
     val seedColor by prefs.seedColor.collectAsState(initial = PresetColors.first().color.toArgb())
@@ -371,20 +374,17 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 scope.launch { prefs.setUseMiuixMonet(enabled) }
             }
 
-            // Use a MutableTransitionState so we can mark the Monet block as
-            // "already target=true" on first composition. Without this, every
-            // re-entry to the theme settings page replays the expandVertically
-            // animation (because `collectAsState(initial = false)` briefly
-            // reports false before DataStore emits the saved value).
-            val monetMenuState = remember { MutableTransitionState(useMiuixMonet) }
-            LaunchedEffect(useMiuixMonet) {
-                monetMenuState.targetState = useMiuixMonet
-            }
-            AnimatedVisibility(
-                visibleState = monetMenuState,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
+            // Fixed re-animation: only show when data loaded (nullable != null)
+            if (useMiuixMonetNullable != null) {
+                val monetMenuState = remember { MutableTransitionState(useMiuixMonet) }
+                LaunchedEffect(useMiuixMonet) {
+                    monetMenuState.targetState = useMiuixMonet
+                }
+                AnimatedVisibility(
+                    visibleState = monetMenuState,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
                 Column {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         Spacer(Modifier.height(8.dp))
@@ -427,21 +427,18 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                     )
                 }
             }
+            }
         }
 
-        // Same trick for the accent color grid: seed the transition state from
-        // the actual saved values, so re-entering the page does not replay the
-        // expand animation when Monet is already on.
-        //
-        // InstallerX behaviour + one exception: when the palette style is
-        // Monochrome there is no colored seed to pick (green/red/blue make no
-        // sense on a pure monochrome palette), so the color options disappear.
+        // Fixed: avoid re-animation on enter/exit, only show when data loaded
         val accentGridTarget = useMiuixMonet &&
             paletteStyle != PaletteStyle.Monochrome &&
             (!dynamicColor || Build.VERSION.SDK_INT < Build.VERSION_CODES.S)
-        val accentGridState = remember { MutableTransitionState(accentGridTarget) }
-        LaunchedEffect(accentGridTarget) {
-            accentGridState.targetState = accentGridTarget
+        // Only animate when nullable states are loaded to prevent flicker
+        val accentGridVisible = useMiuixMonetNullable != null && dynamicColorNullable != null && accentGridTarget
+        val accentGridState = remember { MutableTransitionState(accentGridVisible) }
+        LaunchedEffect(accentGridVisible) {
+            accentGridState.targetState = accentGridVisible
         }
         AnimatedVisibility(
             visibleState = accentGridState,
@@ -734,11 +731,6 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                                     scope.launch { prefs.setPredictiveBackExitDirection(newDirection) }
                                 }
                             }
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        MiuixPredictiveBackDirectionBottomSwitcher(
-                            selectedDirection = predictiveBackDirection,
-                            onSelect = { dir -> scope.launch { prefs.setPredictiveBackExitDirection(dir) } }
                         )
                     }
                 }
@@ -1073,24 +1065,29 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
         )
     }
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        BgEffectBackground(
-            isDarkTheme = isDarkTheme,
-            modifier = Modifier.fillMaxSize(),
-            isFullSize = true,
-            surface = Color.Black,
-            alpha = { 1f - scrollProgress * 0.85f }
-        ) {
-            aboutContent()
-        }
-    } else {
-        // Solid fallback on <13: gradient fails, use black/white per dark mode
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(if (isDarkTheme) Color.Black else Color.White)
-        ) {
-            aboutContent()
+    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(
+        onBack = onBack,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            BgEffectBackground(
+                isDarkTheme = isDarkTheme,
+                modifier = Modifier.fillMaxSize(),
+                isFullSize = true,
+                surface = Color.Black,
+                alpha = { 1f - scrollProgress * 0.85f }
+            ) {
+                aboutContent()
+            }
+        } else {
+            // Solid fallback on <13: gradient fails, use black/white per dark mode
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(if (isDarkTheme) Color.Black else Color.White)
+            ) {
+                aboutContent()
+            }
         }
     }
 }
@@ -1103,62 +1100,54 @@ private fun SettingsPageScaffold(
 ) {
     val strings = LocalStrings.current
     val cs = MiuixAppTheme.colorScheme
-    // Use same pattern as other working pages (Home, Music, Playlists list)
-    // – CollapsingTopBarState provides both scrollBehavior and pageBackdrop,
-    // and captureForTopBarBlur correctly wires layerBackdrop.
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
     val scrollState = rememberScrollState()
     val scrollProgress = topBarState.collapseFraction
 
-    Column(modifier = Modifier.fillMaxSize().background(cs.background)) {
-        SmallTopAppBar(
-            title = title,
-            modifier = if (topBarState.pageBackdrop != null) {
-                Modifier.miuixTopBarBlur(backdrop = topBarState.pageBackdrop)
-            } else Modifier,
-            color = if (topBarState.pageBackdrop != null) Color.Transparent else cs.background.copy(alpha = scrollProgress),
-            titleColor = cs.onBackground.copy(alpha = scrollProgress),
-            scrollBehavior = topBarState.scrollBehavior,
-            defaultWindowInsetsPadding = false,
-            navigationIcon = {
-                Box(
-                    modifier = Modifier
-                        .padding(start = 12.dp)
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(cs.surfaceVariant.copy(alpha = 0.75f))
-                        .bounceClick { onBack() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription, tint = cs.onBackground)
-                }
+    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(
+        onBack = onBack,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            topBar = {
+                // Use SubmenuTopBar for consistent blur like other detail pages
+                dev.shephard.player.ui.components.SubmenuTopBar(
+                    title = title,
+                    state = topBarState,
+                    onBack = onBack
+                )
             }
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .captureForTopBarBlur(topBarState)
-                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                .overScrollVertical()
-                .verticalScroll(scrollState)
-                .padding(horizontal = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = title,
-                style = MiuixAppTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = wallpaperAdaptiveTextColor(),
+        ) { innerPadding ->
+            Column(
                 modifier = Modifier
-                    .padding(top = 4.dp)
-                    .graphicsLayer {
-                        alpha = 1f - scrollProgress
-                        scaleX = 1f - scrollProgress * 0.05f
-                        scaleY = 1f - scrollProgress * 0.05f
-                    }
-            )
-            content()
-            Spacer(Modifier.height(24.dp))
+                    .fillMaxSize()
+                    .captureForTopBarBlur(topBarState)
+                    .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                    .overScrollVertical()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 12.dp)
+                    .padding(top = innerPadding.calculateTopPadding() + 8.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MiuixAppTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = wallpaperAdaptiveTextColor(),
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .graphicsLayer {
+                            alpha = 1f - scrollProgress
+                            scaleX = 1f - scrollProgress * 0.05f
+                            scaleY = 1f - scrollProgress * 0.05f
+                        }
+                )
+                content()
+                Spacer(Modifier.height(24.dp))
+            }
         }
     }
 }
@@ -1302,141 +1291,22 @@ private fun MiuixSpinnerRow(
     selectedIndex: Int,
     onSelectedIndexChange: (Int) -> Unit
 ) {
-    var showDrawer by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .miuixWidgetClick(pressScale = 0.97f, maxTiltDegrees = 3f) { showDrawer = true }
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(end = 16.dp)
-        ) {
-            Text(
-                text = title,
-                color = MiuixAppTheme.colorScheme.onBackground,
-                style = MiuixAppTheme.typography.bodyLarge
-            )
-            if (summary != null) {
-                Text(
-                    text = summary,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                    style = MiuixAppTheme.typography.bodySmall
-                )
-            }
-            Text(
-                text = items.getOrNull(selectedIndex) ?: "",
-                color = MiuixAppTheme.colorScheme.primary,
-                style = MiuixAppTheme.typography.bodySmall,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-        Icon(
-            imageVector = Icons.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-            modifier = Modifier.size(20.dp)
-        )
+    // InstallerX style: use WindowSpinnerPreference popup instead of drawer
+    // This shows a small anchored popup, not a full bottom drawer
+    val dropdownItems = remember(items) {
+        items.map { top.yukonga.miuix.kmp.basic.DropdownItem(title = it) }
     }
-
-    if (showDrawer) {
-        MiuixDrawer(onDismissRequest = { showDrawer = false }) {
-            val dismissDrawer = rememberDrawerDismiss()
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.6f)
-                    .padding(20.dp)
-            ) {
-                Text(title, style = MiuixAppTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MiuixAppTheme.colorScheme.onBackground)
-                if (summary != null) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(summary, style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
-                }
-                Spacer(Modifier.height(12.dp))
-                LazyColumn(
-                    modifier = Modifier.weight(1f).overScrollVertical(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(items.size) { idx ->
-                        val selected = idx == selectedIndex
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(
-                                    if (selected) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
-                                    else MiuixAppTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.58f)
-                                )
-                                .miuixWidgetClick(pressScale = 0.97f, maxTiltDegrees = 3f) {
-                                    onSelectedIndexChange(idx)
-                                    dismissDrawer()
-                                }
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = items[idx],
-                                color = if (selected) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onBackground,
-                                style = MiuixAppTheme.typography.bodyLarge,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-                            )
-                            if (selected) {
-                                Icon(Icons.Filled.KeyboardArrowRight, contentDescription = null, tint = MiuixAppTheme.colorScheme.primary)
-                            }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun MiuixPredictiveBackDirectionBottomSwitcher(
-    selectedDirection: PredictiveBackExitDirection,
-    onSelect: (PredictiveBackExitDirection) -> Unit
-) {
-    val options = listOf(
-        PredictiveBackExitDirection.FOLLOW_GESTURE to "Follow",
-        PredictiveBackExitDirection.ALWAYS_RIGHT to "Right",
-        PredictiveBackExitDirection.ALWAYS_LEFT to "Left"
+    // Use WindowSpinnerPreference from miuix-preference
+    top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
+        title = title,
+        summary = summary,
+        items = dropdownItems,
+        selectedIndex = selectedIndex,
+        onSelectedIndexChange = onSelectedIndexChange,
+        modifier = Modifier.fillMaxWidth()
     )
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        options.forEach { (dir, label) ->
-            val isSelected = dir == selectedDirection
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(
-                        if (isSelected) MiuixAppTheme.colorScheme.primary
-                        else MiuixAppTheme.colorScheme.surfaceContainerHighest
-                    )
-                    .miuixWidgetClick(pressScale = 0.96f, maxTiltDegrees = 3f) { onSelect(dir) }
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = label,
-                    color = if (isSelected) MiuixAppTheme.colorScheme.onPrimary else MiuixAppTheme.colorScheme.onSurface,
-                    style = MiuixAppTheme.typography.labelMedium,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                )
-            }
-        }
-    }
 }
+
 
 private fun formatListeningTime(
     ms: Long,
