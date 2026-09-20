@@ -101,6 +101,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import dev.shephard.player.player.PlayerViewModel
+import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -744,6 +745,7 @@ private fun m3FormatMillisLineage(ms: Long): String {
     return "%d:%02d".format(m, s)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun M3AddToPlaylistDrawer(
     trackId: Long,

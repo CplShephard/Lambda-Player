@@ -327,16 +327,19 @@ fun NavGraph(
 
             val currentScene = sceneState.currentScene
             val previousScenes = sceneState.previousScenes
-            gestureState = if (isPredictiveEnabled) {
-                rememberNavigationEventState(
-                    currentInfo = SceneInfo(currentScene),
-                    backInfo = previousScenes.map { SceneInfo(it) }
-                )
-            } else null
+            // NavDisplay(sceneState, navigationEventState, ...) requires a NON-null
+            // NavigationEventState, so it must always be created. When predictive back is
+            // disabled we simply don't attach a NavigationBackHandler to it, so it stays Idle
+            // and the plain BackHandler below handles the back press instead.
+            val navEventState = rememberNavigationEventState(
+                currentInfo = SceneInfo(currentScene),
+                backInfo = previousScenes.map { SceneInfo(it) }
+            )
+            gestureState = if (isPredictiveEnabled) navEventState else null
 
-            if (isPredictiveEnabled && gestureState != null) {
+            if (isPredictiveEnabled) {
                 NavigationBackHandler(
-                    state = gestureState,
+                    state = navEventState,
                     isBackEnabled = backStack.size > 1,
                     onBackCompleted = {
                         navigationScope.launch {
@@ -358,7 +361,7 @@ fun NavGraph(
 
             NavDisplay(
                 sceneState = sceneState,
-                navigationEventState = gestureState,
+                navigationEventState = navEventState,
                 contentAlignment = Alignment.TopStart,
                 transitionEffects = NavDisplayTransitionEffects(
                     blockInputDuringTransition = true
