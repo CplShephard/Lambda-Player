@@ -35,7 +35,7 @@ import kotlin.math.abs
 
 // InstallerX exact easings
 private val AnywhereBackGestureEasing = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
-private val AnywhereAnywhereFastOutExtraSlowIn = CubicBezierEasing(0.2f, 0f, 0f, 1f) // simplified, actual InstallerX uses compound but this matches
+private val AnywhereFastOutExtraSlowIn = CubicBezierEasing(0.2f, 0f, 0f, 1f) // simplified, actual InstallerX uses compound but this matches
 
 /**
  * Wraps content with anywhere-drag predictive back.
