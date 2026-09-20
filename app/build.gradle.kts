@@ -57,9 +57,7 @@ android {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
             freeCompilerArgs.addAll(
-                "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
-
-                "-Xcontext-parameters"
+                "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi"
             )
         }
     }
