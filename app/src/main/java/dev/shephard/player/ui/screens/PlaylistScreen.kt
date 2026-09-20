@@ -1074,7 +1074,7 @@ private fun PlaylistListView(
     onMenu: (Int) -> Unit,
     onCreate: () -> Unit
 ) {
-    val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
+    val topBarState = dev.shephard.player.ui.components.rememberSolidCollapsingTopBarState()
 
 Box(modifier = Modifier.fillMaxSize()) {
 
@@ -1454,18 +1454,12 @@ private fun PlaylistDetailTopBar(
 ) {
     val strings = LocalStrings.current
     val cs = MiuixAppTheme.colorScheme
-    val collapse = topBarState.collapseFraction
+    // Solid submenu: always solid background, title visible
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .then(
-                if (topBarState.pageBackdrop != null) {
-                    Modifier.miuixTopBarBlur(backdrop = topBarState.pageBackdrop)
-                } else {
-                    Modifier.background(cs.background.copy(alpha = collapse))
-                }
-            )
+            .background(cs.background)
             .height(52.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -1486,7 +1480,6 @@ private fun PlaylistDetailTopBar(
             )
         }
         Row(
-            modifier = Modifier.graphicsLayer { alpha = collapse },
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (cover != null) {
@@ -1529,7 +1522,7 @@ internal fun PlaylistDetailView(
     onChangeSort: (String) -> Unit = {},
     isHomeSimplified: Boolean = false
 ) {
-    val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
+    val topBarState = dev.shephard.player.ui.components.rememberSolidCollapsingTopBarState()
     val reorderItems = remember { mutableStateListOf<AudioTrack>() }
     var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var isReordering by remember { mutableStateOf(false) }
@@ -1597,7 +1590,7 @@ internal fun PlaylistDetailView(
     ) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Transparent,
+            containerColor = MiuixAppTheme.colorScheme.background,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
                 PlaylistDetailTopBar(

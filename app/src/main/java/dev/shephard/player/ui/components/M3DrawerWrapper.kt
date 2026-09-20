@@ -56,10 +56,18 @@ fun M3BottomSheetWrapper(
     val predictiveBack by prefs.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
     val isPredictiveEnabled = predictiveBack != PredictiveBackAnimation.NONE
 
+
     if (!isPredictiveEnabled) {
         var visible by remember { mutableStateOf(false) }
         LaunchedEffect(Unit) { visible = true }
         val currentOnDismiss by rememberUpdatedState(onDismissRequest)
+
+        LaunchedEffect(visible) {
+            if (!visible) {
+                kotlinx.coroutines.delay(260)
+                currentOnDismiss()
+            }
+        }
 
         BackHandler(enabled = visible) {
             visible = false
@@ -74,7 +82,12 @@ fun M3BottomSheetWrapper(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.32f)),
+                    .background(Color.Black.copy(alpha = 0.32f))
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null,
+                        onClick = { visible = false }
+                    ),
                 contentAlignment = Alignment.BottomCenter
             ) {
                 AnimatedVisibility(
@@ -87,19 +100,19 @@ fun M3BottomSheetWrapper(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                             .background(containerColor)
+                            .clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null,
+                                onClick = {}
+                            )
                     ) {
-                        LaunchedEffect(visible) {
-                            if (!visible) {
-                                kotlinx.coroutines.delay(260)
-                                currentOnDismiss()
-                            }
-                        }
                         Column { content() }
                     }
                 }
             }
         }
     } else {
+
         ModalBottomSheet(
             onDismissRequest = onDismissRequest,
             sheetState = sheetState,

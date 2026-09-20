@@ -71,7 +71,7 @@ fun StatsScreen(
     val strings = LocalStrings.current
     val cs = MiuixAppTheme.colorScheme
     val scrollState = rememberScrollState()
-    val topBarState = rememberCollapsingTopBarState()
+    val topBarState = dev.shephard.player.ui.components.rememberSolidCollapsingTopBarState()
 
     val allEvents by playerViewModel.statsEventsFlow.collectAsState()
     val tracks by libraryViewModel.tracks.collectAsState()
@@ -85,7 +85,7 @@ fun StatsScreen(
     dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(onBack = onBack, modifier = Modifier.fillMaxSize()) {
         top.yukonga.miuix.kmp.basic.Scaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Transparent,
+            containerColor = cs.background,
             contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
             topBar = {
                 dev.shephard.player.ui.components.SubmenuTopBar(
@@ -98,7 +98,6 @@ fun StatsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .captureForTopBarBlur(topBarState)
                 .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                 .overScrollVertical()
                 .verticalScroll(scrollState)

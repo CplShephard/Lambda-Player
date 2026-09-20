@@ -6,6 +6,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -66,11 +68,20 @@ fun MiuixDrawer(
     val predictiveBack by prefs.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
     val isPredictiveEnabled = predictiveBack != PredictiveBackAnimation.NONE
 
+
     if (!isPredictiveEnabled) {
         // NONE: predictive back fully disabled – use non-predictive Dialog bottom sheet
         var visible by remember { mutableStateOf(false) }
         LaunchedEffect(Unit) { visible = true }
         val currentOnDismissRequest by rememberUpdatedState(onDismissRequest)
+
+        // Handle dismiss outside AnimatedVisibility to avoid touch block
+        LaunchedEffect(visible) {
+            if (!visible) {
+                kotlinx.coroutines.delay(260)
+                currentOnDismissRequest()
+            }
+        }
 
         // Use legacy BackHandler (non-predictive) when predictive is disabled
         BackHandler(enabled = visible && allowDismiss) {
@@ -88,7 +99,17 @@ fun MiuixDrawer(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.32f)),
+                    .background(Color.Black.copy(alpha = 0.32f))
+                    .then(
+                        if (allowDismiss) Modifier
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(0.dp))
+                            .clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null,
+                                onClick = { visible = false }
+                            )
+                        else Modifier
+                    ),
                 contentAlignment = Alignment.BottomCenter
             ) {
                 AnimatedVisibility(
@@ -101,19 +122,17 @@ fun MiuixDrawer(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius))
                             .background(backgroundColor)
+                            .clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null,
+                                onClick = {}
+                            )
                     ) {
                         androidx.compose.runtime.CompositionLocalProvider(
                             LocalDismissState provides {
                                 visible = false
                             }
                         ) {
-                            // Handle dismiss finished
-                            LaunchedEffect(visible) {
-                                if (!visible) {
-                                    kotlinx.coroutines.delay(260)
-                                    currentOnDismissRequest()
-                                }
-                            }
                             content()
                         }
                     }
@@ -122,6 +141,7 @@ fun MiuixDrawer(
         }
         return
     }
+
 
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }

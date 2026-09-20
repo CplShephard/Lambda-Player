@@ -403,259 +403,11 @@ Spacer(modifier = Modifier.weight(1f))
 
 SeekBarRow(playerViewModel = playerViewModel)
 
-Row(
+            // M3 layout match: first row = prev/next, pause, shuffle, repeat (same as M3 first row)
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp, start = 20.dp, end = 20.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val lyricsSheetScope = rememberCoroutineScope()
-                val trackId = track?.id ?: -1L
-                val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
-
-BouncyIconButton(
-                    onClick = {
-                        showQueue = true
-                    },
-                    icon = Icons.AutoMirrored.Filled.QueueMusic,
-                    contentDescription = strings.queue,
-                    tint = Color.White,
-                    iconSize = 28.dp
-                )
-                BouncyIconButton(
-                    onClick = {
-                        showLyrics = true
-                    },
-                    icon = Icons.Filled.Lyrics,
-                    contentDescription = strings.lyrics,
-                    tint = Color.White,
-                    iconSize = 28.dp
-                )
-
-Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .bounceClick {
-                            if (trackId > 0) {
-                                if (isLiked) {
-                                    showPlaylists = true
-                                } else {
-                                    playerViewModel.addToLiked(trackId)
-                                }
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    androidx.compose.animation.AnimatedContent(
-                        targetState = isLiked,
-                        transitionSpec = {
-                            (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)) +
-                                androidx.compose.animation.scaleIn(
-                                    initialScale = 0.45f,
-                                    animationSpec = androidx.compose.animation.core.spring(
-                                        dampingRatio = 0.55f,
-                                        stiffness = 400f
-                                    )
-                                )).togetherWith(
-                                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150)) +
-                                    androidx.compose.animation.scaleOut(targetScale = 1.35f)
-                            )
-                        },
-                        label = "likeMorph"
-                    ) { liked ->
-                        Icon(
-                            imageVector = if (liked) Icons.Filled.Check else Icons.Filled.Add,
-                            contentDescription = if (liked) "Added" else "Add",
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                }
-
-if (showQueue) {
-                    MiuixDrawer(
-                        onDismissRequest = { showQueue = false },
-                    ) {
-                        QueueList(
-                            queue = state.queue,
-                            currentTrackId = state.currentTrack?.id,
-                            onMove = { from, to -> playerViewModel.moveQueueItem(from, to) },
-                            onPlay = { playerViewModel.playQueueItem(it) },
-                            onRemove = { playerViewModel.removeFromQueue(it) },
-                            strings = strings
-                        )
-                    }
-                }
-
-if (showLyrics) {
-                    val lyricsContext = LocalContext.current
-                    var isDownloading by remember { mutableStateOf(false) }
-                    var downloadError by remember { mutableStateOf<String?>(null) }
-                    val lyricListState = rememberLazyListState()
-                    val syncedLyrics = state.syncedLyrics
-
-val lyricsProgress by playerViewModel.progress.collectAsState()
-                    val currentMs = lyricsProgress.positionMs
-                    val activeIndex = if (syncedLyrics.isNotEmpty()) {
-                        syncedLyrics.indexOfLast { it.timeMs <= currentMs }.coerceAtLeast(0)
-                    } else -1
-
-var isEditing by remember { mutableStateOf(false) }
-                    var editText by remember { mutableStateOf("") }
-                    val isDarkTheme = MiuixAppTheme.colorScheme.background.luminance() < 0.5f
-
-val lyricsFilePicker = rememberLauncherForActivityResult(
-                        contract = ActivityResultContracts.OpenDocument()
-                    ) { uri ->
-                        if (uri != null) {
-                            lyricsSheetScope.launch {
-                                val lines = withContext(Dispatchers.IO) {
-                                    try {
-                                        lyricsContext.contentResolver.openInputStream(uri)
-                                            ?.bufferedReader()?.readText()
-                                            ?.let { playerViewModel.parseLrcPublic(it) }
-                                    } catch (_: Exception) { null }
-                                }
-                                if (lines != null) playerViewModel.setManualLyrics(lines)
-                            }
-                        }
-                    }
-
-MiuixDrawer(
-                        onDismissRequest = { showLyrics = false },
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp)
-                                .fillMaxHeight(0.72f)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-
-dev.shephard.player.ui.miuix.IconButton(
-                                    onClick = { lyricsFilePicker.launch(arrayOf("text/*", "application/octet-stream")) }
-                                ) {
-                                    Icon(
-                                        Icons.Filled.FolderOpen,
-                                        contentDescription = strings.addLyricsFromFile,
-                                        tint = MiuixAppTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Text(
-                                    strings.lyrics,
-                                    style = MiuixAppTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.weight(1f).padding(start = 4.dp)
-                                )
-
-dev.shephard.player.ui.miuix.IconButton(
-                                    onClick = {
-                                        if (!isEditing) {
-                                            editText = state.lyrics.joinToString("\n")
-                                            isEditing = true
-                                        } else {
-                                            val lines = editText.lines()
-                                                .map { it.trimEnd() }
-                                                .filter { it.isNotBlank() }
-                                            playerViewModel.setManualLyrics(lines)
-                                            isEditing = false
-                                        }
-                                    }
-                                ) {
-                                    Icon(
-                                        Icons.Filled.Edit,
-                                        contentDescription = strings.edit,
-                                        tint = if (isEditing) MiuixAppTheme.colorScheme.primary
-                                        else MiuixAppTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.height(12.dp))
-                            if (isEditing) {
-                                dev.shephard.player.ui.miuix.OutlinedTextField(
-                                    value = editText,
-                                    onValueChange = { editText = it },
-                                    label = { Text(strings.lyrics) },
-                                    modifier = Modifier.fillMaxWidth().weight(1f)
-                                )
-                            } else if (state.lyrics.isEmpty()) {
-                                Text(strings.noLyricsFound, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
-                                Spacer(Modifier.height(16.dp))
-                                val currentTrack = state.currentTrack
-                                if (currentTrack != null) {
-                                    if (isDownloading) {
-                                        dev.shephard.player.ui.miuix.CircularProgressIndicator(modifier = Modifier.size(28.dp), color = MiuixAppTheme.colorScheme.primary)
-                                    } else {
-                                        dev.shephard.player.ui.miuix.FilledTonalButton(
-                                            onClick = {
-                                                isDownloading = true
-                                                downloadError = null
-                                                lyricsSheetScope.launch {
-                                                    val result = withContext(Dispatchers.IO) {
-                                                        fetchLyricsFromApi(currentTrack.artist, currentTrack.title)
-                                                    }
-                                                    isDownloading = false
-                                                    if (result != null) playerViewModel.setManualLyrics(result)
-                                                    else downloadError = strings.noLyricsFound
-                                                }
-                                            }
-                                        ) {
-                                            Icon(Icons.Filled.Lyrics, null, modifier = Modifier.size(18.dp))
-                                            Spacer(Modifier.width(6.dp))
-                                            Text(strings.downloadLyrics)
-                                        }
-                                    }
-                                    downloadError?.let {
-                                        Spacer(Modifier.height(8.dp))
-                                        Text(it, color = MiuixAppTheme.colorScheme.error, style = MiuixAppTheme.typography.bodySmall)
-                                    }
-                                }
-                            } else {
-                                LazyColumn(
-                                    state = lyricListState,
-                                    modifier = Modifier.overScrollVertical().weight(1f)
-                                ) {
-                                    itemsIndexed(state.lyrics) { idx, line ->
-                                        val isActive = idx == activeIndex
-                                        Text(
-                                            text = line,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .then(
-                                                    if (syncedLyrics.isNotEmpty()) Modifier.clickable {
-                                                        playerViewModel.seekTo(syncedLyrics.getOrNull(idx)?.timeMs ?: 0L)
-                                                    } else Modifier
-                                                )
-                                                .padding(vertical = 6.dp),
-                                            style = MiuixAppTheme.typography.bodyMedium,
-                                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isActive) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-                            }
-                            Spacer(Modifier.height(16.dp))
-                        }
-                    }
-                }
-
-if (showPlaylists) {
-                    AddToPlaylistDrawer(
-                        trackId = trackId,
-                        track = track,
-                        playerViewModel = playerViewModel,
-                        onDismiss = { showPlaylists = false },
-                        strings = strings
-                    )
-                }
-            }
-
-Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 32.dp, start = 22.dp, end = 22.dp)
-                    .pointerInput(Unit) { detectHorizontalDragGestures { _, _ -> } },
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -675,7 +427,7 @@ Row(
                     iconSize = 36.dp
                 )
 
-Box(
+                Box(
                     modifier = Modifier
                         .size(72.dp)
                         .bounceClick {
@@ -723,6 +475,259 @@ Box(
                     contentDescription = strings.repeat,
                     tint = if (state.repeatMode != RepeatMode.OFF) MiuixAppTheme.colorScheme.primary else Color.White,
                     iconSize = 28.dp
+                )
+            }
+
+            // M3 layout match: second row = addToPlaylist, queue, lyrics with shared background Card
+            val lyricsSheetScope = rememberCoroutineScope()
+            val trackId = track?.id ?: -1L
+            val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 8.dp, bottom = 32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.12f))
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    BouncyIconButton(
+                        onClick = { showQueue = true },
+                        icon = Icons.AutoMirrored.Filled.QueueMusic,
+                        contentDescription = strings.queue,
+                        tint = Color.White,
+                        iconSize = 28.dp
+                    )
+                    BouncyIconButton(
+                        onClick = { showLyrics = true },
+                        icon = Icons.Filled.Lyrics,
+                        contentDescription = strings.lyrics,
+                        tint = Color.White,
+                        iconSize = 28.dp
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .bounceClick {
+                                if (trackId > 0) {
+                                    if (isLiked) {
+                                        showPlaylists = true
+                                    } else {
+                                        playerViewModel.addToLiked(trackId)
+                                    }
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        androidx.compose.animation.AnimatedContent(
+                            targetState = isLiked,
+                            transitionSpec = {
+                                (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)) +
+                                    androidx.compose.animation.scaleIn(
+                                        initialScale = 0.45f,
+                                        animationSpec = androidx.compose.animation.core.spring(
+                                            dampingRatio = 0.55f,
+                                            stiffness = 400f
+                                        )
+                                    )).togetherWith(
+                                    androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150)) +
+                                        androidx.compose.animation.scaleOut(targetScale = 1.35f)
+                                )
+                            },
+                            label = "likeMorph"
+                        ) { liked ->
+                            Icon(
+                                imageVector = if (liked) Icons.Filled.Check else Icons.Filled.Add,
+                                contentDescription = if (liked) "Added" else "Add",
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (showQueue) {
+                MiuixDrawer(
+                    onDismissRequest = { showQueue = false },
+                ) {
+                    QueueList(
+                        queue = state.queue,
+                        currentTrackId = state.currentTrack?.id,
+                        onMove = { from, to -> playerViewModel.moveQueueItem(from, to) },
+                        onPlay = { playerViewModel.playQueueItem(it) },
+                        onRemove = { playerViewModel.removeFromQueue(it) },
+                        strings = strings
+                    )
+                }
+            }
+
+            if (showLyrics) {
+                val lyricsContext = LocalContext.current
+                var isDownloading by remember { mutableStateOf(false) }
+                var downloadError by remember { mutableStateOf<String?>(null) }
+                val lyricListState = rememberLazyListState()
+                val syncedLyrics = state.syncedLyrics
+
+                val lyricsProgress by playerViewModel.progress.collectAsState()
+                val currentMs = lyricsProgress.positionMs
+                val activeIndex = if (syncedLyrics.isNotEmpty()) {
+                    syncedLyrics.indexOfLast { it.timeMs <= currentMs }.coerceAtLeast(0)
+                } else -1
+
+                var isEditing by remember { mutableStateOf(false) }
+                var editText by remember { mutableStateOf("") }
+                val isDarkTheme = MiuixAppTheme.colorScheme.background.luminance() < 0.5f
+
+                val lyricsFilePicker = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.OpenDocument()
+                ) { uri ->
+                    if (uri != null) {
+                        lyricsSheetScope.launch {
+                            val lines = withContext(Dispatchers.IO) {
+                                try {
+                                    lyricsContext.contentResolver.openInputStream(uri)
+                                        ?.bufferedReader()?.readText()
+                                        ?.let { playerViewModel.parseLrcPublic(it) }
+                                } catch (_: Exception) { null }
+                            }
+                            if (lines != null) playerViewModel.setManualLyrics(lines)
+                        }
+                    }
+                }
+
+                MiuixDrawer(
+                    onDismissRequest = { showLyrics = false },
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .fillMaxHeight(0.72f)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+
+                            dev.shephard.player.ui.miuix.IconButton(
+                                onClick = { lyricsFilePicker.launch(arrayOf("text/*", "application/octet-stream")) }
+                            ) {
+                                Icon(
+                                    Icons.Filled.FolderOpen,
+                                    contentDescription = strings.addLyricsFromFile,
+                                    tint = MiuixAppTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                strings.lyrics,
+                                style = MiuixAppTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f).padding(start = 4.dp)
+                            )
+
+                            dev.shephard.player.ui.miuix.IconButton(
+                                onClick = {
+                                    if (!isEditing) {
+                                        editText = state.lyrics.joinToString("\n")
+                                        isEditing = true
+                                    } else {
+                                        val lines = editText.lines()
+                                            .map { it.trimEnd() }
+                                            .filter { it.isNotBlank() }
+                                        playerViewModel.setManualLyrics(lines)
+                                        isEditing = false
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    Icons.Filled.Edit,
+                                    contentDescription = strings.edit,
+                                    tint = if (isEditing) MiuixAppTheme.colorScheme.primary
+                                    else MiuixAppTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        if (isEditing) {
+                            dev.shephard.player.ui.miuix.OutlinedTextField(
+                                value = editText,
+                                onValueChange = { editText = it },
+                                label = { Text(strings.lyrics) },
+                                modifier = Modifier.fillMaxWidth().weight(1f)
+                            )
+                        } else if (state.lyrics.isEmpty()) {
+                            Text(strings.noLyricsFound, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(16.dp))
+                            val currentTrack = state.currentTrack
+                            if (currentTrack != null) {
+                                if (isDownloading) {
+                                    dev.shephard.player.ui.miuix.CircularProgressIndicator(modifier = Modifier.size(28.dp), color = MiuixAppTheme.colorScheme.primary)
+                                } else {
+                                    dev.shephard.player.ui.miuix.FilledTonalButton(
+                                        onClick = {
+                                            isDownloading = true
+                                            downloadError = null
+                                            lyricsSheetScope.launch {
+                                                val result = withContext(Dispatchers.IO) {
+                                                    fetchLyricsFromApi(currentTrack.artist, currentTrack.title)
+                                                }
+                                                isDownloading = false
+                                                if (result != null) playerViewModel.setManualLyrics(result)
+                                                else downloadError = strings.noLyricsFound
+                                            }
+                                        }
+                                    ) {
+                                        Icon(Icons.Filled.Lyrics, null, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(strings.downloadLyrics)
+                                    }
+                                }
+                                downloadError?.let {
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(it, color = MiuixAppTheme.colorScheme.error, style = MiuixAppTheme.typography.bodySmall)
+                                }
+                            }
+                        } else {
+                            LazyColumn(
+                                state = lyricListState,
+                                modifier = Modifier.overScrollVertical().weight(1f)
+                            ) {
+                                itemsIndexed(state.lyrics) { idx, line ->
+                                    val isActive = idx == activeIndex
+                                    Text(
+                                        text = line,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .then(
+                                                if (syncedLyrics.isNotEmpty()) Modifier.clickable {
+                                                    playerViewModel.seekTo(syncedLyrics.getOrNull(idx)?.timeMs ?: 0L)
+                                                } else Modifier
+                                            )
+                                            .padding(vertical = 6.dp),
+                                        style = MiuixAppTheme.typography.bodyMedium,
+                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isActive) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(16.dp))
+                    }
+                }
+            }
+
+            if (showPlaylists) {
+                AddToPlaylistDrawer(
+                    trackId = trackId,
+                    track = track,
+                    playerViewModel = playerViewModel,
+                    onDismiss = { showPlaylists = false },
+                    strings = strings
                 )
             }
         }

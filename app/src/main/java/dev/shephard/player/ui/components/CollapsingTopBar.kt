@@ -33,6 +33,13 @@ import androidx.compose.ui.text.font.FontWeight
 import dev.shephard.player.ui.i18n.LocalStrings
 
 @Composable
+fun rememberSolidCollapsingTopBarState(): CollapsingTopBarState {
+    val scrollBehavior = MiuixScrollBehavior()
+    // Solid submenu: no backdrop, no blur smear, solid background
+    return remember(scrollBehavior) { CollapsingTopBarState(scrollBehavior, null) }
+}
+
+@Composable
 fun rememberCollapsingTopBarState(): CollapsingTopBarState {
     val scrollBehavior = MiuixScrollBehavior()
 
@@ -139,19 +146,18 @@ fun SubmenuTopBar(
     modifier: Modifier = Modifier,
 ) {
     val cs = MiuixAppTheme.colorScheme
-    val collapseFraction = state.collapseFraction
+    val isSolid = state.pageBackdrop == null
+    // For solid submenus, always show title and solid background (no alpha based on collapse)
+    // For main pages with backdrop, keep previous behavior but ensure smallTopBar visible
     SmallTopAppBar(
         title = title,
         modifier = modifier.then(
-            if (state.pageBackdrop != null) {
+            if (!isSolid && state.pageBackdrop != null) {
                 Modifier.miuixTopBarBlur(backdrop = state.pageBackdrop)
             } else Modifier
         ),
-        color = if (state.pageBackdrop != null)
-            androidx.compose.ui.graphics.Color.Transparent
-        else
-            cs.background.copy(alpha = collapseFraction),
-        titleColor = wallpaperAdaptiveTextColor().copy(alpha = collapseFraction),
+        color = if (isSolid) cs.background else androidx.compose.ui.graphics.Color.Transparent,
+        titleColor = if (isSolid) cs.onBackground else wallpaperAdaptiveTextColor(),
         scrollBehavior = state.scrollBehavior,
         defaultWindowInsetsPadding = false,
         navigationIcon = {

@@ -374,10 +374,17 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 scope.launch { prefs.setUseMiuixMonet(enabled) }
             }
 
-            // Fixed re-animation: only show when data loaded (nullable != null)
+            // Fixed re-animation: snap to target on first load to avoid enter animation on re-enter
             if (useMiuixMonetNullable != null) {
-                val monetMenuState = remember { MutableTransitionState(useMiuixMonet) }
+                val monetMenuState = remember(useMiuixMonetNullable) { MutableTransitionState(useMiuixMonet).apply { targetState = useMiuixMonet } }
                 LaunchedEffect(useMiuixMonet) {
+                    if (monetMenuState.currentState != useMiuixMonet) {
+                        monetMenuState.targetState = useMiuixMonet
+                    }
+                }
+                // Snap currentState to target immediately when data first loads to prevent re-animation
+                LaunchedEffect(useMiuixMonetNullable) {
+                    monetMenuState.currentState = useMiuixMonet
                     monetMenuState.targetState = useMiuixMonet
                 }
                 AnimatedVisibility(
@@ -430,14 +437,19 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // Fixed: avoid re-animation on enter/exit, only show when data loaded
+        // Fixed: avoid re-animation on enter/exit, only show when data loaded, snap on first load
         val accentGridTarget = useMiuixMonet &&
             paletteStyle != PaletteStyle.Monochrome &&
             (!dynamicColor || Build.VERSION.SDK_INT < Build.VERSION_CODES.S)
-        // Only animate when nullable states are loaded to prevent flicker
         val accentGridVisible = useMiuixMonetNullable != null && dynamicColorNullable != null && accentGridTarget
-        val accentGridState = remember { MutableTransitionState(accentGridVisible) }
+        val accentGridState = remember(useMiuixMonetNullable, dynamicColorNullable) { MutableTransitionState(accentGridVisible).apply { targetState = accentGridVisible } }
         LaunchedEffect(accentGridVisible) {
+            if (accentGridState.currentState != accentGridVisible) {
+                accentGridState.targetState = accentGridVisible
+            }
+        }
+        LaunchedEffect(useMiuixMonetNullable, dynamicColorNullable) {
+            accentGridState.currentState = accentGridVisible
             accentGridState.targetState = accentGridVisible
         }
         AnimatedVisibility(
@@ -1042,8 +1054,8 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
         SmallTopAppBar(
             title = strings.aboutSectionTitle,
             modifier = Modifier.align(Alignment.TopCenter),
-            color = MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
-            titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
+            color = MiuixAppTheme.colorScheme.background,
+            titleColor = MiuixAppTheme.colorScheme.onBackground,
             scrollBehavior = topAppBarScrollBehavior,
             defaultWindowInsetsPadding = false,
             navigationIcon = {
@@ -1052,6 +1064,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                         .padding(start = 12.dp)
                         .size(40.dp)
                         .clip(CircleShape)
+                        .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
                         .bounceClick { onBack() },
                     contentAlignment = Alignment.Center
                 ) {
@@ -1100,7 +1113,8 @@ private fun SettingsPageScaffold(
 ) {
     val strings = LocalStrings.current
     val cs = MiuixAppTheme.colorScheme
-    val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
+    // Solid background for submenus – no wallpaper backdrop, per requirement
+    val topBarState = dev.shephard.player.ui.components.rememberSolidCollapsingTopBarState()
     val scrollState = rememberScrollState()
     val scrollProgress = topBarState.collapseFraction
 
@@ -1110,10 +1124,9 @@ private fun SettingsPageScaffold(
     ) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Transparent,
+            containerColor = cs.background,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
-                // Use SubmenuTopBar for consistent blur like other detail pages
                 dev.shephard.player.ui.components.SubmenuTopBar(
                     title = title,
                     state = topBarState,
@@ -1124,7 +1137,6 @@ private fun SettingsPageScaffold(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .captureForTopBarBlur(topBarState)
                     .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                     .overScrollVertical()
                     .verticalScroll(scrollState)
@@ -1136,7 +1148,7 @@ private fun SettingsPageScaffold(
                     text = title,
                     style = MiuixAppTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = wallpaperAdaptiveTextColor(),
+                    color = cs.onBackground,
                     modifier = Modifier
                         .padding(top = 4.dp)
                         .graphicsLayer {

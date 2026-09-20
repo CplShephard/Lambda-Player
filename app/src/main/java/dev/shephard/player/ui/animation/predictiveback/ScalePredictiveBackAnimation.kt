@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Copyright (C) 2026 InstallerX Revived contributors
-// Adapted for Lambda Player
+// Copyright (C) 2026 InstallerX Revived contributors – ported exact logic for Lambda Player
+// Adapted from InstallerX Revived ScaleNavTransition.kt
+// Exact formulas: MIN_SCALE 0.85, pivot based on swipe edge and touchY, translation sign based on exitDirection
 package dev.shephard.player.ui.animation.predictiveback
 
 import androidx.compose.animation.AnimatedContentTransitionScope
@@ -9,6 +10,7 @@ import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
@@ -38,8 +40,10 @@ import dev.shephard.player.theme.PredictiveBackExitDirection
 import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import kotlinx.coroutines.CoroutineScope
 
+private val BackGestureEasing = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
+
 class ScalePredictiveBackAnimation(
-    private val exitDirection: PredictiveBackExitDirection = PredictiveBackExitDirection.ALWAYS_RIGHT
+    private val exitDirection: PredictiveBackExitDirection = PredictiveBackExitDirection.FOLLOW_GESTURE
 ) : PredictiveBackAnimationHandler {
     private var exitingPageKey: String? = null
     private val exitAnimatable = Animatable(0f)
@@ -49,7 +53,6 @@ class ScalePredictiveBackAnimation(
         transitionState: NavigationEventTransitionState?,
         currentPageKey: NavKey?,
     ) {
-        // Always trigger exit animation on back press, regardless of inPredictive flag
         exitingPageKey = currentPageKey.toString()
         exitAnimatable.animateTo(
             targetValue = 1f,
@@ -102,10 +105,10 @@ class ScalePredictiveBackAnimation(
 
                 inPredictiveBackAnimation = isGestureActiveNow || animatedScale != 1f || exitingPageKey != null
 
+                // Exact InstallerX pivot logic
                 val currentPivotY = if (touchY != null && containerHeightPx > 0) {
                     (touchY / containerHeightPx).coerceIn(0.1f, 0.9f)
                 } else 0.5f
-
                 val currentPivotX = if (edge == EDGE_LEFT) 0.8f else 0.2f
 
                 val directionMultiplier = when (exitDirection) {
@@ -117,15 +120,24 @@ class ScalePredictiveBackAnimation(
                 val exitProgress =
                     if (pageKey != currentPageKey.toString()) 1f else exitAnimatable.value
 
-                // During gesture, use gestureProgress for scale, not just exitAnimatable
-                val gestureScale = 1f - (1f - 0.85f) * gestureProgress
+                // Exact InstallerX scale formula: 0.85 + 0.15 * easedProgress
+                // easedProgress = shapedTopProgress = 1 - BackGestureEasing(1 - progress)
+                fun shapedTopProgress(progress: Float): Float = 1f - BackGestureEasing.transform((1f - progress).coerceIn(0f, 1f))
+
+                val gestureScale = if (isGestureActiveNow) {
+                    val eased = shapedTopProgress(gestureProgress)
+                    0.85f + (1f - 0.85f) * eased
+                } else animatedScale
+
                 val scaleToUse = if (isGestureActiveNow) gestureScale else animatedScale
+
+                // Exact InstallerX translation: 0 during gesture, sign * post * width during commit
                 val animatedTranslationX = if (isGestureActiveNow) {
-                    // During gesture, don't translate yet, just scale
                     0f
                 } else {
                     containerWidthPx * exitProgress * directionMultiplier
                 }
+
                 val needsClip = inPredictiveBackAnimation
 
                 this
@@ -140,6 +152,7 @@ class ScalePredictiveBackAnimation(
                         else RoundedCornerShape(0.dp)
                     )
             } else {
+                // Underlying page dim
                 val renderModifier = if (isGestureActiveNow) {
                     val progress = if (!inPredictiveBackAnimation) gestureProgress else exitAnimatable.value
                     val dynamicAlpha = 0.5f * (1f - progress)

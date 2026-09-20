@@ -101,7 +101,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import dev.shephard.player.player.PlayerViewModel
-import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -194,26 +193,16 @@ fun M3NowPlayingSheet(
                 Box(modifier = Modifier.size(width = 36.dp, height = 4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
             }
 
-            // Fixed: top-left says Now Playing instead of song name
+            // Top-left only Now Playing
             androidx.compose.material3.TopAppBar(
                 title = {
-                    Column(horizontalAlignment = Alignment.Start) {
-                        Text(
-                            text = strings.nowPlaying,
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (track != null) {
-                            Text(
-                                text = "${track.title} • ${track.artist}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
+                    Text(
+                        text = strings.nowPlaying,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = { dismissWithAnimation() }) {
@@ -745,7 +734,6 @@ private fun m3FormatMillisLineage(ms: Long): String {
     return "%d:%02d".format(m, s)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun M3AddToPlaylistDrawer(
     trackId: Long,
@@ -756,7 +744,7 @@ private fun M3AddToPlaylistDrawer(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val prefs = remember { PreferencesManager(context) }
+    val prefs = remember { dev.shephard.player.player.PreferencesManager(context) }
     val json by prefs.playlistsJson.collectAsState(initial = "[]")
     val playlists = remember(json) { dev.shephard.player.ui.screens.parsePlaylists(json) }
     val likedJson by prefs.likedSongIds.collectAsState(initial = "[]")
@@ -764,32 +752,64 @@ private fun M3AddToPlaylistDrawer(
         try { org.json.JSONArray(likedJson).let { arr -> (0 until arr.length()).map { arr.getLong(it) } } }
         catch (_: Exception) { emptyList() }
     }
+    val isLiked = likedIds.contains(trackId)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     M3BottomSheetWrapper(
             onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surfaceContainer) {
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
             Text(strings.addToPlaylist, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                items(playlists.filterNot { it.isSystem }) { pl ->
+                item {
+                    androidx.compose.material3.ListItem(
+                        headlineContent = { Text(strings.likedSongs) },
+                        supportingContent = { Text("${likedIds.size} ${strings.trackCount}") },
+                        leadingContent = { Icon(Icons.Filled.Favorite, null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingContent = {
+                            Icon(
+                                imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                contentDescription = null,
+                                tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            scope.launch {
+                                val newIds = if (isLiked) likedIds - trackId else likedIds + trackId
+                                val arr = org.json.JSONArray().apply { newIds.forEach { put(it) } }
+                                prefs.setLikedSongIds(arr.toString())
+                            }
+                        }
+                    )
+                }
+                items(playlists.filterNot { it.isSystem }.size) { idxFiltered ->
+                    val filtered = playlists.filterNot { it.isSystem }
+                    val pl = filtered[idxFiltered]
+                    val originalIdx = playlists.indexOf(pl)
                     val contains = trackId in pl.trackIds
                     androidx.compose.material3.ListItem(
                         headlineContent = { Text(pl.name) },
-                        supportingContent = { Text("${pl.trackIds.size} tracks") },
+                        supportingContent = { Text("${pl.trackIds.size} ${strings.trackCount}") },
                         trailingContent = {
-                            if (contains) Icon(Icons.Filled.Favorite, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Icon(
+                                imageVector = if (contains) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                contentDescription = null,
+                                tint = if (contains) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
                         },
                         modifier = Modifier.clickable {
                             scope.launch {
                                 val all = playlists.toMutableList()
-                                val idx = all.indexOf(pl)
-                                if (idx >= 0) {
-                                    val current = all[idx]
+                                if (originalIdx >= 0) {
+                                    val current = all[originalIdx]
                                     val newIds = if (contains) current.trackIds - trackId else current.trackIds + trackId
-                                    all[idx] = current.copy(trackIds = newIds)
+                                    all[originalIdx] = current.copy(trackIds = newIds)
                                     prefs.setPlaylistsJson(dev.shephard.player.ui.screens.encodePlaylists(all))
                                 }
                             }
-                            onDismiss()
+                            if (!contains && track != null) {
+                                playerViewModel.addTrackToQueue(track)
+                            }
                         }
                     )
                 }
