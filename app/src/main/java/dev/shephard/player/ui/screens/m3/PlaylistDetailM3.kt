@@ -7,6 +7,9 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import dev.shephard.player.ui.components.m3.m3ItemCardColors
+import dev.shephard.player.ui.components.m3.m3TopBarColors
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -271,16 +274,12 @@ internal fun M3PlaylistDetail(
         )
     }
 
-    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(
-        onBack = onBack,
-        modifier = Modifier.fillMaxSize()
-    ) {
-        Scaffold(
+            Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
             topBar = {
             TopAppBar(
-                title = { Text(text = playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
+                title = { Text(text = playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription)
@@ -297,7 +296,7 @@ internal fun M3PlaylistDetail(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface),
+                colors = m3TopBarColors(),
             )
         },
         floatingActionButton = {
@@ -331,7 +330,11 @@ internal fun M3PlaylistDetail(
                             .fillMaxWidth()
                             .padding(horizontal = 24.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.secondaryContainer),
+                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                            .then(
+                                if (!playlist.isSystem) Modifier.clickable { coverPicker.launch(arrayOf("image/*")) }
+                                else Modifier
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         val displayCover = playlist.coverUri ?: plTracks.firstOrNull()?.albumArtUri?.toString()
@@ -345,6 +348,19 @@ internal fun M3PlaylistDetail(
                         } else {
                             Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                                 Icon(Icons.Filled.QueueMusic, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(64.dp))
+                            }
+                        }
+                        if (!playlist.isSystem) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(12.dp)
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Filled.Edit, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
                             }
                         }
                     }
@@ -370,7 +386,7 @@ internal fun M3PlaylistDetail(
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                    colors = m3ItemCardColors()
                 ) {
                     LineageListItemWithThumbnail(
                         headline = track.title,
@@ -385,7 +401,6 @@ internal fun M3PlaylistDetail(
             }
         }
         }
-    }
 
     trackMenuTrack?.let { menuTrack ->
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)

@@ -76,7 +76,7 @@ fun BouncyIconButton(
             when {
                 backgroundColor != null && liquidGlassOn ->
                     it.blurSurfaceCompact(enabled = true, shape = androidx.compose.foundation.shape.CircleShape, tint = glassTint)
-                backgroundColor != null -> it.background(backgroundColor)
+                backgroundColor != null -> it.background(backgroundColor, androidx.compose.foundation.shape.CircleShape)
                 else -> it
             }
         }

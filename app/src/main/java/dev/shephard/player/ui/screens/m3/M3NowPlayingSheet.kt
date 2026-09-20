@@ -210,9 +210,7 @@ fun M3NowPlayingSheet(
                         Icon(Icons.Filled.MusicNote, contentDescription = null)
                     }
                 },
-                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
+                colors = dev.shephard.player.ui.components.m3.m3TopBarColors()
             )
 
             // Album art card - 16dp radius, margin 40dp like Twelve
@@ -641,6 +639,7 @@ fun M3NowPlayingSheet(
                                     fontWeight = if (index == activeIndex) FontWeight.Bold else FontWeight.Normal,
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
                                         .clickable { playerViewModel.seekTo(line.timeMs) }
                                         .padding(horizontal = 24.dp, vertical = 8.dp)
                                 )
@@ -774,7 +773,7 @@ private fun M3AddToPlaylistDrawer(
                                 modifier = Modifier.size(20.dp)
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.clip(RoundedCornerShape(16.dp)).clickable {
                             scope.launch {
                                 val newIds = if (isLiked) likedIds - trackId else likedIds + trackId
                                 val arr = org.json.JSONArray().apply { newIds.forEach { put(it) } }
@@ -799,7 +798,7 @@ private fun M3AddToPlaylistDrawer(
                                 modifier = Modifier.size(20.dp)
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.clip(RoundedCornerShape(16.dp)).clickable {
                             scope.launch {
                                 val all = playlists.toMutableList()
                                 if (originalIdx >= 0) {

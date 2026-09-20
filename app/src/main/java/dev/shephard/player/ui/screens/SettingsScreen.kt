@@ -693,7 +693,6 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                     PredictiveBackAnimation.NONE to strings.predictiveBackNone,
                     PredictiveBackAnimation.AOSP to strings.predictiveBackAosp,
                     PredictiveBackAnimation.MIUIX to strings.predictiveBackMiuix,
-                    PredictiveBackAnimation.SCALE to strings.predictiveBackScale,
                     PredictiveBackAnimation.CLASSIC to strings.predictiveBackClassic,
                 )
                 val predictiveBackIndex = predictiveBackOptions.indexOfFirst { it.first == predictiveBack }.coerceAtLeast(0)
@@ -710,7 +709,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                     }
                 )
                 AnimatedVisibility(
-                    visible = predictiveBack == PredictiveBackAnimation.SCALE || predictiveBack == PredictiveBackAnimation.AOSP,
+                    visible = predictiveBack == PredictiveBackAnimation.AOSP,
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically(),
                 ) {
@@ -1045,8 +1044,8 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
         SmallTopAppBar(
             title = strings.aboutSectionTitle,
             modifier = Modifier.align(Alignment.TopCenter),
-            color = MiuixAppTheme.colorScheme.background,
-            titleColor = MiuixAppTheme.colorScheme.onBackground,
+            color = MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
+            titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
             scrollBehavior = topAppBarScrollBehavior,
             defaultWindowInsetsPadding = false,
             navigationIcon = {
@@ -1069,11 +1068,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
         )
     }
 
-    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(
-        onBack = onBack,
-        modifier = Modifier.fillMaxSize()
-    ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             BgEffectBackground(
                 isDarkTheme = isDarkTheme,
                 modifier = Modifier.fillMaxSize(),
@@ -1093,7 +1088,6 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                 aboutContent()
             }
         }
-    }
 }
 
 @Composable
@@ -1107,13 +1101,9 @@ private fun SettingsPageScaffold(
     // Solid background for submenus – no wallpaper backdrop, per requirement
     val topBarState = dev.shephard.player.ui.components.rememberSolidCollapsingTopBarState()
     val scrollState = rememberScrollState()
-    val scrollProgress = topBarState.collapseFraction
+    val scrollProgress by dev.shephard.player.ui.components.rememberScrollFraction(scrollState)
 
-    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(
-        onBack = onBack,
-        modifier = Modifier.fillMaxSize()
-    ) {
-        Scaffold(
+            Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = cs.background,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -1121,6 +1111,7 @@ private fun SettingsPageScaffold(
                 dev.shephard.player.ui.components.SubmenuTopBar(
                     title = title,
                     state = topBarState,
+                    collapseFraction = scrollProgress,
                     onBack = onBack
                 )
             }
@@ -1152,7 +1143,6 @@ private fun SettingsPageScaffold(
                 Spacer(Modifier.height(24.dp))
             }
         }
-    }
 }
 
 @Composable
@@ -1300,13 +1290,19 @@ private fun MiuixSpinnerRow(
         items.map { top.yukonga.miuix.kmp.basic.DropdownItem(title = it) }
     }
     // Use WindowSpinnerPreference from miuix-preference
+    // The library draws its pressed highlight edge-to-edge with square corners. Clipping the
+    // row to the device's screen corner radius rounds that highlight the same way the
+    // display corners are rounded (falls back to 28dp when the OS reports none).
+    val pressedShape = RoundedCornerShape(dev.shephard.player.ui.util.rememberDeviceCornerRadius())
     top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
         title = title,
         summary = summary,
         items = dropdownItems,
         selectedIndex = selectedIndex,
         onSelectedIndexChange = onSelectedIndexChange,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(pressedShape)
     )
 }
 

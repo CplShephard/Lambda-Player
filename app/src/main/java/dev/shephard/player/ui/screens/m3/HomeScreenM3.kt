@@ -17,6 +17,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import dev.shephard.player.ui.components.m3.m3ItemCardColors
+import dev.shephard.player.ui.components.m3.m3TopBarColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.QueueMusic
@@ -170,10 +172,7 @@ fun HomeScreenM3(
                     topBar = {
                         TopAppBar(
                             title = { Text(strings.home) },
-                            colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
-                                titleContentColor = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface),
-                            ),
+                            colors = m3TopBarColors(),
                         )
                     },
                 ) { padding ->
@@ -249,7 +248,7 @@ fun HomeScreenM3(
                                             .fillMaxWidth()
                                             .padding(horizontal = 12.dp, vertical = 2.dp),
                                         shape = RoundedCornerShape(20.dp),
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                                        colors = m3ItemCardColors()
                                     ) {
                                         LineageListItemWithThumbnail(
                                             headline = track.title,

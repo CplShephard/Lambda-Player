@@ -286,7 +286,14 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun setPredictiveBackAnimation(animation: PredictiveBackAnimation) {
-        context.dataStore.edit { it[PrefsKeys.PREDICTIVE_BACK_ANIMATION] = animation.value }
+        context.dataStore.edit {
+            it[PrefsKeys.PREDICTIVE_BACK_ANIMATION] = animation.value
+            // MIUIX always exits to the right. Persist that in the same edit so the
+            // stored direction can never linger on a value picked for another style.
+            if (animation == PredictiveBackAnimation.MIUIX) {
+                it[PrefsKeys.PREDICTIVE_BACK_EXIT_DIRECTION] = PredictiveBackExitDirection.ALWAYS_RIGHT.value
+            }
+        }
     }
 
     suspend fun setPredictiveBackExitDirection(direction: PredictiveBackExitDirection) {

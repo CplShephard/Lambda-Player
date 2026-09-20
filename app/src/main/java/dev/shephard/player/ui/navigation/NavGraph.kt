@@ -65,6 +65,7 @@ import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.theme.PredictiveBackAnimation
 import dev.shephard.player.theme.PredictiveBackExitDirection
+import dev.shephard.player.theme.effectiveExitDirection
 import dev.shephard.player.ui.animation.predictiveback.predictiveBackHandler
 import dev.shephard.player.ui.components.MiniPlayer
 import dev.shephard.player.ui.components.M3MiniPlayer
@@ -131,8 +132,11 @@ fun NavGraph(
 ) {
     val predictiveBackAnimation by preferences.predictiveBackAnimation
         .collectAsState(initial = PredictiveBackAnimation.MIUIX)
-    val predictiveBackExitDirection by preferences.predictiveBackExitDirection
+    val storedExitDirection by preferences.predictiveBackExitDirection
         .collectAsState(initial = PredictiveBackExitDirection.FOLLOW_GESTURE)
+    // MIUIX always exits to the right; the stored value only matters for styles
+    // that expose the option (AOSP), so a stale "always left" can never leak in.
+    val predictiveBackExitDirection = effectiveExitDirection(predictiveBackAnimation, storedExitDirection)
 
     val isPredictiveEnabled = predictiveBackAnimation != PredictiveBackAnimation.NONE
 

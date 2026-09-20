@@ -152,9 +152,7 @@ object PageTransitions {
                     initialContentExit = popExitSubmenu
                 )
 
-                PredictiveBackAnimation.AOSP,
-                PredictiveBackAnimation.SCALE,
-                -> ContentTransform(
+                PredictiveBackAnimation.AOSP -> ContentTransform(
                     targetContentEnter = fadeIn(
                         animationSpec = tween(durationMillis = 220, delayMillis = 90),
                     ) + scaleIn(
@@ -176,17 +174,15 @@ object PageTransitions {
                     )
                 }
 
-                PredictiveBackAnimation.MIUIX -> {
-                    val sign = directionSign(edge)
-                    ContentTransform(
-                        targetContentEnter = slideInHorizontally(
-                            animationSpec = tween(durationMillis = 550, easing = LinearEasing),
-                        ) { -sign * it / 4 },
-                        initialContentExit = slideOutHorizontally(
-                            animationSpec = tween(durationMillis = 550, easing = LinearEasing),
-                        ) { sign * it },
-                    )
-                }
+                PredictiveBackAnimation.MIUIX -> ContentTransform(
+                    // MIUIX always exits to the right (sign = 1), never the stored direction.
+                    targetContentEnter = slideInHorizontally(
+                        animationSpec = tween(durationMillis = 550, easing = LinearEasing),
+                    ) { -it / 4 },
+                    initialContentExit = slideOutHorizontally(
+                        animationSpec = tween(durationMillis = 550, easing = LinearEasing),
+                    ) { it },
+                )
             }
         }
 

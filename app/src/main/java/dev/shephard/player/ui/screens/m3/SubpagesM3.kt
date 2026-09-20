@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import dev.shephard.player.ui.components.m3.m3TopBarColors
+import dev.shephard.player.ui.components.m3.m3ItemCardColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -94,8 +96,8 @@ fun SettingsScreenM3(
         containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text(strings.settings, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface),
+                title = { Text(strings.settings) },
+                colors = m3TopBarColors(),
             )
         },
     ) { padding ->
@@ -125,7 +127,7 @@ fun SettingsScreenM3(
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                    colors = m3ItemCardColors()
                 ) {
                     LineageListItem(
                         headline = strings.themeSettings,
@@ -139,7 +141,7 @@ fun SettingsScreenM3(
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                    colors = m3ItemCardColors()
                 ) {
                     LineageListItem(
                         headline = strings.playbackSettings,
@@ -153,7 +155,7 @@ fun SettingsScreenM3(
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                    colors = m3ItemCardColors()
                 ) {
                     LineageListItem(
                         headline = strings.aboutLambdaPlayerTitle,
@@ -178,17 +180,16 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
     val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
     val playWith by prefs.playWithOthers.collectAsState(initial = false)
 
-    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(onBack = onBack, modifier = Modifier.fillMaxSize()) {
-        Scaffold(
+            Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text(strings.playbackSettings, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
+                title = { Text(strings.playbackSettings) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface),
+                colors = m3TopBarColors(),
             )
         },
     ) { padding ->
@@ -201,7 +202,7 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                    colors = m3ItemCardColors()
                 ) {
                     LineageListItem(
                         headline = strings.crossfade,
@@ -215,7 +216,7 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                    colors = m3ItemCardColors()
                 ) {
                     LineageListItem(
                         headline = strings.gapless,
@@ -229,7 +230,7 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                    colors = m3ItemCardColors()
                 ) {
                     LineageListItem(
                         headline = strings.playWithOthers,
@@ -241,7 +242,6 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
             }
             }
         }
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -266,15 +266,14 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
         }
     }
 
-    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(onBack = onBack, modifier = Modifier.fillMaxSize()) {
-        Scaffold(
+            Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
             topBar = {
                 TopAppBar(
-                    title = { Text(strings.aboutSectionTitle, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
+                    title = { Text(strings.aboutSectionTitle) },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface),
+                    colors = m3TopBarColors(),
                 )
             },
         ) { padding ->
@@ -305,7 +304,7 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                colors = m3ItemCardColors()
             ) {
                 LineageListItem(
                     headline = strings.github,
@@ -319,7 +318,7 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                colors = m3ItemCardColors()
             ) {
                 LineageListItem(
                     headline = strings.sourceCode,
@@ -333,7 +332,6 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
             // Miuix removed from M3 about section #3
             }
         }
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -353,15 +351,14 @@ fun StatsScreenM3(
         ListenStatsCalculator.buildSnapshot(periodEvents)
     }
 
-    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(onBack = onBack, modifier = Modifier.fillMaxSize()) {
-        Scaffold(
+            Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
             topBar = {
                 TopAppBar(
-                    title = { Text(strings.statsTitle, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
+                    title = { Text(strings.statsTitle) },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface),
+                    colors = m3TopBarColors(),
                 )
             },
         ) { padding ->
@@ -419,7 +416,7 @@ fun StatsScreenM3(
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                         shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                        colors = m3ItemCardColors()
                     ) {
                         LineageListItemWithThumbnail(
                             headline = "${index + 1}. $displayTitle",
@@ -433,7 +430,6 @@ fun StatsScreenM3(
             Spacer(Modifier.height(60.dp))
             }
         }
-    }
 }
 
 private fun formatListeningTimeM3Lineage(ms: Long, strings: dev.shephard.player.ui.i18n.Strings): String {

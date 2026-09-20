@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -72,6 +73,7 @@ fun StatsScreen(
     val cs = MiuixAppTheme.colorScheme
     val scrollState = rememberScrollState()
     val topBarState = dev.shephard.player.ui.components.rememberSolidCollapsingTopBarState()
+    val scrollProgress by dev.shephard.player.ui.components.rememberScrollFraction(scrollState)
 
     val allEvents by playerViewModel.statsEventsFlow.collectAsState()
     val tracks by libraryViewModel.tracks.collectAsState()
@@ -82,8 +84,7 @@ fun StatsScreen(
         ListenStatsCalculator.buildSnapshot(periodEvents)
     }
 
-    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(onBack = onBack, modifier = Modifier.fillMaxSize()) {
-        top.yukonga.miuix.kmp.basic.Scaffold(
+            top.yukonga.miuix.kmp.basic.Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = cs.background,
             contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
@@ -91,6 +92,7 @@ fun StatsScreen(
                 dev.shephard.player.ui.components.SubmenuTopBar(
                     title = strings.statsTitle,
                     state = topBarState,
+                    collapseFraction = scrollProgress,
                     onBack = onBack
                 )
             }
@@ -105,6 +107,19 @@ fun StatsScreen(
                 .padding(top = innerPadding.calculateTopPadding() + 8.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            Text(
+                text = strings.statsTitle,
+                style = MiuixAppTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = cs.onBackground,
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .graphicsLayer {
+                        alpha = 1f - scrollProgress
+                        scaleX = 1f - scrollProgress * 0.05f
+                        scaleY = 1f - scrollProgress * 0.05f
+                    }
+            )
             StatsPeriodPills(selectedPeriod = selectedPeriod, onPeriodSelected = { selectedPeriod = it })
 
             StatsSummaryCard(
@@ -123,7 +138,6 @@ fun StatsScreen(
             Spacer(Modifier.height(90.dp))
             }
         }
-    }
 }
 
 @Composable

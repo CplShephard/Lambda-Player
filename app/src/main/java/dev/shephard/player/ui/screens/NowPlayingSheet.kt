@@ -703,6 +703,7 @@ SeekBarRow(playerViewModel = playerViewModel)
                                         text = line,
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
                                             .then(
                                                 if (syncedLyrics.isNotEmpty()) Modifier.clickable {
                                                     playerViewModel.seekTo(syncedLyrics.getOrNull(idx)?.timeMs ?: 0L)

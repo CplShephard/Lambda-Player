@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -54,7 +55,8 @@ fun LineageListItem(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
+            // No background of its own: the surrounding Card (m3ItemCardColors) provides the
+            // colour. An opaque surface fill here used to hide the card entirely.
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -158,7 +160,7 @@ fun LineageListItemWithThumbnail(
                         modifier = Modifier
                             .size(24.dp)
                             .then(
-                                if (onTrailingClick != null) Modifier.clickable(onClick = onTrailingClick)
+                                if (onTrailingClick != null) Modifier.clip(CircleShape).clickable(onClick = onTrailingClick)
                                 else Modifier
                             )
                     )
@@ -187,7 +189,7 @@ fun LineageHorizontalMediaItem(
         modifier = modifier
             .width(thumbnailSize + 16.dp)
             .padding(8.dp)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            .then(if (onClick != null) Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick) else Modifier),
         verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -286,7 +288,7 @@ fun LineageGridMediaItem(
         modifier = modifier
             .fillMaxWidth()
             .padding(8.dp)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            .then(if (onClick != null) Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick) else Modifier),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Card(

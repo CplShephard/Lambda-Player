@@ -13,6 +13,5 @@ fun predictiveBackHandler(
     PredictiveBackAnimation.NONE -> NoPredictiveBackAnimationSimple()
     PredictiveBackAnimation.MIUIX -> MiuixPredictiveBackAnimation()
     PredictiveBackAnimation.AOSP -> AOSPCrossActivityAnimation(exitDirection)
-    PredictiveBackAnimation.SCALE -> ScalePredictiveBackAnimation(exitDirection)
     PredictiveBackAnimation.CLASSIC -> ClassicPredictiveBackAnimation()
 }

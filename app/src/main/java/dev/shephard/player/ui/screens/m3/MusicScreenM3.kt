@@ -24,6 +24,12 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import dev.shephard.player.ui.components.m3.M3CoverEditor
+import dev.shephard.player.ui.components.m3.m3ItemCardColors
+import dev.shephard.player.ui.components.m3.m3TopBarColors
+import dev.shephard.player.ui.components.m3.rememberCoverPicker
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -136,10 +142,8 @@ fun MusicScreenM3(
         containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text(strings.music, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
-                ),
+                title = { Text(strings.music) },
+                colors = m3TopBarColors(),
             )
         },
     ) { innerPadding ->
@@ -229,7 +233,7 @@ fun MusicScreenM3(
                                             .fillMaxWidth()
                                             .padding(horizontal = 12.dp, vertical = 2.dp),
                                         shape = RoundedCornerShape(20.dp),
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                                        colors = m3ItemCardColors()
                                     ) {
                                         LineageListItemWithThumbnail(
                                             headline = track.title,
@@ -263,7 +267,7 @@ fun MusicScreenM3(
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                    colors = m3ItemCardColors()
                 ) {
                     LineageListItemWithThumbnail(
                         headline = track.title,
@@ -367,108 +371,22 @@ private fun M3EditTrackDialogLineage(
     var artistText by remember { mutableStateOf(existing?.artist ?: track.artist) }
     var albumText by remember { mutableStateOf(existing?.album ?: track.album) }
     var coverUri by remember { mutableStateOf<Uri?>(existing?.coverUri?.let { Uri.parse(it) }) }
-    var showRemoveCoverConfirm by remember { mutableStateOf(false) }
-    val coverScope = rememberCoroutineScope()
-
-    var coverCropOutputUri by remember { mutableStateOf<Uri?>(null) }
-
-    val coverCropLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val output = coverCropOutputUri
-        if (result.resultCode == android.app.Activity.RESULT_OK && output != null) {
-            coverUri = output
-        }
-    }
-
-    fun launchCoverCrop(sourceUri: Uri) {
-        val mimeType = context.contentResolver.getType(sourceUri)
-        if (mimeType == "image/gif") {
-            coverScope.launch {
-                val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, sourceUri)
-                if (persisted != null) coverUri = persisted
-            }
-            return
-        }
-        val dir = java.io.File(context.filesDir, "persisted_covers").apply { mkdirs() }
-        val file = java.io.File(dir, "cover_${System.currentTimeMillis()}.jpg")
-        val outputUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        coverCropOutputUri = outputUri
-
-        val cropIntent = Intent("com.android.camera.action.CROP").apply {
-            setDataAndType(sourceUri, "image/*")
-            putExtra("crop", "true")
-            putExtra("scale", true)
-            putExtra("outputX", 512)
-            putExtra("outputY", 512)
-            putExtra("aspectX", 1)
-            putExtra("aspectY", 1)
-            putExtra(android.provider.MediaStore.EXTRA_OUTPUT, outputUri)
-            putExtra("outputFormat", android.graphics.Bitmap.CompressFormat.JPEG.toString())
-            putExtra("return-data", false)
-            putExtra("noFaceDetection", true)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            clipData = android.content.ClipData.newUri(context.contentResolver, "cover", sourceUri)
-        }
-
-        val resolvedActivities = context.packageManager.queryIntentActivities(cropIntent, 0)
-        for (info in resolvedActivities) {
-            val packageName = info.activityInfo?.packageName ?: continue
-            try {
-                context.grantUriPermission(packageName, outputUri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            } catch (_: SecurityException) { }
-        }
-
-        if (resolvedActivities.isNotEmpty()) {
-            coverCropLauncher.launch(cropIntent)
-        } else {
-            coverScope.launch {
-                val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, sourceUri)
-                if (persisted != null) coverUri = persisted
-            }
-        }
-    }
-
-    val coverPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            try {
-                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            } catch (_: SecurityException) { }
-            launchCoverCrop(uri)
-        }
-    }
+    val pickCover = rememberCoverPicker { coverUri = it }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(strings.editMusic) },
         text = {
-            Column {
-                Box(
-                    modifier = Modifier
-                        .size(120.dp)
-                        .padding(8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    var loaded by remember { mutableStateOf(false) }
-                    val displayUri = coverUri ?: track.albumArtUri
-                    AsyncImage(
-                        model = displayUri,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                        onState = { loaded = it is AsyncImagePainter.State.Success }
-                    )
-                    if (!loaded) {
-                        Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
-                    }
-                }
-                if (coverUri != null) {
-                    TextButton(onClick = { showRemoveCoverConfirm = true }, modifier = Modifier.align(Alignment.End)) {
-                        Text(strings.removeCover, color = MaterialTheme.colorScheme.error)
-                    }
-                }
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                M3CoverEditor(
+                    model = coverUri ?: track.albumArtUri,
+                    placeholderIcon = Icons.Filled.MusicNote,
+                    hasCustomCover = coverUri != null,
+                    onPick = pickCover,
+                    onRemove = { coverUri = null },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(12.dp))
                 OutlinedTextField(value = titleText, onValueChange = { titleText = it }, label = { Text(strings.title) }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = artistText, onValueChange = { artistText = it }, label = { Text(strings.artist) }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = albumText, onValueChange = { albumText = it }, label = { Text(strings.album) }, modifier = Modifier.fillMaxWidth())
@@ -488,18 +406,4 @@ private fun M3EditTrackDialogLineage(
             TextButton(onClick = onDismiss) { Text(strings.cancel) }
         },
     )
-
-    if (showRemoveCoverConfirm) {
-        AlertDialog(
-            onDismissRequest = { showRemoveCoverConfirm = false },
-            title = { Text(strings.removeCover) },
-            text = { Text(strings.removeCoverConfirm, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            confirmButton = {
-                TextButton(onClick = { showRemoveCoverConfirm = false; coverUri = null }) { Text(strings.removeCover) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRemoveCoverConfirm = false }) { Text(strings.cancel) }
-            },
-        )
-    }
 }

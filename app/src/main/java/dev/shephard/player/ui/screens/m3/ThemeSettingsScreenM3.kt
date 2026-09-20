@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import dev.shephard.player.ui.components.m3.m3TopBarColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DarkMode
@@ -187,18 +188,14 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
         }
     }
 
-    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(
-        onBack = onBack,
-        modifier = Modifier.fillMaxSize()
-    ) {
-        Scaffold(
+            Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
             topBar = {
                 TopAppBar(
-                    title = { Text(strings.themeSettings, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
+                    title = { Text(strings.themeSettings) },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface),
+                    colors = m3TopBarColors(),
                 )
             },
         ) { paddingValues ->
@@ -378,7 +375,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                                 onChoiceChange = { idx -> scope.launch { prefs.setPredictiveBackAnimation(PredictiveBackAnimation.entries[idx]) } }
                             )
                         }
-                        item(animatedVisibility = predictiveBack == PredictiveBackAnimation.SCALE || predictiveBack == PredictiveBackAnimation.AOSP) {
+                        item(animatedVisibility = predictiveBack == PredictiveBackAnimation.AOSP) {
                             Column {
                                 DropDownMenuWidget(
                                     icon = Icons.Filled.Tune,
@@ -411,7 +408,6 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
             }
         }
         }
-    }
 
     if (showRemoveWallpaperConfirm) {
         AlertDialog(
@@ -428,7 +424,6 @@ private fun predictiveBackDisplayName(animation: PredictiveBackAnimation, string
     PredictiveBackAnimation.NONE -> strings.predictiveBackNone
     PredictiveBackAnimation.AOSP -> strings.predictiveBackAosp
     PredictiveBackAnimation.MIUIX -> strings.predictiveBackMiuix
-    PredictiveBackAnimation.SCALE -> strings.predictiveBackScale
     PredictiveBackAnimation.CLASSIC -> strings.predictiveBackClassic
 }
 

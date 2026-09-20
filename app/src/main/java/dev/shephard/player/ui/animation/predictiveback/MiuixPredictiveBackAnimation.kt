@@ -4,15 +4,23 @@ package dev.shephard.player.ui.animation.predictiveback
 
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.defaultPopTransitionSpec
-import androidx.navigation3.ui.defaultPredictivePopTransitionSpec
 import androidx.navigation3.ui.defaultTransitionSpec
 import androidx.navigationevent.NavigationEventTransitionState
 
+/**
+ * MIUIX predictive back. The popped page always travels to the right, no matter
+ * which edge the gesture started from or which exit direction was stored for
+ * another style (see `effectiveExitDirection`).
+ */
 class MiuixPredictiveBackAnimation : PredictiveBackAnimationHandler {
 
     override suspend fun onBackPressed(
@@ -32,9 +40,18 @@ class MiuixPredictiveBackAnimation : PredictiveBackAnimationHandler {
         return this
     }
 
+    // Always-right: the incoming (previous) page drifts in from the left while the
+    // top page slides off to the right, independent of the swipe edge.
     override fun AnimatedContentTransitionScope<Scene<NavKey>>.onPredictivePopTransitionSpec(
         swipeEdge: Int
-    ): ContentTransform = defaultPredictivePopTransitionSpec<NavKey>().invoke(this, swipeEdge)
+    ): ContentTransform = ContentTransform(
+        targetContentEnter = slideInHorizontally(
+            animationSpec = tween(durationMillis = 550, easing = LinearEasing),
+        ) { -it / 4 },
+        initialContentExit = slideOutHorizontally(
+            animationSpec = tween(durationMillis = 550, easing = LinearEasing),
+        ) { it },
+    )
 
     override fun AnimatedContentTransitionScope<Scene<NavKey>>.onPopTransitionSpec(): ContentTransform =
         defaultPopTransitionSpec<NavKey>().invoke(this)

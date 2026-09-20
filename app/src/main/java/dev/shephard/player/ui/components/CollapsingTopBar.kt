@@ -1,6 +1,8 @@
 package dev.shephard.player.ui.components
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -10,11 +12,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.miuixTopBarBlur
@@ -138,26 +144,56 @@ fun MiuixTopBar(
     )
 }
 
+/**
+ * 0f..1f "how far the in-content page title has scrolled away" for a page that
+ * scrolls with [scrollState]. Drives [SubmenuTopBar] so its title/background fade
+ * in on scroll, exactly like the main pages' collapsing bar, instead of being
+ * permanently visible.
+ */
+@Composable
+fun rememberScrollFraction(scrollState: ScrollState, thresholdDp: Dp = 44.dp): State<Float> {
+    val thresholdPx = with(LocalDensity.current) { thresholdDp.toPx() }.coerceAtLeast(1f)
+    return remember(scrollState, thresholdPx) {
+        derivedStateOf { (scrollState.value / thresholdPx).coerceIn(0f, 1f) }
+    }
+}
+
+/** LazyColumn variant of [rememberScrollFraction]; the title must be item 0. */
+@Composable
+fun rememberScrollFraction(listState: LazyListState, thresholdDp: Dp = 44.dp): State<Float> {
+    val thresholdPx = with(LocalDensity.current) { thresholdDp.toPx() }.coerceAtLeast(1f)
+    return remember(listState, thresholdPx) {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex > 0) 1f
+            else (listState.firstVisibleItemScrollOffset / thresholdPx).coerceIn(0f, 1f)
+        }
+    }
+}
+
+/**
+ * Small top bar for sub-pages (theme / playback / about / stats / playlist detail).
+ *
+ * Behaves like the main pages' bar: at the top of the page only the back button is
+ * shown (the page title lives in the content); as the content scrolls, [collapseFraction]
+ * fades the solid background and the small title in. It must be driven by a real Miuix
+ * bar (not a hand-rolled Box) so the attached scroll behavior gets initialised — an
+ * un-initialised behavior swallows every upward scroll and freezes the list.
+ */
 @Composable
 fun SubmenuTopBar(
     title: String,
     onBack: () -> Unit,
     state: CollapsingTopBarState,
+    collapseFraction: Float,
     modifier: Modifier = Modifier,
 ) {
     val cs = MiuixAppTheme.colorScheme
-    val isSolid = state.pageBackdrop == null
-    // For solid submenus, always show title and solid background (no alpha based on collapse)
-    // For main pages with backdrop, keep previous behavior but ensure smallTopBar visible
+    val fraction = collapseFraction.coerceIn(0f, 1f)
     SmallTopAppBar(
         title = title,
-        modifier = modifier.then(
-            if (!isSolid && state.pageBackdrop != null) {
-                Modifier.miuixTopBarBlur(backdrop = state.pageBackdrop)
-            } else Modifier
-        ),
-        color = if (isSolid) cs.background else androidx.compose.ui.graphics.Color.Transparent,
-        titleColor = if (isSolid) cs.onBackground else wallpaperAdaptiveTextColor(),
+        modifier = modifier,
+        color = cs.background.copy(alpha = fraction),
+        titleColor = cs.onBackground.copy(alpha = fraction),
         scrollBehavior = state.scrollBehavior,
         defaultWindowInsetsPadding = false,
         navigationIcon = {

@@ -1446,66 +1446,6 @@ tint = MiuixAppTheme.colorScheme.onPrimary,
 }
 
 @Composable
-private fun PlaylistDetailTopBar(
-    title: String,
-    cover: android.net.Uri?,
-    onBack: () -> Unit,
-    topBarState: dev.shephard.player.ui.components.CollapsingTopBarState
-) {
-    val strings = LocalStrings.current
-    val cs = MiuixAppTheme.colorScheme
-    // Solid submenu: always solid background, title visible
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .background(cs.background)
-            .height(52.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 12.dp)
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(cs.surfaceVariant.copy(alpha = 0.75f))
-                .bounceClick { onBack() },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = strings.backContentDescription,
-                tint = cs.onBackground
-            )
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (cover != null) {
-                AsyncImage(
-                    model = cover,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(RoundedCornerShape(7.dp)),
-                    contentScale = ContentScale.Crop
-                )
-                Spacer(Modifier.width(8.dp))
-            }
-            Text(
-                text = title,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontWeight = FontWeight.Medium,
-                fontSize = 17.sp,
-                color = cs.onBackground
-            )
-        }
-    }
-}
-
-@Composable
 internal fun PlaylistDetailView(
     playlist: LocalPlaylist,
     allTracks: List<AudioTrack>,
@@ -1550,6 +1490,7 @@ internal fun PlaylistDetailView(
     }
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val detailCollapse by dev.shephard.player.ui.components.rememberScrollFraction(listState)
     val reorderableHeaderItemCount = 2
     val reorderableState = rememberReorderableLazyListState(
         lazyListState = listState
@@ -1584,21 +1525,16 @@ internal fun PlaylistDetailView(
 
     val detailTitle = if (playlist.isSystem) strings.likedSongs else playlist.name
 
-    dev.shephard.player.ui.components.PredictiveBackAnywhereWrapper(
-        onBack = onBack,
-        modifier = Modifier.fillMaxSize()
-    ) {
-        Scaffold(
+            Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = MiuixAppTheme.colorScheme.background,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
-                PlaylistDetailTopBar(
+                dev.shephard.player.ui.components.SubmenuTopBar(
                     title = detailTitle,
-                    cover = playlist.coverUri?.let { Uri.parse(it) }
-                        ?: displayTracks.firstOrNull()?.albumArtUri,
                     onBack = onBack,
-                    topBarState = topBarState
+                    state = topBarState,
+                    collapseFraction = detailCollapse
                 )
             }
         ) { innerPadding ->
@@ -1606,8 +1542,6 @@ internal fun PlaylistDetailView(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .captureForTopBarBlur(topBarState)
-                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                 .overScrollVertical(),
             contentPadding = PaddingValues(
                 start = 16.dp,
@@ -1618,7 +1552,6 @@ internal fun PlaylistDetailView(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             item {
-                val detailCollapse = topBarState.collapseFraction
                 Text(
                     text = detailTitle,
                     style = MiuixAppTheme.typography.headlineSmall,
@@ -1807,7 +1740,6 @@ internal fun PlaylistDetailView(
             }
         }
         }
-    }
 }
 
 @Composable

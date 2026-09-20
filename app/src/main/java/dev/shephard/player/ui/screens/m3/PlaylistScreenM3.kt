@@ -25,6 +25,12 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import dev.shephard.player.ui.components.m3.M3CoverEditor
+import dev.shephard.player.ui.components.m3.m3ItemCardColors
+import dev.shephard.player.ui.components.m3.m3TopBarColors
+import dev.shephard.player.ui.components.m3.rememberCoverPicker
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -136,6 +142,26 @@ fun PlaylistScreenM3(
         scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
     }
 
+    fun setPlaylistCover(pl: LocalPlaylist, cover: Uri?) {
+        val all = rawPlaylists.toMutableList()
+        val i = all.indexOfFirst { it.name == pl.name && it.createdAt == pl.createdAt && it.isSystem == pl.isSystem }
+        if (i >= 0) {
+            all[i] = all[i].copy(coverUri = cover?.toString())
+            writePlaylists(all)
+        }
+    }
+
+    // The playlist whose cover is being replaced; remembered across the picker/crop round-trip.
+    var coverTarget by remember { mutableStateOf<LocalPlaylist?>(null) }
+    val editCoverPicker = rememberCoverPicker { uri ->
+        coverTarget?.let { setPlaylistCover(it, uri) }
+        coverTarget = null
+    }
+    val pickEditCover: () -> Unit = {
+        coverTarget = playlists.getOrNull(editPlaylistIndex ?: -1)
+        editCoverPicker()
+    }
+
     fun deletePlaylist(pl: LocalPlaylist) {
         val all = rawPlaylists.filterNot { it.name == pl.name && it.createdAt == pl.createdAt && it.isSystem == pl.isSystem }
         writePlaylists(all)
@@ -213,17 +239,16 @@ fun PlaylistScreenM3(
             onDismissRequest = { showCreate = false },
             title = { Text(strings.createPlaylist) },
             text = {
-                Column {
-                    Box(
-                        modifier = Modifier.size(96.dp).align(Alignment.CenterHorizontally),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (newCoverUri != null) {
-                            AsyncImage(model = newCoverUri, contentDescription = null, modifier = Modifier.fillMaxSize())
-                        } else {
-                            Icon(Icons.Filled.QueueMusic, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
-                        }
-                    }
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    M3CoverEditor(
+                        model = newCoverUri,
+                        placeholderIcon = Icons.Filled.QueueMusic,
+                        hasCustomCover = newCoverUri != null,
+                        onPick = { newCoverPicker.launch(arrayOf("image/*")) },
+                        onRemove = { newCoverUri = null },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(12.dp))
                     OutlinedTextField(value = newName, onValueChange = { newName = it }, singleLine = true, label = { Text(strings.playlistName) }, modifier = Modifier.fillMaxWidth())
                 }
             },
@@ -254,7 +279,19 @@ fun PlaylistScreenM3(
                 onDismissRequest = { editPlaylistIndex = null },
                 title = { Text(strings.editPlaylist) },
                 text = {
-                    OutlinedTextField(value = editPlaylistName, onValueChange = { editPlaylistName = it }, singleLine = true, label = { Text(strings.playlistName) })
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        M3CoverEditor(
+                            model = editingPl.coverUri?.let { Uri.parse(it) }
+                                ?: resolvePlaylistTracks(editingPl, tracks, likedIds).firstOrNull()?.albumArtUri,
+                            placeholderIcon = Icons.Filled.QueueMusic,
+                            hasCustomCover = editingPl.coverUri != null,
+                            onPick = { pickEditCover() },
+                            onRemove = { setPlaylistCover(editingPl, null) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedTextField(value = editPlaylistName, onValueChange = { editPlaylistName = it }, singleLine = true, label = { Text(strings.playlistName) }, modifier = Modifier.fillMaxWidth())
+                    }
                 },
                 confirmButton = {
                     TextButton(
@@ -307,6 +344,12 @@ fun PlaylistScreenM3(
         playlistDetailGuard.pop { openIndex = null }
     }
 
+    val fabLift by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (hasMiniPlayer) 160.dp else 80.dp,
+        animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 300f),
+        label = "playlistFabLift"
+    )
+
     AnimatedContent(
         targetState = openIndex,
         transitionSpec = {
@@ -333,13 +376,8 @@ fun PlaylistScreenM3(
                     containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
                     topBar = {
                         TopAppBar(
-                            title = { Text(strings.playlists, color = wallpaperAdaptiveTextColor(fallback = MaterialTheme.colorScheme.onSurface)) },
-                            actions = {
-                                IconButton(onClick = { showCreate = true }) {
-                                    Icon(Icons.Filled.Add, contentDescription = strings.createPlaylist)
-                                }
-                            },
-                            colors = TopAppBarDefaults.topAppBarColors(containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface),
+                            title = { Text(strings.playlists) },
+                            colors = m3TopBarColors(),
                         )
                     },
                     floatingActionButton = {
@@ -350,7 +388,9 @@ fun PlaylistScreenM3(
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                             contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                             expanded = true,
-                            modifier = Modifier.padding(bottom = if (hasMiniPlayer) 80.dp else 0.dp)
+                            // Lives above the bottom dock (80dp) and, when the mini player is
+                            // showing, above that too (+80dp). Animated so it glides up with it.
+                            modifier = Modifier.padding(bottom = fabLift)
                         )
                     }
                 ) { innerPadding ->
@@ -425,7 +465,7 @@ fun PlaylistScreenM3(
                                         Card(
                                             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                                             shape = RoundedCornerShape(20.dp),
-                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                                            colors = m3ItemCardColors()
                                         ) {
                                             LineageListItemWithThumbnail(
                                                 headline = pl.name,
