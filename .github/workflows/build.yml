@@ -29,6 +29,24 @@ jobs:
       - name: Build Release APK
         run: ./gradlew --no-daemon assembleRelease
 
+      # Diagnostics (never fail the build): which squircle artifacts reach the release runtime
+      # classpath, and whether the class really ends up in the APK's dex files.
+      - name: Diagnose squircle dependency
+        if: always()
+        run: |
+          echo "== releaseRuntimeClasspath squircle entries"
+          ./gradlew --no-daemon -q :app:dependencies --configuration releaseRuntimeClasspath 2>&1 | grep -i squircle || echo "(no squircle entries)"
+          echo "== APK squircle check"
+          for apk in app/build/outputs/apk/release/*.apk; do
+            echo "-- $apk"
+            unzip -l "$apk" | grep -i squircle || echo "(no squircle files in APK)"
+            for dex in $(unzip -Z1 "$apk" | grep '^classes.*\.dex$'); do
+              if unzip -p "$apk" "$dex" | grep -aq "SquircleBackgroundKt"; then
+                echo "SquircleBackgroundKt found in $dex"
+              fi
+            done
+          done
+
       - name: Upload APK
         uses: actions/upload-artifact@v6
         with:

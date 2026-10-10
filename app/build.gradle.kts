@@ -105,6 +105,10 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-shader-android:0.9.3")
 
     implementation("top.yukonga.miuix.kmp:miuix-squircle:0.9.3")
+    // The Android squircle classes (SquircleBackgroundKt) are what miuix-ui and miuix-nav call at
+    // runtime. Declared explicitly so they stay on the classpath despite the miuix-nav exclusion below
+    // (missing class = NoClassDefFoundError on launch).
+    implementation("top.yukonga.miuix.kmp:miuix-squircle-android:0.9.3")
     // Navigation engine used by InstallerX Revived (NavDisplay, NavTransition, predictive back).
     // miuix-nav 0.9.4 needs no miuix-ui code; its squircle dependency is excluded so the
     // squircle version stays the one already used by the 0.9.3 UI artifacts.
