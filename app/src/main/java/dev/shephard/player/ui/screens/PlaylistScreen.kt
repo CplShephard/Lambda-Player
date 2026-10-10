@@ -1067,17 +1067,19 @@ Scaffold(
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 item(key = "pinned_header", span = { GridItemSpan(2) }) {
-                                    AnimatedVisibility(
-                                        visible = hasPinned,
-                                        enter = fadeIn() + expandVertically(),
-                                        exit = fadeOut() + shrinkVertically()
-                                    ) {
-                                        Text(
-                                            text = strings.pinnedPlaylists,
-                                            style = MiuixAppTheme.typography.labelMedium,
-                                            color = MiuixAppTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(bottom = 4.dp)
-                                        )
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        AnimatedVisibility(
+                                            visible = hasPinned,
+                                            enter = fadeIn() + expandVertically(),
+                                            exit = fadeOut() + shrinkVertically()
+                                        ) {
+                                            Text(
+                                                text = strings.pinnedPlaylists,
+                                                style = MiuixAppTheme.typography.labelMedium,
+                                                color = MiuixAppTheme.colorScheme.primary,
+                                                modifier = Modifier.padding(bottom = 4.dp)
+                                            )
+                                        }
                                     }
                                 }
                                 items(
@@ -1110,17 +1112,19 @@ Scaffold(
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 item(key = "pinned_header") {
-                                    AnimatedVisibility(
-                                        visible = hasPinned,
-                                        enter = fadeIn() + expandVertically(),
-                                        exit = fadeOut() + shrinkVertically()
-                                    ) {
-                                        Text(
-                                            text = strings.pinnedPlaylists,
-                                            style = MiuixAppTheme.typography.labelMedium,
-                                            color = MiuixAppTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(bottom = 4.dp)
-                                        )
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        AnimatedVisibility(
+                                            visible = hasPinned,
+                                            enter = fadeIn() + expandVertically(),
+                                            exit = fadeOut() + shrinkVertically()
+                                        ) {
+                                            Text(
+                                                text = strings.pinnedPlaylists,
+                                                style = MiuixAppTheme.typography.labelMedium,
+                                                color = MiuixAppTheme.colorScheme.primary,
+                                                modifier = Modifier.padding(bottom = 4.dp)
+                                            )
+                                        }
                                     }
                                 }
                                 items(
