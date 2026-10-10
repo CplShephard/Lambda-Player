@@ -21,8 +21,6 @@ import dev.shephard.player.theme.PredictiveBackAnimation
 import dev.shephard.player.theme.PredictiveBackExitDirection
 import dev.shephard.player.ui.animation.predictiveback.installerNavTransition
 import dev.shephard.player.ui.components.LocalPlaylistDetailOpen
-import dev.shephard.player.ui.glass.NoWallpaperScope
-import dev.shephard.player.ui.theme.LocalUseMiuix
 import top.yukonga.miuix.kmp.nav.core.NavCornerClipMode
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
@@ -141,10 +139,7 @@ fun PlaylistDetailNavHost(
                 interceptPredictiveBack = animation == PredictiveBackAnimation.NONE && backStack.size > 1,
                 onBack = ::popDetail,
             ) {
-                // Playlist details never show the wallpaper (main pages only).
-                NoWallpaperScope(useMiuix = LocalUseMiuix.current) {
-                    currentContent(detailIndex)
-                }
+                currentContent(detailIndex)
             }
         }
     }

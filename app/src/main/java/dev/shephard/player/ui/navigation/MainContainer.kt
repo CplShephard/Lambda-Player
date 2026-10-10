@@ -23,21 +23,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import top.yukonga.miuix.kmp.nav.core.NavKey
-import coil.compose.AsyncImage
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
-import dev.shephard.player.ui.glass.LocalAppBackdrop
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.LocalContentBackdrop
-import dev.shephard.player.ui.glass.LocalWallpaperContentColor
-import dev.shephard.player.ui.glass.LocalWallpaperEnabled
 import dev.shephard.player.ui.glass.rememberAppBlurBackdrop
-import dev.shephard.player.ui.glass.rememberWallpaperBlurBackdrop
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.i18n.stringsFor
 import dev.shephard.player.ui.miuix.MiuixAppTheme
@@ -61,8 +54,6 @@ fun MainContainer(
     val prefs = remember { PreferencesManager(context) }
     val languageCode by prefs.language.collectAsState(initial = "en")
     val strings = remember(languageCode) { stringsFor(languageCode) }
-    val wallpaper by prefs.wallpaperUri.collectAsState(initial = "")
-    val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = 0.55f)
 
     val blurEnabled = LocalBlurEnabled.current
     val initialUseMiuix = remember { runBlocking { prefs.useMiuix.first() } }
@@ -75,12 +66,9 @@ fun MainContainer(
     // change, which in turn causes a noticeable hitch when leaving Settings.
     val initialLastMainPage = remember { runBlocking { prefs.lastMainPage.first() } }
 
-    // A dedicated backdrop whose layer captures the wallpaper. The Apple-style
-    // floating dock uses this so the wallpaper stays visible behind its
-    // liquid-glass surface (see rememberWallpaperBlurBackdrop). The wallpaper
-    // itself is rendered by the Box wrapped in Modifier.layerBackdrop(...)
-    // below — the drawContent() call inside the backdrop is what captures it.
-    val wallpaperBackdrop = rememberWallpaperBlurBackdrop(blurEnabled)
+    // The custom wallpaper feature was removed: clear its leftover settings and image files once.
+    LaunchedEffect(Unit) { prefs.clearRemovedWallpaperData() }
+
     // Backdrop used by the dock / mini player glass. Its layer records ONLY the
     // pager (inside NavGraph), and every consumer of it lives OUTSIDE that
     // recording, so it can never become self-referential.
@@ -90,36 +78,12 @@ fun MainContainer(
     // (Apple dock, glass icon buttons) consume the same backdrop creates a
     // self-referential RenderNode, which the RenderThread cannot terminate —
     // prepareTreeImpl() recurses until the stack overflows and the app dies with
-    // SIGSEGV right after enabling blur. LocalAppBackdrop now points at the
-    // wallpaper-only backdrop (recorded from a sibling subtree), which is always
-    // safe.
+    // SIGSEGV right after enabling blur.
     val contentBackdrop = rememberAppBlurBackdrop(blurEnabled)
-
-    // Foreground colour for headings/text drawn directly on the wallpaper.
-    // The theme's onBackground colour is fixed to the light/dark mode and does
-    // not react to the wallpaper, so a bright wallpaper can leave dark-mode text
-    // unreadable. Here we pick a contrasting colour from the wallpaper brightness
-    // slider (high brightness -> dark text, low brightness -> light text). When no
-    // wallpaper is set this stays Unspecified and screens use the theme default.
-    val wallpaperContentColor = remember(wallpaper, wallpaperBrightness) {
-        if (wallpaper.isNotEmpty()) {
-            if (wallpaperBrightness >= 0.5f) Color(0xFF111113) else Color(0xFFF5F5F7)
-        } else {
-            Color.Unspecified
-        }
-    }
 
     CompositionLocalProvider(
         LocalStrings provides strings,
-        // The "app" backdrop for glass surfaces (Apple dock, glass icon buttons)
-        // is the wallpaper backdrop. It is only ever recorded from the wallpaper
-        // box below, which contains no consumers of it — so drawing from it is
-        // always safe. When no wallpaper is set we provide null so those surfaces
-        // fall back to their solid-colour paths.
-        LocalAppBackdrop provides if (wallpaper.isNotEmpty()) wallpaperBackdrop else null,
         LocalContentBackdrop provides contentBackdrop,
-        LocalWallpaperContentColor provides wallpaperContentColor,
-        LocalWallpaperEnabled provides wallpaper.isNotEmpty(),
     ) {
         val backStack = remember { mutableStateListOf<NavKey>(MainRoute) }
         var showNowPlaying by remember { mutableStateOf(false) }
@@ -190,16 +154,12 @@ fun MainContainer(
             }
         }
 
-        // When the user has set a wallpaper we want the page content to sit on
-        // top of it rather than on a solid Miuix/MA3 background. Otherwise fall
-        // back to the theme's normal background so the dark/light theme still
-        // looks correct.
+        // Solid theme background behind the whole app.
         val themeBackground = if (useMiuix) {
             MiuixAppTheme.colorScheme.background
         } else {
             MaterialTheme.colorScheme.surfaceContainer
         }
-        val containerBackground = if (wallpaper.isNotEmpty()) Color.Transparent else themeBackground
 
         Box(
             modifier = Modifier
@@ -213,40 +173,6 @@ fun MainContainer(
             Box(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Solid base layer in the theme color. When a wallpaper is set
-                // we leave this opaque to avoid any flash of a wrong color, but
-                // the wallpaper layer below covers it completely.
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(themeBackground)
-                )
-                if (wallpaper.isNotEmpty()) {
-                    // The wallpaper layer is wrapped in a `layerBackdrop` so
-                    // any glass effect (Apple dock, mini player pop-up) bound
-                    // to the same backdrop will see the wallpaper underneath.
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .then(
-                                if (wallpaperBackdrop != null) Modifier.layerBackdrop(wallpaperBackdrop)
-                                else Modifier
-                            )
-                    ) {
-                        AsyncImage(
-                            model = wallpaper,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 1f - wallpaperBrightness))
-                        )
-                    }
-                }
-
                 NavGraph(
                     backStack = backStack,
                     playerViewModel = playerViewModel,
@@ -255,7 +181,7 @@ fun MainContainer(
                     mainPagerState = mainPagerState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(containerBackground),
+                        .background(themeBackground),
                     hasMiniPlayer = hasMiniPlayer,
                     onOpenNowPlaying = { showNowPlaying = true },
                     onTrackClick = { tracks, index, playlistName ->

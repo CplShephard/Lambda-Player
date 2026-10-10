@@ -39,3 +39,9 @@
 -dontwarn org.jaudiotagger.**
 -keep class java.awt.** { *; }
 -dontwarn java.awt.**
+
+# Compose 1.12.0 keyboard flicker workaround (see LambdaPlayerApplication): keep the
+# Choreographer text-input path so R8 can drop the out-of-frame scheduler.
+-assumevalues class androidx.compose.ui.AndroidComposeUiFlags {
+    public static boolean isOutOfFrameSchedulerForTextInputEventsEnabled return false;
+}

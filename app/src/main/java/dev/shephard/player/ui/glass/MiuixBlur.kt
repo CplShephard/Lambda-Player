@@ -22,37 +22,7 @@ import dev.shephard.player.ui.theme.LocalUseMiuix
 
 val LocalBlurEnabled = staticCompositionLocalOf { false }
 
-val LocalAppBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
-
 val LocalContentBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
-
-/**
- * Foreground colour to use for text that is drawn *directly on top of the
- * wallpaper* (headings, section titles, labels — anything without a card
- * behind it). `MainContainer` provides a value derived from the wallpaper
- * brightness whenever a wallpaper is set, so text stays readable whether the
- * wallpaper is bright or dark. When no wallpaper is configured this stays
- * [Color.Unspecified] and callers fall back to the theme's normal text colour.
- */
-val LocalWallpaperContentColor = staticCompositionLocalOf<Color> { Color.Unspecified }
-
-/**
- * True when the user has configured a custom wallpaper. Material 3 screens use
- * it to switch their Scaffold container colour to transparent so the wallpaper
- * layer behind the NavGraph stays visible (the Miuix engine already does this).
- */
-val LocalWallpaperEnabled = staticCompositionLocalOf { false }
-
-/**
- * Returns the wallpaper-aware foreground colour for text that sits directly on
- * the wallpaper. Falls back to the theme's [MiuixAppTheme.colorScheme.onBackground]
- * when no wallpaper is set.
- */
-@Composable
-fun wallpaperAdaptiveTextColor(fallback: Color = MiuixAppTheme.colorScheme.onBackground): Color {
-    val wallpaperColor = LocalWallpaperContentColor.current
-    return if (wallpaperColor != Color.Unspecified) wallpaperColor else fallback
-}
 
 val isBlurSupported: Boolean
     get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -113,10 +83,9 @@ fun Modifier.miuixTopBarBlur(
  * Remembers the global app blur backdrop.
  *
  * The backdrop's draw block paints a base surface fill followed by the captured
- * content of the modifier that owns the backdrop (e.g. wallpaper, content pages,
- * mini player, etc.). To make sure glass effects (Apple dock, mini player, top
- * bars) actually see the wallpaper, callers should attach the resulting backdrop
- * to a modifier that wraps both the wallpaper layer AND the content.
+ * content of the modifier that owns the backdrop (the pager content). Glass
+ * surfaces (Apple dock, mini player) that sample it must live outside that
+ * recording so the backdrop never becomes self-referential.
  */
 @Composable
 fun rememberAppBlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
@@ -133,33 +102,9 @@ fun rememberAppBlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
     }
 }
 
-/**
- * Remembers a dedicated wallpaper blur backdrop. The wallpaper itself is
- * rendered by the caller as a normal composable (an `AsyncImage` in a `Box`)
- * wrapped by `Modifier.layerBackdrop(<this>)`. By keeping the draw block here
- * minimal (just the base surface + `drawContent()`) we let miuix's layer
- * capture the wallpaper together with the darkening overlay so any
- * liquid-glass surface (Apple dock, mini player pop-up) bound to the same
- * backdrop can sample the wallpaper underneath.
- */
-@Composable
-fun rememberWallpaperBlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
-    if (!enableBlur || !isLiquidGlassSupported || !isRenderEffectSupported()) return null
-    val useMiuix = LocalUseMiuix.current
-    val surfaceColor = if (useMiuix) {
-        top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.surface
-    } else {
-        androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer
-    }
-    return rememberLayerBackdrop {
-        drawRect(surfaceColor)
-        drawContent()
-    }
-}
-
 @Composable
 fun Modifier.miuixBlurSurface(
-    backdrop: LayerBackdrop? = LocalAppBackdrop.current,
+    backdrop: LayerBackdrop? = null,
     shape: Shape = RoundedCornerShape(20.dp),
     blurRadius: Float = 25f,
     tintAlpha: Float = 0.8f,
@@ -182,7 +127,7 @@ fun Modifier.miuixBlurSurface(
 
 @Composable
 fun Modifier.miuixBlurAccent(
-    backdrop: LayerBackdrop? = LocalAppBackdrop.current,
+    backdrop: LayerBackdrop? = null,
     shape: Shape = RoundedCornerShape(16.dp),
     blurRadius: Float = 20f,
     tintAlpha: Float = 0.55f,
@@ -205,7 +150,7 @@ fun Modifier.miuixBlurAccent(
 
 @Composable
 fun Modifier.miuixBlurSheet(
-    backdrop: LayerBackdrop? = LocalAppBackdrop.current,
+    backdrop: LayerBackdrop? = null,
     shape: Shape = RectangleShape,
     blurRadius: Float = 30f,
     tintAlpha: Float = 0.85f,

@@ -477,7 +477,7 @@ fun MiuixDeleteConfirmationDialog(
  * consistency in Miuix mode).
  *
  * The previous implementation used `androidx.compose.ui.window.Dialog`; that
- * is what made the wallpaper / cover / playlist delete confirmations look
+ * is what made the cover / playlist delete confirmations look
  * like Material 3 popups while the track delete dialog (which goes through
  * [MiuixDeleteConfirmationDialog]) rendered as Miuix. Routing this overload
  * through `WindowDialog` fixes the inconsistency.

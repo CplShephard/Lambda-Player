@@ -57,9 +57,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Solid top-bar colours for every M3 page. The container is an opaque theme surface
- * (so it follows the accent colour) instead of being transparent over the wallpaper,
- * matching the solid Miuix small top bars; title/icons use theme on-surface colours
- * so they stay readable regardless of the wallpaper.
+ * (so it follows the accent colour), matching the solid Miuix small top bars;
+ * title/icons use theme on-surface colours.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

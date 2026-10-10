@@ -27,9 +27,7 @@ object PrefsKeys {
     val TOTAL_LISTENING_MS = longPreferencesKey("total_listening_ms")
     val LANGUAGE = stringPreferencesKey("language")
     val ACCENT_COLOR = intPreferencesKey("accent_color")
-    val WALLPAPER_URI = stringPreferencesKey("wallpaper_uri")
     val PLAYLISTS_JSON = stringPreferencesKey("playlists_json")
-    val WALLPAPER_BRIGHTNESS = floatPreferencesKey("wallpaper_brightness")
     val CARD_ALPHA = floatPreferencesKey("card_alpha")
     val DARK_MODE = booleanPreferencesKey("dark_mode")
     val THEME_MODE = intPreferencesKey("theme_mode")
@@ -46,6 +44,7 @@ object PrefsKeys {
     val PALETTE_STYLE = stringPreferencesKey("palette_style")
     val COLOR_SPEC = stringPreferencesKey("color_spec")
     val USE_MIUIX_MONET = booleanPreferencesKey("use_miuix_monet")
+    val MIUIX_GREEN_ACCENT = booleanPreferencesKey("miuix_green_accent")
     val USE_APPLE_FLOATING_BAR = booleanPreferencesKey("use_apple_floating_bar")
     val LAST_MAIN_PAGE = intPreferencesKey("last_main_page")
     val PREDICTIVE_BACK_ANIMATION = stringPreferencesKey("predictive_back_animation")
@@ -83,10 +82,6 @@ fun Int.toThemeMode(): ThemeMode = when (this) {
 
 class PreferencesManager(private val context: Context) {
 
-    companion object {
-        var cachedWallpaperBrightness: Float = 0.55f
-    }
-
     val crossfadeEnabled: Flow<Boolean> = context.dataStore.data.map {
         it[PrefsKeys.CROSSFADE_ENABLED] ?: false
     }
@@ -122,10 +117,6 @@ class PreferencesManager(private val context: Context) {
 
     val accentColor: Flow<Int> = context.dataStore.data.map {
         it[PrefsKeys.ACCENT_COLOR] ?: 0xFF22C55E.toInt()
-    }
-
-    val wallpaperUri: Flow<String> = context.dataStore.data.map {
-        it[PrefsKeys.WALLPAPER_URI] ?: ""
     }
 
     val playlistsJson: Flow<String> = context.dataStore.data.map {
@@ -228,12 +219,6 @@ class PreferencesManager(private val context: Context) {
         it[PrefsKeys.LYRICS_JSON] ?: "{}"
     }
 
-    val wallpaperBrightness: Flow<Float> = context.dataStore.data.map {
-        val v = it[PrefsKeys.WALLPAPER_BRIGHTNESS] ?: 0.55f
-        cachedWallpaperBrightness = v
-        v
-    }
-
     val cardAlpha: Flow<Float> = context.dataStore.data.map {
         it[PrefsKeys.CARD_ALPHA] ?: 0.85f
     }
@@ -284,8 +269,20 @@ class PreferencesManager(private val context: Context) {
         context.dataStore.edit { it[PrefsKeys.ACCENT_COLOR] = argb }
     }
 
-    suspend fun setWallpaperUri(uri: String) {
-        context.dataStore.edit { it[PrefsKeys.WALLPAPER_URI] = uri }
+    /**
+     * One-time cleanup for the removed custom wallpaper feature: drops its two stored
+     * preferences and deletes the cropped/copied wallpaper images from app storage.
+     */
+    suspend fun clearRemovedWallpaperData() {
+        val legacyUri = stringPreferencesKey("wallpaper_uri")
+        val legacyBrightness = floatPreferencesKey("wallpaper_brightness")
+        context.dataStore.edit {
+            it.remove(legacyUri)
+            it.remove(legacyBrightness)
+        }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            java.io.File(context.filesDir, "persisted_wallpaper").deleteRecursively()
+        }
     }
 
     suspend fun setPlaylistsJson(json: String) {
@@ -356,6 +353,15 @@ class PreferencesManager(private val context: Context) {
         context.dataStore.edit { it[PrefsKeys.COLOR_SPEC] = spec.name }
     }
 
+    /** Green instead of the stock blue Miuix accent (only used while Miuix custom colors are off). */
+    val miuixGreenAccent: Flow<Boolean> = context.dataStore.data.map {
+        it[PrefsKeys.MIUIX_GREEN_ACCENT] ?: false
+    }
+
+    suspend fun setMiuixGreenAccent(enabled: Boolean) {
+        context.dataStore.edit { it[PrefsKeys.MIUIX_GREEN_ACCENT] = enabled }
+    }
+
     suspend fun setUseMiuixMonet(use: Boolean) {
         context.dataStore.edit { it[PrefsKeys.USE_MIUIX_MONET] = use }
     }
@@ -410,11 +416,6 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setLyricsJson(json: String) {
         context.dataStore.edit { it[PrefsKeys.LYRICS_JSON] = json }
-    }
-
-    suspend fun setWallpaperBrightness(value: Float) {
-        cachedWallpaperBrightness = value.coerceIn(0f, 1f)
-        context.dataStore.edit { it[PrefsKeys.WALLPAPER_BRIGHTNESS] = value.coerceIn(0f, 1f) }
     }
 
     suspend fun setCardAlpha(value: Float) {

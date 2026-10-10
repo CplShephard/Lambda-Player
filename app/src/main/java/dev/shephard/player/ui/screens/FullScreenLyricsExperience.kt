@@ -32,6 +32,15 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.runtime.MutableLongState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.drawText
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -62,17 +71,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Lyrics
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
@@ -191,20 +195,33 @@ fun FullScreenLyricsExperience(
     var seekFraction by remember { mutableStateOf<Float?>(null) }
 
     val synced = state.syncedLyrics
-    val activeIndex = if (synced.isNotEmpty()) {
-        synced.indexOfLast { it.timeMs + syncOffsetMs <= progress.positionMs }
-    } else -1
+    // The player reports its position every 500 ms. Lines (and the karaoke sweep) follow a
+    // frame-accurate position extrapolated between those reports instead, so a line lights up
+    // on time and word colouring moves smoothly.
+    val smoothPositionMs = rememberSmoothLyricsPosition(
+        positionMs = progress.positionMs,
+        isPlaying = state.isPlaying,
+        enabled = synced.isNotEmpty(),
+    )
+    val activeIndex by remember(synced, syncOffsetMs) {
+        derivedStateOf {
+            if (synced.isNotEmpty()) synced.indexOfLast { it.timeMs + syncOffsetMs <= smoothPositionMs.longValue } else -1
+        }
+    }
     val durationMs = progress.durationMs.coerceAtLeast(0L)
     val displayedFraction = seekFraction ?: if (durationMs > 0L) {
         (progress.positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
     } else 0f
 
-    LaunchedEffect(track?.id, state.lyrics, synced, isEditing) {
-        if (!isEditing) {
-            editText = if (synced.isNotEmpty()) {
-                synced.joinToString("\n") { line -> "[${formatLrcTime(line.timeMs)}]${line.text}" }
-            } else state.lyrics.joinToString("\n")
-        }
+    // Plain LRC for the editor (word tags would be noise there). Saving an unchanged text is
+    // skipped so opening the editor never throws away word-by-word timings.
+    val editSource = remember(state.lyrics, synced) {
+        if (synced.isNotEmpty()) {
+            synced.joinToString("\n") { line -> "[${formatLrcTime(line.timeMs)}]${line.text}" }
+        } else state.lyrics.joinToString("\n")
+    }
+    LaunchedEffect(track?.id, editSource, isEditing) {
+        if (!isEditing) editText = editSource
     }
 
     LaunchedEffect(track?.id) {
@@ -223,31 +240,33 @@ fun FullScreenLyricsExperience(
 
     LaunchedEffect(activeIndex, autoScroll, showSearch, showSettings, isEditing, track?.id) {
         if (autoScroll && !showSearch && !isEditing && synced.isNotEmpty() && activeIndex >= 0) {
-            val viewport = lyricsListState.layoutInfo.viewportSize
+            val layoutInfo = lyricsListState.layoutInfo
+            val viewportHeight = layoutInfo.viewportSize.height
             val targetIndex = activeIndex.coerceIn(synced.indices)
-            // The active line grows (18sp -> 23sp) while the list moves to it. Its top is pinned by the
-            // scroll, so the growth would shift its centre. Both resting heights are measured here with the
-            // same text style, and the list is aimed once at the position that keeps the centre in place.
-            // That makes the jump and the growth a single motion, with no second correction.
-            val linePaddingPx = with(density) { 24.dp.toPx() } // 12dp top + 12dp bottom inside each line
-            val textWidthPx = (viewport.width - with(density) { 28.dp.toPx() }).toInt().coerceAtLeast(1) // 14dp each side
-            val text = synced[targetIndex].text
-            val inactiveHeight = textMeasurer.measure(
-                text = text,
-                style = textStyle.copy(fontSize = 18.sp, lineHeight = 26.sp, fontWeight = FontWeight.Medium),
-                constraints = Constraints(maxWidth = textWidthPx),
-            ).size.height + linePaddingPx
-            val activeHeight = textMeasurer.measure(
-                text = text,
-                style = textStyle.copy(fontSize = 23.sp, lineHeight = 31.sp, fontWeight = FontWeight.Bold),
-                constraints = Constraints(maxWidth = textWidthPx),
-            ).size.height + linePaddingPx
-            // Top of the line at its final size, chosen so its centre matches the resting centre at 34%.
-            val finalTop = viewport.height * 0.34f - (activeHeight - inactiveHeight) / 2f
-            lyricsListState.animateScrollToItem(
-                index = targetIndex,
-                scrollOffset = -finalTop.toInt(),
-            )
+            // Every line is laid out at the active size and only *scaled* down when inactive, so
+            // line heights never change. The landing position is therefore known exactly before
+            // the move starts, and the scroll and the grow/shrink run as one motion with no
+            // correction (no few-dp jump) at the end.
+            val visible = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }
+            val itemHeight = visible?.size ?: run {
+                val textWidthPx = (layoutInfo.viewportSize.width - with(density) { (LyricLineHorizontalPadding * 2).toPx() })
+                    .toInt().coerceAtLeast(1)
+                textMeasurer.measure(
+                    text = synced[targetIndex].text,
+                    style = lyricLineLayoutStyle(textStyle),
+                    constraints = Constraints(maxWidth = textWidthPx),
+                ).size.height + with(density) { (LyricLineVerticalPadding * 2).toPx() }.toInt()
+            }
+            // Item offsets start after the top content padding; aim the line's centre at the anchor.
+            val desiredOffset = viewportHeight * LyricAnchorFraction - itemHeight / 2f - layoutInfo.beforeContentPadding
+            if (visible != null) {
+                lyricsListState.animateScrollBy(
+                    value = visible.offset - desiredOffset,
+                    animationSpec = tween(LyricMoveDurationMs, easing = FastOutSlowInEasing),
+                )
+            } else {
+                lyricsListState.animateScrollToItem(index = targetIndex, scrollOffset = -desiredOffset.toInt())
+            }
         }
     }
 
@@ -271,9 +290,10 @@ fun FullScreenLyricsExperience(
         }
     }
 
+    // Exported as enhanced LRC when the lyrics are word-synced, so karaoke timings survive.
     val exportText = remember(state.lyrics, synced) {
         if (synced.isNotEmpty()) {
-            synced.joinToString("\n") { line -> "[${formatLrcTime(line.timeMs)}]${line.text}" }
+            synced.joinToString("\n") { line -> line.toLrcLine() }
         } else state.lyrics.joinToString("\n")
     }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
@@ -394,7 +414,7 @@ fun FullScreenLyricsExperience(
                 onImport = { importLauncher.launch(arrayOf("text/*", "application/octet-stream", "application/x-lrc")) },
                 onEdit = {
                     if (isEditing) {
-                        playerViewModel.setManualLyricsText(editText)
+                        if (editText != editSource) playerViewModel.setManualLyricsText(editText)
                         isEditing = false
                     } else {
                         showSearch = false
@@ -407,6 +427,7 @@ fun FullScreenLyricsExperience(
 
             if (showSettings) {
                 LyricsSettingsPanel(
+                    useMiuix = useMiuix,
                     primary = primary,
                     textStyle = textStyle,
                     blurEnabled = blurEnabled,
@@ -506,7 +527,7 @@ fun FullScreenLyricsExperience(
                         state = lyricsListState,
                         modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 4.dp),
                         contentPadding = PaddingValues(top = 28.dp, bottom = 26.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (synced.isNotEmpty()) 0.dp else 6.dp),
                     ) {
                         if (synced.isNotEmpty()) {
                             itemsIndexed(synced, key = { index, line -> "${line.timeMs}_$index" }) { index, line ->
@@ -515,43 +536,61 @@ fun FullScreenLyricsExperience(
                                 val lineBlur = if (blurEnabled && activeIndex >= 0) {
                                     min(10f, distance * (blurStrength / 24f)).dp
                                 } else 0.dp
-                                // Active line grows (18sp -> 23sp) and the others shrink back, with a
-                                // slight spring overshoot, instead of jumping to the new size.
+                                // Grow/shrink is a pure scale (layout size is fixed), timed and eased
+                                // exactly like the scroll so the line lands at full size in place.
                                 val activeAmount by animateFloatAsState(
                                     targetValue = if (isActive) 1f else 0f,
-                                    animationSpec = spring(dampingRatio = 0.7f, stiffness = 320f),
+                                    animationSpec = tween(LyricMoveDurationMs, easing = FastOutSlowInEasing),
                                     label = "lyricLineSize",
                                 )
                                 val animatedBlur by animateDpAsState(
                                     targetValue = lineBlur,
-                                    animationSpec = tween(350),
+                                    animationSpec = tween(LyricMoveDurationMs),
                                     label = "lyricLineBlur",
                                 )
+                                val foreground = LocalLyricsForeground.current
+                                val karaoke = isActive && line.words.isNotEmpty()
                                 val targetColor = when {
-                                    isActive -> LocalLyricsForeground.current
-                                    distance > 3 -> LocalLyricsForeground.current.copy(alpha = 0.40f)
-                                    else -> LocalLyricsForeground.current.copy(alpha = 0.72f)
+                                    // Word-synced: the unsung part stays dim, sung words are painted over it.
+                                    karaoke -> foreground.copy(alpha = 0.45f)
+                                    isActive -> foreground
+                                    distance > 3 -> foreground.copy(alpha = 0.40f)
+                                    else -> foreground.copy(alpha = 0.72f)
                                 }
                                 val animatedColor by animateColorAsState(
                                     targetValue = targetColor,
-                                    animationSpec = tween(350),
+                                    animationSpec = tween(LyricMoveDurationMs),
                                     label = "lyricLineColor",
                                 )
+                                var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
                                 BasicText(
                                     text = line.text,
+                                    onTextLayout = { textLayout = it },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(18.dp))
                                         .clickable { playerViewModel.seekTo((line.timeMs + syncOffsetMs).coerceAtLeast(0)) }
+                                        .graphicsLayer {
+                                            val scale = LyricInactiveScale + (1f - LyricInactiveScale) * activeAmount
+                                            scaleX = scale
+                                            scaleY = scale
+                                        }
                                         .blur(animatedBlur)
-                                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                                    style = textStyle.copy(
-                                        color = animatedColor,
-                                        fontSize = (18f + 5f * activeAmount).sp,
-                                        lineHeight = (26f + 5f * activeAmount).sp,
-                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                                        textAlign = TextAlign.Center,
-                                    ),
+                                        .padding(horizontal = LyricLineHorizontalPadding, vertical = LyricLineVerticalPadding)
+                                        .drawWithContent {
+                                            drawContent()
+                                            if (karaoke) {
+                                                textLayout?.let { layout ->
+                                                    drawKaraokeHighlight(
+                                                        layout = layout,
+                                                        line = line,
+                                                        positionMs = smoothPositionMs.longValue - syncOffsetMs,
+                                                        color = foreground,
+                                                    )
+                                                }
+                                            }
+                                        },
+                                    style = lyricLineLayoutStyle(textStyle).copy(color = animatedColor),
                                 )
                             }
                         } else {
@@ -638,6 +677,7 @@ private fun LyricsHeader(
 
 @Composable
 private fun LyricsSettingsPanel(
+    useMiuix: Boolean,
     primary: Color,
     textStyle: TextStyle,
     blurEnabled: Boolean,
@@ -653,6 +693,25 @@ private fun LyricsSettingsPanel(
     exportEnabled: Boolean,
     strings: dev.shephard.player.ui.i18n.Strings,
 ) {
+    if (useMiuix) {
+        MiuixLyricsSettingsPanel(
+            primary = primary,
+            textStyle = textStyle,
+            blurEnabled = blurEnabled,
+            blurStrength = blurStrength,
+            autoScroll = autoScroll,
+            syncOffsetMs = syncOffsetMs,
+            onBlurEnabledChange = onBlurEnabledChange,
+            onBlurStrengthChange = onBlurStrengthChange,
+            onBlurStrengthChangeFinished = onBlurStrengthChangeFinished,
+            onAutoScrollChange = onAutoScrollChange,
+            onOffsetChange = onOffsetChange,
+            onExport = onExport,
+            exportEnabled = exportEnabled,
+            strings = strings,
+        )
+        return
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -697,6 +756,123 @@ private fun LyricsSettingsPanel(
             BasicText("${strings.lyricsSyncOffset}: ${if (syncOffsetMs >= 0) "+" else ""}${syncOffsetMs} ms", style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.82f), fontSize = 12.sp), modifier = Modifier.weight(1f))
             LyricsPill("−100", primary, onClick = { onOffsetChange(syncOffsetMs - 100) })
             LyricsPill("+100", primary, onClick = { onOffsetChange(syncOffsetMs + 100) })
+        }
+    }
+}
+
+/**
+ * Miuix rendering of the lyrics options: Miuix switches, slider and buttons instead of the
+ * Material pills/slider. The lyrics screen is always dark in Miuix (#111318 + white text), so
+ * the "off" colours are set for a dark surface regardless of the app's light/dark mode.
+ */
+@Composable
+private fun MiuixLyricsSettingsPanel(
+    primary: Color,
+    textStyle: TextStyle,
+    blurEnabled: Boolean,
+    blurStrength: Float,
+    autoScroll: Boolean,
+    syncOffsetMs: Int,
+    onBlurEnabledChange: (Boolean) -> Unit,
+    onBlurStrengthChange: (Float) -> Unit,
+    onBlurStrengthChangeFinished: () -> Unit,
+    onAutoScrollChange: (Boolean) -> Unit,
+    onOffsetChange: (Int) -> Unit,
+    onExport: () -> Unit,
+    exportEnabled: Boolean,
+    strings: dev.shephard.player.ui.i18n.Strings,
+) {
+    val foreground = LocalLyricsForeground.current
+    val labelStyle = textStyle.copy(color = foreground.copy(alpha = 0.9f), fontSize = 15.sp, fontWeight = FontWeight.Medium)
+    val switchColors = top.yukonga.miuix.kmp.basic.SwitchDefaults.switchColors(
+        checkedTrackColor = primary,
+        checkedThumbColor = Color.White,
+        uncheckedTrackColor = foreground.copy(alpha = 0.20f),
+        uncheckedThumbColor = Color.White,
+    )
+    val buttonColors = top.yukonga.miuix.kmp.basic.ButtonDefaults.textButtonColors(
+        color = foreground.copy(alpha = 0.12f),
+        disabledColor = foreground.copy(alpha = 0.06f),
+        textColor = foreground,
+        disabledTextColor = foreground.copy(alpha = 0.35f),
+    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(foreground.copy(alpha = 0.10f))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            BasicText(strings.blurEffect, style = labelStyle, modifier = Modifier.weight(1f))
+            top.yukonga.miuix.kmp.basic.Switch(
+                checked = blurEnabled,
+                onCheckedChange = onBlurEnabledChange,
+                colors = switchColors,
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            BasicText(strings.autoscroll, style = labelStyle, modifier = Modifier.weight(1f))
+            top.yukonga.miuix.kmp.basic.Switch(
+                checked = autoScroll,
+                onCheckedChange = onAutoScrollChange,
+                colors = switchColors,
+            )
+        }
+        BasicText(
+            "${strings.blurEffect} · ${blurStrength.toInt()} dp",
+            style = textStyle.copy(color = foreground.copy(alpha = 0.75f), fontSize = 12.sp),
+        )
+        top.yukonga.miuix.kmp.basic.Slider(
+            value = blurStrength,
+            onValueChange = onBlurStrengthChange,
+            onValueChangeFinished = onBlurStrengthChangeFinished,
+            valueRange = 0f..64f,
+            enabled = blurEnabled,
+            modifier = Modifier.fillMaxWidth(),
+            colors = top.yukonga.miuix.kmp.basic.SliderDefaults.sliderColors(
+                foregroundColor = primary,
+                disabledForegroundColor = foreground.copy(alpha = 0.30f),
+                backgroundColor = foreground.copy(alpha = 0.16f),
+                disabledBackgroundColor = foreground.copy(alpha = 0.08f),
+                thumbColor = Color.White,
+                disabledThumbColor = foreground.copy(alpha = 0.55f),
+            ),
+        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            BasicText(
+                "${strings.lyricsSyncOffset}: ${if (syncOffsetMs >= 0) "+" else ""}${syncOffsetMs} ms",
+                style = textStyle.copy(color = foreground.copy(alpha = 0.82f), fontSize = 13.sp),
+                modifier = Modifier.weight(1f),
+            )
+            top.yukonga.miuix.kmp.basic.TextButton(
+                text = "−100",
+                onClick = { onOffsetChange(syncOffsetMs - 100) },
+                colors = buttonColors,
+                minHeight = 36.dp,
+            )
+            top.yukonga.miuix.kmp.basic.TextButton(
+                text = "+100",
+                onClick = { onOffsetChange(syncOffsetMs + 100) },
+                colors = buttonColors,
+                minHeight = 36.dp,
+            )
+            top.yukonga.miuix.kmp.basic.IconButton(
+                onClick = onExport,
+                enabled = exportEnabled,
+                backgroundColor = foreground.copy(alpha = 0.12f),
+                minHeight = 36.dp,
+                minWidth = 36.dp,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.FileDownload,
+                    contentDescription = "Export lyrics",
+                    tint = if (exportEnabled) foreground else foreground.copy(alpha = 0.35f),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }
@@ -1103,6 +1279,111 @@ private fun LyricsPill(
     ) {
         BasicText(label, style = MaterialTheme.typography.labelSmall.copy(color = LocalLyricsForeground.current, fontWeight = FontWeight.SemiBold, fontSize = 11.sp))
     }
+}
+
+// Synced lyrics line geometry. Lines are laid out at the active size (23sp bold) and inactive
+// lines are scaled to 18/23 of it, so a line's height is the same whether it is active or not.
+private const val LyricInactiveScale = 18f / 23f
+private const val LyricMoveDurationMs = 650
+private const val LyricAnchorFraction = 0.40f
+private val LyricLineHorizontalPadding = 14.dp
+private val LyricLineVerticalPadding = 9.dp
+
+private fun lyricLineLayoutStyle(base: TextStyle): TextStyle = base.copy(
+    fontSize = 23.sp,
+    lineHeight = 31.sp,
+    fontWeight = FontWeight.Bold,
+    textAlign = TextAlign.Center,
+)
+
+/**
+ * Position used by the lyrics: follows [positionMs] but keeps counting every frame while
+ * playing. Small backwards corrections from the next report are ignored so the karaoke sweep
+ * never jumps back; real seeks (bigger differences) are followed immediately.
+ */
+@Composable
+private fun rememberSmoothLyricsPosition(positionMs: Long, isPlaying: Boolean, enabled: Boolean): MutableLongState {
+    val smooth = remember { mutableLongStateOf(positionMs) }
+    LaunchedEffect(positionMs, isPlaying, enabled) {
+        val current = smooth.longValue
+        val base = if (isPlaying && positionMs <= current && current - positionMs < 400L) current else positionMs
+        smooth.longValue = base
+        if (!isPlaying || !enabled) return@LaunchedEffect
+        var startNanos = -1L
+        while (true) {
+            withFrameNanos { now ->
+                if (startNanos < 0L) startNanos = now
+                smooth.longValue = base + (now - startNanos) / 1_000_000L
+            }
+        }
+    }
+    return smooth
+}
+
+/**
+ * QQ-Music-style karaoke: paints the already-sung part of [line] in [color] over the dim base
+ * text, sweeping through the current word/character in proportion to its sung time.
+ */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawKaraokeHighlight(
+    layout: TextLayoutResult,
+    line: SyncedLyricLine,
+    positionMs: Long,
+    color: Color,
+) {
+    val textLength = layout.layoutInput.text.length
+    if (textLength == 0) return
+    var sungChars = 0f
+    for (word in line.words) {
+        if (positionMs >= word.endMs) {
+            sungChars = word.endChar.toFloat()
+        } else {
+            if (positionMs > word.startMs) {
+                val fraction = (positionMs - word.startMs).toFloat() / (word.endMs - word.startMs).coerceAtLeast(1L)
+                sungChars = word.startChar + fraction.coerceIn(0f, 1f) * (word.endChar - word.startChar)
+            }
+            break
+        }
+    }
+    sungChars = sungChars.coerceIn(0f, textLength.toFloat())
+    if (sungChars <= 0f) return
+    for (lineIndex in 0 until layout.lineCount) {
+        val lineStart = layout.getLineStart(lineIndex)
+        if (sungChars <= lineStart) break
+        val lineEnd = layout.getLineEnd(lineIndex, visibleEnd = true)
+        val top = layout.getLineTop(lineIndex)
+        val bottom = layout.getLineBottom(lineIndex)
+        val rtl = layout.getParagraphDirection(lineStart) == androidx.compose.ui.text.style.ResolvedTextDirection.Rtl
+        val edge = if (sungChars >= lineEnd || lineEnd <= lineStart) {
+            if (rtl) layout.getLineLeft(lineIndex) else layout.getLineRight(lineIndex)
+        } else {
+            val charIndex = sungChars.toInt().coerceIn(lineStart, lineEnd - 1)
+            val box = layout.getBoundingBox(charIndex)
+            val within = sungChars - charIndex
+            if (rtl) box.right - box.width * within else box.left + box.width * within
+        }
+        clipRect(
+            left = if (rtl) edge else 0f,
+            top = top,
+            right = if (rtl) size.width else edge,
+            bottom = bottom,
+        ) {
+            drawText(layout, color = color)
+        }
+    }
+}
+
+/** `[mm:ss.xx]text`, or enhanced LRC (`[t]<t1>word<t2>word<end>`) for word-synced lines. */
+private fun SyncedLyricLine.toLrcLine(): String {
+    if (words.isEmpty()) return "[${formatLrcTime(timeMs)}]$text"
+    val builder = StringBuilder("[${formatLrcTime(timeMs)}]")
+    builder.append(text, 0, words.first().startChar)
+    words.forEachIndexed { index, word ->
+        builder.append('<').append(formatLrcTime(word.startMs)).append('>')
+        val next = words.getOrNull(index + 1)?.startChar ?: text.length
+        builder.append(text, word.startChar, next.coerceAtLeast(word.startChar))
+    }
+    builder.append('<').append(formatLrcTime(words.last().endMs)).append('>')
+    return builder.toString()
 }
 
 private fun formatLrcTime(ms: Long): String {

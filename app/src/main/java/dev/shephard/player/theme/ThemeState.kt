@@ -8,6 +8,7 @@ data class ThemeState(
     val colorSpec: ThemeColorSpec = ThemeColorSpec.SPEC_2025,
     val useDynamicColor: Boolean = false,
     val useMiuixMonet: Boolean = false,
+    val useMiuixGreenAccent: Boolean = false,
     val useAppleFloatingBar: Boolean = false,
     val seedColor: Int = 0xFF22C55E.toInt(),
     val useBlur: Boolean = false,

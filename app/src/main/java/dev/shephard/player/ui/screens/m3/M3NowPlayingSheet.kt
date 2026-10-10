@@ -3,8 +3,6 @@
 // LineageOS Twelve 1:1 - Now Playing Screen
 package dev.shephard.player.ui.screens.m3
 
-import androidx.activity.BackEventCompat
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -41,14 +39,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
@@ -61,15 +54,12 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import dev.shephard.player.ui.components.M3BottomSheetWrapper
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -77,7 +67,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -93,6 +82,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
+import kotlin.math.min
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
@@ -102,22 +93,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import dev.shephard.player.player.PlayerUiState
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
+import dev.shephard.player.ui.components.QueueRemoveButton
 import dev.shephard.player.player.RepeatMode
-import dev.shephard.player.theme.PredictiveBackAnimation
-import dev.shephard.player.ui.util.rememberDeviceCornerRadius
-import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.i18n.LocalStrings
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -158,16 +143,11 @@ fun M3NowPlayingSheet(
         surfaceContainerHighest = lerp(baseScheme.surfaceContainerHighest, accent, 0.42f),
         outline = lerp(baseScheme.outline, accent, 0.28f),
     )
-    val context = LocalContext.current
-    val preferences = remember(context) { PreferencesManager(context) }
-    val predictiveBack by preferences.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
-
     MaterialTheme(colorScheme = tintedScheme) {
         M3NowPlayingSheetContent(
             playerViewModel = playerViewModel,
             state = state,
             onDismiss = onDismiss,
-            useClassicPredictiveBack = predictiveBack == PredictiveBackAnimation.CLASSIC,
         )
     }
 }
@@ -178,7 +158,6 @@ private fun M3NowPlayingSheetContent(
     playerViewModel: PlayerViewModel,
     state: PlayerUiState,
     onDismiss: () -> Unit,
-    useClassicPredictiveBack: Boolean,
 ) {
     val track = state.currentTrack
     val strings = LocalStrings.current
@@ -206,9 +185,8 @@ private fun M3NowPlayingSheetContent(
 
     var measuredHeightPx by remember { mutableFloatStateOf(with(density) { configuration.screenHeightDp.dp.toPx() }) }
     val screenHeightPx = measuredHeightPx
-    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    // Raw predictive back progress (0..1), turned into the ModalBottomSheet transform below.
     val predictiveBackProgress = remember { Animatable(0f) }
-    var predictiveBackEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
 
     var isInteractingWithSheet by remember { mutableStateOf(false) }
     val isFullyExpanded by remember { derivedStateOf { hasEnteredRest && !isInteractingWithSheet && dragOffset.value <= 0.5f } }
@@ -217,7 +195,6 @@ private fun M3NowPlayingSheetContent(
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "sheetCornerRadiusM3"
     )
-    val deviceCornerRadius = rememberDeviceCornerRadius()
 
     val dismissWithAnimation: () -> Unit = {
         dragScope.launch {
@@ -228,22 +205,19 @@ private fun M3NowPlayingSheetContent(
         }
     }
 
-    if (useClassicPredictiveBack) {
-        PredictiveBackHandler(enabled = !showQueue && !showLyrics && !showAddToPlaylist) { events ->
-            try {
-                events.collect { event ->
-                    predictiveBackEdge = event.swipeEdge
-                    predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
-                }
-                if (predictiveBackProgress.value < 1f) predictiveBackProgress.animateTo(1f, tween(160))
-                onDismiss()
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                predictiveBackProgress.animateTo(0f, spring(dampingRatio = 0.82f, stiffness = 380f))
-                throw cancelled
+    // Same predictive back as the M3 drawers (ModalBottomSheet): the sheet shrinks towards the
+    // bottom edge while the gesture runs; releasing slides it down (keeping that scale, exactly
+    // like ModalBottomSheet's hide), cancelling springs it back to full size.
+    PredictiveBackHandler(enabled = !showQueue && !showLyrics && !showAddToPlaylist) { events ->
+        try {
+            events.collect { event ->
+                predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
             }
+            dismissWithAnimation()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            dragScope.launch { predictiveBackProgress.animateTo(0f) }
+            throw cancelled
         }
-    } else {
-        BackHandler(enabled = !showQueue && !showLyrics && !showAddToPlaylist, onBack = dismissWithAnimation)
     }
 
     Box(
@@ -251,16 +225,21 @@ private fun M3NowPlayingSheetContent(
             .fillMaxSize()
             .onSizeChanged { measuredHeightPx = it.height.toFloat() }
             .graphicsLayer {
-                val p = predictiveBackProgress.value.coerceIn(0f, 1f)
-                val direction = if (predictiveBackEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
                 translationY = dragOffset.value.coerceAtLeast(0f)
-                translationX = screenWidthPx * 0.12f * p * direction
-                val scale = 1f - 0.035f * p
-                scaleX = scale
-                scaleY = scale
-                alpha = 1f - 0.12f * p
-                shape = if (p > 0f) RoundedCornerShape(deviceCornerRadius * p)
-                else RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
+                // ModalBottomSheet's predictive back: eased progress, up to 48dp narrower and
+                // 24dp shorter, scaled around the bottom centre; top corners round to 28dp.
+                val p = M3PredictiveBackEasing.transform(predictiveBackProgress.value.coerceIn(0f, 1f))
+                if (p > 0f && size.width > 0f && size.height > 0f) {
+                    scaleX = 1f - (min(48.dp.toPx(), size.width) / size.width) * p
+                    scaleY = 1f - (min(24.dp.toPx(), size.height) / size.height) * p
+                    transformOrigin = TransformOrigin(0.5f, 1f)
+                }
+                val topCorner = if (p > 0f) {
+                    sheetCornerRadius + (28.dp - sheetCornerRadius) * min(1f, p * 3f)
+                } else {
+                    sheetCornerRadius
+                }
+                shape = RoundedCornerShape(topStart = topCorner, topEnd = topCorner)
                 clip = true
             }
             .background(nowPlayingBackground)
@@ -535,8 +514,10 @@ private fun M3NowPlayingSheetContent(
                                     else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                 )
                                 .clickable {
+                                    // The view model takes indexes relative to the current track
+                                    // (the list starts there), not absolute queue positions.
                                     val index = queue.indexOfFirst { it.id == queueTrack.id }
-                                    if (index>=0) playerViewModel.playQueueItem(index)
+                                    if (index >= 0) playerViewModel.playQueueItem(index - currentStartIndex)
                                 }
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -553,14 +534,20 @@ private fun M3NowPlayingSheetContent(
                                 Text(queueTrack.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(queueTrack.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
-                            // trash then drag handle per spec
-                            IconButton(onClick = {
-                                val index = queue.indexOfFirst { it.id == queueTrack.id }
-                                if (index>=0) playerViewModel.removeFromQueue(index)
-                            }, modifier = Modifier.size(36.dp)) {
-                                Icon(Icons.Filled.Delete, strings.removeFromQueue, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
-                            }
+                            // Trash (tap twice: "Confirm?" then remove) then drag handle. The
+                            // playing track can't be removed or moved, so it gets neither.
                             if (!isCurrent) {
+                                QueueRemoveButton(
+                                    trackId = queueTrack.id,
+                                    contentDescription = strings.removeFromQueue,
+                                    confirmLabel = strings.queueRemoveConfirm,
+                                    color = MaterialTheme.colorScheme.error,
+                                    labelStyle = MaterialTheme.typography.labelMedium,
+                                    onRemove = {
+                                        val index = queue.indexOfFirst { it.id == queueTrack.id }
+                                        if (index > currentStartIndex) playerViewModel.removeFromQueue(index - currentStartIndex)
+                                    },
+                                )
                                 Icon(
                                     Icons.Filled.DragHandle,
                                     contentDescription = strings.reorder,
@@ -686,8 +673,14 @@ private fun M3AddToPlaylistDrawer(
     M3BottomSheetWrapper(
             onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surfaceContainer) {
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-            Text(strings.addToPlaylist, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxWidth()) {
+            Text(strings.addToPlaylist, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+            // Same insets as the queue sheet: cards keep 16dp from the screen edges and 6dp
+            // between each other instead of touching the edges and their neighbours.
+            androidx.compose.foundation.lazy.LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            ) {
                 item {
                     androidx.compose.material3.ListItem(
                         headlineContent = { Text(strings.likedSongs) },
@@ -749,3 +742,6 @@ private fun M3AddToPlaylistDrawer(
 
 private fun contrastColorFor(color: Color): Color =
     if (color.luminance() >= 0.56f) Color(0xFF17131A) else Color.White
+
+/** Easing Material 3 applies to predictive back progress (PredictiveBack.transform). */
+private val M3PredictiveBackEasing = androidx.compose.animation.core.CubicBezierEasing(0.1f, 0.1f, 0f, 1f)

@@ -93,6 +93,7 @@ fun PlayerTheme(state: ThemeState, content: @Composable () -> Unit) {
         colorSpec = state.colorSpec,
         useDynamicColor = state.useDynamicColor,
         useMiuixMonet = state.useMiuixMonet,
+        useMiuixGreenAccent = state.useMiuixGreenAccent,
         seedColor = Color(state.seedColor),
         content = content,
     )
@@ -107,6 +108,7 @@ fun PlayerTheme(
     colorSpec: ThemeColorSpec,
     useDynamicColor: Boolean,
     useMiuixMonet: Boolean,
+    useMiuixGreenAccent: Boolean = false,
     seedColor: Color,
     content: @Composable () -> Unit,
 ) {
@@ -160,6 +162,7 @@ fun PlayerTheme(
                 themeMode = themeMode,
                 useDynamicColor = useDynamicColor,
                 useMiuixMonet = useMiuixMonet,
+                useGreenAccent = useMiuixGreenAccent,
                 seedColor = seedColor,
                 paletteStyle = paletteStyle,
                 colorSpec = colorSpec,
@@ -208,6 +211,7 @@ fun PlayerMiuixTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     themeMode: ThemeMode,
     useMiuixMonet: Boolean,
+    useGreenAccent: Boolean = false,
     useDynamicColor: Boolean = false,
     compatStatusBarColor: Boolean = true,
     seedColor: Color,
@@ -287,16 +291,58 @@ fun PlayerMiuixTheme(
             ThemeMode.DARK -> ColorSchemeMode.Dark
         }
 
-        val lightColors = lightColorScheme(
-            background = Color(0xFFF7F7F8),
-            onBackground = Color(0xFF111113),
-        )
-        val darkColors = darkColorScheme(
-            background = Color(0xFF000000),
-            onBackground = Color(0xFFF5F5F7),
-        )
+        // Optional green accent (Theme settings → "Green accent"): swaps every blue-derived role
+        // of the stock scheme for its green counterpart; everything else stays stock Miuix.
+        val lightColors = if (useGreenAccent) {
+            lightColorScheme(
+                primary = Color(0xFF23B26D),
+                primaryVariant = Color(0xFF23B26D),
+                onPrimaryVariant = Color(0xFFB0E8CB),
+                disabledPrimary = Color(0xFFBDE9D2),
+                disabledOnPrimary = Color(0xFFF2FBF6),
+                disabledPrimaryButton = Color(0xFFBDE9D2),
+                disabledPrimarySlider = Color(0xFFB3E0C8),
+                primaryContainer = Color(0xFF4FC88B),
+                tertiaryContainer = Color(0xFFE6F7EE),
+                onTertiaryContainer = Color(0xFF23B26D),
+                tertiaryContainerVariant = Color(0xFFE6F7EE),
+                sliderKeyPoint = Color(0x4DA3CDB6),
+                sliderKeyPointForeground = Color(0xFF6EDBA4),
+                background = Color(0xFFF7F7F8),
+                onBackground = Color(0xFF111113),
+            )
+        } else {
+            lightColorScheme(
+                background = Color(0xFFF7F7F8),
+                onBackground = Color(0xFF111113),
+            )
+        }
+        val darkColors = if (useGreenAccent) {
+            darkColorScheme(
+                primary = Color(0xFF1FA463),
+                primaryVariant = Color(0xFF14935A),
+                onPrimaryVariant = Color(0xFF99E2BE),
+                disabledPrimary = Color(0xFF1F4A35),
+                disabledOnPrimary = Color(0xFF678F7A),
+                disabledPrimaryButton = Color(0xFF1F4A35),
+                disabledOnPrimaryButton = Color(0xFF678F7A),
+                disabledPrimarySlider = Color(0xFF3D6B53),
+                primaryContainer = Color(0xFF2FB874),
+                tertiaryContainer = Color(0xFF203F30),
+                onTertiaryContainer = Color(0xFF47C985),
+                sliderKeyPoint = Color(0x4D7AA68D),
+                sliderKeyPointForeground = Color(0xFF5DDB9A),
+                background = Color(0xFF000000),
+                onBackground = Color(0xFFF5F5F7),
+            )
+        } else {
+            darkColorScheme(
+                background = Color(0xFF000000),
+                onBackground = Color(0xFFF5F5F7),
+            )
+        }
 
-        val controller = remember(colorSchemeMode, darkTheme) {
+        val controller = remember(colorSchemeMode, darkTheme, useGreenAccent) {
             ThemeController(
                 colorSchemeMode = colorSchemeMode,
                 lightColors = lightColors,

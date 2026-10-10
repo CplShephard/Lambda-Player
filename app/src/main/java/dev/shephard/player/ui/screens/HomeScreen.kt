@@ -34,14 +34,12 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.navigation.SubmenuNavGuard
-import dev.shephard.player.ui.navigation.PageTransitions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,7 +53,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,7 +67,6 @@ import kotlinx.coroutines.launch
 import dev.shephard.player.ui.components.MiuixTopBar
 import dev.shephard.player.ui.components.captureForTopBarBlur
 import dev.shephard.player.ui.components.rememberCollapsingTopBarState
-import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
@@ -270,7 +266,7 @@ private fun HomeEmptyState() {
             Text(
                 text = strings.noSongsToPlay,
                 style = MiuixAppTheme.typography.titleLarge,
-                color = wallpaperAdaptiveTextColor(),
+                color = MiuixAppTheme.colorScheme.onBackground,
                 modifier = Modifier.padding(top = 16.dp)
             )
             Text(
@@ -296,7 +292,7 @@ private fun FeaturedSongsSection(
             text = title,
             style = MiuixAppTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = wallpaperAdaptiveTextColor(),
+            color = MiuixAppTheme.colorScheme.onBackground,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
         )
         Spacer(modifier = Modifier.height(10.dp))
@@ -399,7 +395,7 @@ private fun RecentlyPlayedSection(
             text = title,
             style = MiuixAppTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = wallpaperAdaptiveTextColor(),
+            color = MiuixAppTheme.colorScheme.onBackground,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
         )
         Spacer(modifier = Modifier.height(10.dp))
@@ -538,7 +534,7 @@ private fun FeaturedPlaylistsSection(
             text = title,
             style = MiuixAppTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = wallpaperAdaptiveTextColor(),
+            color = MiuixAppTheme.colorScheme.onBackground,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
         )
         Spacer(modifier = Modifier.height(10.dp))

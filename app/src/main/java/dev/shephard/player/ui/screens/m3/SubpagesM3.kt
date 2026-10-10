@@ -8,20 +8,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import dev.shephard.player.ui.components.comradeEasterEggTrigger
 import dev.shephard.player.ui.components.m3.M3SmallTopBar
 import dev.shephard.player.ui.components.m3.DropDownMenuWidget
 import dev.shephard.player.player.LyricsAutoSearchMode
@@ -86,9 +85,6 @@ import dev.shephard.player.ui.components.m3.LineageSectionHeader
 import dev.shephard.player.ui.components.m3.SegmentedColumn
 import dev.shephard.player.ui.components.m3.SwitchWidget
 import dev.shephard.player.ui.screens.AppLicenses
-import androidx.compose.ui.graphics.Color
-import dev.shephard.player.ui.glass.LocalWallpaperEnabled
-import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -111,7 +107,7 @@ fun SettingsScreenM3(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             M3SmallTopBar(
                 title = { Text(strings.settings) },
@@ -202,7 +198,7 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
 
             Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             M3SmallTopBar(
                 title = { Text(strings.playbackSettings) },
@@ -279,6 +275,10 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
     val strings = LocalStrings.current
     var showLicenses by remember { mutableStateOf(false) }
     if (showLicenses) LicensesDialogM3(onDismiss = { showLicenses = false })
+    var showComradeEasterEgg by remember { mutableStateOf(false) }
+    if (showComradeEasterEgg) {
+        dev.shephard.player.ui.components.ComradeEasterEggDialog(useMiuix = false, onDismiss = { showComradeEasterEgg = false })
+    }
     val density = LocalDensity.current
     val versionName = remember {
         try { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() } catch (_: Exception) { "" }
@@ -297,7 +297,7 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
 
             Scaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surface,
             topBar = {
                 M3SmallTopBar(
                     title = { Text(strings.aboutSectionTitle) },
@@ -315,7 +315,8 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(16.dp))
-            Box(modifier = Modifier.size(88.dp).clip(RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+            // Hidden pop-up: tap the icon quickly several times (Chinese UI only).
+            Box(modifier = Modifier.size(88.dp).clip(RoundedCornerShape(16.dp)).comradeEasterEggTrigger { showComradeEasterEgg = true }, contentAlignment = Alignment.Center) {
                 val bitmap = appIconBitmap
                 if (bitmap != null) {
                     Image(bitmap = bitmap.asImageBitmap(), contentDescription = strings.appName, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -394,7 +395,7 @@ fun StatsScreenM3(
 
             Scaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surface,
             topBar = {
                 M3SmallTopBar(
                     title = { Text(strings.statsTitle) },

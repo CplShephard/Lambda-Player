@@ -4,12 +4,8 @@
 
 package dev.shephard.player.ui.screens
 
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
@@ -22,19 +18,15 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,16 +39,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.ColorLens
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -66,7 +52,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -92,10 +77,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
-import coil.compose.AsyncImagePainter
 import dev.shephard.player.R
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.LyricsAutoSearchMode
@@ -108,20 +90,16 @@ import dev.shephard.player.theme.PredictiveBackAnimation
 import dev.shephard.player.theme.ThemeColorSpec
 import dev.shephard.player.ui.components.captureForTopBarBlur
 import dev.shephard.player.ui.components.m3.ColorSwatchPreview
+import dev.shephard.player.ui.components.comradeEasterEggTrigger
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.glass.bgeffect.BgEffectBackground
-import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.Card
 import dev.shephard.player.ui.miuix.CardDefaults
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
-import dev.shephard.player.ui.miuix.Slider
-import dev.shephard.player.ui.miuix.SliderDefaults
-import dev.shephard.player.ui.miuix.Switch
-import dev.shephard.player.ui.miuix.SwitchDefaults
 import dev.shephard.player.ui.miuix.Text
 import dev.shephard.player.ui.theme.material.PresetColors
 import kotlinx.coroutines.Dispatchers
@@ -200,7 +178,6 @@ fun SettingsScreen(
 @Composable
 fun ThemeSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    var showRemoveWallpaperConfirm by remember { mutableStateOf(false) }
     val prefs = remember { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
     val strings = LocalStrings.current
@@ -213,97 +190,17 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     // Fix custom colors re-animation: use nullable initial to avoid false->true flicker on enter
     val useMiuixMonetNullable by prefs.useMiuixMonet.collectAsState(initial = null as Boolean?)
     val useMiuixMonet = useMiuixMonetNullable ?: false
+    val miuixGreenAccent by prefs.miuixGreenAccent.collectAsState(initial = false)
     val dynamicColorNullable by prefs.dynamicColor.collectAsState(initial = null as Boolean?)
     val dynamicColor = dynamicColorNullable ?: false
     val paletteStyle by prefs.paletteStyle.collectAsState(initial = PaletteStyle.TonalSpot)
     val colorSpec by prefs.colorSpec.collectAsState(initial = ThemeColorSpec.SPEC_2025)
     val seedColor by prefs.seedColor.collectAsState(initial = PresetColors.first().color.toArgb())
 
-    val wallpaper by prefs.wallpaperUri.collectAsState(initial = "")
-    val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = PreferencesManager.cachedWallpaperBrightness)
     val language by prefs.language.collectAsState(initial = "en")
     val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
     val playlistsLayout by prefs.playlistsLayout.collectAsState(initial = LayoutMode.LIST)
     val predictiveBack by prefs.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
-
-    var wallpaperBrightnessValue by remember { mutableFloatStateOf(PreferencesManager.cachedWallpaperBrightness) }
-    LaunchedEffect(wallpaperBrightness) {
-        wallpaperBrightnessValue = wallpaperBrightness
-    }
-    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-        wallpaperBrightnessValue = wallpaperBrightness
-    }
-
-    var wallpaperCropOutputUri by remember { mutableStateOf<Uri?>(null) }
-    val wallpaperCropLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val output = wallpaperCropOutputUri
-        if (result.resultCode == android.app.Activity.RESULT_OK && output != null) {
-            scope.launch { prefs.setWallpaperUri(output.toString()) }
-        }
-    }
-
-    fun launchWallpaperCrop(sourceUri: Uri) {
-        val dir = java.io.File(context.filesDir, "persisted_wallpaper").apply { mkdirs() }
-        val file = java.io.File(dir, "wallpaper_${System.currentTimeMillis()}.jpg")
-        val outputUri = FileProvider.getUriForFile(
-            context, "${context.packageName}.fileprovider", file
-        )
-        wallpaperCropOutputUri = outputUri
-
-        val displayMetrics = context.resources.displayMetrics
-        val screenWidth = displayMetrics.widthPixels
-        val screenHeight = displayMetrics.heightPixels
-
-        val cropIntent = Intent("com.android.camera.action.CROP").apply {
-            setDataAndType(sourceUri, "image/*")
-            putExtra("crop", "true")
-            putExtra("scale", "true")
-            putExtra("aspectX", screenWidth)
-            putExtra("aspectY", screenHeight)
-            putExtra("outputX", screenWidth)
-            putExtra("outputY", screenHeight)
-            putExtra(android.provider.MediaStore.EXTRA_OUTPUT, outputUri)
-            putExtra("outputFormat", android.graphics.Bitmap.CompressFormat.JPEG.toString())
-            putExtra("return-data", false)
-            putExtra("noFaceDetection", true)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            clipData = android.content.ClipData.newUri(context.contentResolver, "wallpaper", sourceUri)
-        }
-        val resolved = context.packageManager.queryIntentActivities(cropIntent, 0)
-        for (info in resolved) {
-            val pkg = info.activityInfo?.packageName ?: continue
-            try {
-                context.grantUriPermission(
-                    pkg, outputUri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                )
-            } catch (_: SecurityException) { }
-        }
-        if (resolved.isNotEmpty()) {
-            wallpaperCropLauncher.launch(cropIntent)
-        } else {
-            scope.launch {
-                val persisted = dev.shephard.player.player.ImagePersistence.persistWallpaper(context, sourceUri)
-                prefs.setWallpaperUri((persisted ?: sourceUri).toString())
-            }
-        }
-    }
-
-    val wallpaperPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            try {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            } catch (_: SecurityException) { }
-            launchWallpaperCrop(uri)
-        }
-    }
 
     SettingsPageScaffold(title = strings.themeSettings, onBack = onBack) {
         // ── Group 1: UI Style (identical to InstallerX Revived) ──────────────
@@ -357,6 +254,18 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 MiuixSwitchRow(label = strings.blurEffect, checked = liquidGlassEnabled, description = strings.blurEffectDescription) { enabled ->
                     scope.launch { prefs.setLiquidGlassEnabled(enabled) }
                 }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            // Green instead of the stock blue accent; only applies to the stock palette, so it is
+            // greyed out while custom colors generate the palette from the seed color.
+            MiuixSwitchRow(
+                label = strings.miuixGreenAccent,
+                checked = miuixGreenAccent,
+                description = strings.miuixGreenAccentDescription,
+                enabled = !useMiuixMonet,
+            ) { enabled ->
+                scope.launch { prefs.setMiuixGreenAccent(enabled) }
             }
 
             Spacer(Modifier.height(8.dp))
@@ -530,147 +439,6 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        SectionCard {
-            Text(strings.wallpaper, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
-            Spacer(Modifier.height(14.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(115.dp)
-                        .aspectRatio(9f / 19.5f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MiuixAppTheme.colorScheme.background),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (wallpaper.isNotEmpty()) {
-                        var previewLoaded by remember(wallpaper) { mutableStateOf(false) }
-                        AsyncImage(
-                            model = wallpaper,
-                            contentDescription = strings.wallpaperPreviewContentDescription,
-                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
-                            contentScale = ContentScale.Crop,
-                            onState = { previewLoaded = it is AsyncImagePainter.State.Success }
-                        )
-                        if (!previewLoaded) {
-                            Icon(Icons.Filled.BrokenImage, null, tint = MiuixAppTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 1f - wallpaperBrightnessValue))
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Filled.Image,
-                            contentDescription = null,
-                            tint = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
-                }
-
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            .clickable { wallpaperPicker.launch(arrayOf("image/*")) }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.FolderOpen,
-                            contentDescription = null,
-                            tint = MiuixAppTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            text = if (wallpaper.isEmpty()) strings.chooseFromGallery else strings.changeWallpaper,
-                            style = MiuixAppTheme.typography.bodyMedium,
-                            color = MiuixAppTheme.colorScheme.onBackground
-                        )
-                    }
-
-                    if (wallpaper.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            .clickable {
-                                runCatching {
-                                    launchWallpaperCrop(Uri.parse(wallpaper))
-                                }
-                            }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Edit,
-                                contentDescription = null,
-                                tint = MiuixAppTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                text = strings.edit,
-                                style = MiuixAppTheme.typography.bodyMedium,
-                                color = MiuixAppTheme.colorScheme.onBackground
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            .clickable { showRemoveWallpaperConfirm = true }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Delete,
-                                contentDescription = null,
-                                tint = Color(0xFFE53935),
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                text = strings.removeWallpaper,
-                                style = MiuixAppTheme.typography.bodyMedium,
-                                color = Color(0xFFE53935)
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (wallpaper.isNotEmpty()) {
-                Spacer(Modifier.height(16.dp))
-                Text(strings.wallpaperBrightness, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
-                Slider(
-                    value = wallpaperBrightnessValue,
-                    onValueChange = { wallpaperBrightnessValue = it },
-                    onValueChangeFinished = { scope.launch { prefs.setWallpaperBrightness(wallpaperBrightnessValue) } },
-                    valueRange = 0f..1f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MiuixAppTheme.colorScheme.primary,
-                        activeTrackColor = MiuixAppTheme.colorScheme.primary,
-                        inactiveTrackColor = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                    )
-                )
-            }
-        }
-
         // ── Predictive Back (exactly like InstallerX Revived Miuix page) ─────
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             SmallTitle(
@@ -722,21 +490,6 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         }
 
         Spacer(Modifier.height(110.dp))
-    }
-
-    if (showRemoveWallpaperConfirm) {
-        dev.shephard.player.ui.miuix.MiuixDeleteConfirmationDialog(
-            show = true,
-            title = strings.removeWallpaper,
-            message = strings.removeWallpaperConfirm,
-            confirmText = strings.removeWallpaper,
-            cancelText = strings.cancel,
-            onDismiss = { showRemoveWallpaperConfirm = false },
-            onConfirm = {
-                showRemoveWallpaperConfirm = false
-                scope.launch { prefs.setWallpaperUri("") }
-            },
-        )
     }
 }
 
@@ -798,6 +551,10 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
 
     var showLicenses by remember { mutableStateOf(false) }
     if (showLicenses) MiuixLicensesDialog(onDismiss = { showLicenses = false })
+    var showComradeEasterEgg by remember { mutableStateOf(false) }
+    if (showComradeEasterEgg) {
+        dev.shephard.player.ui.components.ComradeEasterEggDialog(useMiuix = true, onDismiss = { showComradeEasterEgg = false })
+    }
     val density = LocalDensity.current
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val appBarHeight = 56.dp
@@ -917,7 +674,19 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                         .fillMaxWidth()
                         .height(headerTopPadding + headerHeightDp + 48.dp)
                         .onSizeChanged { size -> logoHeightPx = size.height }
-                )
+                ) {
+                    // This list is drawn above the header, so the app icon itself never gets
+                    // taps. This transparent 88dp target sits exactly over the icon instead.
+                    // Hidden pop-up: tap the icon quickly several times (Chinese UI only).
+                    Box(
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = headerTopPadding)
+                            .size(88.dp)
+                            .clip(RoundedCornerShape(30.dp))
+                            .comradeEasterEggTrigger { showComradeEasterEgg = true }
+                    )
+                }
             }
             item(key = "about_content") {
                 Column(modifier = Modifier.fillParentMaxHeight()) {
@@ -1120,12 +889,13 @@ private typealias ColumnScope = androidx.compose.foundation.layout.ColumnScope
  * Used inside cards that have zero content padding, so the row sits at the same inset as InstallerX.
  */
 @Composable
-private fun MiuixSwitchRow(label: String, checked: Boolean, description: String? = null, onChange: (Boolean) -> Unit) {
+private fun MiuixSwitchRow(label: String, checked: Boolean, description: String? = null, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
     top.yukonga.miuix.kmp.preference.SwitchPreference(
         checked = checked,
         onCheckedChange = onChange,
         title = label,
         summary = description,
+        enabled = enabled,
     )
 }
 

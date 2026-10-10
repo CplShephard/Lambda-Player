@@ -9,19 +9,13 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.material.icons.filled.Delete
 
-import androidx.activity.BackEventCompat
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +32,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -52,28 +45,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lyrics
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.VerticalAlignCenter
 import dev.shephard.player.ui.miuix.ExperimentalMaterial3Api
 import dev.shephard.player.ui.miuix.Icon
-import dev.shephard.player.ui.miuix.IconButton
 import dev.shephard.player.ui.miuix.MiuixAppTheme
-import dev.shephard.player.ui.miuix.OutlinedTextField
 import dev.shephard.player.ui.components.MiuixDrawer
-import dev.shephard.player.ui.components.rememberDrawerDismiss
+import dev.shephard.player.ui.components.MiuixDrawerDefaults
+import dev.shephard.player.ui.components.QueueRemoveButton
 import dev.shephard.player.ui.miuix.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -81,7 +65,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -90,15 +73,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.input.pointer.pointerInput
@@ -110,7 +90,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
@@ -121,21 +100,14 @@ import dev.shephard.player.data.formattedDuration
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.RepeatMode
-import dev.shephard.player.theme.PredictiveBackAnimation
-import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import dev.shephard.player.ui.components.BouncyIconButton
-import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
-import dev.shephard.player.ui.glass.blurSurface
-import dev.shephard.player.ui.glass.blurSurfaceCompact
 import dev.shephard.player.ui.components.MinimalSeekBar
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.json.JSONArray
 
 @Composable
@@ -149,9 +121,6 @@ fun NowPlayingSheet(
     val strings = LocalStrings.current
     val nowPlayingLiquidGlassOn = LocalBlurEnabled.current
     val context = LocalContext.current
-    val preferences = remember(context) { PreferencesManager(context) }
-    val predictiveBackStyle by preferences.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
-    val useClassicPredictiveBack = predictiveBackStyle == PredictiveBackAnimation.CLASSIC
 
     var showQueue by remember { mutableStateOf(false) }
     var showPlaylists by remember { mutableStateOf(false) }
@@ -188,9 +157,8 @@ fun NowPlayingSheet(
     val configuration = LocalConfiguration.current
     var measuredHeightPx by remember { mutableFloatStateOf(with(density) { configuration.screenHeightDp.dp.toPx() }) }
     val screenHeightPx = measuredHeightPx
-    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
-    val predictiveBackProgress = remember { androidx.compose.animation.core.Animatable(0f) }
-    var predictiveBackEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
+    // True while a predictive back gesture drags the sheet (rounds the corners like a drag).
+    var isBackGestureActive by remember { mutableStateOf(false) }
 
     val dismissWithAnimation: () -> Unit = {
         dragScope.launch {
@@ -207,23 +175,20 @@ fun NowPlayingSheet(
         }
     }
 
-    if (useClassicPredictiveBack) {
-        PredictiveBackHandler(enabled = !showQueue && !showLyrics && !showPlaylists) { events ->
-            try {
-                events.collect { event ->
-                    predictiveBackEdge = event.swipeEdge
-                    predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
-                }
-                if (predictiveBackProgress.value < 1f) predictiveBackProgress.animateTo(1f, androidx.compose.animation.core.tween(160))
-                onDismiss()
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                predictiveBackProgress.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 380f))
-                throw cancelled
+    // Same predictive back as the Miuix drawers (WindowBottomSheet): while the back gesture runs
+    // the sheet follows it downwards, releasing slides it off screen, cancelling snaps it back.
+    PredictiveBackHandler(enabled = !showQueue && !showLyrics && !showPlaylists) { events ->
+        isBackGestureActive = true
+        try {
+            events.collect { event ->
+                dragOffset.snapTo(event.progress.coerceIn(0f, 1f) * screenHeightPx)
             }
-        }
-    } else {
-        BackHandler(enabled = !showQueue && !showLyrics && !showPlaylists) {
+            isBackGestureActive = false
             dismissWithAnimation()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            isBackGestureActive = false
+            dragScope.launch { dragOffset.animateTo(0f, androidx.compose.animation.core.tween(150)) }
+            throw cancelled
         }
     }
 
@@ -232,7 +197,7 @@ val playButtonScale = remember { androidx.compose.animation.core.Animatable(1f) 
 
 var isInteractingWithSheet by remember { mutableStateOf(false) }
     val isFullyExpanded by remember {
-        androidx.compose.runtime.derivedStateOf { hasEnteredRest && !isInteractingWithSheet && dragOffset.value <= 0.5f }
+        androidx.compose.runtime.derivedStateOf { hasEnteredRest && !isInteractingWithSheet && !isBackGestureActive && dragOffset.value <= 0.5f }
     }
     val sheetCornerRadius by androidx.compose.animation.core.animateDpAsState(
         targetValue = if (isFullyExpanded) 0.dp else 30.dp,
@@ -246,22 +211,14 @@ var isInteractingWithSheet by remember { mutableStateOf(false) }
         topStart = sheetCornerRadius,
         topEnd = sheetCornerRadius
     )
-    val deviceCornerRadius = rememberDeviceCornerRadius()
 
 Box(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { measuredHeightPx = it.height.toFloat() }
             .graphicsLayer {
-                val p = predictiveBackProgress.value.coerceIn(0f, 1f)
-                val direction = if (predictiveBackEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
                 translationY = dragOffset.value.coerceAtLeast(0f)
-                translationX = screenWidthPx * 0.12f * p * direction
-                val scale = 1f - 0.035f * p
-                scaleX = scale
-                scaleY = scale
-                alpha = 1f - 0.12f * p
-                shape = if (p > 0f) RoundedCornerShape(deviceCornerRadius * p) else sheetShape
+                shape = sheetShape
                 clip = true
             }
             .background(MiuixAppTheme.colorScheme.background)
@@ -433,6 +390,17 @@ val forward = navigationDirection >= 0
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.padding(horizontal = 24.dp)
                                     )
+                                    // Album under the artist, like the Material 3 Now Playing screen.
+                                    if (animatedTrack.album.isNotBlank()) {
+                                        Text(
+                                            text = animatedTrack.album,
+                                            style = MiuixAppTheme.typography.bodyMedium,
+                                            color = Color.White.copy(alpha = 0.55f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(horizontal = 24.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -958,26 +926,29 @@ private fun QueueTrackItem(
 ) {
     val strings = LocalStrings.current
     val duration = remember(track.id) { track.formattedDuration() }
-    val elevation by androidx.compose.animation.core.animateDpAsState(
-        targetValue = if (isDragged) 8.dp else 0.dp,
-        label = "queueItemElevation"
-    )
     val rowShape = RoundedCornerShape(12.dp)
+    // Cards sit on the drawer's surfaceContainer, so tint them darker than it (they used to be
+    // the same colour and vanished). Opaque colours only: no elevation shadow while dragging —
+    // a shadow behind a translucent card showed through below it and looked like a lagging
+    // second item. The dragged card just takes a stronger accent tint (pressed look).
+    val drawerColor = MiuixDrawerDefaults.backgroundColor()
+    val cardColor = Color.Black.copy(alpha = if (drawerColor.luminance() < 0.5f) 0.28f else 0.06f)
+        .compositeOver(drawerColor)
+    val accent = MiuixAppTheme.colorScheme.primary
+    val rowColor by androidx.compose.animation.animateColorAsState(
+        targetValue = when {
+            isDragged -> accent.copy(alpha = 0.24f).compositeOver(cardColor)
+            isPlaying -> accent.copy(alpha = 0.12f).compositeOver(cardColor)
+            else -> cardColor
+        },
+        label = "queueItemColor"
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
-            .shadow(elevation, rowShape)
-            .zIndex(if (isDragged) 1f else 0f)
             .clip(rowShape)
-            .background(
-                when {
-                    isDragged -> MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
-                    isPlaying -> MiuixAppTheme.colorScheme.primary.copy(alpha = 0.08f)
-                    else -> MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-                },
-                rowShape
-            )
+            .background(rowColor, rowShape)
             .clickable { onPlay() }
             .padding(vertical = 6.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1021,19 +992,16 @@ private fun QueueTrackItem(
         }
         Text(duration, style = MiuixAppTheme.typography.labelSmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(6.dp))
-        // Red trash button left of drag handle
+        // Red trash button left of drag handle: first tap asks "Confirm?", second tap removes.
         if (!isPlaying) {
-            IconButton(
-                onClick = onRemove,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Delete,
-                    contentDescription = strings.removeFromQueue,
-                    tint = Color(0xFFE53935),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+            QueueRemoveButton(
+                trackId = track.id,
+                contentDescription = strings.removeFromQueue,
+                confirmLabel = strings.queueRemoveConfirm,
+                color = Color(0xFFE53935),
+                labelStyle = MiuixAppTheme.typography.labelSmall,
+                onRemove = onRemove,
+            )
             Icon(
                 imageVector = Icons.Filled.DragHandle,
                 contentDescription = strings.reorder,

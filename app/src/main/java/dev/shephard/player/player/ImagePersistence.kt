@@ -11,7 +11,6 @@ import java.io.IOException
 object ImagePersistence {
 
     private const val COVERS_DIR = "persisted_covers"
-    private const val WALLPAPER_DIR = "persisted_wallpaper"
 
     suspend fun persistImage(
         context: Context,
@@ -47,7 +46,4 @@ object ImagePersistence {
 
     suspend fun persistCover(context: Context, sourceUri: Uri): Uri? =
         persistImage(context, sourceUri, COVERS_DIR, "cover_")
-
-    suspend fun persistWallpaper(context: Context, sourceUri: Uri): Uri? =
-        persistImage(context, sourceUri, WALLPAPER_DIR, "wallpaper_")
 }

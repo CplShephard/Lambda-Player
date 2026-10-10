@@ -63,6 +63,8 @@ class MainActivity : ComponentActivity() {
             val colorSpec by prefs.colorSpec.collectAsState(initial = dev.shephard.player.theme.ThemeColorSpec.SPEC_2025)
             val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
             val useMiuixMonet by prefs.useMiuixMonet.collectAsState(initial = false)
+            val initialMiuixGreenAccent = remember { runBlocking { prefs.miuixGreenAccent.first() } }
+            val miuixGreenAccent by prefs.miuixGreenAccent.collectAsState(initial = initialMiuixGreenAccent)
             val seedColor by prefs.seedColor.collectAsState(initial = 0xFF22C55E.toInt())
             // Read the persisted blur toggle synchronously so glass surfaces (dock,
             // top bars) don't render in their solid fallback state for a second on
@@ -83,6 +85,8 @@ class MainActivity : ComponentActivity() {
                 colorSpec = colorSpec,
                 useDynamicColor = dynamicColor,
                 useMiuixMonet = if (useMiuix) useMiuixMonet else true,
+                // Only meaningful for the stock Miuix palette (custom colors off).
+                useMiuixGreenAccent = useMiuix && !useMiuixMonet && miuixGreenAccent,
                 seedColor = seedColor,
                 useBlur = blurEnabled,
                 useAppleFloatingBar = appleFloatingBar,

@@ -41,7 +41,14 @@ private const val QQ_USER_AGENT =
 /** Sentences QQ Music returns instead of lyrics for instrumental tracks. */
 private val QQ_INSTRUMENTAL_MARKERS = listOf("此歌曲为没有填词的纯音乐", "纯音乐，请欣赏", "純音樂，請欣賞")
 
-data class SyncedLyricLine(val timeMs: Long, val text: String)
+/**
+ * One timed word (or character) of a word-synced lyrics line: it is sung from [startMs] to
+ * [endMs] and covers `text.substring(startChar, endChar)` of its line.
+ */
+data class LyricWord(val startMs: Long, val endMs: Long, val startChar: Int, val endChar: Int)
+
+/** [words] is filled for word-synced (karaoke) lyrics, e.g. QQ Music QRC / enhanced LRC. */
+data class SyncedLyricLine(val timeMs: Long, val text: String, val words: List<LyricWord> = emptyList())
 
 data class PlaybackProgress(
     val positionMs: Long = 0L,
@@ -1207,28 +1214,26 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun parseLyricsDocument(content: String): LyricsDocument {
         val timestampRegex = Regex("\\[(\\d{1,3}):(\\d{2})(?:[.:](\\d{1,3}))?]")
         val metadataRegex = Regex("\\[[A-Za-z]+:[^]]*]")
+        // Enhanced LRC word tags: [00:12.00]<00:12.00>Word <00:12.40>word<00:12.90>
+        val wordTagRegex = Regex("<(\\d{1,3}):(\\d{2})(?:[.:](\\d{1,3}))?>")
         val synced = mutableListOf<SyncedLyricLine>()
         val plain = mutableListOf<String>()
 
         content.lineSequence().forEach { sourceLine ->
             val tags = timestampRegex.findAll(sourceLine).toList()
             if (tags.isNotEmpty()) {
-                val text = sourceLine
+                val body = sourceLine
                     .replace(timestampRegex, "")
                     .replace(metadataRegex, "")
-                    .trim()
+                // Word timings are absolute, so they only make sense for a line with one timestamp.
+                val (text, words) = if (tags.size == 1 && wordTagRegex.containsMatchIn(body)) {
+                    parseWordTimedText(body, wordTagRegex)
+                } else {
+                    body.replace(wordTagRegex, "").trim() to emptyList()
+                }
                 if (text.isNotBlank()) {
                     tags.forEach { tag ->
-                        val minutes = tag.groupValues[1].toLongOrNull() ?: 0L
-                        val seconds = tag.groupValues[2].toLongOrNull() ?: 0L
-                        val fractionText = tag.groupValues.getOrNull(3).orEmpty()
-                        val fraction = fractionText.toLongOrNull() ?: 0L
-                        val millis = when (fractionText.length) {
-                            1 -> fraction * 100L
-                            2 -> fraction * 10L
-                            else -> fraction
-                        }
-                        synced += SyncedLyricLine((minutes * 60L + seconds) * 1000L + millis, text)
+                        synced += SyncedLyricLine(lrcTagMillis(tag.groupValues), text, words)
                     }
                 }
             } else {
@@ -1240,6 +1245,47 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val sortedSynced = synced.sortedBy { it.timeMs }
         val lines = if (sortedSynced.isNotEmpty()) sortedSynced.map { it.text } else plain
         return LyricsDocument(content, lines, sortedSynced)
+    }
+
+    /** Milliseconds of a `mm:ss(.xxx)` match whose groups 1..3 are minutes, seconds and fraction. */
+    private fun lrcTagMillis(groups: List<String>): Long {
+        val minutes = groups.getOrNull(1)?.toLongOrNull() ?: 0L
+        val seconds = groups.getOrNull(2)?.toLongOrNull() ?: 0L
+        val fractionText = groups.getOrNull(3).orEmpty()
+        val fraction = fractionText.toLongOrNull() ?: 0L
+        val millis = when (fractionText.length) {
+            1 -> fraction * 100L
+            2 -> fraction * 10L
+            else -> fraction
+        }
+        return (minutes * 60L + seconds) * 1000L + millis
+    }
+
+    /**
+     * Splits an enhanced-LRC line body (`<t1>word<t2>word<t3>`) into its display text and the
+     * timed words. A word lasts until the next tag; the final tag only marks the end of the last word.
+     */
+    private fun parseWordTimedText(body: String, wordTagRegex: Regex): Pair<String, List<LyricWord>> {
+        val matches = wordTagRegex.findAll(body).toList()
+        val builder = StringBuilder(body.substring(0, matches.first().range.first))
+        val segments = ArrayList<Triple<Long, Int, Int>>(matches.size) // start, startChar, endChar
+        matches.forEachIndexed { index, match ->
+            val segmentEnd = if (index + 1 < matches.size) matches[index + 1].range.first else body.length
+            val start = builder.length
+            builder.append(body, match.range.last + 1, segmentEnd)
+            segments += Triple(lrcTagMillis(match.groupValues), start, builder.length)
+        }
+        val full = builder.toString()
+        val leading = full.length - full.trimStart().length
+        val text = full.trim()
+        val words = segments.mapIndexedNotNull { index, (startMs, startChar, endChar) ->
+            val from = (startChar - leading).coerceIn(0, text.length)
+            val to = (endChar - leading).coerceIn(0, text.length)
+            if (to <= from) return@mapIndexedNotNull null
+            val endMs = segments.getOrNull(index + 1)?.first ?: (startMs + 600L)
+            LyricWord(startMs, endMs.coerceAtLeast(startMs), from, to)
+        }
+        return text to words
     }
 
     private suspend fun loadLyricsSyncOffset(trackId: Long): Int = runCatching {
@@ -1601,6 +1647,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 decodedLyrics.lineSequence().count { it.isNotBlank() } <= 3
             ) return null
             val hasTimestamps = Regex("\\[\\d{1,3}:\\d{2}(?:[.:]\\d{1,3})?]").containsMatchIn(decodedLyrics)
+            // Prefer QQ's word-by-word (QRC) lyrics when the song has them: the lyrics screen then
+            // colours every word/character exactly while it is sung, like QQ Music does.
+            val karaoke = candidate.songId?.let { id -> runCatching { QqQrc.download(id) }.getOrNull() }
+                ?.takeUnless { qrc -> QQ_INSTRUMENTAL_MARKERS.any { qrc.contains(it) } }
+            if (karaoke != null) {
+                return LyricsSearchResult(
+                    id = candidate.songId,
+                    title = candidate.title,
+                    artist = candidate.artist,
+                    album = candidate.album,
+                    durationSeconds = candidate.durationSeconds,
+                    instrumental = false,
+                    plainLyrics = null,
+                    syncedLyrics = karaoke,
+                    source = "QQ Music",
+                    sourceId = candidate.songMid,
+                )
+            }
             LyricsSearchResult(
                 id = candidate.songId,
                 title = candidate.title,

@@ -2,12 +2,10 @@
 
 package dev.shephard.player.ui.screens
 
-import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -18,10 +16,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -81,8 +77,6 @@ import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.rememberAudioPermissionState
 import dev.shephard.player.ui.glass.LocalBlurEnabled
-import dev.shephard.player.ui.glass.blurSurface
-import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
@@ -518,8 +512,6 @@ private fun EditMusicDrawer(
     var showRemoveCoverConfirm by remember { mutableStateOf(false) }
     val coverScope = rememberCoroutineScope()
 
-    // wallpaper gibi metin tercihleri kadar kalıcı olmalı, sadece seçilen content:
-
     var coverCropOutputUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
     val coverCropLauncher = rememberLauncherForActivityResult(
@@ -785,7 +777,7 @@ private fun EmptyState() {
         Text(
             text = strings.noSongsToPlay,
             style = MiuixAppTheme.typography.titleLarge,
-            color = wallpaperAdaptiveTextColor(),
+            color = MiuixAppTheme.colorScheme.onBackground,
             modifier = Modifier.padding(top = 16.dp)
         )
         Text(

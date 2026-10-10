@@ -39,7 +39,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -58,10 +57,8 @@ import androidx.compose.material.icons.filled.Pin
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.QueueMusic
-import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -72,8 +69,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -89,21 +84,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import coil.compose.AsyncImage
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.m3.BaseWidget
-import dev.shephard.player.ui.components.m3.LineageGridMediaItem
-import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.components.m3.LineageNoElements
 import dev.shephard.player.ui.components.m3.LineageSortingChip
 import dev.shephard.player.ui.components.m3.SegmentedColumn
-import dev.shephard.player.ui.glass.LocalWallpaperEnabled
-import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
-import dev.shephard.player.ui.navigation.PageTransitions
 import dev.shephard.player.ui.navigation.SubmenuNavGuard
 import dev.shephard.player.ui.screens.LocalPlaylist
 import dev.shephard.player.ui.screens.encodePlaylists
@@ -378,7 +367,7 @@ fun PlaylistScreenM3(
             if (idx == null) {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+                    containerColor = MaterialTheme.colorScheme.surface,
                     topBar = {
                         M3SmallTopBar(
                             title = { Text(strings.playlists) },
@@ -558,23 +547,7 @@ fun PlaylistScreenM3(
                 Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
                     Text(pl.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                     SegmentedColumn {
-                        item {
-                            BaseWidget(icon = Icons.Filled.PlayArrow, title = strings.play, onClick = {
-                                playlistMenuIndex = null
-                                val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
-                                if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name)
-                            })
-                        }
-                        item {
-                            BaseWidget(icon = Icons.Filled.Shuffle, title = strings.remix, onClick = {
-                                playlistMenuIndex = null
-                                val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
-                                if (plTracks.isNotEmpty()) {
-                                    if (pl.isSystem) onPlaylistRemixClick(plTracks.shuffled(), strings.likedSongs)
-                                    else onPlaylistRemixClick(plTracks.shuffled(), pl.name)
-                                }
-                            })
-                        }
+                        // Play / Remix live on the row itself (Play button) and the detail page.
                         if (!pl.isSystem) {
                             item {
                                 BaseWidget(icon = Icons.Filled.Edit, title = strings.editPlaylist, onClick = {
@@ -667,8 +640,11 @@ private fun PlaylistRowM3(
             IconButton(onClick = onPlay, enabled = plTracks.isNotEmpty()) {
                 Icon(Icons.Filled.PlayArrow, contentDescription = strings.play, tint = MaterialTheme.colorScheme.primary)
             }
-            IconButton(onClick = onMore) {
-                Icon(Icons.Filled.MoreVert, contentDescription = strings.menu, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            // The menu only holds edit / pin / delete, none of which apply to system playlists.
+            if (!playlist.isSystem) {
+                IconButton(onClick = onMore) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = strings.menu, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }
@@ -707,17 +683,19 @@ private fun PlaylistGridCardM3(
                     Icon(Icons.Filled.QueueMusic, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(48.dp))
                 }
             )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(4.dp)
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.35f))
-                    .clickable(onClick = onMore),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Filled.MoreVert, contentDescription = strings.menu, tint = Color.White, modifier = Modifier.size(18.dp))
+            if (!playlist.isSystem) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .clickable(onClick = onMore),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = strings.menu, tint = Color.White, modifier = Modifier.size(18.dp))
+                }
             }
             Box(
                 modifier = Modifier

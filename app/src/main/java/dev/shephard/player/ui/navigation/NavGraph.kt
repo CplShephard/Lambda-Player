@@ -44,7 +44,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -72,13 +71,9 @@ import dev.shephard.player.ui.components.M3MiniPlayer
 import dev.shephard.player.ui.glass.FloatingBottomBar
 import dev.shephard.player.ui.glass.FloatingBottomBarDefaults
 import dev.shephard.player.ui.glass.FloatingBottomBarMode
-import dev.shephard.player.ui.glass.LocalAppBackdrop
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.LocalContentBackdrop
-import dev.shephard.player.ui.glass.NoWallpaperScope
 import dev.shephard.player.ui.glass.isLiquidGlassSupported
-import dev.shephard.player.ui.glass.rememberCombinedBackdrop
-import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.screens.AboutSettingsScreen
@@ -107,7 +102,6 @@ import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
@@ -337,49 +331,37 @@ fun NavGraph(
             }
             entry<ThemeRoute>(swipeDismiss = swipeBackDirection) {
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
-                    // Submenus never show the wallpaper (main pages only).
-                    NoWallpaperScope(useMiuix) {
-                        if (useMiuix) {
-                            ThemeSettingsScreen(onBack = ::pop)
-                        } else {
-                            ThemeSettingsScreenM3(onBack = ::pop)
-                        }
+                    if (useMiuix) {
+                        ThemeSettingsScreen(onBack = ::pop)
+                    } else {
+                        ThemeSettingsScreenM3(onBack = ::pop)
                     }
                 }
             }
             entry<PlayerRoute>(swipeDismiss = swipeBackDirection) {
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
-                    // Submenus never show the wallpaper (main pages only).
-                    NoWallpaperScope(useMiuix) {
-                        if (useMiuix) {
-                            PlayerSettingsScreen(onBack = ::pop)
-                        } else {
-                            PlayerSettingsScreenM3(onBack = ::pop)
-                        }
+                    if (useMiuix) {
+                        PlayerSettingsScreen(onBack = ::pop)
+                    } else {
+                        PlayerSettingsScreenM3(onBack = ::pop)
                     }
                 }
             }
             entry<AboutRoute>(swipeDismiss = swipeBackDirection) {
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
-                    // Submenus never show the wallpaper (main pages only).
-                    NoWallpaperScope(useMiuix) {
-                        if (useMiuix) {
-                            AboutSettingsScreen(onBack = ::pop)
-                        } else {
-                            AboutSettingsScreenM3(onBack = ::pop)
-                        }
+                    if (useMiuix) {
+                        AboutSettingsScreen(onBack = ::pop)
+                    } else {
+                        AboutSettingsScreenM3(onBack = ::pop)
                     }
                 }
             }
             entry<StatsRoute>(swipeDismiss = swipeBackDirection) {
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
-                    // Submenus never show the wallpaper (main pages only).
-                    NoWallpaperScope(useMiuix) {
-                        if (useMiuix) {
-                            StatsScreen(playerViewModel = playerViewModel, onBack = ::pop)
-                        } else {
-                            StatsScreenM3(playerViewModel = playerViewModel, onBack = ::pop)
-                        }
+                    if (useMiuix) {
+                        StatsScreen(playerViewModel = playerViewModel, onBack = ::pop)
+                    } else {
+                        StatsScreenM3(playerViewModel = playerViewModel, onBack = ::pop)
                     }
                 }
             }
@@ -532,12 +514,8 @@ private fun AppleFloatingDock(
     onSelected: (Int) -> Unit,
 ) {
     val blurOn = LocalBlurEnabled.current
-    val wallpaperBackdrop = LocalAppBackdrop.current
     val contentBackdrop = LocalContentBackdrop.current
     val effectiveBackdrop: top.yukonga.miuix.kmp.blur.Backdrop = when {
-        wallpaperBackdrop != null && contentBackdrop != null ->
-            rememberCombinedBackdrop(wallpaperBackdrop, contentBackdrop)
-        wallpaperBackdrop != null -> wallpaperBackdrop
         contentBackdrop != null -> contentBackdrop
         else -> rememberLayerBackdrop()
     }
@@ -547,10 +525,8 @@ private fun AppleFloatingDock(
         else -> FloatingBottomBarMode.None
     }
     val strings = LocalStrings.current
-    val contentColor = wallpaperAdaptiveTextColor(
-        fallback = if (useMiuix) MiuixAppTheme.colorScheme.onSurface
-        else MaterialTheme.colorScheme.onSurface
-    )
+    val contentColor = if (useMiuix) MiuixAppTheme.colorScheme.onSurface
+    else MaterialTheme.colorScheme.onSurface
     val barColors = if (useMiuix) {
         FloatingBottomBarDefaults.colors(contentColor = contentColor)
     } else {
