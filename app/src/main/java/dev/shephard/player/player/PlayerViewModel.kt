@@ -1021,30 +1021,39 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         _lyricsSyncOffsetMs.value = 0
         lyricsLoadJob = viewModelScope.launch {
-            val mode = prefs.lyricsAutoSearchMode.first()
+            // This coroutine is not wrapped by anything else. An uncaught exception here (bad
+            // lyrics text, network or parser surprise) would crash the whole app, so any failure
+            // is contained: the lyrics are cleared and the player keeps running.
+            try {
+                val mode = prefs.lyricsAutoSearchMode.first()
 
-            // A lyrics result the user chose manually always wins.
-            val saved = withContext(Dispatchers.IO) { loadSavedLyrics(track.id) }
-            if (saved != null) {
-                applyLyricsDocument(track, saved)
-                return@launch
-            }
-
-            val embedded = withContext(Dispatchers.IO) { loadEmbeddedLyricsDocument(track) }
-            val hasEmbedded = embedded != null && embedded.lines.isNotEmpty()
-            when (mode) {
-                LyricsAutoSearchMode.OFF,
-                LyricsAutoSearchMode.ONLINE_FIRST -> applyLyricsDocument(track, embedded)
-
-                LyricsAutoSearchMode.EMBEDDED_FIRST -> {
-                    if (hasEmbedded) {
-                        applyLyricsDocument(track, embedded)
-                    } else {
-                        autoSearchLyricsAndApply(track, fallback = null)
-                    }
+                // A lyrics result the user chose manually always wins.
+                val saved = withContext(Dispatchers.IO) { loadSavedLyrics(track.id) }
+                if (saved != null) {
+                    applyLyricsDocument(track, saved)
+                    return@launch
                 }
 
-                LyricsAutoSearchMode.BEST_MATCH -> autoSearchLyricsAndApply(track, fallback = embedded)
+                val embedded = withContext(Dispatchers.IO) { loadEmbeddedLyricsDocument(track) }
+                val hasEmbedded = embedded != null && embedded.lines.isNotEmpty()
+                when (mode) {
+                    LyricsAutoSearchMode.OFF,
+                    LyricsAutoSearchMode.ONLINE_FIRST -> applyLyricsDocument(track, embedded)
+
+                    LyricsAutoSearchMode.EMBEDDED_FIRST -> {
+                        if (hasEmbedded) {
+                            applyLyricsDocument(track, embedded)
+                        } else {
+                            autoSearchLyricsAndApply(track, fallback = null)
+                        }
+                    }
+
+                    LyricsAutoSearchMode.BEST_MATCH -> autoSearchLyricsAndApply(track, fallback = embedded)
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                runCatching { applyLyricsDocument(track, null) }
             }
         }
     }
