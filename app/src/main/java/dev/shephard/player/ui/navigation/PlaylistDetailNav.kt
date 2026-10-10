@@ -23,7 +23,6 @@ import top.yukonga.miuix.kmp.nav.core.NavCornerClipMode
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
 import top.yukonga.miuix.kmp.nav.core.NavKey
-import top.yukonga.miuix.kmp.nav.core.entryProvider
 import top.yukonga.miuix.kmp.nav.transition.NavTransition
 
 /**
@@ -38,8 +37,8 @@ class SubmenuNavConfig(
 
 val LocalSubmenuNavConfig = staticCompositionLocalOf<SubmenuNavConfig?> { null }
 
-private object PlaylistListRoute : NavKey
-private object PlaylistDetailRoute : NavKey
+private data object PlaylistListRoute : NavKey
+private data object PlaylistDetailRoute : NavKey
 
 /**
  * Hosts a playlist list page plus its detail inside a local NavDisplay, so the detail is a real
@@ -108,24 +107,6 @@ fun PlaylistDetailNavHost(
         currentOnClosed()
     }
 
-    val entryProvider = remember(backStack, animation) {
-        entryProvider {
-            entry<PlaylistListRoute> {
-                currentContent(null)
-            }
-            entry<PlaylistDetailRoute> {
-                // NONE: no predictive preview, the entry takes the gesture itself (same as NavGraph submenus).
-                NavEntryBackHandler(
-                    interceptPredictiveBack = animation == PredictiveBackAnimation.NONE && backStack.size > 1,
-                    onBack = ::popDetail,
-                ) {
-                    currentContent(detailIndex)
-                }
-            }
-        }
-    }
-
-    // The bottom stack (global mini + dock) is hidden while a detail is on the stack.
     val detailActive = backStack.size > 1
     val detailOpen = LocalPlaylistDetailOpen.current
     SideEffect { detailOpen.value = detailActive }
@@ -134,11 +115,23 @@ fun PlaylistDetailNavHost(
     }
 
     NavDisplay(
-        backStack,
-        entryProvider,
-        modifier,
-        ::popDetail,
-        transition,
-        effects,
-    )
+        backStack = backStack,
+        modifier = modifier,
+        onBack = ::popDetail,
+        transition = transition,
+        effects = effects,
+    ) {
+        entry<PlaylistListRoute> {
+            currentContent(null)
+        }
+        entry<PlaylistDetailRoute> {
+            // NONE: no predictive preview; the entry takes the gesture itself (same as NavGraph's entries).
+            NavEntryBackHandler(
+                interceptPredictiveBack = animation == PredictiveBackAnimation.NONE && backStack.size > 1,
+                onBack = ::popDetail,
+            ) {
+                currentContent(detailIndex)
+            }
+        }
+    }
 }

@@ -100,7 +100,7 @@ import top.yukonga.miuix.kmp.nav.core.NavCornerClipMode
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
 import top.yukonga.miuix.kmp.nav.core.NavKey
-import top.yukonga.miuix.kmp.nav.core.entryProvider
+import top.yukonga.miuix.kmp.nav.core.NavEntryBuilder
 import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -115,11 +115,11 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
 
-object MainRoute : NavKey
-object ThemeRoute : NavKey
-object PlayerRoute : NavKey
-object AboutRoute : NavKey
-object StatsRoute : NavKey
+data object MainRoute : NavKey
+data object ThemeRoute : NavKey
+data object PlayerRoute : NavKey
+data object AboutRoute : NavKey
+data object StatsRoute : NavKey
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -201,8 +201,9 @@ fun NavGraph(
             modifier = detailModifier
         )
     }
-    val entryProvider = remember(backStack, useMiuix, swipeBackDirection, interceptPredictiveBack) {
-        entryProvider {
+    // DSL block for NavDisplay (the public overload). entryProvider() itself is internal in miuix-nav.
+    val entryContent = remember(backStack, useMiuix, swipeBackDirection, interceptPredictiveBack) {
+        val block: NavEntryBuilder.() -> Unit = {
             entry<MainRoute> {
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
                     Box(modifier = Modifier.fillMaxSize()) {
@@ -372,6 +373,7 @@ fun NavGraph(
                 }
             }
         }
+        block
     }
 
     val submenuNavConfig = remember(predictiveBackAnimation, transition, effects) {
@@ -386,12 +388,12 @@ fun NavGraph(
         Box(modifier = modifier) {
             key(useMiuix) {
                 NavDisplay(
-                    backStack,
-                    entryProvider,
-                    Modifier.fillMaxSize(),
-                    ::pop,
-                    transition,
-                    effects,
+                    backStack = backStack,
+                    modifier = Modifier.fillMaxSize(),
+                    onBack = ::pop,
+                    transition = transition,
+                    effects = effects,
+                    content = entryContent,
                 )
             }
         }
@@ -588,9 +590,7 @@ private fun AppleFloatingDock(
                 dev.shephard.player.ui.miuix.Text(
                     text = labelOf(dest),
                     fontSize = 11.sp,
-                    lineHeight = 14.sp,
                     maxLines = 1,
-                    softWrap = false,
                     overflow = TextOverflow.Visible,
                 )
             } else {

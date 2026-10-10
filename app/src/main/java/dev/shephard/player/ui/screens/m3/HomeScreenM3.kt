@@ -168,10 +168,6 @@ fun HomeScreenM3(
                             scope.launch { prefs.setPlaylistsJson(encodePlaylists(next)) }
                         }
                     },
-                    onAddTracks = {},
-                    onPickCover = {},
-                    onRename = {},
-                    onDelete = {},
                 )
             } else {
                 Scaffold(

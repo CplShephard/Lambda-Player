@@ -174,7 +174,7 @@ private fun M3MiniWavyProgress(
         trackColor = trackColor,
         stroke = stroke,
         trackStroke = stroke,
-        gapSize = 2f * 6f * (1f + 0.1573f * waveAmplitude * waveAmplitude),
+        gapSize = (12f * (1f + 0.1573f * waveAmplitude * waveAmplitude)).dp,
         stopSize = 3.dp,
         amplitude = { p -> if (p > 0f) waveAmplitude else 0f },
         wavelength = WavyProgressIndicatorDefaults.LinearDeterminateWavelength,
