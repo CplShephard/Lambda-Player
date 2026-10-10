@@ -35,6 +35,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.layout.BottomSheetDefaults
+import top.yukonga.miuix.kmp.nav.gesture.WindowNavigationEventBridge
 import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
@@ -74,7 +75,12 @@ fun MiuixDrawer(
         enableNestedScroll = enableNestedScroll,
         onDismissRequest = { if (allowDismiss) visible = false },
         onDismissFinished = { currentOnDismissRequest() },
-        content = content,
+        content = {
+            // The sheet is a separate Android window: forward its predictive back gesture to the
+            // dispatcher the miuix sheet's back handler is registered on (see MiuixSpinnerRow).
+            WindowNavigationEventBridge()
+            content()
+        },
     )
 }
 

@@ -51,6 +51,7 @@ import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 import dev.shephard.player.ui.util.TrackOverlayForBack
+import top.yukonga.miuix.kmp.nav.gesture.WindowNavigationEventBridge
 
 @RequiresOptIn(level = RequiresOptIn.Level.WARNING)
 annotation class ExperimentalMaterial3Api
@@ -431,6 +432,8 @@ fun MiuixDeleteConfirmationDialog(
         onDismissRequest = onDismiss,
         title = title,
         content = {
+            // Separate Android window: forward its predictive back gesture (see MiuixSpinnerRow).
+            WindowNavigationEventBridge()
             Column {
                 Text(
                     text = message,
@@ -499,6 +502,8 @@ fun MiuixDialog(
         },
         title = title,
         content = {
+            // Separate Android window: forward its predictive back gesture (see MiuixSpinnerRow).
+            WindowNavigationEventBridge()
             Column {
                 Box(modifier = Modifier.padding(top = 12.dp)) {
                     text()

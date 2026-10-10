@@ -21,32 +21,18 @@ enum class PredictiveBackAnimation(val value: String, val displayName: String) {
 }
 
 /**
- * Which edge the AOSP predictive pop travels towards.
+ * Which edge the predictive pop travels towards.
  *
- * MIUIX always pops towards the right, so it does not expose this setting and
- * [effectiveExitDirection] pins it to [ALWAYS_RIGHT] regardless of what was
- * last stored for another style.
+ * There is no user-facing picker for this any more: MIUIX always pops towards the right and
+ * every other style follows the gesture. See [effectiveExitDirection].
  */
-enum class PredictiveBackExitDirection(val value: String, val displayName: String) {
-    FOLLOW_GESTURE("follow_gesture", "Follow Gesture"),
-    ALWAYS_RIGHT("always_right", "Always Right"),
-    ALWAYS_LEFT("always_left", "Always Left"),
-    ;
-
-    companion object {
-        fun fromValueOrDefault(value: String) = entries.find { it.value == value } ?: FOLLOW_GESTURE
-    }
+enum class PredictiveBackExitDirection {
+    FOLLOW_GESTURE,
+    ALWAYS_RIGHT,
 }
 
-/**
- * Exit direction that actually applies for [animation]. Selecting MIUIX forces
- * [PredictiveBackExitDirection.ALWAYS_RIGHT]; the stored preference is only
- * honoured by styles that expose the option.
- */
-fun effectiveExitDirection(
-    animation: PredictiveBackAnimation,
-    stored: PredictiveBackExitDirection,
-): PredictiveBackExitDirection = when (animation) {
+/** Exit direction for [animation]: MIUIX always exits to the right, the rest follow the gesture. */
+fun effectiveExitDirection(animation: PredictiveBackAnimation): PredictiveBackExitDirection = when (animation) {
     PredictiveBackAnimation.MIUIX -> PredictiveBackExitDirection.ALWAYS_RIGHT
-    else -> stored
+    else -> PredictiveBackExitDirection.FOLLOW_GESTURE
 }

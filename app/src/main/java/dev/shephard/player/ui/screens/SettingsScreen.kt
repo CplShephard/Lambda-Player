@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -104,14 +105,11 @@ import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
 import dev.shephard.player.theme.PaletteStyle
 import dev.shephard.player.theme.PredictiveBackAnimation
-import dev.shephard.player.theme.PredictiveBackExitDirection
 import dev.shephard.player.theme.ThemeColorSpec
-import dev.shephard.player.ui.components.MiuixDrawer
 import dev.shephard.player.ui.components.captureForTopBarBlur
 import dev.shephard.player.ui.components.m3.ColorSwatchPreview
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
-import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.glass.bgeffect.BgEffectBackground
 import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.AllLanguages
@@ -227,9 +225,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
     val playlistsLayout by prefs.playlistsLayout.collectAsState(initial = LayoutMode.LIST)
     val predictiveBack by prefs.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
-    val predictiveBackDirection by prefs.predictiveBackExitDirection.collectAsState(initial = PredictiveBackExitDirection.FOLLOW_GESTURE)
 
-    var langMenuOpen by remember { mutableStateOf(false) }
     var wallpaperBrightnessValue by remember { mutableFloatStateOf(PreferencesManager.cachedWallpaperBrightness) }
     LaunchedEffect(wallpaperBrightness) {
         wallpaperBrightnessValue = wallpaperBrightness
@@ -433,7 +429,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             text = strings.layout,
             insideMargin = PaddingValues(16.dp, 8.dp),
         )
-        SectionCard {
+        SectionCard(contentPadding = PaddingValues(0.dp)) {
             val layoutModes = listOf(LayoutMode.LIST, LayoutMode.GRID)
             val layoutLabels = listOf(strings.list, strings.grid)
             MiuixSpinnerRow(
@@ -681,7 +677,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 text = strings.predictiveBackTitle,
                 insideMargin = PaddingValues(16.dp, 8.dp),
             )
-            SectionCard {
+            SectionCard(contentPadding = PaddingValues(0.dp)) {
                 val predictiveBackOptions = listOf(
                     PredictiveBackAnimation.NONE to strings.predictiveBackNone,
                     PredictiveBackAnimation.AOSP to strings.predictiveBackAosp,
@@ -702,100 +698,30 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                         }
                     }
                 )
-                AnimatedVisibility(
-                    visible = predictiveBack == PredictiveBackAnimation.AOSP || predictiveBack == PredictiveBackAnimation.SCALE,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically(),
-                ) {
-                    Column {
-                        Spacer(Modifier.height(8.dp))
-                        val predictiveDirectionOptions = listOf(
-                            PredictiveBackExitDirection.FOLLOW_GESTURE to strings.predictiveBackFollowGesture,
-                            PredictiveBackExitDirection.ALWAYS_RIGHT to strings.predictiveBackAlwaysRight,
-                            PredictiveBackExitDirection.ALWAYS_LEFT to strings.predictiveBackAlwaysLeft,
-                        )
-                        val predictiveDirectionIndex = predictiveDirectionOptions
-                            .indexOfFirst { it.first == predictiveBackDirection }.coerceAtLeast(0)
-                        MiuixSpinnerRow(
-                            title = strings.predictiveBackExitDirectionTitle,
-                            summary = strings.predictiveBackExitDirectionDescription,
-                            items = predictiveDirectionOptions.map { it.second },
-                            selectedIndex = predictiveDirectionIndex,
-                            onSelectedIndexChange = { index ->
-                                val newDirection = predictiveDirectionOptions[index].first
-                                if (newDirection != predictiveBackDirection) {
-                                    scope.launch { prefs.setPredictiveBackExitDirection(newDirection) }
-                                }
-                            }
-                        )
-                    }
-                }
             }
         }
 
-        SectionCard {
-            Text(strings.language, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
-            Spacer(Modifier.height(8.dp))
-            SettingsActionRow(
-                icon = Icons.Filled.ArrowDropDown,
-                title = AllLanguages.firstOrNull { it.code == language }?.displayName ?: language,
-                onClick = { langMenuOpen = true }
+        // Language uses the same library spinner (and library padding) as every other switcher.
+        SmallTitle(
+            text = strings.language,
+            insideMargin = PaddingValues(16.dp, 8.dp),
+        )
+        SectionCard(contentPadding = PaddingValues(0.dp)) {
+            val languageIndex = AllLanguages.indexOfFirst { it.code == language }.coerceAtLeast(0)
+            MiuixSpinnerRow(
+                title = strings.language,
+                items = AllLanguages.map { it.displayName },
+                selectedIndex = languageIndex,
+                onSelectedIndexChange = { index ->
+                    val code = AllLanguages[index].code
+                    if (code != language) {
+                        scope.launch { prefs.setLanguage(code) }
+                    }
+                }
             )
         }
 
         Spacer(Modifier.height(110.dp))
-    }
-
-    if (langMenuOpen) {
-        MiuixDrawer(
-            onDismissRequest = { langMenuOpen = false },
-        ) {
-            val dismissDrawer = rememberDrawerDismiss()
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.72f)
-                    .padding(20.dp)
-            ) {
-                Text(strings.language, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(12.dp))
-                LazyColumn(
-                    modifier = Modifier.weight(1f).overScrollVertical(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(AllLanguages) { lang ->
-                        val selected = lang.code == language
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(
-                                    if (selected) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f)
-                                    else MiuixAppTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.58f)
-                                )
-                                .miuixWidgetClick(pressScale = 0.97f, maxTiltDegrees = 3f) {
-                                    scope.launch { prefs.setLanguage(lang.code) }
-                                    dismissDrawer()
-                                }
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = lang.displayName,
-                                color = if (selected) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onBackground,
-                                style = MiuixAppTheme.typography.bodyLarge,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-                            )
-                            if (selected) {
-                                Icon(Icons.Filled.KeyboardArrowRight, contentDescription = null, tint = MiuixAppTheme.colorScheme.primary)
-                            }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-            }
-        }
     }
 
     if (showRemoveWallpaperConfirm) {
@@ -827,12 +753,17 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
     val volumeNormalization by prefs.volumeNormalization.collectAsState(initial = VolumeNormalization.NONE)
 
     SettingsPageScaffold(title = strings.playbackSettings, onBack = onBack) {
-        SectionCard {
-            Text(strings.playbackSettings, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
+        SmallTitle(
+            text = strings.playbackSettings,
+            insideMargin = PaddingValues(16.dp, 8.dp),
+        )
+        SectionCard(contentPadding = PaddingValues(0.dp)) {
+            MiuixSwitchRow(label = strings.crossfade, checked = crossfade) { scope.launch { prefs.setCrossfadeEnabled(it) } }
             Spacer(Modifier.height(8.dp))
-            ToggleRow(label = strings.crossfade, checked = crossfade) { scope.launch { prefs.setCrossfadeEnabled(it) } }
-            ToggleRow(label = strings.gapless, checked = gapless) { scope.launch { prefs.setGaplessEnabled(it) } }
-            ToggleRow(label = strings.playWithOthers, checked = playWith) { scope.launch { prefs.setPlayWithOthers(it) } }
+            MiuixSwitchRow(label = strings.gapless, checked = gapless) { scope.launch { prefs.setGaplessEnabled(it) } }
+            Spacer(Modifier.height(8.dp))
+            MiuixSwitchRow(label = strings.playWithOthers, checked = playWith) { scope.launch { prefs.setPlayWithOthers(it) } }
+            Spacer(Modifier.height(8.dp))
             val lyricsModes = LyricsAutoSearchMode.entries
             MiuixSpinnerRow(
                 title = strings.lyricsAutoSearchTitle,
@@ -841,6 +772,7 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
                 selectedIndex = lyricsModes.indexOf(lyricsAutoSearch),
                 onSelectedIndexChange = { idx -> scope.launch { prefs.setLyricsAutoSearchMode(lyricsModes[idx]) } }
             )
+            Spacer(Modifier.height(8.dp))
             val normalizationModes = VolumeNormalization.entries
             MiuixSpinnerRow(
                 title = strings.volumeNormalizationTitle,
@@ -864,6 +796,8 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
         catch (_: PackageManager.NameNotFoundException) { "" }
     }
 
+    var showLicenses by remember { mutableStateOf(false) }
+    if (showLicenses) MiuixLicensesDialog(onDismiss = { showLicenses = false })
     val density = LocalDensity.current
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val appBarHeight = 56.dp
@@ -1006,9 +940,9 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                             onClick = { uriHandler.openUri("https://github.com/CplShephard/Lambda-Player") }
                         )
                         ArrowPreference(
-                            title = "Miuix",
-                            summary = strings.miuixDescription,
-                            onClick = { uriHandler.openUri("https://github.com/miuix-project/miuix") }
+                            title = strings.licensesTitle,
+                            summary = strings.licensesSummary,
+                            onClick = { showLicenses = true }
                         )
                     }
                     Spacer(Modifier.height(110.dp))
@@ -1143,27 +1077,6 @@ private fun SettingsNavigationCard(
 }
 
 @Composable
-private fun SettingsActionRow(
-    icon: ImageVector,
-    title: String,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(MiuixAppTheme.colorScheme.background.copy(alpha = 0.72f))
-            .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Icon(icon, contentDescription = null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-        Text(title, color = MiuixAppTheme.colorScheme.onBackground, style = MiuixAppTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
 private fun TotalListeningTimeCard(playerViewModel: PlayerViewModel, onClick: () -> Unit) {
     val strings = LocalStrings.current
     val totalMs by playerViewModel.totalListeningMsLive.collectAsState()
@@ -1202,40 +1115,6 @@ private fun SectionCard(
 
 private typealias ColumnScope = androidx.compose.foundation.layout.ColumnScope
 
-@Composable
-private fun ToggleRow(label: String, checked: Boolean, description: String? = null, onChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(end = 16.dp)
-        ) {
-            Text(
-                text = label,
-                color = MiuixAppTheme.colorScheme.onBackground,
-                style = MiuixAppTheme.typography.bodyLarge
-            )
-            if (description != null) {
-                Text(
-                    text = description,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                    style = MiuixAppTheme.typography.bodySmall
-                )
-            }
-        }
-        Switch(
-            checked = checked,
-            onCheckedChange = onChange,
-            colors = SwitchDefaults.colors()
-        )
-    }
-}
-
 /**
  * Miuix switch row as in InstallerX (SwitchPreference: title, optional summary, library padding).
  * Used inside cards that have zero content padding, so the row sits at the same inset as InstallerX.
@@ -1249,33 +1128,6 @@ private fun MiuixSwitchRow(label: String, checked: Boolean, description: String?
         summary = description,
     )
 }
-
-@Composable
-internal fun MiuixSpinnerRow(
-    title: String,
-    summary: String? = null,
-    items: List<String>,
-    selectedIndex: Int,
-    onSelectedIndexChange: (Int) -> Unit
-) {
-    // InstallerX style: use WindowSpinnerPreference popup instead of drawer
-    // This shows a small anchored popup, not a full bottom drawer
-    val dropdownItems = remember(items) {
-        items.map { top.yukonga.miuix.kmp.basic.DropdownItem(title = it) }
-    }
-    // Use WindowSpinnerPreference from miuix-preference
-    // Same pressed highlight as the toggle rows (MiuixSwitchRow): no extra corner clip, so the
-    // highlight uses the library's default shape instead of the 30dp device-corner clip.
-    top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
-        title = title,
-        summary = summary,
-        items = dropdownItems,
-        selectedIndex = selectedIndex,
-        onSelectedIndexChange = onSelectedIndexChange,
-        modifier = Modifier.fillMaxWidth()
-    )
-}
-
 
 private fun formatListeningTime(
     ms: Long,
@@ -1292,5 +1144,50 @@ private fun formatListeningTime(
     ) else "%d%s %02d%s".format(
         m, strings.minuteShort,
         s, strings.secondShort
+    )
+}
+
+@Composable
+private fun MiuixLicensesDialog(onDismiss: () -> Unit) {
+    val strings = LocalStrings.current
+    val uriHandler = LocalUriHandler.current
+    dev.shephard.player.ui.miuix.MiuixDialog(
+        onDismissRequest = onDismiss,
+        title = strings.licensesTitle,
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                AppLicenses.forEach { entry ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { uriHandler.openUri(entry.url) }
+                            .padding(vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = entry.name,
+                            color = MiuixAppTheme.colorScheme.onBackground,
+                            style = MiuixAppTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = "${entry.license} \u00B7 ${entry.author}",
+                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                            style = MiuixAppTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        },
+        buttons = {
+            top.yukonga.miuix.kmp.basic.TextButton(
+                text = strings.close,
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     )
 }

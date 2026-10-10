@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -32,10 +34,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.twotone.LinearScale
+import androidx.compose.material.icons.twotone.SpeakerGroup
+import androidx.compose.material.icons.twotone.SwapHoriz
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,6 +53,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -73,6 +83,9 @@ import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.m3.LineageListItem
 import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.components.m3.LineageSectionHeader
+import dev.shephard.player.ui.components.m3.SegmentedColumn
+import dev.shephard.player.ui.components.m3.SwitchWidget
+import dev.shephard.player.ui.screens.AppLicenses
 import androidx.compose.ui.graphics.Color
 import dev.shephard.player.ui.glass.LocalWallpaperEnabled
 import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
@@ -202,73 +215,60 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding() + 4.dp, bottom = padding.calculateBottomPadding())
+            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 80.dp)
         ) {
-            item { LineageSectionHeader(title = strings.playbackSettings) }
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = m3ItemCardColors()
-                ) {
-                    LineageListItem(
-                        headline = strings.crossfade,
-                        trailingContent = {
-                            androidx.compose.material3.Switch(checked = crossfade, onCheckedChange = { scope.launch { prefs.setCrossfadeEnabled(it) } })
-                        }
-                    )
+                SegmentedColumn(title = strings.playbackSettings) {
+                    item {
+                        SwitchWidget(
+                            icon = Icons.TwoTone.SwapHoriz,
+                            title = strings.crossfade,
+                            checked = crossfade,
+                            onCheckedChange = { scope.launch { prefs.setCrossfadeEnabled(it) } }
+                        )
+                    }
+                    item {
+                        SwitchWidget(
+                            icon = Icons.TwoTone.LinearScale,
+                            title = strings.gapless,
+                            checked = gapless,
+                            onCheckedChange = { scope.launch { prefs.setGaplessEnabled(it) } }
+                        )
+                    }
+                    item {
+                        val lyricsModes = LyricsAutoSearchMode.entries
+                        DropDownMenuWidget(
+                            icon = Icons.Filled.Subtitles,
+                            title = strings.lyricsAutoSearchTitle,
+                            description = strings.lyricsAutoSearchDescription,
+                            choice = lyricsModes.indexOf(lyricsAutoSearch),
+                            data = lyricsModes.map { lyricsAutoSearchLabel(it, strings) },
+                            onChoiceChange = { idx -> scope.launch { prefs.setLyricsAutoSearchMode(lyricsModes[idx]) } }
+                        )
+                    }
+                    item {
+                        val normalizationModes = VolumeNormalization.entries
+                        DropDownMenuWidget(
+                            icon = Icons.Filled.GraphicEq,
+                            title = strings.volumeNormalizationTitle,
+                            description = strings.volumeNormalizationDescription,
+                            choice = normalizationModes.indexOf(volumeNormalization),
+                            data = normalizationModes.map { volumeNormalizationLabel(it, strings) },
+                            onChoiceChange = { idx -> scope.launch { prefs.setVolumeNormalization(normalizationModes[idx]) } }
+                        )
+                    }
+                    item {
+                        SwitchWidget(
+                            icon = Icons.TwoTone.SpeakerGroup,
+                            title = strings.playWithOthers,
+                            checked = playWith,
+                            onCheckedChange = { scope.launch { prefs.setPlayWithOthers(it) } }
+                        )
+                    }
                 }
-            }
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = m3ItemCardColors()
-                ) {
-                    LineageListItem(
-                        headline = strings.gapless,
-                        trailingContent = {
-                            androidx.compose.material3.Switch(checked = gapless, onCheckedChange = { scope.launch { prefs.setGaplessEnabled(it) } })
-                        }
-                    )
-                }
-            }
-            item {
-                val lyricsModes = LyricsAutoSearchMode.entries
-                DropDownMenuWidget(
-                    title = strings.lyricsAutoSearchTitle,
-                    description = strings.lyricsAutoSearchDescription,
-                    choice = lyricsModes.indexOf(lyricsAutoSearch),
-                    data = lyricsModes.map { lyricsAutoSearchLabel(it, strings) },
-                    onChoiceChange = { idx -> scope.launch { prefs.setLyricsAutoSearchMode(lyricsModes[idx]) } }
-                )
-            }
-            item {
-                val normalizationModes = VolumeNormalization.entries
-                DropDownMenuWidget(
-                    title = strings.volumeNormalizationTitle,
-                    description = strings.volumeNormalizationDescription,
-                    choice = normalizationModes.indexOf(volumeNormalization),
-                    data = normalizationModes.map { volumeNormalizationLabel(it, strings) },
-                    onChoiceChange = { idx -> scope.launch { prefs.setVolumeNormalization(normalizationModes[idx]) } }
-                )
-            }
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = m3ItemCardColors()
-                ) {
-                    LineageListItem(
-                        headline = strings.playWithOthers,
-                        trailingContent = {
-                            androidx.compose.material3.Switch(checked = playWith, onCheckedChange = { scope.launch { prefs.setPlayWithOthers(it) } })
-                        }
-                    )
-                }
-            }
             }
         }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -277,6 +277,8 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val strings = LocalStrings.current
+    var showLicenses by remember { mutableStateOf(false) }
+    if (showLicenses) LicensesDialogM3(onDismiss = { showLicenses = false })
     val density = LocalDensity.current
     val versionName = remember {
         try { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() } catch (_: Exception) { "" }
@@ -356,7 +358,19 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-            // Miuix removed from M3 about section #3
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = m3ItemCardColors()
+            ) {
+                LineageListItem(
+                    headline = strings.licensesTitle,
+                    supporting = strings.licensesSummary,
+                    leadingContent = { Icon(Icons.Filled.Description, null) },
+                    onClick = { showLicenses = true },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             }
         }
 }
@@ -490,4 +504,32 @@ private fun formatListeningTimeM3Lineage(ms: Long, strings: dev.shephard.player.
         if (m > 0 || h > 0) append("${m}m ")
         append("${s}s")
     }
+}
+
+@Composable
+private fun LicensesDialogM3(onDismiss: () -> Unit) {
+    val strings = LocalStrings.current
+    val uriHandler = LocalUriHandler.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.licensesTitle) },
+        text = {
+            LazyColumn {
+                items(AppLicenses) { entry ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { uriHandler.openUri(entry.url) }
+                            .padding(horizontal = 8.dp, vertical = 10.dp)
+                    ) {
+                        Text(entry.name, style = MaterialTheme.typography.titleSmall)
+                        Text(entry.license, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                        Text(entry.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(strings.close) } },
+    )
 }

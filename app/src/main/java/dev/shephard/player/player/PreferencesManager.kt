@@ -10,7 +10,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.shephard.player.theme.PaletteStyle
 import dev.shephard.player.theme.PredictiveBackAnimation
-import dev.shephard.player.theme.PredictiveBackExitDirection
 import dev.shephard.player.theme.ThemeColorSpec
 import dev.shephard.player.theme.ThemeMode
 import kotlinx.coroutines.flow.Flow
@@ -171,10 +170,6 @@ class PreferencesManager(private val context: Context) {
 
     val predictiveBackAnimation: Flow<PredictiveBackAnimation> = context.dataStore.data.map {
         PredictiveBackAnimation.fromValueOrDefault(it[PrefsKeys.PREDICTIVE_BACK_ANIMATION] ?: "")
-    }
-
-    val predictiveBackExitDirection: Flow<PredictiveBackExitDirection> = context.dataStore.data.map {
-        PredictiveBackExitDirection.fromValueOrDefault(it[PrefsKeys.PREDICTIVE_BACK_EXIT_DIRECTION] ?: "")
     }
 
     val lastMainPage: Flow<Int> = context.dataStore.data.map {
@@ -348,16 +343,9 @@ class PreferencesManager(private val context: Context) {
     suspend fun setPredictiveBackAnimation(animation: PredictiveBackAnimation) {
         context.dataStore.edit {
             it[PrefsKeys.PREDICTIVE_BACK_ANIMATION] = animation.value
-            // MIUIX always exits to the right. Persist that in the same edit so the
-            // stored direction can never linger on a value picked for another style.
-            if (animation == PredictiveBackAnimation.MIUIX) {
-                it[PrefsKeys.PREDICTIVE_BACK_EXIT_DIRECTION] = PredictiveBackExitDirection.ALWAYS_RIGHT.value
-            }
+            // The exit direction picker was removed; drop any value an older version stored.
+            it.remove(PrefsKeys.PREDICTIVE_BACK_EXIT_DIRECTION)
         }
-    }
-
-    suspend fun setPredictiveBackExitDirection(direction: PredictiveBackExitDirection) {
-        context.dataStore.edit { it[PrefsKeys.PREDICTIVE_BACK_EXIT_DIRECTION] = direction.value }
     }
 
     suspend fun setPaletteStyle(style: PaletteStyle) {

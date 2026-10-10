@@ -78,7 +78,6 @@ import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.toPreferenceInt
 import dev.shephard.player.theme.PaletteStyle
 import dev.shephard.player.theme.PredictiveBackAnimation
-import dev.shephard.player.theme.PredictiveBackExitDirection
 import dev.shephard.player.theme.ThemeColorSpec
 import dev.shephard.player.theme.ThemeMode
 import dev.shephard.player.ui.components.m3.ColorSwatchPreview
@@ -108,7 +107,6 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
     val seedColor by prefs.seedColor.collectAsState(initial = PresetColors.first().color.toArgb())
     val blurEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
     val predictiveBack by prefs.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
-    val predictiveBackDirection by prefs.predictiveBackExitDirection.collectAsState(initial = PredictiveBackExitDirection.FOLLOW_GESTURE)
 
     val wallpaper by prefs.wallpaperUri.collectAsState(initial = "")
     val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = PreferencesManager.cachedWallpaperBrightness)
@@ -367,7 +365,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                 }
             }
 
-            // Predictive Back - switcher dropdown #7 + bottom direction switcher (InstallerX Revived)
+            // Predictive Back (InstallerX Revived)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 item {
                     SegmentedColumn(title = strings.predictiveBackTitle) {
@@ -380,18 +378,6 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                                 data = PredictiveBackAnimation.entries.map { predictiveBackDisplayName(it, strings) },
                                 onChoiceChange = { idx -> scope.launch { prefs.setPredictiveBackAnimation(PredictiveBackAnimation.entries[idx]) } }
                             )
-                        }
-                        item(animatedVisibility = predictiveBack == PredictiveBackAnimation.AOSP || predictiveBack == PredictiveBackAnimation.SCALE) {
-                            Column {
-                                DropDownMenuWidget(
-                                    icon = Icons.Filled.Tune,
-                                    title = strings.predictiveBackExitDirectionTitle,
-                                    description = strings.predictiveBackExitDirectionDescription,
-                                    choice = PredictiveBackExitDirection.entries.indexOf(predictiveBackDirection).coerceAtLeast(0),
-                                    data = PredictiveBackExitDirection.entries.map { predictiveDirectionDisplayName(it, strings) },
-                                    onChoiceChange = { idx -> scope.launch { prefs.setPredictiveBackExitDirection(PredictiveBackExitDirection.entries[idx]) } }
-                                )
-                            }
                         }
                     }
                 }
@@ -433,10 +419,3 @@ private fun predictiveBackDisplayName(animation: PredictiveBackAnimation, string
     PredictiveBackAnimation.CLASSIC -> strings.predictiveBackClassic
     PredictiveBackAnimation.SCALE -> strings.predictiveBackScale
 }
-
-private fun predictiveDirectionDisplayName(direction: PredictiveBackExitDirection, strings: dev.shephard.player.ui.i18n.Strings): String = when (direction) {
-    PredictiveBackExitDirection.FOLLOW_GESTURE -> strings.predictiveBackFollowGesture
-    PredictiveBackExitDirection.ALWAYS_RIGHT -> strings.predictiveBackAlwaysRight
-    PredictiveBackExitDirection.ALWAYS_LEFT -> strings.predictiveBackAlwaysLeft
-}
-

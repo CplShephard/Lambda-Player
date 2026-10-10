@@ -34,11 +34,22 @@ internal fun normalizeForLyricsMatch(text: String): String =
     text.lowercase().filter { it.isLetterOrDigit() }
 
 /**
+ * Removes bracketed extras such as "(Live)", "[Remastered]", "（伴奏）" or "【官方版】" and anything after
+ * " - " so "晴天 (Live)" and "晴天" are treated as the same title.
+ */
+internal fun stripTitleDecorations(title: String): String =
+    title
+        .replace(Regex("[(\\[（【「『][^)\\]）】」』]*[)\\]）】」』]"), " ")
+        .substringBefore(" - ")
+        .trim()
+        .ifEmpty { title }
+
+/**
  * Scores an online lyrics candidate against the local track.
  *  - Duration closeness is the strongest signal (within 2 s: +4, 5 s: +2, 10 s: +0.5, otherwise -4).
  *  - Synced (timestamped) lyrics: +2.
  *  - Artist name match: +3.
- *  - Title match: +2.
+ *  - Title match: +2 (one title containing the other: +1), ignoring "(Live)"-style extras.
  * Returns null when the candidate has no usable lyrics or does not reach [MIN_AUTO_LYRICS_SCORE].
  */
 internal fun scoreLyricsCandidate(candidate: LyricsSearchResult, track: AudioTrack): Double? {
@@ -72,9 +83,14 @@ internal fun scoreLyricsCandidate(candidate: LyricsSearchResult, track: AudioTra
         score += 3.0
     }
 
-    val trackTitle = normalizeForLyricsMatch(track.title)
-    if (trackTitle.isNotEmpty() && trackTitle == normalizeForLyricsMatch(candidate.title)) {
-        score += 2.0
+    val trackTitle = normalizeForLyricsMatch(stripTitleDecorations(track.title))
+    val candidateTitle = normalizeForLyricsMatch(stripTitleDecorations(candidate.title))
+    if (trackTitle.isNotEmpty() && candidateTitle.isNotEmpty()) {
+        if (trackTitle == candidateTitle) {
+            score += 2.0
+        } else if (trackTitle.contains(candidateTitle) || candidateTitle.contains(trackTitle)) {
+            score += 1.0
+        }
     }
 
     return score.takeIf { it >= MIN_AUTO_LYRICS_SCORE }

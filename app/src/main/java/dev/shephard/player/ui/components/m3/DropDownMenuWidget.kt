@@ -23,6 +23,7 @@ import dev.shephard.player.ui.util.TrackOverlayForBack
 @Composable
 fun DropDownMenuWidget(
     icon: ImageVector? = null,
+    iconPlaceholder: Boolean = true,
     title: String,
     description: String? = null,
     enabled: Boolean = true,
@@ -43,6 +44,7 @@ fun DropDownMenuWidget(
 
     BaseWidget(
         icon = icon,
+        iconPlaceholder = iconPlaceholder,
         title = title,
         description = subline,
         enabled = enabled,

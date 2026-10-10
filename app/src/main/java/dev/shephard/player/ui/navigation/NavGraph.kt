@@ -65,7 +65,6 @@ import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.theme.PredictiveBackAnimation
-import dev.shephard.player.theme.PredictiveBackExitDirection
 import dev.shephard.player.theme.effectiveExitDirection
 import dev.shephard.player.ui.animation.predictiveback.installerNavTransition
 import dev.shephard.player.ui.components.MiniPlayer
@@ -76,7 +75,7 @@ import dev.shephard.player.ui.glass.FloatingBottomBarMode
 import dev.shephard.player.ui.glass.LocalAppBackdrop
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.LocalContentBackdrop
-import dev.shephard.player.ui.glass.LocalWallpaperEnabled
+import dev.shephard.player.ui.glass.NoWallpaperScope
 import dev.shephard.player.ui.glass.isLiquidGlassSupported
 import dev.shephard.player.ui.glass.rememberCombinedBackdrop
 import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
@@ -140,11 +139,8 @@ fun NavGraph(
 ) {
     val predictiveBackAnimation by preferences.predictiveBackAnimation
         .collectAsState(initial = PredictiveBackAnimation.MIUIX)
-    val storedExitDirection by preferences.predictiveBackExitDirection
-        .collectAsState(initial = PredictiveBackExitDirection.FOLLOW_GESTURE)
-    // MIUIX always exits to the right; the stored value only matters for styles
-    // that expose the option (AOSP, Scale), so a stale "always left" can never leak in.
-    val predictiveBackExitDirection = effectiveExitDirection(predictiveBackAnimation, storedExitDirection)
+    // MIUIX always exits to the right; every other style follows the gesture.
+    val predictiveBackExitDirection = effectiveExitDirection(predictiveBackAnimation)
 
     // Same wiring as InstallerX Revived: the transition decides how pages move while NavDisplay
     // drives the back gesture. The same transitions are used by both the Material 3 and MIUIX UI.
@@ -341,10 +337,11 @@ fun NavGraph(
             }
             entry<ThemeRoute>(swipeDismiss = swipeBackDirection) {
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
-                    if (useMiuix) {
-                        ThemeSettingsScreen(onBack = ::pop)
-                    } else {
-                        CompositionLocalProvider(LocalWallpaperEnabled provides false) {
+                    // Submenus never show the wallpaper (main pages only).
+                    NoWallpaperScope(useMiuix) {
+                        if (useMiuix) {
+                            ThemeSettingsScreen(onBack = ::pop)
+                        } else {
                             ThemeSettingsScreenM3(onBack = ::pop)
                         }
                     }
@@ -352,10 +349,11 @@ fun NavGraph(
             }
             entry<PlayerRoute>(swipeDismiss = swipeBackDirection) {
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
-                    if (useMiuix) {
-                        PlayerSettingsScreen(onBack = ::pop)
-                    } else {
-                        CompositionLocalProvider(LocalWallpaperEnabled provides false) {
+                    // Submenus never show the wallpaper (main pages only).
+                    NoWallpaperScope(useMiuix) {
+                        if (useMiuix) {
+                            PlayerSettingsScreen(onBack = ::pop)
+                        } else {
                             PlayerSettingsScreenM3(onBack = ::pop)
                         }
                     }
@@ -363,10 +361,11 @@ fun NavGraph(
             }
             entry<AboutRoute>(swipeDismiss = swipeBackDirection) {
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
-                    if (useMiuix) {
-                        AboutSettingsScreen(onBack = ::pop)
-                    } else {
-                        CompositionLocalProvider(LocalWallpaperEnabled provides false) {
+                    // Submenus never show the wallpaper (main pages only).
+                    NoWallpaperScope(useMiuix) {
+                        if (useMiuix) {
+                            AboutSettingsScreen(onBack = ::pop)
+                        } else {
                             AboutSettingsScreenM3(onBack = ::pop)
                         }
                     }
@@ -374,10 +373,11 @@ fun NavGraph(
             }
             entry<StatsRoute>(swipeDismiss = swipeBackDirection) {
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
-                    if (useMiuix) {
-                        StatsScreen(playerViewModel = playerViewModel, onBack = ::pop)
-                    } else {
-                        CompositionLocalProvider(LocalWallpaperEnabled provides false) {
+                    // Submenus never show the wallpaper (main pages only).
+                    NoWallpaperScope(useMiuix) {
+                        if (useMiuix) {
+                            StatsScreen(playerViewModel = playerViewModel, onBack = ::pop)
+                        } else {
                             StatsScreenM3(playerViewModel = playerViewModel, onBack = ::pop)
                         }
                     }

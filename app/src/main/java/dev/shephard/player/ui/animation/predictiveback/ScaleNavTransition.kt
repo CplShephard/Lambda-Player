@@ -113,8 +113,6 @@ private fun exitDirectionSign(
         if (scope.gesture?.swipeEdge == NavSwipeEdge.Left) 1f else -1f
 
     PredictiveBackExitDirection.ALWAYS_RIGHT -> 1f
-
-    PredictiveBackExitDirection.ALWAYS_LEFT -> -1f
 }
 
 private fun gesturePivotY(gesture: NavGesture?, height: Float): Float = if (gesture != null && height > 0f) {

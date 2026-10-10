@@ -35,6 +35,11 @@ import kotlinx.coroutines.withContext
 import kotlin.math.sin
 
 private const val DEFAULT_GLOW_COLOR = -14498466 // ARGB #22C55E
+private const val QQ_USER_AGENT =
+    "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36 LambdaPlayer/2.5"
+
+/** Sentences QQ Music returns instead of lyrics for instrumental tracks. */
+private val QQ_INSTRUMENTAL_MARKERS = listOf("此歌曲为没有填词的纯音乐", "纯音乐，请欣赏", "純音樂，請欣賞")
 
 data class SyncedLyricLine(val timeMs: Long, val text: String)
 
@@ -1091,17 +1096,25 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private suspend fun findBestOnlineLyrics(track: AudioTrack): LyricsSearchResult? {
-        val query = listOf(track.title, track.artist)
-            .map { it.trim() }
-            .filter { it.isNotEmpty() && !it.equals("<unknown>", ignoreCase = true) }
-            .joinToString(" ")
-        if (query.isBlank()) return null
-        val candidates = coroutineScope {
-            val lrclib = async(Dispatchers.IO) { runCatching { searchLrclib(query) }.getOrDefault(emptyList()) }
-            val qqMusic = async { runCatching { searchQqLyrics(query) }.getOrDefault(emptyList()) }
-            lrclib.await() + qqMusic.await()
+        fun usable(value: String) = value.trim().takeIf { it.isNotEmpty() && !it.equals("<unknown>", ignoreCase = true) }
+        val title = usable(track.title)
+        val artist = usable(track.artist)
+        val queries = listOfNotNull(
+            listOfNotNull(title, artist).joinToString(" ").takeIf { it.isNotBlank() },
+            // Second round with the title alone: helps when the artist tag is romanized
+            // ("Jay Chou") or otherwise written differently from the service's catalogue.
+            title?.takeIf { artist != null },
+        )
+        for (query in queries) {
+            val candidates = coroutineScope {
+                val lrclib = async(Dispatchers.IO) { runCatching { searchLrclib(query) }.getOrDefault(emptyList()) }
+                val qqMusic = async { runCatching { searchQqLyrics(query) }.getOrDefault(emptyList()) }
+                lrclib.await() + qqMusic.await()
+            }
+            pickBestLyricsCandidate(candidates, track)?.let { return it }
+            if (_uiState.value.currentTrack?.id != track.id) return null
         }
-        return pickBestLyricsCandidate(candidates, track)
+        return null
     }
 
     /**
@@ -1389,75 +1402,149 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }.awaitAll().filterNotNull()
     }
 
+    /**
+     * QQ Music song search. The old `c.y.qq.com/soso/fcgi-bin/client_search_cp` endpoint now
+     * answers every request with HTTP 500, so QQ Music never returned anything. The search now
+     * goes through the `musicu.fcg` gateway used by the QQ Music apps, with the smartbox
+     * suggestion endpoint as a fallback.
+     */
     private fun searchQqSongCandidates(query: String): List<QqSongCandidate> {
+        val primary = runCatching { searchQqSongsViaMusicu(query) }.getOrDefault(emptyList())
+        if (primary.isNotEmpty()) return primary
+        return runCatching { searchQqSongsViaSmartbox(query) }.getOrDefault(emptyList())
+    }
+
+    private fun searchQqSongsViaMusicu(query: String): List<QqSongCandidate> {
+        val payload = org.json.JSONObject()
+            .put(
+                "comm",
+                org.json.JSONObject()
+                    .put("ct", 11)
+                    .put("cv", "1003006")
+                    .put("v", "1003006")
+                    .put("os_ver", "12")
+                    .put("phonetype", "0")
+                    .put("tmeAppID", "qqmusic")
+                    .put("nettype", "NETWORK_WIFI")
+                    .put("uin", "0")
+            )
+            .put(
+                "req",
+                org.json.JSONObject()
+                    .put("module", "music.search.SearchCgiService")
+                    .put("method", "DoSearchForQQMusicMobile")
+                    .put(
+                        "param",
+                        org.json.JSONObject()
+                            .put("search_type", 0)
+                            .put("query", query)
+                            .put("page_num", 1)
+                            .put("num_per_page", 12)
+                            .put("highlight", 0)
+                            .put("nqc_flag", 0)
+                            .put("multi_zhida", 0)
+                            .put("cat", 2)
+                            .put("grp", 1)
+                            .put("sin", 0)
+                            .put("sem", 0)
+                    )
+            )
+        val connection = (java.net.URL("https://u.y.qq.com/cgi-bin/musicu.fcg").openConnection()
+            as java.net.HttpURLConnection).apply {
+            connectTimeout = 7_000
+            readTimeout = 7_000
+            requestMethod = "POST"
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            setRequestProperty("Accept", "application/json,text/plain,*/*")
+            setRequestProperty("Referer", "https://y.qq.com/")
+            setRequestProperty("User-Agent", QQ_USER_AGENT)
+        }
+        return try {
+            connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+            val responseCode = connection.responseCode
+            if (responseCode !in 200..299) throw java.io.IOException("QQ Music search returned HTTP $responseCode")
+            val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            val songs = org.json.JSONObject(body)
+                .optJSONObject("req")
+                ?.optJSONObject("data")
+                ?.optJSONObject("body")
+                ?.let { it.optJSONArray("item_song") ?: it.optJSONObject("song")?.optJSONArray("list") }
+                ?: return emptyList()
+            buildList {
+                val seen = HashSet<String>()
+                for (index in 0 until songs.length()) {
+                    val item = songs.optJSONObject(index) ?: continue
+                    fun text(obj: org.json.JSONObject?, vararg keys: String): String? = keys.firstNotNullOfOrNull { key ->
+                        obj?.optString(key)?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                    }
+                    val songMid = text(item, "mid", "songmid") ?: continue
+                    if (!seen.add(songMid)) continue
+                    val title = text(item, "name", "title", "songname") ?: continue
+                    val singers = item.optJSONArray("singer")
+                    val artist = if (singers != null) {
+                        (0 until singers.length()).mapNotNull { singerIndex ->
+                            text(singers.optJSONObject(singerIndex), "name", "title")
+                        }.joinToString(" / ")
+                    } else ""
+                    add(
+                        QqSongCandidate(
+                            songMid = songMid,
+                            songId = item.optLong("id", item.optLong("songid")).takeIf { it > 0L },
+                            title = title,
+                            artist = artist,
+                            album = text(item.optJSONObject("album"), "name", "title") ?: "",
+                            durationSeconds = item.optDouble("interval", -1.0).takeIf { it > 0.0 },
+                        )
+                    )
+                }
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    /** Fallback: the search-suggestion endpoint. It returns few songs and no durations. */
+    private fun searchQqSongsViaSmartbox(query: String): List<QqSongCandidate> {
         val params = listOf(
-            "ct" to "24",
-            "qqmusic_ver" to "1298",
-            "new_json" to "1",
-            "remoteplace" to "txt.yqq.song",
-            "t" to "0",
-            "aggr" to "1",
-            "cr" to "1",
-            "catZhida" to "0",
-            "lossless" to "0",
-            "flag_qc" to "0",
-            "p" to "1",
-            "n" to "12",
-            "w" to query,
-            "g_tk" to "5381",
-            "loginUin" to "0",
-            "hostUin" to "0",
-            "inCharset" to "utf8",
+            "key" to query,
+            "format" to "json",
+            "inCharset" to "utf-8",
             "outCharset" to "utf-8",
-            "notice" to "0",
-            "platform" to "yqq.json",
-            "needNewCode" to "0",
         ).joinToString("&") { (key, value) ->
             "${java.net.URLEncoder.encode(key, "UTF-8")}=${java.net.URLEncoder.encode(value, "UTF-8")}"
         }
-        val connection = (java.net.URL("https://c.y.qq.com/soso/fcgi-bin/client_search_cp?$params").openConnection()
+        val connection = (java.net.URL("https://c.y.qq.com/splcloud/fcgi-bin/smartbox_new.fcg?$params").openConnection()
             as java.net.HttpURLConnection).apply {
             connectTimeout = 7_000
             readTimeout = 7_000
             requestMethod = "GET"
             setRequestProperty("Accept", "application/json,text/plain,*/*")
-            setRequestProperty("Referer", "https://y.qq.com/portal/player.html")
-            setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36 LambdaPlayer/2.5")
+            setRequestProperty("Referer", "https://y.qq.com/")
+            setRequestProperty("User-Agent", QQ_USER_AGENT)
         }
         return try {
             val responseCode = connection.responseCode
-            if (responseCode !in 200..299) throw java.io.IOException("QQ Music search returned HTTP $responseCode")
+            if (responseCode !in 200..299) throw java.io.IOException("QQ Music smartbox returned HTTP $responseCode")
             val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            val root = org.json.JSONObject(body)
-            val data = root.optJSONObject("data") ?: return emptyList()
-            val songBlock = data.optJSONObject("song") ?: return emptyList()
-            val songs = songBlock.optJSONArray("list") ?: songBlock.optJSONArray("itemlist") ?: return emptyList()
+            val songs = org.json.JSONObject(body)
+                .optJSONObject("data")
+                ?.optJSONObject("song")
+                ?.optJSONArray("itemlist")
+                ?: return emptyList()
             buildList {
-                val seen = HashSet<String>()
                 for (index in 0 until songs.length()) {
                     val item = songs.optJSONObject(index) ?: continue
-                    fun text(vararg keys: String): String? = keys.firstNotNullOfOrNull { key ->
-                        item.optString(key).takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
-                    }
-                    val songMid = text("songmid", "mid") ?: continue
-                    if (!seen.add(songMid)) continue
-                    val title = text("songname", "name", "title") ?: continue
-                    val singers = item.optJSONArray("singer")
-                    val artist = if (singers != null) {
-                        (0 until singers.length()).mapNotNull { singerIndex ->
-                            singers.optJSONObject(singerIndex)?.optString("name")
-                                ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
-                        }.joinToString(" / ")
-                    } else text("singer", "artist") ?: ""
-                    val duration = item.optDouble("interval", -1.0).takeIf { it > 0.0 }
+                    val songMid = item.optString("mid").takeIf { it.isNotBlank() } ?: continue
+                    val title = item.optString("name").takeIf { it.isNotBlank() } ?: continue
                     add(
                         QqSongCandidate(
                             songMid = songMid,
-                            songId = item.optLong("songid", item.optLong("id")).takeIf { it > 0L },
+                            songId = item.optString("id").toLongOrNull()?.takeIf { it > 0L },
                             title = title,
-                            artist = artist,
-                            album = text("albumname", "album") ?: "",
-                            durationSeconds = duration,
+                            artist = item.optString("singer"),
+                            album = "",
+                            durationSeconds = null,
                         )
                     )
                 }
@@ -1492,7 +1579,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             setRequestProperty("Accept", "application/json,text/plain,*/*")
             setRequestProperty("Origin", "https://y.qq.com")
             setRequestProperty("Referer", "https://y.qq.com/portal/player.html")
-            setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36 LambdaPlayer/2.5")
+            setRequestProperty("User-Agent", QQ_USER_AGENT)
         }
         return try {
             val responseCode = connection.responseCode
@@ -1505,11 +1592,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val lyricText = json.optString("lyric").takeIf {
                 it.isNotBlank() && !it.equals("null", ignoreCase = true) && !it.equals("无", ignoreCase = true)
             } ?: return null
-            val decodedLyrics = android.text.Html.fromHtml(
-                lyricText,
-                android.text.Html.FROM_HTML_MODE_LEGACY,
-            ).toString().replace("\r", "").trim()
+            // Html.fromHtml() was used here before; it collapses every newline into a space, so
+            // QQ lyrics arrived as one single line. Entities are now decoded by hand instead.
+            val decodedLyrics = decodeQqLyricText(lyricText).replace("\r", "").trim()
             if (decodedLyrics.isBlank()) return null
+            // QQ returns a placeholder sentence for instrumentals; treat those as "no lyrics".
+            if (QQ_INSTRUMENTAL_MARKERS.any { decodedLyrics.contains(it) } &&
+                decodedLyrics.lineSequence().count { it.isNotBlank() } <= 3
+            ) return null
             val hasTimestamps = Regex("\\[\\d{1,3}:\\d{2}(?:[.:]\\d{1,3})?]").containsMatchIn(decodedLyrics)
             LyricsSearchResult(
                 id = candidate.songId,
@@ -1525,6 +1615,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             )
         } finally {
             connection.disconnect()
+        }
+    }
+
+    /**
+     * QQ lyrics are plain LRC text, older responses also contain HTML entities such as `&#58;`
+     * or `&#10;`. Decode those without touching the real line breaks.
+     */
+    private fun decodeQqLyricText(raw: String): String {
+        if (!raw.contains('&')) return raw
+        return Regex("&(#[xX][0-9a-fA-F]+|#\\d+|amp|lt|gt|quot|apos|nbsp);").replace(raw) { match ->
+            val entity = match.groupValues[1]
+            when {
+                entity.startsWith("#x") || entity.startsWith("#X") ->
+                    entity.substring(2).toIntOrNull(16)?.let { String(Character.toChars(it)) } ?: match.value
+                entity.startsWith("#") ->
+                    entity.substring(1).toIntOrNull()?.let { String(Character.toChars(it)) } ?: match.value
+                entity == "amp" -> "&"
+                entity == "lt" -> "<"
+                entity == "gt" -> ">"
+                entity == "quot" -> "\""
+                entity == "apos" -> "'"
+                entity == "nbsp" -> " "
+                else -> match.value
+            }
         }
     }
 
