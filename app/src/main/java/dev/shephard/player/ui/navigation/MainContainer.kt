@@ -27,7 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation3.runtime.NavKey
+import top.yukonga.miuix.kmp.nav.core.NavKey
 import coil.compose.AsyncImage
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
@@ -176,10 +176,11 @@ fun MainContainer(
             }
         }
 
-        BackHandler(enabled = showNowPlaying || submenuOpen || mainPagerState.selectedPage != 0) {
+        // Submenus are popped by NavDisplay's own predictive back handling (see NavGraph), so this
+        // plain BackHandler only covers the now-playing sheet and returning to the first pager page.
+        BackHandler(enabled = showNowPlaying || (!submenuOpen && mainPagerState.selectedPage != 0)) {
             when {
                 showNowPlaying -> showNowPlaying = false
-                submenuOpen -> if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
                 else -> mainPagerState.animateToPage(0)
             }
         }

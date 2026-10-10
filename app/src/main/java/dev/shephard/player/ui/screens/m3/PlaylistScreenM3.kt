@@ -2,9 +2,25 @@
 // LineageOS Twelve 1:1 + M3 padding/radius + grid 3-dot
 package dev.shephard.player.ui.screens.m3
 
+import dev.shephard.player.ui.components.LocalBottomOverlayHeight
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
+import dev.shephard.player.ui.components.PlaylistCoverArt
 import android.content.Intent
 import android.net.Uri
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -27,6 +43,7 @@ import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import dev.shephard.player.ui.components.m3.M3SmallTopBar
 import dev.shephard.player.ui.components.m3.M3CoverEditor
 import dev.shephard.player.ui.components.m3.m3ItemCardColors
 import dev.shephard.player.ui.components.m3.m3TopBarColors
@@ -94,6 +111,7 @@ import dev.shephard.player.ui.screens.ensureLikedSongsPlaylist
 import dev.shephard.player.ui.screens.parsePlaylists
 import dev.shephard.player.ui.screens.resolvePlaylistTracks
 import kotlinx.coroutines.launch
+import dev.shephard.player.ui.navigation.PlaylistDetailNavHost
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,6 +155,10 @@ fun PlaylistScreenM3(
 
     var newCoverUri by remember { mutableStateOf<Uri?>(null) }
     var newCoverCropOutputUri by remember { mutableStateOf<Uri?>(null) }
+
+    fun playPlaylist(pl: LocalPlaylist, plTracks: List<AudioTrack>) {
+        if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name)
+    }
 
     fun writePlaylists(all: List<LocalPlaylist>) {
         scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
@@ -340,34 +362,17 @@ fun PlaylistScreenM3(
     if (openIndex != null && openIndex !in playlists.indices) openIndex = null
     if (playlistMenuIndex != null && playlistMenuIndex !in playlists.indices) playlistMenuIndex = null
 
-    BackHandler(enabled = openIndex != null) {
-        playlistDetailGuard.pop { openIndex = null }
-    }
-
+    // Real height of the mini player + dock (measured in NavGraph), so the FAB always clears them.
+    val overlayHeight by LocalBottomOverlayHeight.current
     val fabLift by androidx.compose.animation.core.animateDpAsState(
-        targetValue = if (hasMiniPlayer) 160.dp else 80.dp,
+        targetValue = overlayHeight + 8.dp,
         animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 300f),
         label = "playlistFabLift"
     )
 
-    AnimatedContent(
-        targetState = openIndex,
-        transitionSpec = {
-            if (targetState != null) {
-                androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.m3EnterSubmenu,
-                    initialContentExit = PageTransitions.m3ExitSubmenu,
-                    targetContentZIndex = 1f
-                )
-            } else {
-                androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.m3PopEnterSubmenu,
-                    initialContentExit = PageTransitions.m3PopExitSubmenu,
-                    targetContentZIndex = 0f
-                )
-            }
-        },
-        label = "playlistM3Nav",
+    PlaylistDetailNavHost(
+        openIndex = openIndex,
+        onClosed = { openIndex = null }
     ) { idx ->
         Box(modifier = Modifier.fillMaxSize()) {
             if (idx == null) {
@@ -375,7 +380,7 @@ fun PlaylistScreenM3(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
                     topBar = {
-                        TopAppBar(
+                        M3SmallTopBar(
                             title = { Text(strings.playlists) },
                             colors = m3TopBarColors(),
                         )
@@ -388,8 +393,8 @@ fun PlaylistScreenM3(
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                             contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                             expanded = true,
-                            // Lives above the bottom dock (80dp) and, when the mini player is
-                            // showing, above that too (+80dp). Animated so it glides up with it.
+                            // Lives above the whole bottom stack (mini player + dock). Animated so it
+                            // glides up/down together with the mini player.
                             modifier = Modifier.padding(bottom = fabLift)
                         )
                     }
@@ -429,53 +434,69 @@ fun PlaylistScreenM3(
                                 pinned + unpinned
                             }
 
-                            if (playlistsLayout == LayoutMode.GRID) {
-                                LazyVerticalGrid(
-                                    columns = GridCells.Fixed(2),
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(
-                                        start = 8.dp,
-                                        end = 8.dp,
-                                        bottom = if (hasMiniPlayer) 160.dp else 80.dp
-                                    )
-                                ) {
-                                    gridItems(sortedPlaylists, key = { it.name + "_" + it.createdAt }) { pl ->
-                                        val realIdx = playlists.indexOf(pl)
-                                        val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                                        LineageGridMediaItem(
-                                            headline = pl.name,
-                                            subhead = "${plTracks.size} tracks",
-                                            thumbnailModel = pl.coverUri ?: plTracks.firstOrNull()?.albumArtUri,
-                                            placeholderIcon = Icons.Filled.QueueMusic,
-                                            trailingIcon = Icons.Filled.MoreVert,
-                                            onTrailingClick = { playlistMenuIndex = realIdx },
-                                            onClick = { playlistDetailGuard.push(openIndex, realIdx) { openIndex = realIdx } }
+                            // Grid <-> list: the content slides sideways while it scales and fades, so the
+                            // switch reads as one motion instead of a cut.
+                            AnimatedContent(
+                                targetState = playlistsLayout,
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                transitionSpec = {
+                                    val toGrid = targetState == LayoutMode.GRID
+                                    (slideInHorizontally(animationSpec = tween(380)) { full -> if (toGrid) full / 5 else -full / 5 } +
+                                        fadeIn(animationSpec = tween(260)) +
+                                        scaleIn(animationSpec = tween(380), initialScale = 0.94f)) togetherWith
+                                        (slideOutHorizontally(animationSpec = tween(380)) { full -> if (toGrid) -full / 5 else full / 5 } +
+                                            fadeOut(animationSpec = tween(200)) +
+                                            scaleOut(animationSpec = tween(380), targetScale = 0.94f)) using
+                                        SizeTransform(clip = false)
+                                },
+                                label = "playlistLayoutSwitch",
+                            ) { layout ->
+                                if (layout == LayoutMode.GRID) {
+                                    LazyVerticalGrid(
+                                        columns = GridCells.Fixed(2),
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentPadding = PaddingValues(
+                                            start = 8.dp,
+                                            end = 8.dp,
+                                            top = 4.dp,
+                                            bottom = 220.dp
                                         )
+                                    ) {
+                                        items(count = sortedPlaylists.size, key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }) { i ->
+                                            val pl = sortedPlaylists[i]
+                                            val realIdx = playlists.indexOf(pl)
+                                            val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+                                            Box(modifier = Modifier.animateItem()) {
+                                                PlaylistGridCardM3(
+                                                    playlist = pl,
+                                                    plTracks = plTracks,
+                                                    strings = strings,
+                                                    onClick = { playlistDetailGuard.push(openIndex, realIdx) { openIndex = realIdx } },
+                                                    onMore = { playlistMenuIndex = realIdx },
+                                                    onPlay = { playPlaylist(pl, plTracks) },
+                                                )
+                                            }
+                                        }
                                     }
-                                }
-                            } else {
-                                LazyColumn(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(bottom = if (hasMiniPlayer) 160.dp else 80.dp, top = 4.dp)
-                                ) {
-                                    items(sortedPlaylists.size, key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }) { i ->
-                                        val pl = sortedPlaylists[i]
-                                        val realIdx = playlists.indexOf(pl)
-                                        val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                                        Card(
-                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
-                                            shape = RoundedCornerShape(20.dp),
-                                            colors = m3ItemCardColors()
-                                        ) {
-                                            LineageListItemWithThumbnail(
-                                                headline = pl.name,
-                                                supporting = "${plTracks.size} ${strings.trackCount}",
-                                                thumbnailModel = pl.coverUri ?: plTracks.firstOrNull()?.albumArtUri,
-                                                placeholderIcon = Icons.Filled.QueueMusic,
-                                                trailingIcon = Icons.Filled.MoreVert,
-                                                onClick = { playlistDetailGuard.push(openIndex, realIdx) { openIndex = realIdx } },
-                                                onTrailingClick = { playlistMenuIndex = realIdx }
-                                            )
+                                } else {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentPadding = PaddingValues(bottom = 220.dp, top = 4.dp)
+                                    ) {
+                                        items(count = sortedPlaylists.size, key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }) { i ->
+                                            val pl = sortedPlaylists[i]
+                                            val realIdx = playlists.indexOf(pl)
+                                            val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+                                            Box(modifier = Modifier.animateItem()) {
+                                                PlaylistRowM3(
+                                                    playlist = pl,
+                                                    plTracks = plTracks,
+                                                    strings = strings,
+                                                    onClick = { playlistDetailGuard.push(openIndex, realIdx) { openIndex = realIdx } },
+                                                    onMore = { playlistMenuIndex = realIdx },
+                                                    onPlay = { playPlaylist(pl, plTracks) },
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -487,6 +508,7 @@ fun PlaylistScreenM3(
                 val selectedPl = playlists.getOrNull(idx)
                 if (selectedPl != null) {
                     val plTracks = remember(selectedPl, tracks, likedIds) { resolvePlaylistTracks(selectedPl, tracks, likedIds) }
+                    fun sameRawPlaylist(pl: LocalPlaylist) = pl.name == selectedPl.name && pl.createdAt == selectedPl.createdAt
                     M3PlaylistDetail(
                         playlist = selectedPl,
                         allTracks = tracks,
@@ -510,10 +532,14 @@ fun PlaylistScreenM3(
                                 writePlaylists(all)
                             }
                         },
-                        onAddTracks = {},
-                        onPickCover = {},
-                        onRename = {},
-                        onDelete = {},
+                        onReorder = { newOrder ->
+                            writePlaylists(rawPlaylists.map { pl ->
+                                if (sameRawPlaylist(pl)) pl.copy(trackIds = newOrder.map { it.id }, sortMode = "custom") else pl
+                            })
+                        },
+                        onChangeSort = { mode ->
+                            writePlaylists(rawPlaylists.map { pl -> if (sameRawPlaylist(pl)) pl.copy(sortMode = mode) else pl })
+                        },
                     )
                 }
             }
@@ -579,5 +605,149 @@ fun PlaylistScreenM3(
                 }
             }
         }
+    }
+}
+
+/** Playlist row for the Material 3 list layout: cover (or collage), name, count, Play and more. */
+@Composable
+private fun PlaylistRowM3(
+    playlist: LocalPlaylist,
+    plTracks: List<AudioTrack>,
+    strings: dev.shephard.player.ui.i18n.Strings,
+    onClick: () -> Unit,
+    onMore: () -> Unit,
+    onPlay: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 2.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = m3ItemCardColors()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            ) {
+                PlaylistCoverArt(
+                    coverUri = playlist.coverUri,
+                    tracks = plTracks,
+                    placeholderColor = MaterialTheme.colorScheme.secondaryContainer,
+                    placeholderIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    fallback = {
+                        Icon(Icons.Filled.QueueMusic, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(24.dp))
+                    }
+                )
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (playlist.isSystem) strings.likedSongs else playlist.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${plTracks.size} ${strings.trackCount}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            IconButton(onClick = onPlay, enabled = plTracks.isNotEmpty()) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = strings.play, tint = MaterialTheme.colorScheme.primary)
+            }
+            IconButton(onClick = onMore) {
+                Icon(Icons.Filled.MoreVert, contentDescription = strings.menu, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+/** Playlist tile for the Material 3 grid layout: square cover (or collage) with Play and more overlays. */
+@Composable
+private fun PlaylistGridCardM3(
+    playlist: LocalPlaylist,
+    plTracks: List<AudioTrack>,
+    strings: dev.shephard.player.ui.i18n.Strings,
+    onClick: () -> Unit,
+    onMore: () -> Unit,
+    onPlay: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(12.dp))
+        ) {
+            PlaylistCoverArt(
+                coverUri = playlist.coverUri,
+                tracks = plTracks,
+                placeholderColor = MaterialTheme.colorScheme.secondaryContainer,
+                placeholderIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                fallback = {
+                    Icon(Icons.Filled.QueueMusic, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(48.dp))
+                }
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.35f))
+                    .clickable(onClick = onMore),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.MoreVert, contentDescription = strings.menu, tint = Color.White, modifier = Modifier.size(18.dp))
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(8.dp)
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+                    .clickable(enabled = plTracks.isNotEmpty(), onClick = onPlay),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = strings.play, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(22.dp))
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = if (playlist.isSystem) strings.likedSongs else playlist.name,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text(
+            text = "${plTracks.size} ${strings.trackCount}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }

@@ -20,6 +20,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import dev.shephard.player.ui.components.m3.M3SmallTopBar
+import dev.shephard.player.ui.components.m3.DropDownMenuWidget
+import dev.shephard.player.player.LyricsAutoSearchMode
+import dev.shephard.player.player.VolumeNormalization
+import dev.shephard.player.ui.screens.lyricsAutoSearchLabel
+import dev.shephard.player.ui.screens.volumeNormalizationLabel
 import dev.shephard.player.ui.components.m3.m3TopBarColors
 import dev.shephard.player.ui.components.m3.m3ItemCardColors
 import androidx.compose.material.icons.Icons
@@ -38,8 +44,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -96,7 +100,7 @@ fun SettingsScreenM3(
         modifier = Modifier.fillMaxSize(),
         containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
         topBar = {
-            TopAppBar(
+            M3SmallTopBar(
                 title = { Text(strings.settings) },
                 colors = m3TopBarColors(),
             )
@@ -180,12 +184,14 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
     val crossfade by prefs.crossfadeEnabled.collectAsState(initial = false)
     val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
     val playWith by prefs.playWithOthers.collectAsState(initial = false)
+    val lyricsAutoSearch by prefs.lyricsAutoSearchMode.collectAsState(initial = LyricsAutoSearchMode.OFF)
+    val volumeNormalization by prefs.volumeNormalization.collectAsState(initial = VolumeNormalization.NONE)
 
             Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
         topBar = {
-            TopAppBar(
+            M3SmallTopBar(
                 title = { Text(strings.playbackSettings) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) }
@@ -226,6 +232,26 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
                         }
                     )
                 }
+            }
+            item {
+                val lyricsModes = LyricsAutoSearchMode.entries
+                DropDownMenuWidget(
+                    title = strings.lyricsAutoSearchTitle,
+                    description = strings.lyricsAutoSearchDescription,
+                    choice = lyricsModes.indexOf(lyricsAutoSearch),
+                    data = lyricsModes.map { lyricsAutoSearchLabel(it, strings) },
+                    onChoiceChange = { idx -> scope.launch { prefs.setLyricsAutoSearchMode(lyricsModes[idx]) } }
+                )
+            }
+            item {
+                val normalizationModes = VolumeNormalization.entries
+                DropDownMenuWidget(
+                    title = strings.volumeNormalizationTitle,
+                    description = strings.volumeNormalizationDescription,
+                    choice = normalizationModes.indexOf(volumeNormalization),
+                    data = normalizationModes.map { volumeNormalizationLabel(it, strings) },
+                    onChoiceChange = { idx -> scope.launch { prefs.setVolumeNormalization(normalizationModes[idx]) } }
+                )
             }
             item {
                 Card(
@@ -271,7 +297,7 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
             topBar = {
-                TopAppBar(
+                M3SmallTopBar(
                     title = { Text(strings.aboutSectionTitle) },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
                     colors = m3TopBarColors(),
@@ -292,7 +318,7 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
                 if (bitmap != null) {
                     Image(bitmap = bitmap.asImageBitmap(), contentDescription = strings.appName, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 } else {
-                    Image(painter = painterResource(id = R.mipmap.ic_launcher), contentDescription = strings.appName, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    Image(painter = painterResource(id = R.drawable.ic_launcher_preview), contentDescription = strings.appName, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -356,7 +382,7 @@ fun StatsScreenM3(
             modifier = Modifier.fillMaxSize(),
             containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
             topBar = {
-                TopAppBar(
+                M3SmallTopBar(
                     title = { Text(strings.statsTitle) },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
                     colors = m3TopBarColors(),

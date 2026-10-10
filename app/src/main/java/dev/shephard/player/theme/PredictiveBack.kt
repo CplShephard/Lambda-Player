@@ -11,11 +11,11 @@ enum class PredictiveBackAnimation(val value: String, val displayName: String) {
     AOSP("aosp", "AOSP"),
     MIUIX("miuix", "MIUIX"),
     CLASSIC("ksu_classic", "Classic"),
+    SCALE("scale", "Scale"),
     ;
 
     companion object {
-        // Any stored value that no longer exists (e.g. the removed "scale" style)
-        // silently falls back to MIUIX.
+        // Any unknown stored value silently falls back to MIUIX.
         fun fromValueOrDefault(value: String) = entries.find { it.value == value } ?: MIUIX
     }
 }

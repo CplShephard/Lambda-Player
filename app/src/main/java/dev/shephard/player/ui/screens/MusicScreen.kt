@@ -183,7 +183,7 @@ fun MusicScreen(
                                         start = 12.dp,
                                         end = 12.dp,
                                         top = innerPadding.calculateTopPadding() + 8.dp,
-                                        bottom = 200.dp
+                                        bottom = 220.dp
                                     ),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -208,7 +208,7 @@ fun MusicScreen(
                                         start = 16.dp,
                                         end = 16.dp,
                                         top = innerPadding.calculateTopPadding() + 8.dp,
-                                        bottom = 200.dp
+                                        bottom = 220.dp
                                     ),
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {

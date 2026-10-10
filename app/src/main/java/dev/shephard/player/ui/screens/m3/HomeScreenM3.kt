@@ -3,7 +3,7 @@
 @file:OptIn(androidx.compose.animation.ExperimentalAnimationApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 package dev.shephard.player.ui.screens.m3
 
-import androidx.activity.compose.BackHandler
+import dev.shephard.player.ui.components.PlaylistCoverArt
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -37,11 +37,13 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import dev.shephard.player.ui.components.m3.M3SmallTopBar
 import dev.shephard.player.ui.components.m3.m3TopBarColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -86,6 +88,7 @@ import dev.shephard.player.ui.screens.encodePlaylists
 import dev.shephard.player.ui.screens.parsePlaylists
 import dev.shephard.player.ui.screens.resolvePlaylistTracks
 import kotlinx.coroutines.launch
+import dev.shephard.player.ui.navigation.PlaylistDetailNavHost
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -138,29 +141,9 @@ fun HomeScreenM3(
     var openPlaylistIndex by remember { mutableStateOf<Int?>(null) }
     val playlistDetailGuard = remember { SubmenuNavGuard() }
 
-    BackHandler(enabled = openPlaylistIndex != null) {
-        playlistDetailGuard.pop { openPlaylistIndex = null }
-    }
-
-    AnimatedContent(
-        targetState = openPlaylistIndex,
-        modifier = Modifier.fillMaxSize(),
-        transitionSpec = {
-            if (targetState != null) {
-                androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.m3EnterSubmenu,
-                    initialContentExit = PageTransitions.m3ExitSubmenu,
-                    targetContentZIndex = 1f
-                )
-            } else {
-                androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.m3PopEnterSubmenu,
-                    initialContentExit = PageTransitions.m3PopExitSubmenu,
-                    targetContentZIndex = 0f
-                )
-            }
-        },
-        label = "homeM3PlaylistSubmenu"
+    PlaylistDetailNavHost(
+        openIndex = openPlaylistIndex,
+        onClosed = { openPlaylistIndex = null }
     ) { idx ->
         Box(modifier = Modifier.fillMaxSize()) {
             val selectedPl = idx?.let { featuredPlaylists.getOrNull(it) }
@@ -171,6 +154,7 @@ fun HomeScreenM3(
                     allTracks = tracks,
                     plTracks = plTracks,
                     strings = strings,
+                    isHomeSimplified = true,
                     onBack = { playlistDetailGuard.pop { openPlaylistIndex = null } },
                     onTrackClick = { list, i -> onTrackClick(list, i, selectedPl.name) },
                     onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, selectedPl.name) },
@@ -194,7 +178,7 @@ fun HomeScreenM3(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
                     topBar = {
-                        TopAppBar(
+                        M3SmallTopBar(
                             title = { Text(strings.home) },
                             colors = m3TopBarColors(),
                         )
@@ -212,7 +196,7 @@ fun HomeScreenM3(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(
                                 top = padding.calculateTopPadding() + 8.dp,
-                                bottom = if (hasMiniPlayer) 160.dp else 80.dp
+                                bottom = 220.dp
                             ),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
@@ -247,11 +231,21 @@ fun HomeScreenM3(
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
                                         items(featuredPlaylists, key = { it.name + it.createdAt }) { pl ->
+                                            val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
                                             LineageHorizontalMediaItem(
                                                 headline = pl.name,
-                                                subhead = "${pl.trackIds.size} tracks",
-                                                thumbnailModel = pl.coverUri,
-                                                placeholderIcon = Icons.Filled.QueueMusic,
+                                                subhead = "${plTracks.size} tracks",
+                                                thumbnailContent = {
+                                                    PlaylistCoverArt(
+                                                        coverUri = pl.coverUri,
+                                                        tracks = plTracks,
+                                                        placeholderColor = MaterialTheme.colorScheme.secondaryContainer,
+                                                        placeholderIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                        fallback = {
+                                                            Icon(Icons.Filled.QueueMusic, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(48.dp))
+                                                        }
+                                                    )
+                                                },
                                                 onClick = {
                                                     val i = featuredPlaylists.indexOf(pl)
                                                     if (i >= 0) playlistDetailGuard.push(openPlaylistIndex, i) { openPlaylistIndex = i }

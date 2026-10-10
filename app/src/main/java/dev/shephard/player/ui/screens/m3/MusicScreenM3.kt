@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import dev.shephard.player.ui.components.m3.M3SmallTopBar
 import dev.shephard.player.ui.components.m3.M3CoverEditor
 import dev.shephard.player.ui.components.m3.m3ItemCardColors
 import dev.shephard.player.ui.components.m3.m3TopBarColors
@@ -141,7 +142,7 @@ fun MusicScreenM3(
         modifier = Modifier.fillMaxSize(),
         containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
         topBar = {
-            TopAppBar(
+            M3SmallTopBar(
                 title = { Text(strings.music) },
                 colors = m3TopBarColors(),
             )
@@ -201,7 +202,7 @@ fun MusicScreenM3(
                                 contentPadding = PaddingValues(
                                     start = 8.dp,
                                     end = 8.dp,
-                                    bottom = if (hasMiniPlayer) 160.dp else 80.dp
+                                    bottom = 220.dp
                                 ),
                             ) {
                                 gridItems(tracks, key = { it.id }) { track ->
@@ -223,7 +224,7 @@ fun MusicScreenM3(
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(
-                                    bottom = if (hasMiniPlayer) 160.dp else 80.dp,
+                                    bottom = 220.dp,
                                     top = 4.dp
                                 ),
                             ) {

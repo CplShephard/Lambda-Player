@@ -97,6 +97,8 @@ import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import dev.shephard.player.R
 import dev.shephard.player.player.PlayerViewModel
+import dev.shephard.player.player.LyricsAutoSearchMode
+import dev.shephard.player.player.VolumeNormalization
 import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
@@ -313,7 +315,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             text = strings.themeUiStyleSection,
             insideMargin = PaddingValues(16.dp, 8.dp),
         )
-        SectionCard {
+        SectionCard(contentPadding = PaddingValues(0.dp)) {
             val engineOptions = listOf(true to strings.miuixUi, false to strings.googleUi)
             val engineSelectedIndex = if (useMiuix) 0 else 1
             MiuixSpinnerRow(
@@ -327,7 +329,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             )
 
             Spacer(Modifier.height(8.dp))
-            ToggleRow(label = strings.appleFloatingBar, checked = appleFloatingBar, description = strings.appleFloatingBarDescription) { enabled ->
+            MiuixSwitchRow(label = strings.appleFloatingBar, checked = appleFloatingBar, description = strings.appleFloatingBarDescription) { enabled ->
                 scope.launch { prefs.setUseAppleFloatingBar(enabled) }
             }
         }
@@ -337,7 +339,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             text = strings.themeMiuixUiSection,
             insideMargin = PaddingValues(16.dp, 8.dp),
         )
-        SectionCard {
+        SectionCard(contentPadding = PaddingValues(0.dp)) {
             val themeModeOptions = listOf(
                 ThemeModePreference.LIGHT to strings.lightMode,
                 ThemeModePreference.DARK to strings.darkMode,
@@ -356,13 +358,13 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             // Hide blur toggle on < Android 12 (S) per spec
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 Spacer(Modifier.height(8.dp))
-                ToggleRow(label = strings.blurEffect, checked = liquidGlassEnabled, description = strings.blurEffectDescription) { enabled ->
+                MiuixSwitchRow(label = strings.blurEffect, checked = liquidGlassEnabled, description = strings.blurEffectDescription) { enabled ->
                     scope.launch { prefs.setLiquidGlassEnabled(enabled) }
                 }
             }
 
             Spacer(Modifier.height(8.dp))
-            ToggleRow(label = strings.miuixCustomColors, checked = useMiuixMonet, description = strings.miuixCustomColorsDescription) { enabled ->
+            MiuixSwitchRow(label = strings.miuixCustomColors, checked = useMiuixMonet, description = strings.miuixCustomColorsDescription) { enabled ->
                 scope.launch { prefs.setUseMiuixMonet(enabled) }
             }
 
@@ -384,7 +386,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 Column {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         Spacer(Modifier.height(8.dp))
-                        ToggleRow(label = strings.dynamicColor, checked = dynamicColor, description = strings.dynamicColorDescription) { enabled ->
+                        MiuixSwitchRow(label = strings.dynamicColor, checked = dynamicColor, description = strings.dynamicColorDescription) { enabled ->
                             scope.launch { prefs.setDynamicColor(enabled) }
                         }
                     }
@@ -685,6 +687,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                     PredictiveBackAnimation.AOSP to strings.predictiveBackAosp,
                     PredictiveBackAnimation.MIUIX to strings.predictiveBackMiuix,
                     PredictiveBackAnimation.CLASSIC to strings.predictiveBackClassic,
+                    PredictiveBackAnimation.SCALE to strings.predictiveBackScale,
                 )
                 val predictiveBackIndex = predictiveBackOptions.indexOfFirst { it.first == predictiveBack }.coerceAtLeast(0)
                 MiuixSpinnerRow(
@@ -700,7 +703,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                     }
                 )
                 AnimatedVisibility(
-                    visible = predictiveBack == PredictiveBackAnimation.AOSP,
+                    visible = predictiveBack == PredictiveBackAnimation.AOSP || predictiveBack == PredictiveBackAnimation.SCALE,
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically(),
                 ) {
@@ -820,6 +823,8 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
     val crossfade by prefs.crossfadeEnabled.collectAsState(initial = false)
     val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
     val playWith by prefs.playWithOthers.collectAsState(initial = false)
+    val lyricsAutoSearch by prefs.lyricsAutoSearchMode.collectAsState(initial = LyricsAutoSearchMode.OFF)
+    val volumeNormalization by prefs.volumeNormalization.collectAsState(initial = VolumeNormalization.NONE)
 
     SettingsPageScaffold(title = strings.playbackSettings, onBack = onBack) {
         SectionCard {
@@ -828,6 +833,22 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
             ToggleRow(label = strings.crossfade, checked = crossfade) { scope.launch { prefs.setCrossfadeEnabled(it) } }
             ToggleRow(label = strings.gapless, checked = gapless) { scope.launch { prefs.setGaplessEnabled(it) } }
             ToggleRow(label = strings.playWithOthers, checked = playWith) { scope.launch { prefs.setPlayWithOthers(it) } }
+            val lyricsModes = LyricsAutoSearchMode.entries
+            MiuixSpinnerRow(
+                title = strings.lyricsAutoSearchTitle,
+                summary = strings.lyricsAutoSearchDescription,
+                items = lyricsModes.map { lyricsAutoSearchLabel(it, strings) },
+                selectedIndex = lyricsModes.indexOf(lyricsAutoSearch),
+                onSelectedIndexChange = { idx -> scope.launch { prefs.setLyricsAutoSearchMode(lyricsModes[idx]) } }
+            )
+            val normalizationModes = VolumeNormalization.entries
+            MiuixSpinnerRow(
+                title = strings.volumeNormalizationTitle,
+                summary = strings.volumeNormalizationDescription,
+                items = normalizationModes.map { volumeNormalizationLabel(it, strings) },
+                selectedIndex = normalizationModes.indexOf(volumeNormalization),
+                onSelectedIndexChange = { idx -> scope.launch { prefs.setVolumeNormalization(normalizationModes[idx]) } }
+            )
         }
         Spacer(Modifier.height(110.dp))
     }
@@ -911,7 +932,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                     )
                 } else {
                     Image(
-                        painter = painterResource(id = R.mipmap.ic_launcher),
+                        painter = painterResource(id = R.drawable.ic_launcher_preview),
                         contentDescription = strings.appName,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -1163,6 +1184,7 @@ private fun TotalListeningTimeCard(playerViewModel: PlayerViewModel, onClick: ()
 @Composable
 private fun SectionCard(
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(20.dp),
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
@@ -1172,7 +1194,7 @@ private fun SectionCard(
             containerColor = MiuixAppTheme.colorScheme.surfaceVariant
         )
     ) {
-        Column(modifier = Modifier.padding(20.dp)) { content() }
+        Column(modifier = Modifier.padding(contentPadding)) { content() }
     }
 }
 
@@ -1212,8 +1234,22 @@ private fun ToggleRow(label: String, checked: Boolean, description: String? = nu
     }
 }
 
+/**
+ * Miuix switch row as in InstallerX (SwitchPreference: title, optional summary, library padding).
+ * Used inside cards that have zero content padding, so the row sits at the same inset as InstallerX.
+ */
 @Composable
-private fun MiuixSpinnerRow(
+private fun MiuixSwitchRow(label: String, checked: Boolean, description: String? = null, onChange: (Boolean) -> Unit) {
+    top.yukonga.miuix.kmp.preference.SwitchPreference(
+        checked = checked,
+        onCheckedChange = onChange,
+        title = label,
+        summary = description,
+    )
+}
+
+@Composable
+internal fun MiuixSpinnerRow(
     title: String,
     summary: String? = null,
     items: List<String>,

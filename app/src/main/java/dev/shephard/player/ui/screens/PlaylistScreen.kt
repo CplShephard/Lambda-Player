@@ -2,10 +2,8 @@
 
 package dev.shephard.player.ui.screens
 
+import dev.shephard.player.ui.components.PlaylistCoverArt
 import android.net.Uri
-import androidx.activity.BackEventCompat
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -116,8 +114,7 @@ import dev.shephard.player.data.formattedDuration
 import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PreferencesManager
-import dev.shephard.player.theme.PredictiveBackAnimation
-import dev.shephard.player.ui.util.rememberDeviceCornerRadius
+import dev.shephard.player.ui.components.LocalDetailMiniPlayer
 import dev.shephard.player.ui.components.BouncyIconButton
 import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
@@ -137,6 +134,7 @@ import java.text.Collator
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import dev.shephard.player.ui.navigation.PlaylistDetailNavHost
 
 internal data class LocalPlaylist(
     val name: String,
@@ -434,24 +432,9 @@ LaunchedEffect(playlists) {
         }
     }
 
-    androidx.compose.animation.AnimatedContent(
-        targetState = openIndex,
-        transitionSpec = {
-            if (targetState != null) {
-                androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.enterSubmenu,
-                    initialContentExit = PageTransitions.exitSubmenu,
-                    targetContentZIndex = 1f
-                )
-            } else {
-                androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.popEnterSubmenu,
-                    initialContentExit = PageTransitions.popExitSubmenu,
-                    targetContentZIndex = 0f
-                )
-            }
-        },
-        label = "playlistNav"
+    PlaylistDetailNavHost(
+        openIndex = openIndex,
+        onClosed = { openIndex = null }
     ) { idx ->
         Box(
             modifier = Modifier
@@ -1056,7 +1039,7 @@ Scaffold(
                                     start = 16.dp,
                                     top = innerPadding.calculateTopPadding() + 8.dp,
                                     end = 16.dp,
-                                    bottom = 200.dp
+                                    bottom = 220.dp
                                 ),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -1102,7 +1085,7 @@ Scaffold(
                                     start = 16.dp,
                                     top = innerPadding.calculateTopPadding() + 8.dp,
                                     end = 16.dp,
-                                    bottom = 200.dp
+                                    bottom = 220.dp
                                 ),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
@@ -1165,7 +1148,6 @@ private fun PlaylistListCard(
     onMenu: () -> Unit,
     onPlay: () -> Unit
 ) {
-    val liquidGlassOn = LocalBlurEnabled.current
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
@@ -1175,10 +1157,7 @@ private fun PlaylistListCard(
             .fillMaxWidth()
             .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
-            .then(
-
-Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
-            )
+            .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1187,17 +1166,12 @@ Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MiuixAppTheme.colorScheme.background),
+                    .clip(RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                val coverUri = playlist.coverUri?.let { Uri.parse(it) }
-                val firstArt = coverUri ?: plTracks.firstOrNull()?.albumArtUri
-                var artLoaded by remember(firstArt) { mutableStateOf(false) }
                 if (playlist.isSystem) {
-
-Box(
-                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp))
+                    Box(
+                        modifier = Modifier.fillMaxSize()
                             .background(Brush.linearGradient(
                                 colors = listOf(
                                     MiuixAppTheme.colorScheme.primary.copy(alpha = 0.8f),
@@ -1209,29 +1183,21 @@ Box(
                         Icon(Icons.Filled.Favorite, null, tint = Color.White, modifier = Modifier.size(26.dp))
                     }
                 } else {
-                if (firstArt != null) {
-                    AsyncImage(
-                        model = firstArt,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)),
-                        contentScale = ContentScale.Crop,
-                        onState = { artLoaded = it is AsyncImagePainter.State.Success }
+                    PlaylistCoverArt(
+                        coverUri = playlist.coverUri,
+                        tracks = plTracks,
+                        placeholderColor = MiuixAppTheme.colorScheme.background,
+                        placeholderIconColor = MiuixAppTheme.colorScheme.primary,
+                        fallback = {
+                            Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                        }
                     )
-                }
-                if (!artLoaded) {
-                    Icon(
-                        imageVector = Icons.Filled.MusicNote,
-                        contentDescription = null,
-                        tint = MiuixAppTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
                 }
             }
 
-Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(12.dp))
 
-Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = if (playlist.isSystem) strings.likedSongs else playlist.name,
                     style = MiuixAppTheme.typography.titleMedium,
@@ -1271,16 +1237,12 @@ private fun PlaylistGridCard(
     onMenu: () -> Unit,
     onPlay: () -> Unit
 ) {
-    val liquidGlassOn = LocalBlurEnabled.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .miuixWidgetClick(pressScale = 0.94f, maxTiltDegrees = 7f) { onClick() }
             .clip(RoundedCornerShape(20.dp))
-            .then(
-
-Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
-            )
+            .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
             .padding(12.dp)
     ) {
         Box(
@@ -1291,9 +1253,6 @@ Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
                 .background(MiuixAppTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
-            val coverUri = playlist.coverUri?.let { Uri.parse(it) }
-            val firstArt = coverUri ?: plTracks.firstOrNull()?.albumArtUri
-            var artLoaded by remember(firstArt) { mutableStateOf(false) }
             if (playlist.isSystem) {
                 Box(
                     modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))
@@ -1308,23 +1267,16 @@ Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
                     Icon(Icons.Filled.Favorite, null, tint = Color.White, modifier = Modifier.size(48.dp))
                 }
             } else {
-            if (firstArt != null) {
-                AsyncImage(
-                    model = firstArt,
-                    contentDescription = null,
+                PlaylistCoverArt(
+                    coverUri = playlist.coverUri,
+                    tracks = plTracks,
                     modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.Crop,
-                    onState = { artLoaded = it is AsyncImagePainter.State.Success }
+                    placeholderColor = MiuixAppTheme.colorScheme.surfaceVariant,
+                    placeholderIconColor = MiuixAppTheme.colorScheme.primary,
+                    fallback = {
+                        Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+                    }
                 )
-            }
-            if (!artLoaded) {
-                Icon(
-                    imageVector = Icons.Filled.MusicNote,
-                    contentDescription = null,
-                    tint = MiuixAppTheme.colorScheme.primary,
-                    modifier = Modifier.size(48.dp)
-                )
-            }
             }
             BouncyIconButton(
                 onClick = onMenu,
@@ -1341,18 +1293,14 @@ Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
                     .padding(8.dp)
                     .size(36.dp)
                     .clip(CircleShape)
-                    .then(
-
-Modifier.background(MiuixAppTheme.colorScheme.primary)
-                    )
+                    .background(MiuixAppTheme.colorScheme.primary)
                     .bounceClick { onPlay() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Filled.PlayArrow,
                     contentDescription = strings.play,
-
-tint = MiuixAppTheme.colorScheme.onPrimary,
+                    tint = MiuixAppTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -1390,37 +1338,11 @@ internal fun PlaylistDetailView(
     onChangeSort: (String) -> Unit = {},
     isHomeSimplified: Boolean = false
 ) {
-    val context = LocalContext.current
-    val preferences = remember(context) { PreferencesManager(context) }
-    val predictiveBackStyle by preferences.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
-    val useClassicPredictiveBack = predictiveBackStyle == PredictiveBackAnimation.CLASSIC
-    val deviceCornerRadius = rememberDeviceCornerRadius()
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
     val reorderItems = remember { mutableStateListOf<AudioTrack>() }
     var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var isReordering by remember { mutableStateOf(false) }
     var pendingCommittedOrder by remember { mutableStateOf<List<Long>?>(null) }
-    val predictiveBackProgress = remember { androidx.compose.animation.core.Animatable(0f) }
-    var predictiveBackEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
-
-    if (useClassicPredictiveBack) {
-        PredictiveBackHandler { events ->
-            try {
-                events.collect { event ->
-                    predictiveBackEdge = event.swipeEdge
-                    predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
-                }
-                if (predictiveBackProgress.value < 1f) predictiveBackProgress.animateTo(1f, androidx.compose.animation.core.tween(150))
-                onBack()
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                predictiveBackProgress.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 380f))
-                throw cancelled
-            }
-        }
-    } else {
-        BackHandler(onBack = onBack)
-    }
-
     val displayTracks = if (isHomeSimplified) {
         remember(plTracks) { plTracks.shuffled() }
     } else {
@@ -1478,20 +1400,11 @@ internal fun PlaylistDetailView(
 
     val detailTitle = if (playlist.isSystem) strings.likedSongs else playlist.name
 
-            Scaffold(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    val p = predictiveBackProgress.value.coerceIn(0f, 1f)
-                    val direction = if (predictiveBackEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
-                    translationX = size.width * 0.12f * p * direction
-                    val scale = 1f - 0.035f * p
-                    scaleX = scale
-                    scaleY = scale
-                    alpha = 1f - 0.12f * p
-                    shape = RoundedCornerShape(deviceCornerRadius * p)
-                    clip = p > 0.001f
-                },
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Detail mini player sits above the content (zIndex); it is only composed while the detail is open.
+        LocalDetailMiniPlayer.current(Modifier.align(Alignment.BottomCenter).zIndex(1f))
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
             containerColor = MiuixAppTheme.colorScheme.background,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
@@ -1514,7 +1427,7 @@ internal fun PlaylistDetailView(
                 start = 16.dp,
                 top = innerPadding.calculateTopPadding() + 8.dp,
                 end = 16.dp,
-                bottom = 200.dp
+                bottom = 220.dp
             ),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
@@ -1561,18 +1474,15 @@ internal fun PlaylistDetailView(
                             Icon(Icons.Filled.Favorite, null, tint = Color.White, modifier = Modifier.size(80.dp))
                         }
                     } else {
-                        val coverUri = playlist.coverUri?.let { Uri.parse(it) }
-                        val displayArt = coverUri ?: displayTracks.firstOrNull()?.albumArtUri
-                        if (displayArt != null) {
-                            AsyncImage(
-                                model = displayArt,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Icon(Icons.Filled.LibraryMusic, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
-                        }
+                        PlaylistCoverArt(
+                            coverUri = playlist.coverUri,
+                            tracks = displayTracks,
+                            placeholderColor = MiuixAppTheme.colorScheme.surfaceVariant,
+                            placeholderIconColor = MiuixAppTheme.colorScheme.primary,
+                            fallback = {
+                                Icon(Icons.Filled.LibraryMusic, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+                            }
+                        )
                         if (!playlist.isSystem && !isHomeSimplified) {
                             Box(
                                 modifier = Modifier
@@ -1707,6 +1617,7 @@ internal fun PlaylistDetailView(
             }
         }
         }
+    }
 }
 
 @Composable

@@ -2,6 +2,7 @@
 // Copyright (C) 2026 InstallerX Revived contributors
 package dev.shephard.player.ui.screens
 
+import dev.shephard.player.ui.components.PlaylistCoverArt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -75,6 +76,7 @@ import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.Text
 import top.yukonga.miuix.kmp.basic.Scaffold
+import dev.shephard.player.ui.navigation.PlaylistDetailNavHost
 
 @Composable
 fun HomeScreen(
@@ -142,25 +144,9 @@ fun HomeScreen(
     var openPlaylistIndex by remember { mutableStateOf<Int?>(null) }
     val playlistDetailGuard = remember { SubmenuNavGuard() }
 
-    AnimatedContent(
-        targetState = openPlaylistIndex,
-        modifier = Modifier.fillMaxSize(),
-        transitionSpec = {
-            if (targetState != null) {
-                androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.enterSubmenu,
-                    initialContentExit = PageTransitions.exitSubmenu,
-                    targetContentZIndex = 1f
-                )
-            } else {
-                androidx.compose.animation.ContentTransform(
-                    targetContentEnter = PageTransitions.popEnterSubmenu,
-                    initialContentExit = PageTransitions.popExitSubmenu,
-                    targetContentZIndex = 0f
-                )
-            }
-        },
-        label = "homePlaylistSubmenu"
+    PlaylistDetailNavHost(
+        openIndex = openPlaylistIndex,
+        onClosed = { openPlaylistIndex = null }
     ) { idx ->
         Box(
             modifier = Modifier
@@ -217,7 +203,7 @@ fun HomeScreen(
                                 .verticalScroll(scrollState)
                                 .padding(
                                     top = innerPadding.calculateTopPadding() + 8.dp,
-                                    bottom = if (hasMiniPlayer) 176.dp else 96.dp
+                                    bottom = 220.dp
                                 ),
                             verticalArrangement = Arrangement.spacedBy(24.dp)
                         ) {
@@ -235,6 +221,8 @@ fun HomeScreen(
                                 FeaturedPlaylistsSection(
                                     title = strings.featuredPlaylists,
                                     playlists = featuredPlaylists,
+                                    tracks = tracks,
+                                    likedIds = likedIds,
                                     onPlaylistClick = { pl ->
                                         val i = featuredPlaylists.indexOf(pl)
                                         if (i >= 0) {
@@ -539,6 +527,8 @@ private fun RecentlyPlayedCard(
 private fun FeaturedPlaylistsSection(
     title: String,
     playlists: List<LocalPlaylist>,
+    tracks: List<AudioTrack>,
+    likedIds: List<Long>,
     onPlaylistClick: (LocalPlaylist) -> Unit
 ) {
     val pagerState = rememberPagerState(pageCount = { playlists.size })
@@ -560,7 +550,8 @@ private fun FeaturedPlaylistsSection(
             beyondViewportPageCount = 1
         ) { page ->
             val pl = playlists[page]
-            FeaturedPlaylistCard(playlist = pl, onClick = { onPlaylistClick(pl) })
+            val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+            FeaturedPlaylistCard(playlist = pl, plTracks = plTracks, onClick = { onPlaylistClick(pl) })
         }
     }
 }
@@ -568,6 +559,7 @@ private fun FeaturedPlaylistsSection(
 @Composable
 private fun FeaturedPlaylistCard(
     playlist: LocalPlaylist,
+    plTracks: List<AudioTrack>,
     onClick: () -> Unit
 ) {
     Box(
@@ -579,22 +571,13 @@ private fun FeaturedPlaylistCard(
             .background(MiuixAppTheme.colorScheme.surfaceVariant)
             .clickable(onClick = onClick)
     ) {
-        val coverUri = playlist.coverUri?.let { android.net.Uri.parse(it) }
-        var artLoaded by remember(coverUri) { mutableStateOf(false) }
-        if (coverUri != null) {
-            AsyncImage(
-                model = coverUri,
-                contentDescription = playlist.name,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-                onState = { artLoaded = it is coil.compose.AsyncImagePainter.State.Success }
-            )
-        }
-        if (!artLoaded) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+        PlaylistCoverArt(
+            coverUri = playlist.coverUri,
+            tracks = plTracks,
+            modifier = Modifier.fillMaxSize(),
+            placeholderColor = MiuixAppTheme.colorScheme.surfaceVariant,
+            placeholderIconColor = MiuixAppTheme.colorScheme.primary,
+            fallback = {
                 Icon(
                     imageVector = Icons.Filled.LibraryMusic,
                     contentDescription = null,
@@ -602,7 +585,7 @@ private fun FeaturedPlaylistCard(
                     modifier = Modifier.size(48.dp)
                 )
             }
-        }
+        )
         Box(
             modifier = Modifier
                 .fillMaxSize()

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import dev.shephard.player.ui.components.m3.M3SmallTopBar
 import dev.shephard.player.ui.components.m3.m3TopBarColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -192,7 +193,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
             topBar = {
-                TopAppBar(
+                M3SmallTopBar(
                     title = { Text(strings.themeSettings) },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
                     colors = m3TopBarColors(),
@@ -350,7 +351,6 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                                 onValueChange = { navBarCornerRadiusValue = it },
                                 onValueChangeFinished = { scope.launch { prefs.setM3NavBarCornerRadius(navBarCornerRadiusValue.toInt()) } },
                                 valueRange = 0f..64f,
-                                steps = 63,
                             )
                             Box(
                                 modifier = Modifier
@@ -381,7 +381,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                                 onChoiceChange = { idx -> scope.launch { prefs.setPredictiveBackAnimation(PredictiveBackAnimation.entries[idx]) } }
                             )
                         }
-                        item(animatedVisibility = predictiveBack == PredictiveBackAnimation.AOSP) {
+                        item(animatedVisibility = predictiveBack == PredictiveBackAnimation.AOSP || predictiveBack == PredictiveBackAnimation.SCALE) {
                             Column {
                                 DropDownMenuWidget(
                                     icon = Icons.Filled.Tune,
@@ -431,6 +431,7 @@ private fun predictiveBackDisplayName(animation: PredictiveBackAnimation, string
     PredictiveBackAnimation.AOSP -> strings.predictiveBackAosp
     PredictiveBackAnimation.MIUIX -> strings.predictiveBackMiuix
     PredictiveBackAnimation.CLASSIC -> strings.predictiveBackClassic
+    PredictiveBackAnimation.SCALE -> strings.predictiveBackScale
 }
 
 private fun predictiveDirectionDisplayName(direction: PredictiveBackExitDirection, strings: dev.shephard.player.ui.i18n.Strings): String = when (direction) {

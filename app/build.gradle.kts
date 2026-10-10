@@ -104,14 +104,12 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-shader-android:0.9.3")
 
     implementation("top.yukonga.miuix.kmp:miuix-squircle:0.9.3")
-    implementation("top.yukonga.miuix.kmp:miuix-navigation3-ui:0.9.3")
-
-    // FIX: bumped from 1.1.4 — navigation3 1.1.6 contains the official fix for the
-    // "IllegalArgumentException: Key ... was used multiple times" crash (b/516312097).
-    // NOTE: do NOT add androidx.navigation3:navigation3-ui here — miuix-navigation3-ui
-    // ships its own embedded fork of the navigation3-ui classes, and having both on
-    // the classpath fails checkReleaseDuplicateClasses.
-    implementation("androidx.navigation3:navigation3-runtime:1.1.7")
+    // Navigation engine used by InstallerX Revived (NavDisplay, NavTransition, predictive back).
+    // miuix-nav 0.9.4 needs no miuix-ui code; its squircle dependency is excluded so the
+    // squircle version stays the one already used by the 0.9.3 UI artifacts.
+    implementation("top.yukonga.miuix.kmp:miuix-nav-android:0.9.4") {
+        exclude(group = "top.yukonga.miuix.kmp", module = "miuix-squircle-android")
+    }
 
     implementation("me.zhanghai.android.appiconloader:appiconloader:1.5.0")
     implementation("sh.calvin.reorderable:reorderable:3.0.0")

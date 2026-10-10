@@ -183,7 +183,9 @@ fun LineageHorizontalMediaItem(
     placeholderIcon: ImageVector? = null,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
-    thumbnailSize: Dp = 128.dp
+    thumbnailSize: Dp = 128.dp,
+    // Custom thumbnail (e.g. a playlist collage). Takes precedence over thumbnailModel.
+    thumbnailContent: (@Composable () -> Unit)? = null
 ) {
     Column(
         modifier = modifier
@@ -209,7 +211,9 @@ fun LineageHorizontalMediaItem(
                     .background(MaterialTheme.colorScheme.secondaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                if (thumbnailModel != null) {
+                if (thumbnailContent != null) {
+                    thumbnailContent()
+                } else if (thumbnailModel != null) {
                     AsyncImage(
                         model = thumbnailModel,
                         contentDescription = null,

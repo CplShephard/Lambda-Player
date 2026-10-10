@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +63,8 @@ fun MiniPlayer(
     onPlayPauseClick: () -> Unit,
     onNextClick: () -> Unit,
     onPreviousClick: () -> Unit = {},
+    /** Larger pop-up variant used inside playlist detail screens. */
+    large: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val track = state.currentTrack ?: return
@@ -69,13 +72,19 @@ fun MiniPlayer(
     val liquidGlassOn = LocalBlurEnabled.current
     val contentBackdrop = LocalContentBackdrop.current
     val miniPlayerShape = RoundedCornerShape(14.dp)
-
-    val themeAccent = MiuixAppTheme.colorScheme.primary
+    val artSize = if (large) 52.dp else 40.dp
+    val buttonSize = if (large) 48.dp else 40.dp
+    val iconSize = if (large) 28.dp else 24.dp
+    // Deterministic theme detection: a light surface means a light theme, so the bar is black;
+    // a dark surface means a dark theme, so the bar is white.
+    val isLightSurface = MiuixAppTheme.colorScheme.surfaceVariant.luminance() > 0.5f
+    val progressActive = if (isLightSurface) Color.Black else Color.White
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            // 15dp (was 16dp) on each side: the pop-up is 2dp wider overall; large variant is wider still.
+            .padding(horizontal = if (large) 8.dp else 15.dp, vertical = if (large) 10.dp else 6.dp)
     ) {
         Box(
             modifier = Modifier
@@ -99,7 +108,12 @@ fun MiniPlayer(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
+                    .padding(
+                        start = if (large) 10.dp else 8.dp,
+                        end = if (large) 10.dp else 8.dp,
+                        top = if (large) 12.dp else 8.dp,
+                        bottom = if (large) 16.dp else 12.dp
+                    ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AnimatedContent(
@@ -119,7 +133,7 @@ fun MiniPlayer(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(artSize)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(MiuixAppTheme.colorScheme.background),
                             contentAlignment = Alignment.Center
@@ -129,7 +143,7 @@ fun MiniPlayer(
                                 model = displayTrack.albumArtUri,
                                 contentDescription = null,
                                 modifier = Modifier
-                                    .size(40.dp)
+                                    .size(artSize)
                                     .clip(RoundedCornerShape(8.dp)),
                                 contentScale = ContentScale.Crop,
                                 onState = { imageState ->
@@ -141,7 +155,7 @@ fun MiniPlayer(
                                     imageVector = Icons.Filled.MusicNote,
                                     contentDescription = null,
                                     tint = MiuixAppTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(if (large) 26.dp else 20.dp)
                                 )
                             }
                         }
@@ -167,7 +181,7 @@ fun MiniPlayer(
 
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(buttonSize)
                         .clip(RoundedCornerShape(8.dp))
                         .bounceClick(pressScale = 0.92f) { onPreviousClick() },
                     contentAlignment = Alignment.Center
@@ -176,13 +190,13 @@ fun MiniPlayer(
                         painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_rewind),
                         contentDescription = LocalStrings.current.previous,
                         tint = MiuixAppTheme.colorScheme.onBackground,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(iconSize)
                     )
                 }
 
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(buttonSize)
                         .clip(RoundedCornerShape(8.dp))
                         .bounceClick(pressScale = 0.92f) { onPlayPauseClick() },
                     contentAlignment = Alignment.Center
@@ -202,14 +216,14 @@ fun MiniPlayer(
                             ),
                             contentDescription = if (isPlaying) LocalStrings.current.pause else LocalStrings.current.play,
                             tint = MiuixAppTheme.colorScheme.onBackground,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(iconSize)
                         )
                     }
                 }
 
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(buttonSize)
                         .clip(RoundedCornerShape(8.dp))
                         .bounceClick(pressScale = 0.92f) { onNextClick() },
                     contentAlignment = Alignment.Center
@@ -218,18 +232,20 @@ fun MiniPlayer(
                         painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_fforward),
                         contentDescription = LocalStrings.current.next,
                         tint = MiuixAppTheme.colorScheme.onBackground,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(iconSize)
                     )
                 }
             }
 
             MiniPlayerProgressBar(
                 progressFlow = progressFlow,
-                activeColor = themeAccent,
-                inactiveColor = themeAccent.copy(alpha = 0.18f),
+                activeColor = progressActive,
+                inactiveColor = progressActive.copy(alpha = 0.25f),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    // Inset from the card edges so the bar is a little narrower than the pop-up.
+                    .padding(horizontal = 12.dp)
             )
         }
     }

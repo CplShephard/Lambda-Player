@@ -21,6 +21,9 @@ private val Context.dataStore by preferencesDataStore(name = "lambda_player_pref
 object PrefsKeys {
     val CROSSFADE_ENABLED = booleanPreferencesKey("crossfade_enabled")
     val GAPLESS_ENABLED = booleanPreferencesKey("gapless_enabled")
+    val LYRICS_AUTO_SEARCH_MODE = stringPreferencesKey("lyrics_auto_search_mode")
+    val LYRICS_ONLINE_OPENED_TRACK_IDS = stringPreferencesKey("lyrics_online_opened_track_ids")
+    val VOLUME_NORMALIZATION = stringPreferencesKey("volume_normalization")
     val PLAY_WITH_OTHERS = booleanPreferencesKey("play_with_others")
     val TOTAL_LISTENING_MS = longPreferencesKey("total_listening_ms")
     val LANGUAGE = stringPreferencesKey("language")
@@ -91,6 +94,19 @@ class PreferencesManager(private val context: Context) {
 
     val gaplessEnabled: Flow<Boolean> = context.dataStore.data.map {
         it[PrefsKeys.GAPLESS_ENABLED] ?: true
+    }
+
+    val lyricsAutoSearchMode: Flow<LyricsAutoSearchMode> = context.dataStore.data.map {
+        LyricsAutoSearchMode.fromValueOrDefault(it[PrefsKeys.LYRICS_AUTO_SEARCH_MODE])
+    }
+
+    /** Comma-separated track ids whose lyrics were already opened once in ONLINE_FIRST mode. */
+    val lyricsOnlineOpenedTrackIds: Flow<String> = context.dataStore.data.map {
+        it[PrefsKeys.LYRICS_ONLINE_OPENED_TRACK_IDS].orEmpty()
+    }
+
+    val volumeNormalization: Flow<VolumeNormalization> = context.dataStore.data.map {
+        VolumeNormalization.fromValueOrDefault(it[PrefsKeys.VOLUME_NORMALIZATION])
     }
 
     val playWithOthers: Flow<Boolean> = context.dataStore.data.map {
@@ -233,6 +249,25 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setGaplessEnabled(enabled: Boolean) {
         context.dataStore.edit { it[PrefsKeys.GAPLESS_ENABLED] = enabled }
+    }
+
+    suspend fun setLyricsAutoSearchMode(mode: LyricsAutoSearchMode) {
+        context.dataStore.edit { it[PrefsKeys.LYRICS_AUTO_SEARCH_MODE] = mode.value }
+    }
+
+    suspend fun addLyricsOnlineOpenedTrackId(trackId: Long) {
+        context.dataStore.edit { prefs ->
+            val ids = prefs[PrefsKeys.LYRICS_ONLINE_OPENED_TRACK_IDS].orEmpty()
+                .split(',')
+                .filter { it.isNotBlank() }
+                .toMutableSet()
+            ids.add(trackId.toString())
+            prefs[PrefsKeys.LYRICS_ONLINE_OPENED_TRACK_IDS] = ids.joinToString(",")
+        }
+    }
+
+    suspend fun setVolumeNormalization(mode: VolumeNormalization) {
+        context.dataStore.edit { it[PrefsKeys.VOLUME_NORMALIZATION] = mode.value }
     }
 
     suspend fun setPlayWithOthers(enabled: Boolean) {

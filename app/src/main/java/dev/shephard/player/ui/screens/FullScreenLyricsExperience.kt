@@ -4,6 +4,26 @@
 
 package dev.shephard.player.ui.screens
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.ui.res.painterResource
+import dev.shephard.player.player.RepeatMode
+import dev.shephard.player.ui.components.BouncyIconButton
+import dev.shephard.player.ui.components.MinimalSeekBar
+import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.components.m3.M3WavySlider
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -50,7 +70,6 @@ import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -130,6 +149,7 @@ fun FullScreenLyricsExperience(
     val progress by playerViewModel.progress.collectAsState()
     val searchState by playerViewModel.lyricsSearchState.collectAsState()
     val syncOffsetMs by playerViewModel.lyricsSyncOffsetMs.collectAsState()
+    val isRemixed by playerViewModel.isRemixed.collectAsState()
     val context = LocalContext.current
     val preferences = remember(context) { PreferencesManager(context) }
     val predictiveBack by preferences.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
@@ -185,6 +205,15 @@ fun FullScreenLyricsExperience(
     LaunchedEffect(track?.id) {
         searchQuery = track?.title.orEmpty()
         playerViewModel.clearLyricsSearch()
+    }
+
+    // "Online first" lyrics mode: the first time lyrics are opened for a track, go straight to online results.
+    // Declared after the reset above so the search it starts is not cleared.
+    LaunchedEffect(track?.id) {
+        if (track != null && playerViewModel.consumeFirstLyricsOpenSearch()) {
+            showSearch = true
+            playerViewModel.searchLyrics(track.title)
+        }
     }
 
     LaunchedEffect(activeIndex, autoScroll, showSearch, showSettings, isEditing, track?.id) {
@@ -253,9 +282,15 @@ fun FullScreenLyricsExperience(
     }
     val deviceCornerRadius = rememberDeviceCornerRadius()
 
+    // decorFitsSystemWindows = false lets the lyrics background draw behind the status bar.
+    // The content already applies statusBarsPadding()/navigationBarsPadding(), so the header
+    // is laid out in the status bar's inset area instead of starting below it.
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
     ) {
         CompositionLocalProvider(LocalLyricsForeground provides lyricsForeground) {
             Box(
@@ -455,22 +490,40 @@ fun FullScreenLyricsExperience(
                                 val lineBlur = if (blurEnabled && activeIndex >= 0) {
                                     min(10f, distance * (blurStrength / 24f)).dp
                                 } else 0.dp
+                                // Active line grows (18sp -> 23sp) and the others shrink back, with a
+                                // slight spring overshoot, instead of jumping to the new size.
+                                val activeAmount by animateFloatAsState(
+                                    targetValue = if (isActive) 1f else 0f,
+                                    animationSpec = spring(dampingRatio = 0.7f, stiffness = 320f),
+                                    label = "lyricLineSize",
+                                )
+                                val animatedBlur by animateDpAsState(
+                                    targetValue = lineBlur,
+                                    animationSpec = tween(350),
+                                    label = "lyricLineBlur",
+                                )
+                                val targetColor = when {
+                                    isActive -> LocalLyricsForeground.current
+                                    distance > 3 -> LocalLyricsForeground.current.copy(alpha = 0.40f)
+                                    else -> LocalLyricsForeground.current.copy(alpha = 0.72f)
+                                }
+                                val animatedColor by animateColorAsState(
+                                    targetValue = targetColor,
+                                    animationSpec = tween(350),
+                                    label = "lyricLineColor",
+                                )
                                 BasicText(
                                     text = line.text,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(18.dp))
                                         .clickable { playerViewModel.seekTo((line.timeMs + syncOffsetMs).coerceAtLeast(0)) }
-                                        .blur(lineBlur)
+                                        .blur(animatedBlur)
                                         .padding(horizontal = 14.dp, vertical = 12.dp),
                                     style = textStyle.copy(
-                                        color = when {
-                                            isActive -> LocalLyricsForeground.current
-                                            distance > 3 -> LocalLyricsForeground.current.copy(alpha = 0.40f)
-                                            else -> LocalLyricsForeground.current.copy(alpha = 0.72f)
-                                        },
-                                        fontSize = if (isActive) 23.sp else 18.sp,
-                                        lineHeight = if (isActive) 31.sp else 26.sp,
+                                        color = animatedColor,
+                                        fontSize = (18f + 5f * activeAmount).sp,
+                                        lineHeight = (26f + 5f * activeAmount).sp,
                                         fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
                                         textAlign = TextAlign.Center,
                                     ),
@@ -510,6 +563,12 @@ fun FullScreenLyricsExperience(
                     val fraction = seekFraction ?: displayedFraction
                     if (durationMs > 0L) playerViewModel.onSeekCommit((fraction * durationMs).toLong())
                 },
+                useMiuix = useMiuix,
+                // Miuix's sheet uses "remix" in the first slot, M3's sheet uses "shuffle".
+                shuffleActive = if (useMiuix) isRemixed else state.shuffleEnabled,
+                onShuffle = if (useMiuix) playerViewModel::remixQueue else playerViewModel::toggleShuffle,
+                repeatMode = state.repeatMode,
+                onRepeat = playerViewModel::cycleRepeatMode,
                 onPrevious = playerViewModel::skipToPrevious,
                 onPlayPause = playerViewModel::togglePlayPause,
                 onNext = playerViewModel::skipToNext,
@@ -727,53 +786,249 @@ private fun LyricsPlaybackControls(
     seekFraction: Float,
     primary: Color,
     textStyle: TextStyle,
+    useMiuix: Boolean,
+    shuffleActive: Boolean,
+    repeatMode: RepeatMode,
     onSeekChange: (Float) -> Unit,
     onSeekFinished: () -> Unit,
+    onShuffle: () -> Unit,
     onPrevious: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
+    onRepeat: () -> Unit,
     strings: dev.shephard.player.ui.i18n.Strings,
 ) {
+    val foreground = LocalLyricsForeground.current
     Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 6.dp)) {
-        Slider(
-            value = seekFraction,
-            onValueChange = onSeekChange,
-            onValueChangeFinished = onSeekFinished,
-            enabled = durationMs > 0L,
-            colors = SliderDefaults.colors(
-                thumbColor = primary,
-                activeTrackColor = primary,
-                inactiveTrackColor = LocalLyricsForeground.current.copy(alpha = 0.25f),
-            ),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            BasicText(formatLyricsDuration(if (durationMs > 0L) (seekFraction * durationMs).toLong() else progressMs), style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.68f), fontSize = 12.sp))
-            BasicText(formatLyricsDuration(durationMs), style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.68f), fontSize = 12.sp))
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            LyricsIconButton(Icons.Filled.SkipPrevious, strings.previous, onPrevious, size = 52.dp)
-            LyricsIconButton(
-                if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                if (isPlaying) strings.pause else strings.play,
-                onPlayPause,
-                size = 60.dp,
-                selected = true,
-                primary = primary,
+        if (useMiuix) {
+            // Same progress bar as the MIUIX Now Playing sheet.
+            MinimalSeekBar(
+                progress = seekFraction,
+                onSeekPreview = onSeekChange,
+                onSeekFinished = { fraction ->
+                    onSeekChange(fraction)
+                    onSeekFinished()
+                },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                trackHeight = 6.dp,
+                activeColor = Color.White,
+                inactiveColor = Color.White.copy(alpha = 0.3f),
             )
-            LyricsIconButton(Icons.Filled.SkipNext, strings.next, onNext, size = 52.dp)
+        } else {
+            // Same wavy progress slider as the M3 Now Playing sheet.
+            M3WavySlider(
+                value = { seekFraction },
+                onValueChange = onSeekChange,
+                onValueCommit = { fraction ->
+                    onSeekChange(fraction)
+                    onSeekFinished()
+                },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                enabled = durationMs > 0L,
+                isPlaying = isPlaying,
+                activeTrackColor = primary,
+                inactiveTrackColor = foreground.copy(alpha = 0.25f),
+                thumbColor = primary,
+                semanticsLabel = strings.playbackPosition,
+            )
+        }
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            BasicText(formatLyricsDuration(if (durationMs > 0L) (seekFraction * durationMs).toLong() else progressMs), style = textStyle.copy(color = foreground.copy(alpha = 0.68f), fontSize = 12.sp))
+            BasicText(formatLyricsDuration(durationMs), style = textStyle.copy(color = foreground.copy(alpha = 0.68f), fontSize = 12.sp))
+        }
+        if (useMiuix) {
+            LyricsMiuixTransport(
+                isPlaying = isPlaying,
+                shuffleActive = shuffleActive,
+                repeatMode = repeatMode,
+                primary = primary,
+                onShuffle = onShuffle,
+                onPrevious = onPrevious,
+                onPlayPause = onPlayPause,
+                onNext = onNext,
+                onRepeat = onRepeat,
+                strings = strings,
+            )
+        } else {
+            LyricsM3Transport(
+                isPlaying = isPlaying,
+                shuffleActive = shuffleActive,
+                repeatMode = repeatMode,
+                foreground = foreground,
+                onShuffle = onShuffle,
+                onPrevious = onPrevious,
+                onPlayPause = onPlayPause,
+                onNext = onNext,
+                onRepeat = onRepeat,
+                strings = strings,
+            )
         }
         if (track != null) {
             BasicText(
                 text = "${track.title} · ${track.artist}",
-                modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
-                style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.62f), fontSize = 11.sp, textAlign = TextAlign.Center),
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
+                style = textStyle.copy(color = foreground.copy(alpha = 0.62f), fontSize = 11.sp, textAlign = TextAlign.Center),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** Transport row of the MIUIX Now Playing sheet: remix, previous, play/pause, next, repeat. */
+@Composable
+private fun LyricsMiuixTransport(
+    isPlaying: Boolean,
+    shuffleActive: Boolean,
+    repeatMode: RepeatMode,
+    primary: Color,
+    onShuffle: () -> Unit,
+    onPrevious: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onRepeat: () -> Unit,
+    strings: dev.shephard.player.ui.i18n.Strings,
+) {
+    val playScale = remember { Animatable(1f) }
+    val playScope = rememberCoroutineScope()
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, start = 12.dp, end = 12.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BouncyIconButton(
+            onClick = onShuffle,
+            icon = Icons.Filled.Shuffle,
+            contentDescription = strings.remix,
+            tint = if (shuffleActive) primary else Color.White,
+            iconSize = 28.dp,
+        )
+        BouncyIconButton(
+            onClick = onPrevious,
+            painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_rewind),
+            contentDescription = strings.previous,
+            tint = Color.White,
+            iconSize = 36.dp,
+        )
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .bounceClick {
+                    playScope.launch {
+                        playScale.animateTo(0.85f, tween(80))
+                        playScale.animateTo(1.1f, spring(dampingRatio = 0.45f, stiffness = 600f))
+                        playScale.animateTo(1f, spring(dampingRatio = 0.7f, stiffness = 600f))
+                    }
+                    onPlayPause()
+                }
+                .graphicsLayer {
+                    scaleX = playScale.value
+                    scaleY = playScale.value
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            AnimatedContent(
+                targetState = isPlaying,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(150)).togetherWith(fadeOut(animationSpec = tween(100)))
+                },
+                label = "lyricsMiuixPlayPause",
+            ) { playing ->
+                Icon(
+                    painter = painterResource(
+                        id = if (playing) dev.shephard.player.R.drawable.ic_nowplaying_pause else dev.shephard.player.R.drawable.ic_nowplaying_play,
+                    ),
+                    contentDescription = if (playing) strings.pause else strings.play,
+                    tint = Color.White,
+                    modifier = Modifier.size(40.dp),
+                )
+            }
+        }
+        BouncyIconButton(
+            onClick = onNext,
+            painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_fforward),
+            contentDescription = strings.next,
+            tint = Color.White,
+            iconSize = 36.dp,
+        )
+        BouncyIconButton(
+            onClick = onRepeat,
+            icon = if (repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+            contentDescription = strings.repeat,
+            tint = if (repeatMode != RepeatMode.OFF) primary else Color.White,
+            iconSize = 28.dp,
+        )
+    }
+}
+
+/** Transport row of the M3 Now Playing sheet: shuffle, tonal previous/next, filled play, repeat. */
+@Composable
+private fun LyricsM3Transport(
+    isPlaying: Boolean,
+    shuffleActive: Boolean,
+    repeatMode: RepeatMode,
+    foreground: Color,
+    onShuffle: () -> Unit,
+    onPrevious: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onRepeat: () -> Unit,
+    strings: dev.shephard.player.ui.i18n.Strings,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onShuffle, modifier = Modifier.size(48.dp)) {
+            Icon(
+                Icons.Filled.Shuffle,
+                strings.shuffle,
+                tint = if (shuffleActive) MaterialTheme.colorScheme.primary else foreground,
+            )
+        }
+        FilledTonalIconButton(
+            onClick = onPrevious,
+            modifier = Modifier.size(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ),
+        ) {
+            Icon(Icons.Filled.SkipPrevious, strings.previous, modifier = Modifier.size(28.dp))
+        }
+        FilledIconButton(
+            onClick = onPlayPause,
+            modifier = Modifier.size(72.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+        ) {
+            Icon(
+                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                contentDescription = if (isPlaying) strings.pause else strings.play,
+                modifier = Modifier.size(36.dp),
+            )
+        }
+        FilledTonalIconButton(
+            onClick = onNext,
+            modifier = Modifier.size(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ),
+        ) {
+            Icon(Icons.Filled.SkipNext, strings.next, modifier = Modifier.size(28.dp))
+        }
+        IconButton(onClick = onRepeat, modifier = Modifier.size(48.dp)) {
+            Icon(
+                imageVector = if (repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                contentDescription = strings.repeat,
+                tint = if (repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else foreground,
             )
         }
     }

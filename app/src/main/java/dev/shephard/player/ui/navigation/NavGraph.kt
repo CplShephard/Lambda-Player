@@ -2,6 +2,12 @@
 // Copyright (C) 2026 InstallerX Revived contributors
 package dev.shephard.player.ui.navigation
 
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.mutableStateOf
+import dev.shephard.player.ui.components.LocalBottomOverlayHeight
+import dev.shephard.player.ui.components.LocalDetailMiniPlayer
+import dev.shephard.player.ui.components.LocalPlaylistDetailOpen
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -10,8 +16,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
@@ -19,10 +23,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -39,7 +43,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.navigationevent.NavigationEventInfo
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,19 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation3.runtime.NavEntryDecorator
-import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.entryProvider
-import androidx.navigation3.runtime.rememberDecoratedNavEntries
-import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
-import androidx.navigation3.scene.SceneInfo
-import androidx.navigation3.scene.SinglePaneSceneStrategy
-import androidx.navigation3.scene.rememberSceneState
-import androidx.navigation3.ui.NavDisplay
-import androidx.navigation3.ui.NavDisplayTransitionEffects
-import androidx.activity.compose.BackHandler
 import androidx.navigationevent.compose.NavigationBackHandler
-import androidx.navigationevent.compose.NavigationEventState
 import androidx.navigationevent.compose.rememberNavigationEventState
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PlayerViewModel
@@ -69,12 +65,11 @@ import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.theme.PredictiveBackAnimation
 import dev.shephard.player.theme.PredictiveBackExitDirection
 import dev.shephard.player.theme.effectiveExitDirection
-import dev.shephard.player.ui.animation.predictiveback.predictiveBackHandler
+import dev.shephard.player.ui.animation.predictiveback.installerNavTransition
 import dev.shephard.player.ui.components.MiniPlayer
 import dev.shephard.player.ui.components.M3MiniPlayer
 import dev.shephard.player.ui.glass.FloatingBottomBar
 import dev.shephard.player.ui.glass.FloatingBottomBarDefaults
-import dev.shephard.player.ui.glass.FloatingBottomBarItem
 import dev.shephard.player.ui.glass.FloatingBottomBarMode
 import dev.shephard.player.ui.glass.LocalAppBackdrop
 import dev.shephard.player.ui.glass.LocalBlurEnabled
@@ -101,6 +96,12 @@ import dev.shephard.player.ui.screens.StatsScreen
 import dev.shephard.player.ui.screens.m3.StatsScreenM3
 import dev.shephard.player.ui.screens.ThemeSettingsScreen
 import dev.shephard.player.ui.screens.m3.ThemeSettingsScreenM3
+import top.yukonga.miuix.kmp.nav.core.NavCornerClipMode
+import top.yukonga.miuix.kmp.nav.core.NavDisplay
+import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
+import top.yukonga.miuix.kmp.nav.core.NavKey
+import top.yukonga.miuix.kmp.nav.core.entryProvider
+import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -139,300 +140,260 @@ fun NavGraph(
     val storedExitDirection by preferences.predictiveBackExitDirection
         .collectAsState(initial = PredictiveBackExitDirection.FOLLOW_GESTURE)
     // MIUIX always exits to the right; the stored value only matters for styles
-    // that expose the option (AOSP), so a stale "always left" can never leak in.
+    // that expose the option (AOSP, Scale), so a stale "always left" can never leak in.
     val predictiveBackExitDirection = effectiveExitDirection(predictiveBackAnimation, storedExitDirection)
 
-    val isPredictiveEnabled = predictiveBackAnimation != PredictiveBackAnimation.NONE
+    // Same wiring as InstallerX Revived: the transition decides how pages move while NavDisplay
+    // drives the back gesture. The same transitions are used by both the Material 3 and MIUIX UI.
+    val transition = remember(predictiveBackAnimation, predictiveBackExitDirection) {
+        installerNavTransition(
+            animation = predictiveBackAnimation,
+            exitDirection = predictiveBackExitDirection,
+        )
+    }
+    val swipeBackDirection = when (LocalLayoutDirection.current) {
+        LayoutDirection.Rtl -> NavSwipeDirection.RightToLeft
+        else -> NavSwipeDirection.LeftToRight
+    }
+    // NONE: no predictive preview. Each entry takes the gesture itself and pops normally.
+    val interceptPredictiveBack =
+        predictiveBackAnimation == PredictiveBackAnimation.NONE && backStack.size > 1
 
-    val handler = remember(predictiveBackAnimation, predictiveBackExitDirection) {
-        predictiveBackHandler(predictiveBackAnimation, predictiveBackExitDirection)
+    val roundAllCorners = predictiveBackAnimation == PredictiveBackAnimation.AOSP ||
+        predictiveBackAnimation == PredictiveBackAnimation.SCALE ||
+        predictiveBackAnimation == PredictiveBackAnimation.CLASSIC
+    val backdropColor = if (useMiuix) {
+        MiuixAppTheme.colorScheme.background
+    } else {
+        MaterialTheme.colorScheme.surfaceContainer
+    }
+    val effects = remember(roundAllCorners, backdropColor) {
+        NavDisplayEffects(
+            enableCornerClip = true,
+            cornerClipRadius = if (roundAllCorners) 32.dp else 0.dp,
+            cornerClipMode = if (roundAllCorners) NavCornerClipMode.All else NavCornerClipMode.Leading,
+            dimAmount = 0.5f,
+            backdropColor = backdropColor,
+            blockInputDuringTransition = false,
+        )
     }
 
-    val navigationScope = rememberCoroutineScope()
+    val lastPopTime = remember { mutableLongStateOf(0L) }
 
     fun pop() {
-        if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+        // NavDisplay and the entry-level handler can both report one back press; ignore the echo.
+        val now = System.currentTimeMillis()
+        if (now - lastPopTime.longValue < 100L) return
+        if (backStack.size <= 1) return
+        lastPopTime.longValue = now
+        backStack.removeAt(backStack.lastIndex)
     }
 
-    val entryProvider = remember(backStack, useMiuix) {
-        entryProvider<NavKey> {
+    val overlayHeight = remember { mutableStateOf(0.dp) }
+    val overlayDensity = LocalDensity.current
+    // True while a playlist detail is open; hides the global mini player + dock (like submenus do).
+    val playlistDetailOpen = remember { mutableStateOf(false) }
+    val detailMiniPlayer: @Composable (Modifier) -> Unit = { detailModifier ->
+        DetailMiniPlayerHost(
+            playerViewModel = playerViewModel,
+            useMiuix = useMiuix,
+            onOpenNowPlaying = onOpenNowPlaying,
+            modifier = detailModifier
+        )
+    }
+    val entryProvider = remember(backStack, useMiuix, swipeBackDirection, interceptPredictiveBack) {
+        entryProvider {
             entry<MainRoute> {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    val contentBackdrop = LocalContentBackdrop.current
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .then(
-                                if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop)
-                                else Modifier
-                            )
-                    ) {
-                        HorizontalPager(
-                            state = mainPagerState.pagerState,
-                            userScrollEnabled = true,
-                            beyondViewportPageCount = 1,
-                        ) { page ->
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .then(
-                                        if (!useMiuix) {
-                                            Modifier.m3PagerPageTransition(mainPagerState.pagerState, page)
-                                        } else Modifier
-                                    )
-                            ) {
-                                when (page) {
-                                    0 -> if (useMiuix) {
-                                        HomeScreen(
-                                            libraryViewModel = viewModel(),
-                                            playerViewModel = playerViewModel,
-                                            hasMiniPlayer = hasMiniPlayer,
-                                            onTrackClick = onTrackClick,
+                NavEntryBackHandler(interceptPredictiveBack, ::pop) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        val contentBackdrop = LocalContentBackdrop.current
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .then(
+                                    if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop)
+                                    else Modifier
+                                )
+                        ) {
+                            HorizontalPager(
+                                state = mainPagerState.pagerState,
+                                userScrollEnabled = true,
+                                beyondViewportPageCount = 1,
+                            ) { page ->
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .then(
+                                            if (!useMiuix) {
+                                                Modifier.m3PagerPageTransition(mainPagerState.pagerState, page)
+                                            } else Modifier
                                         )
-                                    } else {
-                                        HomeScreenM3(
-                                            libraryViewModel = viewModel(),
-                                            playerViewModel = playerViewModel,
-                                            hasMiniPlayer = hasMiniPlayer,
-                                            onTrackClick = onTrackClick,
-                                        )
-                                    }
-                                    1 -> if (useMiuix) {
-                                        MusicScreen(
-                                            libraryViewModel = viewModel(),
-                                            playerViewModel = playerViewModel,
-                                            onTrackClick = { tracks, index -> onTrackClick(tracks, index, null) },
-                                            hasMiniPlayer = hasMiniPlayer,
-                                        )
-                                    } else {
-                                        MusicScreenM3(
-                                            libraryViewModel = viewModel(),
-                                            playerViewModel = playerViewModel,
-                                            onTrackClick = { tracks, index -> onTrackClick(tracks, index, null) },
-                                            hasMiniPlayer = hasMiniPlayer,
-                                        )
-                                    }
-                                    2 -> if (useMiuix) {
-                                        PlaylistScreen(
-                                            libraryViewModel = viewModel(),
-                                            onTrackClick = onTrackClick,
-                                            onPlaylistRemixClick = onPlaylistRemixClick,
-                                            hasMiniPlayer = hasMiniPlayer,
-                                        )
-                                    } else {
-                                        PlaylistScreenM3(
-                                            libraryViewModel = viewModel(),
-                                            onTrackClick = onTrackClick,
-                                            onPlaylistRemixClick = onPlaylistRemixClick,
-                                            hasMiniPlayer = hasMiniPlayer,
-                                        )
-                                    }
-                                    3 -> if (useMiuix) {
-                                        SettingsScreen(
-                                            playerViewModel = playerViewModel,
-                                            onOpenThemeSettings = { backStack.add(ThemeRoute) },
-                                            onOpenPlayerSettings = { backStack.add(PlayerRoute) },
-                                            onOpenAbout = { backStack.add(AboutRoute) },
-                                            onOpenStats = { backStack.add(StatsRoute) },
-                                        )
-                                    } else {
-                                        SettingsScreenM3(
-                                            playerViewModel = playerViewModel,
-                                            onOpenThemeSettings = { backStack.add(ThemeRoute) },
-                                            onOpenPlayerSettings = { backStack.add(PlayerRoute) },
-                                            onOpenAbout = { backStack.add(AboutRoute) },
-                                            onOpenStats = { backStack.add(StatsRoute) },
-                                        )
+                                ) {
+                                    when (page) {
+                                        0 -> if (useMiuix) {
+                                            HomeScreen(
+                                                libraryViewModel = viewModel(),
+                                                playerViewModel = playerViewModel,
+                                                hasMiniPlayer = hasMiniPlayer,
+                                                onTrackClick = onTrackClick,
+                                            )
+                                        } else {
+                                            HomeScreenM3(
+                                                libraryViewModel = viewModel(),
+                                                playerViewModel = playerViewModel,
+                                                hasMiniPlayer = hasMiniPlayer,
+                                                onTrackClick = onTrackClick,
+                                            )
+                                        }
+                                        1 -> if (useMiuix) {
+                                            MusicScreen(
+                                                libraryViewModel = viewModel(),
+                                                playerViewModel = playerViewModel,
+                                                onTrackClick = { tracks, index -> onTrackClick(tracks, index, null) },
+                                                hasMiniPlayer = hasMiniPlayer,
+                                            )
+                                        } else {
+                                            MusicScreenM3(
+                                                libraryViewModel = viewModel(),
+                                                playerViewModel = playerViewModel,
+                                                onTrackClick = { tracks, index -> onTrackClick(tracks, index, null) },
+                                                hasMiniPlayer = hasMiniPlayer,
+                                            )
+                                        }
+                                        2 -> if (useMiuix) {
+                                            PlaylistScreen(
+                                                libraryViewModel = viewModel(),
+                                                onTrackClick = onTrackClick,
+                                                onPlaylistRemixClick = onPlaylistRemixClick,
+                                                hasMiniPlayer = hasMiniPlayer,
+                                            )
+                                        } else {
+                                            PlaylistScreenM3(
+                                                libraryViewModel = viewModel(),
+                                                onTrackClick = onTrackClick,
+                                                onPlaylistRemixClick = onPlaylistRemixClick,
+                                                hasMiniPlayer = hasMiniPlayer,
+                                            )
+                                        }
+                                        3 -> if (useMiuix) {
+                                            SettingsScreen(
+                                                playerViewModel = playerViewModel,
+                                                onOpenThemeSettings = { backStack.add(ThemeRoute) },
+                                                onOpenPlayerSettings = { backStack.add(PlayerRoute) },
+                                                onOpenAbout = { backStack.add(AboutRoute) },
+                                                onOpenStats = { backStack.add(StatsRoute) },
+                                            )
+                                        } else {
+                                            SettingsScreenM3(
+                                                playerViewModel = playerViewModel,
+                                                onOpenThemeSettings = { backStack.add(ThemeRoute) },
+                                                onOpenPlayerSettings = { backStack.add(PlayerRoute) },
+                                                onOpenAbout = { backStack.add(AboutRoute) },
+                                                onOpenStats = { backStack.add(StatsRoute) },
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .zIndex(1f)
-                    ) {
-                        MiniPlayerHost(
-                            playerViewModel = playerViewModel,
-                            useMiuix = useMiuix,
-                            onOpenNowPlaying = onOpenNowPlaying,
-                        )
-                        MainDock(
-                            preferences = preferences,
-                            useMiuix = useMiuix,
-                            selectedIndex = { mainPagerState.selectedPage },
-                            onSelected = { index -> mainPagerState.animateToPage(index) },
-                        )
+                        AnimatedVisibility(
+                            visible = !playlistDetailOpen.value,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .zIndex(1f),
+                            enter = fadeIn(tween(200)) + slideInVertically(initialOffsetY = { it }),
+                            exit = fadeOut(tween(150)) + slideOutVertically(targetOffsetY = { it })
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onSizeChanged { overlayHeight.value = with(overlayDensity) { it.height.toDp() } }
+                            ) {
+                                MiniPlayerHost(
+                                    playerViewModel = playerViewModel,
+                                    useMiuix = useMiuix,
+                                    onOpenNowPlaying = onOpenNowPlaying,
+                                )
+                                MainDock(
+                                    preferences = preferences,
+                                    useMiuix = useMiuix,
+                                    selectedIndex = { mainPagerState.selectedPage },
+                                    onSelected = { index -> mainPagerState.animateToPage(index) },
+                                )
+                            }
+                        }
                     }
                 }
             }
-            entry<ThemeRoute> {
-                if (useMiuix) {
-                    ThemeSettingsScreen(onBack = ::pop)
-                } else {
-                    CompositionLocalProvider(LocalWallpaperEnabled provides false) {
-                        ThemeSettingsScreenM3(onBack = ::pop)
+            entry<ThemeRoute>(swipeDismiss = swipeBackDirection) {
+                NavEntryBackHandler(interceptPredictiveBack, ::pop) {
+                    if (useMiuix) {
+                        ThemeSettingsScreen(onBack = ::pop)
+                    } else {
+                        CompositionLocalProvider(LocalWallpaperEnabled provides false) {
+                            ThemeSettingsScreenM3(onBack = ::pop)
+                        }
                     }
                 }
             }
-            entry<PlayerRoute> {
-                if (useMiuix) {
-                    PlayerSettingsScreen(onBack = ::pop)
-                } else {
-                    CompositionLocalProvider(LocalWallpaperEnabled provides false) {
-                        PlayerSettingsScreenM3(onBack = ::pop)
+            entry<PlayerRoute>(swipeDismiss = swipeBackDirection) {
+                NavEntryBackHandler(interceptPredictiveBack, ::pop) {
+                    if (useMiuix) {
+                        PlayerSettingsScreen(onBack = ::pop)
+                    } else {
+                        CompositionLocalProvider(LocalWallpaperEnabled provides false) {
+                            PlayerSettingsScreenM3(onBack = ::pop)
+                        }
                     }
                 }
             }
-            entry<AboutRoute> {
-                if (useMiuix) {
-                    AboutSettingsScreen(onBack = ::pop)
-                } else {
-                    CompositionLocalProvider(LocalWallpaperEnabled provides false) {
-                        AboutSettingsScreenM3(onBack = ::pop)
+            entry<AboutRoute>(swipeDismiss = swipeBackDirection) {
+                NavEntryBackHandler(interceptPredictiveBack, ::pop) {
+                    if (useMiuix) {
+                        AboutSettingsScreen(onBack = ::pop)
+                    } else {
+                        CompositionLocalProvider(LocalWallpaperEnabled provides false) {
+                            AboutSettingsScreenM3(onBack = ::pop)
+                        }
                     }
                 }
             }
-            entry<StatsRoute> {
-                if (useMiuix) {
-                    StatsScreen(playerViewModel = playerViewModel, onBack = ::pop)
-                } else {
-                    CompositionLocalProvider(LocalWallpaperEnabled provides false) {
-                        StatsScreenM3(playerViewModel = playerViewModel, onBack = ::pop)
+            entry<StatsRoute>(swipeDismiss = swipeBackDirection) {
+                NavEntryBackHandler(interceptPredictiveBack, ::pop) {
+                    if (useMiuix) {
+                        StatsScreen(playerViewModel = playerViewModel, onBack = ::pop)
+                    } else {
+                        CompositionLocalProvider(LocalWallpaperEnabled provides false) {
+                            StatsScreenM3(playerViewModel = playerViewModel, onBack = ::pop)
+                        }
                     }
                 }
             }
         }
     }
 
-    Box(modifier = modifier) {
-        key(useMiuix) {
-            var gestureState: NavigationEventState<androidx.navigation3.scene.SceneInfo<NavKey>>? = null
-
-            val entries = rememberDecoratedNavEntries(
-                backStack = backStack,
-                entryDecorators = listOf(
-                    rememberSaveableStateHolderNavEntryDecorator(),
-                    NavEntryDecorator(
-                        onPop = { key ->
-                            handler.onPagePop(
-                                contentPageKey = key,
-                                animationScope = navigationScope
-                            )
-                        }
-                    ) { content ->
-                        with(handler) {
-                            Box(
-                                modifier = Modifier.predictiveBackAnimationDecorator(
-                                    transitionState = gestureState?.transitionState,
-                                    contentPageKey = content.contentKey,
-                                    currentPageKey = backStack.lastOrNull()
-                                )
-                            ) {
-                                content.Content()
-                            }
-                        }
-                    }
-                ),
-                entryProvider = entryProvider,
-            )
-
-            val sceneState = rememberSceneState(
-                entries = entries,
-                sceneStrategies = listOf(SinglePaneSceneStrategy()),
-                onBack = {
-                    navigationScope.launch {
-                        if (isPredictiveEnabled) {
-                            handler.onBackPressed(
-                                transitionState = gestureState?.transitionState,
-                                currentPageKey = backStack.lastOrNull()
-                            )
-                        }
-                        pop()
-                    }
-                }
-            )
-
-            val currentScene = sceneState.currentScene
-            val previousScenes = sceneState.previousScenes
-            // Always create gestureState non-null to satisfy NavDisplay non-null requirement (Navigation3 1.0+)
-            // When predictive is NONE, state exists but back handler is disabled and we use simple BackHandler
-            gestureState = rememberNavigationEventState(
-                currentInfo = SceneInfo(currentScene),
-                backInfo = previousScenes.map { SceneInfo(it) }
-            )
-
-            val currentGestureState = gestureState
-            if (isPredictiveEnabled) {
-                NavigationBackHandler(
-                    state = currentGestureState,
-                    isBackEnabled = backStack.size > 1,
-                    onBackCompleted = {
-                        navigationScope.launch {
-                            handler.onBackPressed(
-                                transitionState = currentGestureState.transitionState,
-                                currentPageKey = backStack.lastOrNull()
-                            )
-                            pop()
-                        }
-                    },
-                    onBackCancelled = {}
+    val submenuNavConfig = remember(predictiveBackAnimation, transition, effects) {
+        SubmenuNavConfig(animation = predictiveBackAnimation, transition = transition, effects = effects)
+    }
+    CompositionLocalProvider(
+        LocalBottomOverlayHeight provides overlayHeight,
+        LocalPlaylistDetailOpen provides playlistDetailOpen,
+        LocalDetailMiniPlayer provides detailMiniPlayer,
+        LocalSubmenuNavConfig provides submenuNavConfig,
+    ) {
+        Box(modifier = modifier) {
+            key(useMiuix) {
+                NavDisplay(
+                    backStack,
+                    entryProvider,
+                    Modifier.fillMaxSize(),
+                    ::pop,
+                    transition,
+                    effects,
                 )
-            } else {
-                // NONE: predictive back fully disabled, use simple BackHandler
-                if (backStack.size > 1) {
-                    BackHandler { pop() }
-                }
             }
-
-            NavDisplay(
-                sceneState = sceneState,
-                navigationEventState = gestureState,
-                contentAlignment = Alignment.TopStart,
-                transitionEffects = NavDisplayTransitionEffects(
-                    blockInputDuringTransition = true
-                ),
-                predictivePopTransitionSpec = { swipeEdge ->
-                    if (!isPredictiveEnabled) {
-                        // NONE: no predictive preview at all
-                        androidx.compose.animation.ContentTransform(
-                            targetContentEnter = androidx.compose.animation.EnterTransition.None,
-                            initialContentExit = androidx.compose.animation.ExitTransition.None
-                        )
-                    } else if (useMiuix) {
-                        with(handler) { onPredictivePopTransitionSpec(swipeEdge) }
-                    } else {
-                        // M3 uses its own PlaylistDetailView animation (m3Enter/m3Exit) for all submenus
-                        androidx.compose.animation.ContentTransform(
-                            targetContentEnter = dev.shephard.player.ui.navigation.PageTransitions.m3PopEnterSubmenu,
-                            initialContentExit = dev.shephard.player.ui.navigation.PageTransitions.m3PopExitSubmenu
-                        )
-                    }
-                },
-                popTransitionSpec = {
-                    if (useMiuix) {
-                        with(handler) { onPopTransitionSpec() }
-                    } else {
-                        androidx.compose.animation.ContentTransform(
-                            targetContentEnter = dev.shephard.player.ui.navigation.PageTransitions.m3PopEnterSubmenu,
-                            initialContentExit = dev.shephard.player.ui.navigation.PageTransitions.m3PopExitSubmenu
-                        )
-                    }
-                },
-                transitionSpec = {
-                    if (useMiuix) {
-                        with(handler) { onTransitionSpec() }
-                    } else {
-                        androidx.compose.animation.ContentTransform(
-                            targetContentEnter = dev.shephard.player.ui.navigation.PageTransitions.m3EnterSubmenu,
-                            initialContentExit = dev.shephard.player.ui.navigation.PageTransitions.m3ExitSubmenu
-                        )
-                    }
-                }
-            )
         }
     }
 }
@@ -586,66 +547,102 @@ private fun AppleFloatingDock(
             contentColor = contentColor,
         )
     }
+    val labelOf: (Destination) -> String = { dest ->
+        when (dest) {
+            Destination.Home -> strings.home
+            Destination.Music -> strings.music
+            Destination.Playlists -> strings.playlists
+            Destination.Settings -> strings.settings
+        }
+    }
 
-    Box(
+    // Miuix dock: InstallerX Revived's FloatingBottomBar (ported to ui/glass).
+    FloatingBottomBar(
+        items = bottomNavDestinations,
+        selectedIndex = selectedIndex,
+        onSelected = onSelected,
+        backdrop = effectiveBackdrop,
+        mode = mode,
+        colors = barColors,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = {},
-            )
             .padding(
                 bottom = 12.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             ),
-        contentAlignment = Alignment.Center
-    ) {
-        FloatingBottomBar(
-            selectedIndex = selectedIndex,
-            onSelected = onSelected,
-            backdrop = effectiveBackdrop,
-            tabsCount = bottomNavDestinations.size,
-            isBlurEnabled = useMiuix && blurOn && effectiveBackdrop != null,
-            mode = mode,
-            colors = barColors,
-        ) {
-            bottomNavDestinations.forEachIndexed { index, dest ->
-                val selected = index == selectedIndex()
-                val label = when (dest) {
-                    Destination.Home -> strings.home
-                    Destination.Music -> strings.music
-                    Destination.Playlists -> strings.playlists
-                    Destination.Settings -> strings.settings
-                }
-                FloatingBottomBarItem(
-                    onClick = { onSelected(index) },
-                    modifier = Modifier.defaultMinSize(minWidth = 76.dp)
-                ) {
-                    if (useMiuix) {
-                        dev.shephard.player.ui.miuix.Icon(
-                            imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
-                            contentDescription = label
-                        )
-                        dev.shephard.player.ui.miuix.Text(
-                            text = label,
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Visible
-                        )
-                    } else {
-                        M3Icon(
-                            imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
-                            contentDescription = label
-                        )
-                        M3Text(
-                            text = label,
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Visible
-                        )
-                    }
-                }
+        iconContent = { dest, index ->
+            val icon = if (index == selectedIndex()) dest.selectedIcon else dest.unselectedIcon
+            if (useMiuix) {
+                dev.shephard.player.ui.miuix.Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                )
+            } else {
+                M3Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                )
             }
+        },
+        labelContent = { dest, _ ->
+            if (useMiuix) {
+                dev.shephard.player.ui.miuix.Text(
+                    text = labelOf(dest),
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Visible,
+                )
+            } else {
+                M3Text(
+                    text = labelOf(dest),
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Visible,
+                )
+            }
+        },
+    )
+}
+
+/**
+ * Mini player for playlist detail screens. Uses the large Miuix variant; M3 keeps its normal size.
+ * Respects the navigation bar inset itself, so nothing is composed (and no space reserved) without a track.
+ */
+@Composable
+private fun DetailMiniPlayerHost(
+    playerViewModel: PlayerViewModel,
+    useMiuix: Boolean,
+    onOpenNowPlaying: () -> Unit,
+    modifier: Modifier
+) {
+    val playerState by playerViewModel.uiState.collectAsState()
+    if (playerState.currentTrack == null) return
+
+    Box(modifier = modifier.navigationBarsPadding()) {
+        if (useMiuix) {
+            MiniPlayer(
+                state = playerState,
+                progressFlow = playerViewModel.progress,
+                onClick = onOpenNowPlaying,
+                onPlayPauseClick = { playerViewModel.togglePlayPause() },
+                onNextClick = { playerViewModel.skipToNext() },
+                onPreviousClick = { playerViewModel.skipToPrevious() },
+                large = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            M3MiniPlayer(
+                state = playerState,
+                progressFlow = playerViewModel.progress,
+                onClick = onOpenNowPlaying,
+                onPlayPauseClick = { playerViewModel.togglePlayPause() },
+                onNextClick = { playerViewModel.skipToNext() },
+                onPreviousClick = { playerViewModel.skipToPrevious() },
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
@@ -660,7 +657,11 @@ private fun MiniPlayerHost(
         playerViewModel.uiState
             .map { it.currentTrack != null }
             .distinctUntilChanged()
-    }.collectAsState(initial = false)
+    }.collectAsState(
+        // Seed from the current state so a re-composed host (e.g. after returning from a submenu)
+        // does not replay the enter animation while a track is already loaded.
+        initial = playerViewModel.uiState.value.currentTrack != null
+    )
 
     AnimatedVisibility(
         visible = visible,
@@ -691,4 +692,23 @@ private fun MiniPlayerHost(
             )
         }
     }
+}
+
+/**
+ * Takes the back gesture for the entry it wraps (InstallerX InstallerNavEntry). When predictive
+ * back is NONE the gesture is handled here, so NavDisplay does not run a predictive preview.
+ */
+@Composable
+internal fun NavEntryBackHandler(
+    interceptPredictiveBack: Boolean,
+    onBack: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val navigationEventState = rememberNavigationEventState(NavigationEventInfo.None)
+    NavigationBackHandler(
+        state = navigationEventState,
+        isBackEnabled = interceptPredictiveBack,
+        onBackCompleted = onBack,
+    )
+    content()
 }

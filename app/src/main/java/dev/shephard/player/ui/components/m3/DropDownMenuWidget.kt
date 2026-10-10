@@ -32,10 +32,18 @@ fun DropDownMenuWidget(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
+    // InstallerX-style: the sub line always shows the currently selected option, so the
+    // user can see the value without opening the menu. The optional explanation (if any)
+    // follows on the next line.
+    val selectedLabel = data.getOrNull(choice)
+    val subline = listOfNotNull(selectedLabel, description)
+        .joinToString(separator = "\n")
+        .ifEmpty { null }
+
     BaseWidget(
         icon = icon,
         title = title,
-        description = description,
+        description = subline,
         enabled = enabled,
         isError = isError,
         onClick = { if (enabled) expanded = !expanded },

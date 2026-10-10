@@ -79,6 +79,8 @@ data class PlayerUiState(
     val queue: List<AudioTrack> = emptyList(),
     val crossfadeEnabled: Boolean = false,
     val gaplessEnabled: Boolean = true,
+    val lyricsAutoSearchMode: LyricsAutoSearchMode = LyricsAutoSearchMode.OFF,
+    val volumeNormalization: VolumeNormalization = VolumeNormalization.NONE,
     val playWithOthers: Boolean = false,
     val totalListeningMs: Long = 0L,
     val glowColorArgb: Int = DEFAULT_GLOW_COLOR,
@@ -99,6 +101,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+
+    /** Tracks whose lyrics were already opened once in ONLINE_FIRST mode. */
+    private val openedLyricsTrackIds = mutableSetOf<Long>()
 
     private val _progress = MutableStateFlow(PlaybackProgress())
     val progress: StateFlow<PlaybackProgress> = _progress.asStateFlow()
@@ -165,6 +170,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             flushListeningTime()
+            VolumeNormalizer.requestReset()
             val track = queueTracks.find { it.id.toString() == mediaItem?.mediaId }
             finalizeStatsSession()
             statsSessionTrackId = track?.id
@@ -372,6 +378,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             prefs.gaplessEnabled.collect { enabled ->
                 _uiState.value = _uiState.value.copy(gaplessEnabled = enabled)
+            }
+        }
+        viewModelScope.launch {
+            prefs.lyricsAutoSearchMode.collect { mode ->
+                _uiState.value = _uiState.value.copy(lyricsAutoSearchMode = mode)
+            }
+        }
+        viewModelScope.launch {
+            prefs.volumeNormalization.collect { mode ->
+                _uiState.value = _uiState.value.copy(volumeNormalization = mode)
+            }
+        }
+        viewModelScope.launch {
+            // Only adds ids: this set is also updated directly when lyrics are opened.
+            prefs.lyricsOnlineOpenedTrackIds.collect { raw ->
+                raw.split(',').mapNotNullTo(openedLyricsTrackIds) { it.toLongOrNull() }
             }
         }
         viewModelScope.launch {
@@ -999,23 +1021,99 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         _lyricsSyncOffsetMs.value = 0
         lyricsLoadJob = viewModelScope.launch {
-            val document = withContext(Dispatchers.IO) {
-                loadSavedLyrics(track.id)
-                    ?: runCatching {
-                        val raw = loadLyricsFromRetriever(track.uri)
-                            ?: loadLyricsFromLrcFile(track)
-                        raw?.let(::parseLyricsDocument)
-                    }.getOrNull()
-                    ?: LyricsDocument(rawText = "", lines = emptyList(), syncedLines = emptyList())
+            val mode = prefs.lyricsAutoSearchMode.first()
+
+            // A lyrics result the user chose manually always wins.
+            val saved = withContext(Dispatchers.IO) { loadSavedLyrics(track.id) }
+            if (saved != null) {
+                applyLyricsDocument(track, saved)
+                return@launch
             }
-            if (_uiState.value.currentTrack?.id != track.id) return@launch
-            _uiState.value = _uiState.value.copy(
-                lyrics = document.lines,
-                syncedLyrics = document.syncedLines,
-                lyricsVisible = document.lines.isNotEmpty(),
-            )
-            _lyricsSyncOffsetMs.value = loadLyricsSyncOffset(track.id)
+
+            val embedded = withContext(Dispatchers.IO) { loadEmbeddedLyricsDocument(track) }
+            val hasEmbedded = embedded != null && embedded.lines.isNotEmpty()
+            when (mode) {
+                LyricsAutoSearchMode.OFF,
+                LyricsAutoSearchMode.ONLINE_FIRST -> applyLyricsDocument(track, embedded)
+
+                LyricsAutoSearchMode.EMBEDDED_FIRST -> {
+                    if (hasEmbedded) {
+                        applyLyricsDocument(track, embedded)
+                    } else {
+                        autoSearchLyricsAndApply(track, fallback = null)
+                    }
+                }
+
+                LyricsAutoSearchMode.BEST_MATCH -> autoSearchLyricsAndApply(track, fallback = embedded)
+            }
         }
+    }
+
+    private fun loadEmbeddedLyricsDocument(track: AudioTrack): LyricsDocument? = runCatching {
+        val raw = loadLyricsFromRetriever(track.uri) ?: loadLyricsFromLrcFile(track)
+        raw?.let(::parseLyricsDocument)
+    }.getOrNull()
+
+    private suspend fun applyLyricsDocument(track: AudioTrack, document: LyricsDocument?) {
+        if (_uiState.value.currentTrack?.id != track.id) return
+        val resolved = document ?: LyricsDocument(rawText = "", lines = emptyList(), syncedLines = emptyList())
+        _uiState.value = _uiState.value.copy(
+            lyrics = resolved.lines,
+            syncedLyrics = resolved.syncedLines,
+            lyricsVisible = resolved.lines.isNotEmpty(),
+        )
+        _lyricsSyncOffsetMs.value = loadLyricsSyncOffset(track.id)
+    }
+
+    /**
+     * Searches online sources, applies the best-scoring candidate and stores it like a manual choice.
+     * Falls back to [fallback] (embedded or .lrc lyrics) when no candidate is good enough.
+     */
+    private suspend fun autoSearchLyricsAndApply(track: AudioTrack, fallback: LyricsDocument?) {
+        val best = findBestOnlineLyrics(track)
+        if (_uiState.value.currentTrack?.id != track.id) return
+        val onlineDocument = best?.let { parseLyricsDocument(it.rawLyrics) }
+        if (onlineDocument != null && onlineDocument.lines.isNotEmpty()) {
+            persistLyricsDocument(track.id, onlineDocument)
+            applyLyricsDocument(track, onlineDocument)
+        } else {
+            applyLyricsDocument(track, fallback)
+        }
+    }
+
+    private suspend fun findBestOnlineLyrics(track: AudioTrack): LyricsSearchResult? {
+        val query = listOf(track.title, track.artist)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && !it.equals("<unknown>", ignoreCase = true) }
+            .joinToString(" ")
+        if (query.isBlank()) return null
+        val candidates = coroutineScope {
+            val lrclib = async(Dispatchers.IO) { runCatching { searchLrclib(query) }.getOrDefault(emptyList()) }
+            val qqMusic = async { runCatching { searchQqLyrics(query) }.getOrDefault(emptyList()) }
+            lrclib.await() + qqMusic.await()
+        }
+        return pickBestLyricsCandidate(candidates, track)
+    }
+
+    /**
+     * Returns true the first time lyrics are opened for the current track in ONLINE_FIRST mode.
+     * The lyrics screen then opens the online search results directly.
+     */
+    fun consumeFirstLyricsOpenSearch(): Boolean {
+        val state = _uiState.value
+        val trackId = state.currentTrack?.id ?: return false
+        if (state.lyricsAutoSearchMode != LyricsAutoSearchMode.ONLINE_FIRST) return false
+        if (!openedLyricsTrackIds.add(trackId)) return false
+        viewModelScope.launch { prefs.addLyricsOnlineOpenedTrackId(trackId) }
+        return true
+    }
+
+    fun setLyricsAutoSearchMode(mode: LyricsAutoSearchMode) {
+        viewModelScope.launch { prefs.setLyricsAutoSearchMode(mode) }
+    }
+
+    fun setVolumeNormalization(mode: VolumeNormalization) {
+        viewModelScope.launch { prefs.setVolumeNormalization(mode) }
     }
 
     private suspend fun loadSavedLyrics(trackId: Long): LyricsDocument? = runCatching {
@@ -1144,21 +1242,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             syncedLyrics = document.syncedLines,
             lyricsVisible = true,
         )
-        viewModelScope.launch {
-            val json = prefs.lyricsJson.first()
-            val obj = runCatching { org.json.JSONObject(json) }.getOrNull() ?: org.json.JSONObject()
-            val payload = org.json.JSONObject().apply {
-                put("rawText", document.rawText)
-                put("lines", org.json.JSONArray(document.lines))
-                put("syncedLyrics", org.json.JSONArray().apply {
-                    document.syncedLines.forEach { line ->
-                        put(org.json.JSONObject().put("timeMs", line.timeMs).put("text", line.text))
-                    }
-                })
-            }
-            obj.put(trackId.toString(), payload)
-            prefs.setLyricsJson(obj.toString())
+        viewModelScope.launch { persistLyricsDocument(trackId, document) }
+    }
+
+    private suspend fun persistLyricsDocument(trackId: Long, document: LyricsDocument) {
+        val json = prefs.lyricsJson.first()
+        val obj = runCatching { org.json.JSONObject(json) }.getOrNull() ?: org.json.JSONObject()
+        val payload = org.json.JSONObject().apply {
+            put("rawText", document.rawText)
+            put("lines", org.json.JSONArray(document.lines))
+            put("syncedLyrics", org.json.JSONArray().apply {
+                document.syncedLines.forEach { line ->
+                    put(org.json.JSONObject().put("timeMs", line.timeMs).put("text", line.text))
+                }
+            })
         }
+        obj.put(trackId.toString(), payload)
+        prefs.setLyricsJson(obj.toString())
     }
 
     fun searchLyrics(query: String) {

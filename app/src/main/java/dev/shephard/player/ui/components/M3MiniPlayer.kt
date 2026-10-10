@@ -35,7 +35,13 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.ProgressIndicatorDefaults
+import androidx.compose.material3.WavyProgressIndicatorDefaults
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -44,6 +50,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -94,11 +101,12 @@ fun M3MiniPlayer(
     val miniForeground = miniPlayerContrastColor(miniSurface)
     val accentForeground = miniPlayerContrastColor(coverAccent)
     val progressTrack = lerp(MaterialTheme.colorScheme.surfaceContainerHighest, coverAccent, 0.24f)
-    val fraction = if (progress.durationMs > 0L) {
-        (progress.positionMs.toFloat() / progress.durationMs.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
+    // Smoothed between progress ticks, same as the other players.
+    val fraction = rememberSmoothProgressFraction(
+        positionMs = progress.positionMs,
+        durationMs = progress.durationMs,
+        isPlaying = state.isPlaying,
+    )
 
     Column(
         modifier = modifier
@@ -124,18 +132,55 @@ fun M3MiniPlayer(
                     onNextClick = onNextClick,
                     onPreviousClick = onPreviousClick,
                 )
-                LinearProgressIndicator(
-                    progress = { fraction },
+                M3MiniWavyProgress(
+                    fraction = fraction,
+                    isPlaying = state.isPlaying,
+                    activeColor = coverAccent,
+                    trackColor = progressTrack,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 12.dp, end = 12.dp, bottom = 6.dp),
-                    color = coverAccent,
-                    trackColor = progressTrack,
-                    strokeCap = StrokeCap.Round,
+                        .height(16.dp)
+                        .padding(start = 12.dp, end = 12.dp, bottom = 4.dp),
                 )
             }
         }
     }
+}
+
+/**
+ * Wavy progress line from the M3 Now Playing sheet (LinearWavyProgressIndicator). Display only:
+ * it does not take touches, so taps on it still open the player. The wave flows while playing.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun M3MiniWavyProgress(
+    fraction: Float,
+    isPlaying: Boolean,
+    activeColor: Color,
+    trackColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    val waveAmplitude by animateFloatAsState(
+        targetValue = if (isPlaying) 1f else 0f,
+        animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec,
+        label = "miniWavyAmplitude",
+    )
+    val strokePx = with(LocalDensity.current) { 3.dp.toPx() }
+    val stroke = remember(strokePx) { Stroke(width = strokePx, cap = StrokeCap.Round) }
+    LinearWavyProgressIndicator(
+        progress = { fraction },
+        modifier = modifier,
+        color = activeColor,
+        trackColor = trackColor,
+        stroke = stroke,
+        trackStroke = stroke,
+        gapSize = 2f * 6f * (1f + 0.1573f * waveAmplitude * waveAmplitude),
+        stopSize = 3.dp,
+        amplitude = { p -> if (p > 0f) waveAmplitude else 0f },
+        wavelength = WavyProgressIndicatorDefaults.LinearDeterminateWavelength,
+        // Slightly slower than the default wave speed (was 1.0x wavelength).
+        waveSpeed = WavyProgressIndicatorDefaults.LinearDeterminateWavelength * 0.6f,
+    )
 }
 
 @Composable

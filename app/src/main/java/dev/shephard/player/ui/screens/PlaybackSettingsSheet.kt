@@ -30,6 +30,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.shephard.player.player.PlayerViewModel
+import dev.shephard.player.player.LyricsAutoSearchMode
+import dev.shephard.player.player.VolumeNormalization
 import dev.shephard.player.ui.i18n.LocalStrings
 
 @Composable
@@ -83,6 +85,28 @@ fun PlaybackSettingsSheet(
             subtitle = "Remove silence between consecutive tracks",
             checked = state.gaplessEnabled,
             onCheckedChange = { playerViewModel.setGaplessEnabled(it) }
+        )
+
+        HorizontalDivider(color = MiuixAppTheme.colorScheme.surfaceVariant)
+
+        val lyricsModes = LyricsAutoSearchMode.entries
+        MiuixSpinnerRow(
+            title = strings.lyricsAutoSearchTitle,
+            summary = strings.lyricsAutoSearchDescription,
+            items = lyricsModes.map { lyricsAutoSearchLabel(it, strings) },
+            selectedIndex = lyricsModes.indexOf(state.lyricsAutoSearchMode),
+            onSelectedIndexChange = { playerViewModel.setLyricsAutoSearchMode(lyricsModes[it]) }
+        )
+
+        HorizontalDivider(color = MiuixAppTheme.colorScheme.surfaceVariant)
+
+        val normalizationModes = VolumeNormalization.entries
+        MiuixSpinnerRow(
+            title = strings.volumeNormalizationTitle,
+            summary = strings.volumeNormalizationDescription,
+            items = normalizationModes.map { volumeNormalizationLabel(it, strings) },
+            selectedIndex = normalizationModes.indexOf(state.volumeNormalization),
+            onSelectedIndexChange = { playerViewModel.setVolumeNormalization(normalizationModes[it]) }
         )
 
         HorizontalDivider(color = MiuixAppTheme.colorScheme.surfaceVariant)

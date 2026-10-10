@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // LineageOS Twelve 1:1 + M3 padding/radius + bottom sheet menu
+// Behaviour mirrors the MIUIX PlaylistDetailView: visible Play / Remix / Add tracks buttons,
+// sort chips (custom, alphabetical, artist, time added), drag-to-reorder for custom order,
+// shuffled order and no add button when opened from Home, and 220dp bottom space for the mini player.
 package dev.shephard.player.ui.screens.m3
 
 import android.content.Intent
@@ -8,14 +11,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import dev.shephard.player.ui.components.m3.m3ItemCardColors
-import dev.shephard.player.ui.components.m3.m3TopBarColors
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,11 +27,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
@@ -36,34 +43,37 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import dev.shephard.player.ui.components.M3BottomSheetWrapper
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.zIndex
+import dev.shephard.player.ui.components.LocalDetailMiniPlayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -73,17 +83,22 @@ import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.PreferencesManager
+import dev.shephard.player.ui.components.PlaylistCoverArt
 import dev.shephard.player.ui.components.m3.BaseWidget
 import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
+import dev.shephard.player.ui.components.m3.M3SmallTopBar
 import dev.shephard.player.ui.components.m3.SegmentedColumn
-import dev.shephard.player.ui.glass.LocalWallpaperEnabled
-import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
+import dev.shephard.player.ui.components.m3.m3ItemCardColors
+import dev.shephard.player.ui.components.m3.m3TopBarColors
+import dev.shephard.player.ui.components.M3BottomSheetWrapper
 import dev.shephard.player.ui.i18n.Strings
 import dev.shephard.player.ui.screens.LocalPlaylist
 import dev.shephard.player.ui.screens.encodePlaylists
 import dev.shephard.player.ui.screens.parsePlaylists
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,14 +112,16 @@ internal fun M3PlaylistDetail(
     onPlayAll: () -> Unit,
     onPlayRemix: () -> Unit,
     onRemoveTrack: (Long) -> Unit,
-    onAddTracks: () -> Unit,
-    onPickCover: () -> Unit = {},
-    onRename: () -> Unit = {},
-    onDelete: () -> Unit = {},
+    onReorder: (List<AudioTrack>) -> Unit = {},
+    onChangeSort: (String) -> Unit = {},
+    isHomeSimplified: Boolean = false,
 ) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
+
+    // Same rules as the MIUIX detail: system (liked songs) and Home playlists are read-only.
+    val canEdit = !playlist.isSystem && !isHomeSimplified
 
     var showMenu by remember { mutableStateOf(false) }
     var showAddTracks by remember { mutableStateOf(false) }
@@ -197,6 +214,56 @@ internal fun M3PlaylistDetail(
         }
     }
 
+    // Home shows the tracks in a random order (as on MIUIX); the list itself is never reordered there.
+    val shuffledTracks = remember(plTracks) { plTracks.shuffled() }
+    val displayTracks = if (isHomeSimplified) shuffledTracks else plTracks
+
+    // Drag-to-reorder state, kept in sync with the playlist order (same approach as the MIUIX detail).
+    val reorderItems = remember { mutableStateListOf<AudioTrack>() }
+    var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var isReordering by remember { mutableStateOf(false) }
+    var pendingCommittedOrder by remember { mutableStateOf<List<Long>?>(null) }
+
+    LaunchedEffect(displayTracks, isReordering) {
+        if (isReordering) return@LaunchedEffect
+        val pending = pendingCommittedOrder
+        if (pending != null) {
+            if (displayTracks.map { it.id } == pending) pendingCommittedOrder = null
+            return@LaunchedEffect
+        }
+        if (reorderItems.map { it.id } != displayTracks.map { it.id }) {
+            reorderItems.clear()
+            reorderItems.addAll(displayTracks)
+        }
+    }
+
+    val listState = rememberLazyListState()
+    // The header (cover, title, buttons, sort chips) is the only item before the tracks.
+    val reorderHeaderItemCount = 1
+    val reorderableState = rememberReorderableLazyListState(lazyListState = listState) { from, to ->
+        val fromIdx = from.index - reorderHeaderItemCount
+        val toIdx = to.index - reorderHeaderItemCount
+        if (fromIdx in reorderItems.indices && toIdx in reorderItems.indices) {
+            val currentDragInfo = dragInfo
+            dragInfo = if (currentDragInfo == null) fromIdx to toIdx else currentDragInfo.first to toIdx
+            reorderItems.add(toIdx, reorderItems.removeAt(fromIdx))
+        }
+    }
+    LaunchedEffect(reorderableState.isAnyItemDragging) {
+        isReordering = reorderableState.isAnyItemDragging
+        if (reorderableState.isAnyItemDragging) pendingCommittedOrder = null
+        if (!reorderableState.isAnyItemDragging) {
+            dragInfo?.let { (from, to) ->
+                dragInfo = null
+                if (from != to && reorderItems.map { it.id } != displayTracks.map { it.id }) {
+                    pendingCommittedOrder = reorderItems.map { it.id }
+                    onReorder(reorderItems.toList())
+                }
+            }
+        }
+    }
+    val customOrder = canEdit && playlist.sortMode == "custom"
+
     if (showAddTracks) {
         var selected by remember { mutableStateOf<Set<Long>>(emptySet()) }
         val existingIds = playlist.trackIds
@@ -274,11 +341,14 @@ internal fun M3PlaylistDetail(
         )
     }
 
-            Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = MaterialTheme.colorScheme.surface,
-            topBar = {
-            TopAppBar(
+    Box(modifier = Modifier.fillMaxSize()) {
+    // Detail mini player sits above the content (zIndex) and is only composed while the detail is open.
+    LocalDetailMiniPlayer.current(Modifier.align(Alignment.BottomCenter).zIndex(1f))
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.surface,
+        topBar = {
+            M3SmallTopBar(
                 title = { Text(text = playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -286,71 +356,50 @@ internal fun M3PlaylistDetail(
                     }
                 },
                 actions = {
-                    Box {
-                        IconButton(onClick = { showMenu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = null) }
-                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                            DropdownMenuItem(text = { Text(strings.addTracks) }, leadingIcon = { Icon(Icons.Filled.Add, null) }, onClick = { showMenu = false; showAddTracks = true })
-                            DropdownMenuItem(text = { Text(strings.editPlaylist) }, leadingIcon = { Icon(Icons.Filled.Edit, null) }, onClick = { showMenu = false; renameText = playlist.name; renameDialog = true })
-                            DropdownMenuItem(text = { Text(strings.cover) }, leadingIcon = { Icon(Icons.Filled.QueueMusic, null) }, onClick = { showMenu = false; coverPicker.launch(arrayOf("image/*")) })
-                            DropdownMenuItem(text = { Text(strings.delete) }, leadingIcon = { Icon(Icons.Filled.Delete, null) }, onClick = { showMenu = false; deleteConfirm = true })
+                    if (canEdit) {
+                        Box {
+                            IconButton(onClick = { showMenu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = null) }
+                            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                                DropdownMenuItem(text = { Text(strings.editPlaylist) }, leadingIcon = { Icon(Icons.Filled.Edit, null) }, onClick = { showMenu = false; renameText = playlist.name; renameDialog = true })
+                                DropdownMenuItem(text = { Text(strings.cover) }, leadingIcon = { Icon(Icons.Filled.QueueMusic, null) }, onClick = { showMenu = false; coverPicker.launch(arrayOf("image/*")) })
+                                DropdownMenuItem(text = { Text(strings.delete) }, leadingIcon = { Icon(Icons.Filled.Delete, null) }, onClick = { showMenu = false; deleteConfirm = true })
+                            }
                         }
                     }
                 },
                 colors = m3TopBarColors(),
             )
         },
-        floatingActionButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ExtendedFloatingActionButton(
-                    onClick = onPlayAll,
-                    icon = { Icon(Icons.Filled.PlayArrow, null) },
-                    text = { Text(strings.play) },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                )
-                ExtendedFloatingActionButton(
-                    onClick = onPlayRemix,
-                    icon = { Icon(Icons.Filled.Shuffle, null) },
-                    text = { Text(strings.remix) },
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                )
-            }
-        }
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 top = padding.calculateTopPadding() + 8.dp,
-                bottom = padding.calculateBottomPadding() + 80.dp,
+                bottom = 220.dp,
             ),
         ) {
-            item {
+            item(key = "header") {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 24.dp)
+                            .aspectRatio(1f)
                             .clip(RoundedCornerShape(16.dp))
                             .background(MaterialTheme.colorScheme.secondaryContainer)
-                            .then(
-                                if (!playlist.isSystem) Modifier.clickable { coverPicker.launch(arrayOf("image/*")) }
-                                else Modifier
-                            ),
-                        contentAlignment = Alignment.Center
+                            .then(if (canEdit) Modifier.clickable { coverPicker.launch(arrayOf("image/*")) } else Modifier),
                     ) {
-                        val displayCover = playlist.coverUri ?: plTracks.firstOrNull()?.albumArtUri?.toString()
-                        if (displayCover != null) {
-                            AsyncImage(
-                                model = displayCover,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        } else {
-                            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                        PlaylistCoverArt(
+                            coverUri = playlist.coverUri,
+                            tracks = plTracks,
+                            placeholderColor = MaterialTheme.colorScheme.secondaryContainer,
+                            placeholderIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            fallback = {
                                 Icon(Icons.Filled.QueueMusic, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(64.dp))
                             }
-                        }
-                        if (!playlist.isSystem) {
+                        )
+                        if (canEdit) {
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.BottomEnd)
@@ -373,34 +422,117 @@ internal fun M3PlaylistDetail(
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "${plTracks.size} tracks",
+                        text = "${plTracks.size} ${strings.trackCount}",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = onPlayAll,
+                            enabled = displayTracks.isNotEmpty(),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(strings.play, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        FilledTonalButton(
+                            onClick = onPlayRemix,
+                            enabled = displayTracks.isNotEmpty(),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(strings.remix, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        if (canEdit) {
+                            OutlinedButton(
+                                onClick = { showAddTracks = true },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(strings.addTracks, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+
+                    if (canEdit) {
+                        Spacer(Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            listOf(
+                                "custom" to strings.customOrder,
+                                "alphabetical" to strings.alphabetical,
+                                "artist" to strings.sortByArtist,
+                                "timeAdded" to strings.timeAdded,
+                            ).forEach { (mode, label) ->
+                                FilterChip(
+                                    selected = playlist.sortMode == mode,
+                                    onClick = { onChangeSort(mode) },
+                                    label = { Text(label) },
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
                 }
             }
 
-            items(plTracks, key = { it.id }) { track ->
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = m3ItemCardColors()
-                ) {
-                    LineageListItemWithThumbnail(
-                        headline = track.title,
-                        supporting = track.artist,
-                        thumbnailModel = track.albumArtUri,
-                        placeholderIcon = Icons.Filled.MusicNote,
-                        trailingIcon = Icons.Filled.MoreVert,
-                        onClick = { onTrackClick(listOf(track), 0) },
-                        onTrailingClick = { trackMenuTrack = track }
+            if (displayTracks.isEmpty()) {
+                item(key = "empty") {
+                    Text(
+                        text = if (playlist.isSystem) "No liked songs yet" else "No tracks yet. Tap \"${strings.addTracks}\".",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
                     )
+                }
+            } else if (customOrder) {
+                itemsIndexed(reorderItems, key = { _, t -> t.id }) { i, t ->
+                    ReorderableItem(state = reorderableState, key = t.id) { isDragging ->
+                        Box(modifier = Modifier.animateItem()) {
+                            M3PlaylistTrackRow(
+                                track = t,
+                                isDragged = isDragging,
+                                onClick = { onTrackClick(reorderItems.toList(), i) },
+                                onMore = { trackMenuTrack = t },
+                                dragHandleModifier = Modifier.draggableHandle(),
+                            )
+                        }
+                    }
+                }
+            } else {
+                itemsIndexed(displayTracks, key = { _, t -> t.id }) { i, t ->
+                    Box(
+                        modifier = Modifier.animateItem(
+                            fadeInSpec = androidx.compose.animation.core.tween(250),
+                            fadeOutSpec = androidx.compose.animation.core.tween(200),
+                            placementSpec = androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 380f)
+                        )
+                    ) {
+                        M3PlaylistTrackRow(
+                            track = t,
+                            onClick = { onTrackClick(displayTracks, i) },
+                            onMore = { trackMenuTrack = t },
+                        )
+                    }
                 }
             }
         }
-        }
+    }
+    }
 
     trackMenuTrack?.let { menuTrack ->
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -427,6 +559,88 @@ internal fun M3PlaylistDetail(
                     }
                 }
                 Spacer(Modifier.height(12.dp))
+            }
+        }
+    }
+}
+
+/**
+ * One track in a playlist. A non-null [dragHandleModifier] shows the drag handle used for custom order.
+ */
+@Composable
+private fun M3PlaylistTrackRow(
+    track: AudioTrack,
+    onClick: () -> Unit,
+    onMore: () -> Unit,
+    isDragged: Boolean = false,
+    dragHandleModifier: Modifier? = null,
+) {
+    val elevation by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isDragged) 6.dp else 0.dp,
+        label = "m3TrackElevation"
+    )
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .shadow(elevation, RoundedCornerShape(20.dp)),
+        shape = RoundedCornerShape(20.dp),
+        colors = m3ItemCardColors()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                if (track.albumArtUri != null) {
+                    AsyncImage(
+                        model = track.albumArtUri,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(24.dp))
+                }
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = track.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = track.artist,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (dragHandleModifier != null) {
+                Icon(
+                    imageVector = Icons.Filled.DragHandle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .then(dragHandleModifier)
+                )
+            }
+            IconButton(onClick = onMore) {
+                Icon(Icons.Filled.MoreVert, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

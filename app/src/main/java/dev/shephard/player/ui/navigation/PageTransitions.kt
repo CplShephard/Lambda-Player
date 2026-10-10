@@ -16,11 +16,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.ui.unit.IntOffset
-import androidx.navigation3.scene.Scene
-import androidx.navigation3.ui.NavDisplay
-import androidx.navigationevent.NavigationEvent
-import dev.shephard.player.theme.PredictiveBackAnimation
-import dev.shephard.player.theme.PredictiveBackExitDirection
 
 object PageTransitions {
 
@@ -82,13 +77,6 @@ object PageTransitions {
     val popExitSubmenu: ExitTransition =
         slideOutHorizontally(animationSpec = miuixDefaultTween) { it }
 
-    val submenuMetadata: Map<String, Any> =
-        NavDisplay.transitionSpec {
-            ContentTransform(enterSubmenu, exitSubmenu)
-        } + NavDisplay.popTransitionSpec {
-            ContentTransform(popEnterSubmenu, popExitSubmenu)
-        }
-
     // ─────────────────────────────────────────────────────────────────────────
     // Material 3 transitions
     // ─────────────────────────────────────────────────────────────────────────
@@ -115,77 +103,4 @@ object PageTransitions {
     val m3PopExitSubmenu: ExitTransition =
         slideOutHorizontally(animationSpec = m3Tween) { it / 3 } +
             fadeOut(animationSpec = m3Fade)
-
-    val m3SubmenuMetadata: Map<String, Any> =
-        NavDisplay.transitionSpec {
-            ContentTransform(m3EnterSubmenu, m3ExitSubmenu)
-        } + NavDisplay.popTransitionSpec {
-            ContentTransform(m3PopEnterSubmenu, m3PopExitSubmenu)
-        }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Predictive back transition specifications (InstallerX Revived styles)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Builds the predictive-pop metadata map for a submenu entry.
-     * Fixed: NONE must still return a close animation (was returning null -> missing animation).
-     */
-    fun predictiveBackSubmenuMetadata(
-        animation: PredictiveBackAnimation,
-        exitDirection: PredictiveBackExitDirection,
-    ): Map<String, Any> {
-
-        fun directionSign(edge: Int): Int = when (exitDirection) {
-            PredictiveBackExitDirection.ALWAYS_RIGHT -> 1
-            PredictiveBackExitDirection.ALWAYS_LEFT -> -1
-            PredictiveBackExitDirection.FOLLOW_GESTURE ->
-                if (edge == NavigationEvent.EDGE_RIGHT) -1 else 1
-        }
-
-        val spec: androidx.compose.animation.AnimatedContentTransitionScope<Scene<*>>.(
-            @androidx.navigationevent.NavigationEvent.SwipeEdge Int,
-        ) -> ContentTransform? = { edge ->
-            when (animation) {
-                PredictiveBackAnimation.NONE -> ContentTransform(
-                    targetContentEnter = popEnterSubmenu,
-                    initialContentExit = popExitSubmenu
-                )
-
-                PredictiveBackAnimation.AOSP -> ContentTransform(
-                    targetContentEnter = fadeIn(
-                        animationSpec = tween(durationMillis = 220, delayMillis = 90),
-                    ) + scaleIn(
-                        animationSpec = tween(durationMillis = 220, delayMillis = 90),
-                        initialScale = 0.94f,
-                    ),
-                    initialContentExit = fadeOut(animationSpec = tween(durationMillis = 90)),
-                )
-
-                PredictiveBackAnimation.CLASSIC -> {
-                    val sign = directionSign(edge)
-                    ContentTransform(
-                        targetContentEnter = slideInHorizontally(
-                            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
-                        ) { -sign * it / 8 } + fadeIn(animationSpec = tween(durationMillis = 220)),
-                        initialContentExit = slideOutHorizontally(
-                            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
-                        ) { sign * it / 3 } + fadeOut(animationSpec = tween(durationMillis = 220)),
-                    )
-                }
-
-                PredictiveBackAnimation.MIUIX -> ContentTransform(
-                    // MIUIX always exits to the right (sign = 1), never the stored direction.
-                    targetContentEnter = slideInHorizontally(
-                        animationSpec = tween(durationMillis = 550, easing = LinearEasing),
-                    ) { -it / 4 },
-                    initialContentExit = slideOutHorizontally(
-                        animationSpec = tween(durationMillis = 550, easing = LinearEasing),
-                    ) { it },
-                )
-            }
-        }
-
-        return NavDisplay.predictivePopTransitionSpec(spec)
-    }
 }

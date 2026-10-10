@@ -11,6 +11,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.add
+import androidx.compose.material3.TopAppBar
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -65,6 +71,39 @@ fun m3TopBarColors(): TopAppBarColors {
         navigationIconContentColor = cs.onSurface,
         titleContentColor = cs.onSurface,
         actionIconContentColor = cs.onSurfaceVariant,
+    )
+}
+
+/**
+ * Small Material 3 top bar used by every M3 page. Mirrors InstallerX Revived's small top bars:
+ * - 12dp extra start inset so the title/back button sit like InstallerX,
+ * - a back/navigation button (when [navigationIcon] is provided) followed by a 16dp gap,
+ * - trailing [actions] rendered as plain icon buttons inside the bar,
+ * - the solid [m3TopBarColors] container.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun M3SmallTopBar(
+    title: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    navigationIcon: (@Composable () -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {},
+    colors: TopAppBarColors = m3TopBarColors(),
+) {
+    TopAppBar(
+        modifier = modifier,
+        windowInsets = TopAppBarDefaults.windowInsets.add(WindowInsets(left = 12.dp)),
+        title = title,
+        navigationIcon = {
+            if (navigationIcon != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    navigationIcon()
+                    Spacer(modifier = Modifier.size(16.dp))
+                }
+            }
+        },
+        actions = actions,
+        colors = colors,
     )
 }
 
