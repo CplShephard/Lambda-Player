@@ -22,6 +22,9 @@ import dev.shephard.player.data.ListenEvent
 import dev.shephard.player.data.ListenStatsCalculator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +33,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.sin
+
+private const val DEFAULT_GLOW_COLOR = -14498466 // ARGB #22C55E
 
 data class SyncedLyricLine(val timeMs: Long, val text: String)
 
@@ -47,6 +52,8 @@ data class LyricsSearchResult(
     val instrumental: Boolean,
     val plainLyrics: String?,
     val syncedLyrics: String?,
+    val source: String = "LRCLIB",
+    val sourceId: String? = null,
 ) {
     val rawLyrics: String get() = syncedLyrics?.takeIf(String::isNotBlank) ?: plainLyrics.orEmpty()
 }
@@ -74,7 +81,7 @@ data class PlayerUiState(
     val gaplessEnabled: Boolean = true,
     val playWithOthers: Boolean = false,
     val totalListeningMs: Long = 0L,
-    val glowColorArgb: Int = 0xFF22C55E.toInt(),
+    val glowColorArgb: Int = DEFAULT_GLOW_COLOR,
     val amplitude: Float = 0f,
     val currentPlaylistName: String? = null,
     val likedSongIds: List<Long> = emptyList(),
@@ -100,6 +107,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val lyricsSearchState: StateFlow<LyricsSearchUiState> = _lyricsSearchState.asStateFlow()
     private var lyricsSearchJob: Job? = null
     private var lyricsLoadJob: Job? = null
+    private var glowColorJob: Job? = null
 
     private val _lyricsSyncOffsetMs = MutableStateFlow(0)
     val lyricsSyncOffsetMs: StateFlow<Int> = _lyricsSyncOffsetMs.asStateFlow()
@@ -937,8 +945,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun extractGlowColor(track: AudioTrack?) {
-        val uri = track?.albumArtUri ?: return
-        viewModelScope.launch {
+        glowColorJob?.cancel()
+        val uri = track?.albumArtUri
+        if (track == null || uri == null) {
+            _uiState.value = _uiState.value.copy(glowColorArgb = DEFAULT_GLOW_COLOR)
+            return
+        }
+        val trackId = track.id
+        glowColorJob = viewModelScope.launch {
             val color = withContext(Dispatchers.IO) {
                 runCatching {
                     val resolver = getApplication<Application>().contentResolver
@@ -962,8 +976,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }.getOrNull()
             }
-            if (color != null) {
-                _uiState.value = _uiState.value.copy(glowColorArgb = color)
+            val current = _uiState.value.currentTrack
+            if (current != null && current.id == trackId && current.albumArtUri == uri) {
+                _uiState.value = _uiState.value.copy(glowColorArgb = color ?: DEFAULT_GLOW_COLOR)
             }
         }
     }
@@ -1157,12 +1172,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _lyricsSearchState.value = LyricsSearchUiState(query = cleanedQuery, isLoading = true)
         lyricsSearchJob = viewModelScope.launch {
             try {
-                val results = withContext(Dispatchers.IO) { searchLrclib(cleanedQuery) }
+                val (lrclibAttempt, qqAttempt) = coroutineScope {
+                    val lrclib = async(Dispatchers.IO) { runCatching { searchLrclib(cleanedQuery) } }
+                    val qqMusic = async {
+                        try {
+                            Result.success(searchQqLyrics(cleanedQuery))
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            Result.failure(error)
+                        }
+                    }
+                    lrclib.await() to qqMusic.await()
+                }
                 if (trackId != _uiState.value.currentTrack?.id) return@launch
+                val results = (lrclibAttempt.getOrDefault(emptyList()) + qqAttempt.getOrDefault(emptyList()))
+                    .distinctBy { "${it.source}|${it.sourceId ?: it.id ?: (it.title.trim().lowercase() + "|" + it.artist.trim().lowercase())}" }
+                    .take(30)
+                val networkFailed = results.isEmpty() && lrclibAttempt.isFailure && qqAttempt.isFailure
                 _lyricsSearchState.value = LyricsSearchUiState(
                     query = cleanedQuery,
                     results = results,
-                    error = if (results.isEmpty()) "not_found" else null,
+                    error = if (results.isNotEmpty()) null else if (networkFailed) "network" else "not_found",
                 )
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
@@ -1176,7 +1207,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun searchLyricsForCurrentTrack() {
         val track = _uiState.value.currentTrack ?: return
-        searchLyrics("${track.artist} ${track.title}".trim())
+        searchLyrics(track.title.trim())
     }
 
     fun selectLyricsSearchResult(result: LyricsSearchResult) {
@@ -1228,6 +1259,161 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     )
                 }
             }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private data class QqSongCandidate(
+        val songMid: String,
+        val songId: Long?,
+        val title: String,
+        val artist: String,
+        val album: String,
+        val durationSeconds: Double?,
+    )
+
+    private suspend fun searchQqLyrics(query: String): List<LyricsSearchResult> = coroutineScope {
+        val candidates = withContext(Dispatchers.IO) { searchQqSongCandidates(query) }.take(6)
+        candidates.map { candidate ->
+            async(Dispatchers.IO) { runCatching { fetchQqLyrics(candidate) }.getOrNull() }
+        }.awaitAll().filterNotNull()
+    }
+
+    private fun searchQqSongCandidates(query: String): List<QqSongCandidate> {
+        val params = listOf(
+            "ct" to "24",
+            "qqmusic_ver" to "1298",
+            "new_json" to "1",
+            "remoteplace" to "txt.yqq.song",
+            "t" to "0",
+            "aggr" to "1",
+            "cr" to "1",
+            "catZhida" to "0",
+            "lossless" to "0",
+            "flag_qc" to "0",
+            "p" to "1",
+            "n" to "12",
+            "w" to query,
+            "g_tk" to "5381",
+            "loginUin" to "0",
+            "hostUin" to "0",
+            "inCharset" to "utf8",
+            "outCharset" to "utf-8",
+            "notice" to "0",
+            "platform" to "yqq.json",
+            "needNewCode" to "0",
+        ).joinToString("&") { (key, value) ->
+            "${java.net.URLEncoder.encode(key, "UTF-8")}=${java.net.URLEncoder.encode(value, "UTF-8")}"
+        }
+        val connection = (java.net.URL("https://c.y.qq.com/soso/fcgi-bin/client_search_cp?$params").openConnection()
+            as java.net.HttpURLConnection).apply {
+            connectTimeout = 7_000
+            readTimeout = 7_000
+            requestMethod = "GET"
+            setRequestProperty("Accept", "application/json,text/plain,*/*")
+            setRequestProperty("Referer", "https://y.qq.com/portal/player.html")
+            setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36 LambdaPlayer/2.5")
+        }
+        return try {
+            val responseCode = connection.responseCode
+            if (responseCode !in 200..299) throw java.io.IOException("QQ Music search returned HTTP $responseCode")
+            val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            val root = org.json.JSONObject(body)
+            val data = root.optJSONObject("data") ?: return emptyList()
+            val songBlock = data.optJSONObject("song") ?: return emptyList()
+            val songs = songBlock.optJSONArray("list") ?: songBlock.optJSONArray("itemlist") ?: return emptyList()
+            buildList {
+                val seen = HashSet<String>()
+                for (index in 0 until songs.length()) {
+                    val item = songs.optJSONObject(index) ?: continue
+                    fun text(vararg keys: String): String? = keys.firstNotNullOfOrNull { key ->
+                        item.optString(key).takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                    }
+                    val songMid = text("songmid", "mid") ?: continue
+                    if (!seen.add(songMid)) continue
+                    val title = text("songname", "name", "title") ?: continue
+                    val singers = item.optJSONArray("singer")
+                    val artist = if (singers != null) {
+                        (0 until singers.length()).mapNotNull { singerIndex ->
+                            singers.optJSONObject(singerIndex)?.optString("name")
+                                ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                        }.joinToString(" / ")
+                    } else text("singer", "artist") ?: ""
+                    val duration = item.optDouble("interval", -1.0).takeIf { it > 0.0 }
+                    add(
+                        QqSongCandidate(
+                            songMid = songMid,
+                            songId = item.optLong("songid", item.optLong("id")).takeIf { it > 0L },
+                            title = title,
+                            artist = artist,
+                            album = text("albumname", "album") ?: "",
+                            durationSeconds = duration,
+                        )
+                    )
+                }
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun fetchQqLyrics(candidate: QqSongCandidate): LyricsSearchResult? {
+        val queryParams = buildList {
+            add("songmid" to candidate.songMid)
+            candidate.songId?.let { add("musicid" to it.toString()) }
+            add("format" to "json")
+            add("nobase64" to "1")
+            add("g_tk" to "5381")
+            add("loginUin" to "0")
+            add("hostUin" to "0")
+            add("inCharset" to "utf8")
+            add("outCharset" to "utf-8")
+            add("notice" to "0")
+            add("platform" to "yqq.json")
+            add("needNewCode" to "0")
+        }.joinToString("&") { (key, value) ->
+            "${java.net.URLEncoder.encode(key, "UTF-8")}=${java.net.URLEncoder.encode(value, "UTF-8")}"
+        }
+        val connection = (java.net.URL("https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?$queryParams").openConnection()
+            as java.net.HttpURLConnection).apply {
+            connectTimeout = 7_000
+            readTimeout = 7_000
+            requestMethod = "GET"
+            setRequestProperty("Accept", "application/json,text/plain,*/*")
+            setRequestProperty("Origin", "https://y.qq.com")
+            setRequestProperty("Referer", "https://y.qq.com/portal/player.html")
+            setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36 LambdaPlayer/2.5")
+        }
+        return try {
+            val responseCode = connection.responseCode
+            if (responseCode !in 200..299) return null
+            val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            val jsonStart = body.indexOf('{')
+            val jsonEnd = body.lastIndexOf('}')
+            if (jsonStart < 0 || jsonEnd < jsonStart) return null
+            val json = org.json.JSONObject(body.substring(jsonStart, jsonEnd + 1))
+            val lyricText = json.optString("lyric").takeIf {
+                it.isNotBlank() && !it.equals("null", ignoreCase = true) && !it.equals("无", ignoreCase = true)
+            } ?: return null
+            val decodedLyrics = android.text.Html.fromHtml(
+                lyricText,
+                android.text.Html.FROM_HTML_MODE_LEGACY,
+            ).toString().replace("\r", "").trim()
+            if (decodedLyrics.isBlank()) return null
+            val hasTimestamps = Regex("\\[\\d{1,3}:\\d{2}(?:[.:]\\d{1,3})?]").containsMatchIn(decodedLyrics)
+            LyricsSearchResult(
+                id = candidate.songId,
+                title = candidate.title,
+                artist = candidate.artist,
+                album = candidate.album,
+                durationSeconds = candidate.durationSeconds,
+                instrumental = false,
+                plainLyrics = decodedLyrics.takeUnless { hasTimestamps },
+                syncedLyrics = decodedLyrics.takeIf { hasTimestamps },
+                source = "QQ Music",
+                sourceId = candidate.songMid,
+            )
         } finally {
             connection.disconnect()
         }

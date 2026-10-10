@@ -4,6 +4,7 @@ package dev.shephard.player.ui.screens
 
 import android.net.Uri
 import androidx.activity.BackEventCompat
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -115,6 +116,8 @@ import dev.shephard.player.data.formattedDuration
 import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PreferencesManager
+import dev.shephard.player.theme.PredictiveBackAnimation
+import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import dev.shephard.player.ui.components.BouncyIconButton
 import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
@@ -461,7 +464,6 @@ LaunchedEffect(playlists) {
                     strings = strings,
                     layout = playlistsLayout,
                     likedIds = likedIds,
-                    onLayoutChange = { mode -> scope.launch { prefs.setPlaylistsLayout(mode) } },
                     onOpen = { openIdx -> playlistDetailGuard.push(openIndex, openIdx) { openIndex = openIdx } },
                     onPlay = { pl ->
                         val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
@@ -987,7 +989,6 @@ private fun PlaylistListView(
     strings: dev.shephard.player.ui.i18n.Strings,
     layout: Int,
     likedIds: List<Long>,
-    onLayoutChange: (Int) -> Unit,
     onOpen: (Int) -> Unit,
     onPlay: (LocalPlaylist) -> Unit,
     onMenu: (Int) -> Unit,
@@ -1041,12 +1042,6 @@ Scaffold(
                 }
                 val hasPinned = playlists.any { it.pinned }
                 Column(modifier = Modifier.fillMaxSize()) {
-                    dev.shephard.player.ui.components.MiuixLayoutSelector(
-                        layout = layout,
-                        strings = strings,
-                        modifier = Modifier.padding(top = innerPadding.calculateTopPadding()),
-                        onLayoutChange = onLayoutChange,
-                    )
                     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         if (layout == LayoutMode.GRID) {
                             LazyVerticalGrid(
@@ -1059,7 +1054,7 @@ Scaffold(
                                     .overScrollVertical(),
                                 contentPadding = PaddingValues(
                                     start = 16.dp,
-                                    top = 8.dp,
+                                    top = innerPadding.calculateTopPadding() + 8.dp,
                                     end = 16.dp,
                                     bottom = 200.dp
                                 ),
@@ -1105,7 +1100,7 @@ Scaffold(
                                     .overScrollVertical(),
                                 contentPadding = PaddingValues(
                                     start = 16.dp,
-                                    top = 8.dp,
+                                    top = innerPadding.calculateTopPadding() + 8.dp,
                                     end = 16.dp,
                                     bottom = 200.dp
                                 ),
@@ -1395,6 +1390,11 @@ internal fun PlaylistDetailView(
     onChangeSort: (String) -> Unit = {},
     isHomeSimplified: Boolean = false
 ) {
+    val context = LocalContext.current
+    val preferences = remember(context) { PreferencesManager(context) }
+    val predictiveBackStyle by preferences.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
+    val useClassicPredictiveBack = predictiveBackStyle == PredictiveBackAnimation.CLASSIC
+    val deviceCornerRadius = rememberDeviceCornerRadius()
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
     val reorderItems = remember { mutableStateListOf<AudioTrack>() }
     var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
@@ -1403,18 +1403,22 @@ internal fun PlaylistDetailView(
     val predictiveBackProgress = remember { androidx.compose.animation.core.Animatable(0f) }
     var predictiveBackEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
 
-    PredictiveBackHandler { events ->
-        try {
-            events.collect { event ->
-                predictiveBackEdge = event.swipeEdge
-                predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
+    if (useClassicPredictiveBack) {
+        PredictiveBackHandler { events ->
+            try {
+                events.collect { event ->
+                    predictiveBackEdge = event.swipeEdge
+                    predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
+                }
+                if (predictiveBackProgress.value < 1f) predictiveBackProgress.animateTo(1f, androidx.compose.animation.core.tween(150))
+                onBack()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                predictiveBackProgress.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 380f))
+                throw cancelled
             }
-            if (predictiveBackProgress.value < 1f) predictiveBackProgress.animateTo(1f, androidx.compose.animation.core.tween(150))
-            onBack()
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            predictiveBackProgress.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 380f))
-            throw cancelled
         }
+    } else {
+        BackHandler(onBack = onBack)
     }
 
     val displayTracks = if (isHomeSimplified) {
@@ -1485,6 +1489,8 @@ internal fun PlaylistDetailView(
                     scaleX = scale
                     scaleY = scale
                     alpha = 1f - 0.12f * p
+                    shape = RoundedCornerShape(deviceCornerRadius * p)
+                    clip = p > 0.001f
                 },
             containerColor = MiuixAppTheme.colorScheme.background,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),

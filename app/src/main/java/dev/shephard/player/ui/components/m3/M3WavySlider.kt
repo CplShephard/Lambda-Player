@@ -104,9 +104,10 @@ fun M3WavySlider(
         Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
     }
 
+    val latestValue = rememberUpdatedState(value)
     val normalizedValueState = remember(valueRange) {
         derivedStateOf {
-            val v = value()
+            val v = latestValue.value()
             if (valueRange.endInclusive == valueRange.start) 0f
             else ((v - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
         }

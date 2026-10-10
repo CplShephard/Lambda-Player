@@ -408,7 +408,9 @@ fun StatsScreenM3(
                 Text(strings.statsTopTracks, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 snapshot.trackEntries.take(10).forEachIndexed { index, entry ->
                     androidx.compose.animation.AnimatedContent(
-                        targetState = entry,
+                        // The ranking animation is keyed only by song identity, not listenedMs.
+                        // Timer ticks update the duration text without replaying the slide.
+                        targetState = entry.trackId,
                         transitionSpec = {
                             (androidx.compose.animation.slideInVertically(
                                 animationSpec = androidx.compose.animation.core.tween(340),
@@ -422,9 +424,10 @@ fun StatsScreenM3(
                                 )
                         },
                         label = "m3StatsRankSlide$index",
-                    ) { animatedEntry ->
-                        val track = remember(animatedEntry.trackId, tracks) {
-                            tracks.firstOrNull { it.id == animatedEntry.trackId }
+                    ) { animatedTrackId ->
+                        val animatedEntry = snapshot.trackEntries.firstOrNull { it.trackId == animatedTrackId } ?: entry
+                        val track = remember(animatedTrackId, tracks) {
+                            tracks.firstOrNull { it.id == animatedTrackId }
                                 ?: tracks.firstOrNull { it.title == animatedEntry.title && it.artist == animatedEntry.artistName }
                         }
                         val coverUri = track?.albumArtUri ?: animatedEntry.albumArtUri

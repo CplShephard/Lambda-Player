@@ -4,6 +4,7 @@
 package dev.shephard.player.ui.screens.m3
 
 import androidx.activity.BackEventCompat
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -89,6 +90,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -103,8 +106,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import dev.shephard.player.player.PlayerUiState
 import dev.shephard.player.player.PlayerViewModel
+import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.RepeatMode
+import dev.shephard.player.theme.PredictiveBackAnimation
+import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
@@ -121,21 +128,65 @@ fun M3NowPlayingSheet(
     onDismiss: () -> Unit
 ) {
     val state by playerViewModel.uiState.collectAsState()
+    val baseScheme = MaterialTheme.colorScheme
+    val accent by androidx.compose.animation.animateColorAsState(
+        targetValue = Color(state.glowColorArgb),
+        animationSpec = tween(620),
+        label = "nowPlayingCoverAccent",
+    )
+    val tintedSurface = lerp(baseScheme.surface, accent, 0.25f)
+    val tintedSurfaceVariant = lerp(baseScheme.surfaceVariant, accent, 0.30f)
+    val tintedSecondaryContainer = lerp(baseScheme.secondaryContainer, accent, 0.48f)
+    val tintedPrimaryContainer = lerp(baseScheme.primaryContainer, accent, 0.42f)
+    val tintedScheme = baseScheme.copy(
+        primary = accent,
+        onPrimary = contrastColorFor(accent),
+        primaryContainer = tintedPrimaryContainer,
+        onPrimaryContainer = contrastColorFor(tintedPrimaryContainer),
+        secondary = accent,
+        onSecondary = contrastColorFor(accent),
+        secondaryContainer = tintedSecondaryContainer,
+        onSecondaryContainer = contrastColorFor(tintedSecondaryContainer),
+        surface = tintedSurface,
+        onSurface = contrastColorFor(tintedSurface),
+        surfaceVariant = tintedSurfaceVariant,
+        onSurfaceVariant = contrastColorFor(tintedSurfaceVariant),
+        surfaceContainerLowest = lerp(baseScheme.surfaceContainerLowest, accent, 0.10f),
+        surfaceContainerLow = lerp(baseScheme.surfaceContainerLow, accent, 0.18f),
+        surfaceContainer = lerp(baseScheme.surfaceContainer, accent, 0.28f),
+        surfaceContainerHigh = lerp(baseScheme.surfaceContainerHigh, accent, 0.36f),
+        surfaceContainerHighest = lerp(baseScheme.surfaceContainerHighest, accent, 0.42f),
+        outline = lerp(baseScheme.outline, accent, 0.28f),
+    )
+    val context = LocalContext.current
+    val preferences = remember(context) { PreferencesManager(context) }
+    val predictiveBack by preferences.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
+
+    MaterialTheme(colorScheme = tintedScheme) {
+        M3NowPlayingSheetContent(
+            playerViewModel = playerViewModel,
+            state = state,
+            onDismiss = onDismiss,
+            useClassicPredictiveBack = predictiveBack == PredictiveBackAnimation.CLASSIC,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun M3NowPlayingSheetContent(
+    playerViewModel: PlayerViewModel,
+    state: PlayerUiState,
+    onDismiss: () -> Unit,
+    useClassicPredictiveBack: Boolean,
+) {
     val track = state.currentTrack
     val strings = LocalStrings.current
-    val backgroundTarget = androidx.compose.ui.graphics.lerp(
-        MaterialTheme.colorScheme.surface,
-        Color(state.glowColorArgb),
-        0.24f,
-    )
-    val nowPlayingBackground by androidx.compose.animation.animateColorAsState(
-        targetValue = backgroundTarget,
-        animationSpec = tween(620),
-        label = "songAwareNowPlayingBackground",
-    )
+    val nowPlayingBackground = MaterialTheme.colorScheme.surface
 
     var showQueue by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
+    var showAddToPlaylist by remember { mutableStateOf(false) }
 
     val density = LocalDensity.current
     val dismissThresholdPx = with(density) { 140.dp.toPx() }
@@ -166,6 +217,7 @@ fun M3NowPlayingSheet(
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "sheetCornerRadiusM3"
     )
+    val deviceCornerRadius = rememberDeviceCornerRadius()
 
     val dismissWithAnimation: () -> Unit = {
         dragScope.launch {
@@ -176,18 +228,22 @@ fun M3NowPlayingSheet(
         }
     }
 
-    PredictiveBackHandler(enabled = !showQueue && !showLyrics) { events ->
-        try {
-            events.collect { event ->
-                predictiveBackEdge = event.swipeEdge
-                predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
+    if (useClassicPredictiveBack) {
+        PredictiveBackHandler(enabled = !showQueue && !showLyrics && !showAddToPlaylist) { events ->
+            try {
+                events.collect { event ->
+                    predictiveBackEdge = event.swipeEdge
+                    predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
+                }
+                if (predictiveBackProgress.value < 1f) predictiveBackProgress.animateTo(1f, tween(160))
+                onDismiss()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                predictiveBackProgress.animateTo(0f, spring(dampingRatio = 0.82f, stiffness = 380f))
+                throw cancelled
             }
-            if (predictiveBackProgress.value < 1f) predictiveBackProgress.animateTo(1f, tween(160))
-            onDismiss()
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            predictiveBackProgress.animateTo(0f, spring(dampingRatio = 0.82f, stiffness = 380f))
-            throw cancelled
         }
+    } else {
+        BackHandler(enabled = !showQueue && !showLyrics && !showAddToPlaylist, onBack = dismissWithAnimation)
     }
 
     Box(
@@ -203,8 +259,10 @@ fun M3NowPlayingSheet(
                 scaleX = scale
                 scaleY = scale
                 alpha = 1f - 0.12f * p
+                shape = if (p > 0f) RoundedCornerShape(deviceCornerRadius * p)
+                else RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
+                clip = true
             }
-            .clip(RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius))
             .background(nowPlayingBackground)
             .draggable(
                 orientation = Orientation.Vertical,
@@ -231,23 +289,15 @@ fun M3NowPlayingSheet(
                 Box(modifier = Modifier.size(width = 36.dp, height = 4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
             }
 
-            // Top-left only Now Playing
-            androidx.compose.material3.TopAppBar(
-                title = {
-                    Text(
-                        text = strings.nowPlaying,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { dismissWithAnimation() }) {
-                        Icon(Icons.Filled.MusicNote, contentDescription = null)
-                    }
-                },
-                colors = dev.shephard.player.ui.components.m3.m3TopBarColors()
+            // Minimal, transparent heading: let the cover-derived Now Playing palette show through.
+            Text(
+                text = strings.nowPlaying,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 10.dp),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
 
             // Album art card - 16dp radius, margin 40dp like Twelve
@@ -398,7 +448,6 @@ fun M3NowPlayingSheet(
                     }
                     val trackId = track?.id ?: -1L
                     val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
-                    var showAddToPlaylist by remember { mutableStateOf(false) }
                     Box(
                         modifier = Modifier
                             .size(48.dp)
@@ -697,3 +746,6 @@ private fun M3AddToPlaylistDrawer(
         }
     }
 }
+
+private fun contrastColorFor(color: Color): Color =
+    if (color.luminance() >= 0.56f) Color(0xFF17131A) else Color.White

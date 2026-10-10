@@ -169,12 +169,6 @@ fun MusicScreen(
                     val gridState = rememberLazyGridState()
 
                     Column(modifier = Modifier.fillMaxSize()) {
-                        dev.shephard.player.ui.components.MiuixLayoutSelector(
-                            layout = musicsLayout,
-                            strings = strings,
-                            modifier = Modifier.padding(top = innerPadding.calculateTopPadding()),
-                            onLayoutChange = { mode -> scope.launch { prefs.setMusicsLayout(mode) } },
-                        )
                         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                             if (musicsLayout == LayoutMode.GRID) {
                                 LazyVerticalGrid(
@@ -188,7 +182,7 @@ fun MusicScreen(
                                     contentPadding = PaddingValues(
                                         start = 12.dp,
                                         end = 12.dp,
-                                        top = 8.dp,
+                                        top = innerPadding.calculateTopPadding() + 8.dp,
                                         bottom = 200.dp
                                     ),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -213,7 +207,7 @@ fun MusicScreen(
                                     contentPadding = PaddingValues(
                                         start = 16.dp,
                                         end = 16.dp,
-                                        top = 8.dp,
+                                        top = innerPadding.calculateTopPadding() + 8.dp,
                                         bottom = 200.dp
                                     ),
                                     verticalArrangement = Arrangement.spacedBy(4.dp)

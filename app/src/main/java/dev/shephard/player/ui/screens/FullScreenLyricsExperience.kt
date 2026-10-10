@@ -9,6 +9,7 @@ import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -20,7 +21,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -62,7 +62,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -79,6 +83,8 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.ColorFilter
@@ -99,6 +105,8 @@ import dev.shephard.player.player.LyricsSearchResult
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.SyncedLyricLine
+import dev.shephard.player.theme.PredictiveBackAnimation
+import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import kotlinx.coroutines.CancellationException
@@ -108,6 +116,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.min
+
+private val LocalLyricsForeground = staticCompositionLocalOf { Color.White }
 
 @Composable
 fun FullScreenLyricsExperience(
@@ -122,6 +132,8 @@ fun FullScreenLyricsExperience(
     val syncOffsetMs by playerViewModel.lyricsSyncOffsetMs.collectAsState()
     val context = LocalContext.current
     val preferences = remember(context) { PreferencesManager(context) }
+    val predictiveBack by preferences.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
+    val useClassicPredictiveBack = predictiveBack == PredictiveBackAnimation.CLASSIC
     val blurEnabled by preferences.lyricsBackgroundBlurEnabled.collectAsState(initial = true)
     val savedBlurStrength by preferences.lyricsBackgroundBlurStrength.collectAsState(initial = 36f)
     val autoScroll by preferences.lyricsAutoScrollEnabled.collectAsState(initial = true)
@@ -133,6 +145,14 @@ fun FullScreenLyricsExperience(
     val primary = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
     val textStyle = if (useMiuix) MiuixAppTheme.typography.bodyMedium else MaterialTheme.typography.bodyMedium
     val titleStyle = if (useMiuix) MiuixAppTheme.typography.titleLarge else MaterialTheme.typography.titleLarge
+    val coverTint = Color(state.glowColorArgb)
+    val m3LyricsBackground by animateColorAsState(
+        targetValue = lerp(MaterialTheme.colorScheme.surface, coverTint, 0.34f),
+        animationSpec = tween(520),
+        label = "m3LyricsCoverTint",
+    )
+    val lyricsBackground = if (useMiuix) Color(0xFF111318) else m3LyricsBackground
+    val lyricsForeground = if (useMiuix || lyricsBackground.luminance() < 0.52f) Color.White else Color(0xFF17131A)
     var blurStrength by remember { mutableFloatStateOf(36f) }
     LaunchedEffect(savedBlurStrength) { blurStrength = savedBlurStrength.coerceIn(0f, 64f) }
 
@@ -141,7 +161,7 @@ fun FullScreenLyricsExperience(
     var isEditing by remember { mutableStateOf(false) }
     var editText by remember { mutableStateOf("") }
     var searchQuery by remember(track?.id) {
-        mutableStateOf(track?.let { "${it.artist} ${it.title}" } ?: "")
+        mutableStateOf(track?.title.orEmpty())
     }
     var seekFraction by remember { mutableStateOf<Float?>(null) }
 
@@ -163,7 +183,7 @@ fun FullScreenLyricsExperience(
     }
 
     LaunchedEffect(track?.id) {
-        searchQuery = track?.let { "${it.artist} ${it.title}" } ?: ""
+        searchQuery = track?.title.orEmpty()
         playerViewModel.clearLyricsSearch()
     }
 
@@ -216,72 +236,82 @@ fun FullScreenLyricsExperience(
 
     val backProgress = remember { Animatable(0f) }
     var backEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
-    PredictiveBackHandler(enabled = true) { events ->
-        try {
-            events.collect { event ->
-                backEdge = event.swipeEdge
-                backProgress.snapTo(event.progress.coerceIn(0f, 1f))
+    if (useClassicPredictiveBack) {
+        PredictiveBackHandler(enabled = true) { events ->
+            try {
+                events.collect { event ->
+                    backEdge = event.swipeEdge
+                    backProgress.snapTo(event.progress.coerceIn(0f, 1f))
+                }
+                if (backProgress.value < 1f) backProgress.animateTo(1f, tween(150))
+                onDismiss()
+            } catch (cancelled: CancellationException) {
+                backProgress.animateTo(0f, spring(dampingRatio = 0.82f, stiffness = 380f))
+                throw cancelled
             }
-            if (backProgress.value < 1f) {
-                backProgress.animateTo(1f, tween(150))
-            }
-            onDismiss()
-        } catch (cancelled: CancellationException) {
-            backProgress.animateTo(0f, spring(dampingRatio = 0.82f, stiffness = 380f))
-            throw cancelled
         }
     }
+    val deviceCornerRadius = rememberDeviceCornerRadius()
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .zIndex(20f)
-            .graphicsLayer {
-                val p = backProgress.value.coerceIn(0f, 1f)
-                val direction = if (backEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
-                translationX = size.width * 0.12f * p * direction
-                scaleX = 1f - 0.035f * p
-                scaleY = 1f - 0.035f * p
-                alpha = 1f - 0.12f * p
-            }
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Crossfade(
-            targetState = track?.albumArtUri,
-            animationSpec = tween(durationMillis = 650),
-            label = "lyricsBackdropCrossfade",
-            modifier = Modifier.fillMaxSize(),
-        ) { artUri ->
-            if (artUri != null && blurEnabled && blurStrength > 0f) {
-                AsyncImage(
-                    model = artUri,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { scaleX = 1.12f; scaleY = 1.12f }
-                        .blur(blurStrength.dp),
-                    contentScale = ContentScale.Crop,
-                    colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.2f) }),
-                )
-            } else if (artUri != null) {
-                AsyncImage(
-                    model = artUri,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
-                Box(Modifier.fillMaxSize().background(Color(0xFF111318)))
-            }
-        }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Black.copy(alpha = 0.72f), Color.Black.copy(alpha = 0.58f), Color.Black.copy(alpha = 0.82f))
+        CompositionLocalProvider(LocalLyricsForeground provides lyricsForeground) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(20f)
+                    .graphicsLayer {
+                        val p = backProgress.value.coerceIn(0f, 1f)
+                        val direction = if (backEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
+                        translationX = size.width * 0.12f * p * direction
+                        scaleX = 1f - 0.035f * p
+                        scaleY = 1f - 0.035f * p
+                        alpha = 1f - 0.12f * p
+                        shape = RoundedCornerShape(deviceCornerRadius * p)
+                        clip = p > 0.001f
+                    }
+            ) {
+                if (useMiuix) {
+                    Crossfade(
+                        targetState = track?.albumArtUri,
+                        animationSpec = tween(durationMillis = 650),
+                        label = "lyricsBackdropCrossfade",
+                        modifier = Modifier.fillMaxSize(),
+                    ) { artUri ->
+                        if (artUri != null && blurEnabled && blurStrength > 0f) {
+                            AsyncImage(
+                                model = artUri,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer { scaleX = 1.12f; scaleY = 1.12f }
+                                    .blur(blurStrength.dp),
+                                contentScale = ContentScale.Crop,
+                                colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.2f) }),
+                            )
+                        } else if (artUri != null) {
+                            AsyncImage(
+                                model = artUri,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                            )
+                        } else {
+                            Box(Modifier.fillMaxSize().background(Color(0xFF111318)))
+                        }
+                    }
+                    Box(
+                        Modifier.fillMaxSize().background(
+                            Brush.verticalGradient(
+                                listOf(Color.Black.copy(alpha = 0.72f), Color.Black.copy(alpha = 0.58f), Color.Black.copy(alpha = 0.82f))
+                            )
+                        )
                     )
-                )
-        )
+                } else {
+                    Box(Modifier.fillMaxSize().background(lyricsBackground))
+                }
 
         Column(
             modifier = Modifier
@@ -364,21 +394,21 @@ fun FullScreenLyricsExperience(
                             .fillMaxWidth()
                             .padding(top = 12.dp)
                             .clip(RoundedCornerShape(24.dp))
-                            .background(Color.White.copy(alpha = 0.10f))
+                            .background(LocalLyricsForeground.current.copy(alpha = 0.10f))
                             .padding(14.dp),
                     ) {
                         BasicTextField(
                             value = editText,
                             onValueChange = { editText = it },
                             modifier = Modifier.fillMaxSize(),
-                            textStyle = textStyle.copy(color = Color.White, fontSize = 16.sp, lineHeight = 25.sp),
+                            textStyle = textStyle.copy(color = LocalLyricsForeground.current, fontSize = 16.sp, lineHeight = 25.sp),
                             cursorBrush = SolidColor(primary),
                             decorationBox = { inner ->
                                 Box(Modifier.fillMaxSize()) {
                                     if (editText.isBlank()) {
                                         BasicText(
                                             text = strings.lyrics,
-                                            style = textStyle.copy(color = Color.White.copy(alpha = 0.55f)),
+                                            style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.55f)),
                                         )
                                     }
                                     inner()
@@ -393,16 +423,16 @@ fun FullScreenLyricsExperience(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        Icon(Icons.Filled.Lyrics, contentDescription = null, tint = Color.White.copy(alpha = 0.72f), modifier = Modifier.size(54.dp))
+                        Icon(Icons.Filled.Lyrics, contentDescription = null, tint = LocalLyricsForeground.current.copy(alpha = 0.72f), modifier = Modifier.size(54.dp))
                         Spacer(Modifier.height(14.dp))
-                        BasicText(strings.noLyricsFound, style = textStyle.copy(color = Color.White.copy(alpha = 0.78f)))
+                        BasicText(strings.noLyricsFound, style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.78f)))
                         Spacer(Modifier.height(16.dp))
                         LyricsPill(
                             label = strings.downloadLyrics,
                             primary = primary,
                             onClick = {
                                 showSearch = true
-                                playerViewModel.searchLyrics(searchQuery.ifBlank { track?.let { "${it.artist} ${it.title}" }.orEmpty() })
+                                playerViewModel.searchLyrics(searchQuery.ifBlank { track?.title.orEmpty() })
                             },
                         )
                         if (searchState.isLoading) {
@@ -435,9 +465,9 @@ fun FullScreenLyricsExperience(
                                         .padding(horizontal = 14.dp, vertical = 12.dp),
                                     style = textStyle.copy(
                                         color = when {
-                                            isActive -> Color.White
-                                            distance > 3 -> Color.White.copy(alpha = 0.40f)
-                                            else -> Color.White.copy(alpha = 0.72f)
+                                            isActive -> LocalLyricsForeground.current
+                                            distance > 3 -> LocalLyricsForeground.current.copy(alpha = 0.40f)
+                                            else -> LocalLyricsForeground.current.copy(alpha = 0.72f)
                                         },
                                         fontSize = if (isActive) 23.sp else 18.sp,
                                         lineHeight = if (isActive) 31.sp else 26.sp,
@@ -452,7 +482,7 @@ fun FullScreenLyricsExperience(
                                     text = line,
                                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
                                     style = textStyle.copy(
-                                        color = Color.White.copy(alpha = 0.86f),
+                                        color = LocalLyricsForeground.current.copy(alpha = 0.86f),
                                         fontSize = 19.sp,
                                         lineHeight = 28.sp,
                                         textAlign = TextAlign.Center,
@@ -486,6 +516,8 @@ fun FullScreenLyricsExperience(
                 strings = strings,
             )
         }
+            }
+        }
     }
 }
 
@@ -510,8 +542,8 @@ private fun LyricsHeader(
     ) {
         LyricsIconButton(Icons.AutoMirrored.Filled.ArrowBack, title, onClose)
         Column(modifier = Modifier.weight(1f).padding(start = 4.dp, end = 4.dp)) {
-            BasicText(title, style = titleStyle.copy(color = Color.White, fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            BasicText(subtitle, style = bodyStyle.copy(color = Color.White.copy(alpha = 0.70f), fontSize = 11.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            BasicText(title, style = titleStyle.copy(color = LocalLyricsForeground.current, fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            BasicText(subtitle, style = bodyStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.70f), fontSize = 11.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         LyricsIconButton(Icons.Filled.Search, "Search lyrics", onSearch)
         LyricsIconButton(Icons.Filled.FolderOpen, "Import lyrics", onImport)
@@ -542,7 +574,7 @@ private fun LyricsSettingsPanel(
             .fillMaxWidth()
             .padding(bottom = 8.dp)
             .clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = 0.11f))
+            .background(LocalLyricsForeground.current.copy(alpha = 0.11f))
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -564,7 +596,7 @@ private fun LyricsSettingsPanel(
         }
         BasicText(
             "${strings.blurEffect} · ${blurStrength.toInt()} dp",
-            style = textStyle.copy(color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp),
+            style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.75f), fontSize = 12.sp),
         )
         Slider(
             value = blurStrength,
@@ -574,11 +606,11 @@ private fun LyricsSettingsPanel(
             colors = SliderDefaults.colors(
                 thumbColor = primary,
                 activeTrackColor = primary,
-                inactiveTrackColor = Color.White.copy(alpha = 0.22f),
+                inactiveTrackColor = LocalLyricsForeground.current.copy(alpha = 0.22f),
             ),
         )
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            BasicText("${strings.lyricsSyncOffset}: ${if (syncOffsetMs >= 0) "+" else ""}${syncOffsetMs} ms", style = textStyle.copy(color = Color.White.copy(alpha = 0.82f), fontSize = 12.sp), modifier = Modifier.weight(1f))
+            BasicText("${strings.lyricsSyncOffset}: ${if (syncOffsetMs >= 0) "+" else ""}${syncOffsetMs} ms", style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.82f), fontSize = 12.sp), modifier = Modifier.weight(1f))
             LyricsPill("−100", primary, onClick = { onOffsetChange(syncOffsetMs - 100) })
             LyricsPill("+100", primary, onClick = { onOffsetChange(syncOffsetMs + 100) })
         }
@@ -605,18 +637,18 @@ private fun LyricsSearchPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(18.dp))
-                .background(Color.White.copy(alpha = 0.12f))
+                .background(LocalLyricsForeground.current.copy(alpha = 0.12f))
                 .padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
-                if (query.isBlank()) BasicText(strings.lyricsSearchPrompt, style = textStyle.copy(color = Color.White.copy(alpha = 0.5f)))
+                if (query.isBlank()) BasicText(strings.lyricsSearchPrompt, style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.5f)))
                 BasicTextField(
                     value = query,
                     onValueChange = onQueryChange,
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    textStyle = textStyle.copy(color = Color.White, fontSize = 16.sp),
+                    textStyle = textStyle.copy(color = LocalLyricsForeground.current, fontSize = 16.sp),
                     cursorBrush = SolidColor(primary),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { onSearch() }),
@@ -633,7 +665,7 @@ private fun LyricsSearchPanel(
             Box(Modifier.fillMaxWidth().weight(1f).padding(20.dp), contentAlignment = Alignment.Center) {
                 BasicText(
                     text = if (error == "network") strings.lyricsSearchFailed else strings.noSearchResults,
-                    style = textStyle.copy(color = Color.White.copy(alpha = 0.76f), textAlign = TextAlign.Center),
+                    style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.76f), textAlign = TextAlign.Center),
                 )
             }
         } else {
@@ -643,7 +675,7 @@ private fun LyricsSearchPanel(
                 contentPadding = PaddingValues(bottom = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(results, key = { result -> result.id ?: (result.title + result.artist).hashCode().toLong() }) { result ->
+                items(results, key = { result -> result.sourceId ?: "${result.source}_${result.id ?: (result.title + result.artist).hashCode()}" }) { result ->
                     LyricsSearchResultCard(result = result, primary = primary, textStyle = textStyle, onClick = { onSelect(result) })
                 }
             }
@@ -662,23 +694,24 @@ private fun LyricsSearchResultCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(Color.White.copy(alpha = 0.12f))
+            .background(LocalLyricsForeground.current.copy(alpha = 0.12f))
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        BasicText(result.title, style = textStyle.copy(color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        BasicText(result.title, style = textStyle.copy(color = LocalLyricsForeground.current, fontWeight = FontWeight.SemiBold, fontSize = 16.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
         BasicText(
             listOfNotNull(result.artist.takeIf(String::isNotBlank), result.album.takeIf(String::isNotBlank)).joinToString(" · "),
-            style = textStyle.copy(color = Color.White.copy(alpha = 0.70f), fontSize = 13.sp),
+            style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.70f), fontSize = 13.sp),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             BasicText(
                 text = result.durationSeconds?.let { formatLyricsDuration((it * 1000.0).toLong()) } ?: "",
-                style = textStyle.copy(color = Color.White.copy(alpha = 0.60f), fontSize = 12.sp),
+                style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.60f), fontSize = 12.sp),
             )
+            LyricsPill(result.source, primary, selected = result.source == "QQ Music", onClick = onClick)
             if (result.syncedLyrics != null) LyricsPill("Synced", primary, selected = true, onClick = onClick)
             if (result.instrumental) LyricsPill("Instrumental", primary, selected = false, onClick = onClick)
         }
@@ -710,13 +743,13 @@ private fun LyricsPlaybackControls(
             colors = SliderDefaults.colors(
                 thumbColor = primary,
                 activeTrackColor = primary,
-                inactiveTrackColor = Color.White.copy(alpha = 0.25f),
+                inactiveTrackColor = LocalLyricsForeground.current.copy(alpha = 0.25f),
             ),
             modifier = Modifier.fillMaxWidth(),
         )
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            BasicText(formatLyricsDuration(if (durationMs > 0L) (seekFraction * durationMs).toLong() else progressMs), style = textStyle.copy(color = Color.White.copy(alpha = 0.68f), fontSize = 12.sp))
-            BasicText(formatLyricsDuration(durationMs), style = textStyle.copy(color = Color.White.copy(alpha = 0.68f), fontSize = 12.sp))
+            BasicText(formatLyricsDuration(if (durationMs > 0L) (seekFraction * durationMs).toLong() else progressMs), style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.68f), fontSize = 12.sp))
+            BasicText(formatLyricsDuration(durationMs), style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.68f), fontSize = 12.sp))
         }
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
@@ -738,7 +771,7 @@ private fun LyricsPlaybackControls(
             BasicText(
                 text = "${track.title} · ${track.artist}",
                 modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
-                style = textStyle.copy(color = Color.White.copy(alpha = 0.62f), fontSize = 11.sp, textAlign = TextAlign.Center),
+                style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.62f), fontSize = 11.sp, textAlign = TextAlign.Center),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -760,14 +793,14 @@ private fun LyricsIconButton(
         modifier = Modifier
             .size(size)
             .clip(CircleShape)
-            .background(if (selected) primary.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.06f))
+            .background(if (selected) primary.copy(alpha = 0.25f) else LocalLyricsForeground.current.copy(alpha = 0.06f))
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = image,
             contentDescription = description,
-            tint = if (!enabled) Color.White.copy(alpha = 0.35f) else Color.White,
+            tint = if (!enabled) LocalLyricsForeground.current.copy(alpha = 0.35f) else LocalLyricsForeground.current,
             modifier = Modifier.size(if (size >= 52.dp) 27.dp else 20.dp),
         )
     }
@@ -783,12 +816,12 @@ private fun LyricsPill(
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(if (selected) primary.copy(alpha = 0.30f) else Color.White.copy(alpha = 0.10f))
+            .background(if (selected) primary.copy(alpha = 0.30f) else LocalLyricsForeground.current.copy(alpha = 0.10f))
             .clickable(onClick = onClick)
             .padding(horizontal = 11.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center,
     ) {
-        BasicText(label, style = MaterialTheme.typography.labelSmall.copy(color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 11.sp))
+        BasicText(label, style = MaterialTheme.typography.labelSmall.copy(color = LocalLyricsForeground.current, fontWeight = FontWeight.SemiBold, fontSize = 11.sp))
     }
 }
 

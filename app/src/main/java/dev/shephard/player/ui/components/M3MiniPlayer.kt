@@ -10,6 +10,7 @@ package dev.shephard.player.ui.components
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -47,6 +48,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -78,6 +81,19 @@ fun M3MiniPlayer(
 ) {
     val track: AudioTrack = state.currentTrack ?: return
     val progress by progressFlow.collectAsState()
+    val coverAccent by animateColorAsState(
+        targetValue = Color(state.glowColorArgb),
+        animationSpec = tween(520),
+        label = "miniPlayerCoverAccent",
+    )
+    val miniSurface by animateColorAsState(
+        targetValue = lerp(MaterialTheme.colorScheme.surfaceContainerHigh, coverAccent, 0.32f),
+        animationSpec = tween(520),
+        label = "miniPlayerCoverSurface",
+    )
+    val miniForeground = miniPlayerContrastColor(miniSurface)
+    val accentForeground = miniPlayerContrastColor(coverAccent)
+    val progressTrack = lerp(MaterialTheme.colorScheme.surfaceContainerHighest, coverAccent, 0.24f)
     val fraction = if (progress.durationMs > 0L) {
         (progress.positionMs.toFloat() / progress.durationMs.toFloat()).coerceIn(0f, 1f)
     } else {
@@ -92,7 +108,7 @@ fun M3MiniPlayer(
         Surface(
             onClick = onClick,
             shape = RoundedCornerShape(MiniPlayerM3CornerRadius),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = miniSurface,
             tonalElevation = 3.dp,
             shadowElevation = 3.dp,
             modifier = Modifier.fillMaxWidth(),
@@ -101,6 +117,9 @@ fun M3MiniPlayer(
                 MiniPlayerM3Row(
                     track = track,
                     isPlaying = state.isPlaying,
+                    accentColor = coverAccent,
+                    accentForeground = accentForeground,
+                    surfaceForeground = miniForeground,
                     onPlayPauseClick = onPlayPauseClick,
                     onNextClick = onNextClick,
                     onPreviousClick = onPreviousClick,
@@ -110,8 +129,8 @@ fun M3MiniPlayer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(start = 12.dp, end = 12.dp, bottom = 6.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    color = coverAccent,
+                    trackColor = progressTrack,
                     strokeCap = StrokeCap.Round,
                 )
             }
@@ -123,6 +142,9 @@ fun M3MiniPlayer(
 private fun MiniPlayerM3Row(
     track: AudioTrack,
     isPlaying: Boolean,
+    accentColor: Color,
+    accentForeground: Color,
+    surfaceForeground: Color,
     onPlayPauseClick: () -> Unit,
     onNextClick: () -> Unit,
     onPreviousClick: () -> Unit,
@@ -139,7 +161,7 @@ private fun MiniPlayerM3Row(
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                .background(lerp(MaterialTheme.colorScheme.surfaceContainerHighest, accentColor, 0.30f)),
             contentAlignment = Alignment.Center
         ) {
             if (track.albumArtUri != null) {
@@ -155,7 +177,7 @@ private fun MiniPlayerM3Row(
                 Icon(
                     imageVector = Icons.Filled.MusicNote,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = accentForeground,
                     modifier = Modifier.size(20.dp),
                 )
             }
@@ -174,6 +196,7 @@ private fun MiniPlayerM3Row(
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = (-0.2).sp,
                 ),
+                color = surfaceForeground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -183,7 +206,7 @@ private fun MiniPlayerM3Row(
                     fontSize = 13.sp,
                     letterSpacing = 0.sp,
                 ),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                color = surfaceForeground.copy(alpha = 0.72f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -193,8 +216,8 @@ private fun MiniPlayerM3Row(
 
         MiniPlayerM3CircleButton(
             size = 36.dp,
-            containerColor = MaterialTheme.colorScheme.onPrimary,
-            contentColor = MaterialTheme.colorScheme.primary,
+            containerColor = accentForeground.copy(alpha = 0.92f),
+            contentColor = accentColor,
             onClick = onPreviousClick,
         ) {
             Icon(
@@ -208,8 +231,8 @@ private fun MiniPlayerM3Row(
 
         MiniPlayerM3CircleButton(
             size = 36.dp,
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+            containerColor = accentColor,
+            contentColor = accentForeground,
             onClick = onPlayPauseClick,
         ) {
             AnimatedContent(
@@ -232,8 +255,8 @@ private fun MiniPlayerM3Row(
 
         MiniPlayerM3CircleButton(
             size = 36.dp,
-            containerColor = MaterialTheme.colorScheme.onPrimary,
-            contentColor = MaterialTheme.colorScheme.primary,
+            containerColor = accentForeground.copy(alpha = 0.92f),
+            contentColor = accentColor,
             onClick = onNextClick,
         ) {
             Icon(
@@ -266,3 +289,6 @@ private fun MiniPlayerM3CircleButton(
         }
     }
 }
+
+private fun miniPlayerContrastColor(color: Color): Color =
+    if (color.luminance() >= 0.56f) Color(0xFF17131A) else Color.White

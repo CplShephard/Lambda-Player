@@ -97,6 +97,7 @@ import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import dev.shephard.player.R
 import dev.shephard.player.player.PlayerViewModel
+import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
 import dev.shephard.player.theme.PaletteStyle
@@ -221,6 +222,8 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     val wallpaper by prefs.wallpaperUri.collectAsState(initial = "")
     val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = PreferencesManager.cachedWallpaperBrightness)
     val language by prefs.language.collectAsState(initial = "en")
+    val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
+    val playlistsLayout by prefs.playlistsLayout.collectAsState(initial = LayoutMode.LIST)
     val predictiveBack by prefs.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
     val predictiveBackDirection by prefs.predictiveBackExitDirection.collectAsState(initial = PredictiveBackExitDirection.FOLLOW_GESTURE)
 
@@ -421,6 +424,33 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 }
             }
             }
+        }
+
+        // ── Grid/list layout preferences (kept in Theme Settings for Miuix) ──
+        SmallTitle(
+            text = strings.layout,
+            insideMargin = PaddingValues(16.dp, 8.dp),
+        )
+        SectionCard {
+            val layoutModes = listOf(LayoutMode.LIST, LayoutMode.GRID)
+            val layoutLabels = listOf(strings.list, strings.grid)
+            MiuixSpinnerRow(
+                title = strings.musicsLayout,
+                items = layoutLabels,
+                selectedIndex = layoutModes.indexOf(musicsLayout).coerceAtLeast(0),
+                onSelectedIndexChange = { index ->
+                    scope.launch { prefs.setMusicsLayout(layoutModes[index]) }
+                }
+            )
+            Spacer(Modifier.height(8.dp))
+            MiuixSpinnerRow(
+                title = strings.playlistsLayout,
+                items = layoutLabels,
+                selectedIndex = layoutModes.indexOf(playlistsLayout).coerceAtLeast(0),
+                onSelectedIndexChange = { index ->
+                    scope.launch { prefs.setPlaylistsLayout(layoutModes[index]) }
+                }
+            )
         }
 
         // Fixed: avoid re-animation on enter/exit, only show when data loaded, snap on first load

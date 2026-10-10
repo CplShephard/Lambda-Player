@@ -12,6 +12,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.material.icons.filled.Delete
 
 import androidx.activity.BackEventCompat
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -120,6 +121,8 @@ import dev.shephard.player.data.formattedDuration
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.RepeatMode
+import dev.shephard.player.theme.PredictiveBackAnimation
+import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import dev.shephard.player.ui.components.BouncyIconButton
 import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
@@ -145,6 +148,10 @@ fun NowPlayingSheet(
     val track = state.currentTrack
     val strings = LocalStrings.current
     val nowPlayingLiquidGlassOn = LocalBlurEnabled.current
+    val context = LocalContext.current
+    val preferences = remember(context) { PreferencesManager(context) }
+    val predictiveBackStyle by preferences.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
+    val useClassicPredictiveBack = predictiveBackStyle == PredictiveBackAnimation.CLASSIC
 
     var showQueue by remember { mutableStateOf(false) }
     var showPlaylists by remember { mutableStateOf(false) }
@@ -200,23 +207,23 @@ fun NowPlayingSheet(
         }
     }
 
-    PredictiveBackHandler(enabled = !showQueue && !showLyrics && !showPlaylists) { events ->
-        try {
-            events.collect { event ->
-                predictiveBackEdge = event.swipeEdge
-                predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
+    if (useClassicPredictiveBack) {
+        PredictiveBackHandler(enabled = !showQueue && !showLyrics && !showPlaylists) { events ->
+            try {
+                events.collect { event ->
+                    predictiveBackEdge = event.swipeEdge
+                    predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
+                }
+                if (predictiveBackProgress.value < 1f) predictiveBackProgress.animateTo(1f, androidx.compose.animation.core.tween(160))
+                onDismiss()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                predictiveBackProgress.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 380f))
+                throw cancelled
             }
-            if (predictiveBackProgress.value < 1f) predictiveBackProgress.animateTo(
-                1f,
-                androidx.compose.animation.core.tween(160)
-            )
-            onDismiss()
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            predictiveBackProgress.animateTo(
-                0f,
-                androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 380f)
-            )
-            throw cancelled
+        }
+    } else {
+        BackHandler(enabled = !showQueue && !showLyrics && !showPlaylists) {
+            dismissWithAnimation()
         }
     }
 
@@ -239,6 +246,7 @@ var isInteractingWithSheet by remember { mutableStateOf(false) }
         topStart = sheetCornerRadius,
         topEnd = sheetCornerRadius
     )
+    val deviceCornerRadius = rememberDeviceCornerRadius()
 
 Box(
         modifier = Modifier
@@ -253,8 +261,9 @@ Box(
                 scaleX = scale
                 scaleY = scale
                 alpha = 1f - 0.12f * p
+                shape = if (p > 0f) RoundedCornerShape(deviceCornerRadius * p) else sheetShape
+                clip = true
             }
-            .clip(sheetShape)
             .background(MiuixAppTheme.colorScheme.background)
             .draggable(
                 orientation = Orientation.Vertical,
