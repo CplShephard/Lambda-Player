@@ -14,6 +14,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.shephard.player.theme.PredictiveBackAnimation
 import dev.shephard.player.theme.PredictiveBackExitDirection
@@ -23,6 +25,7 @@ import top.yukonga.miuix.kmp.nav.core.NavCornerClipMode
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
 import top.yukonga.miuix.kmp.nav.core.NavKey
+import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 import top.yukonga.miuix.kmp.nav.transition.NavTransition
 
 /**
@@ -114,6 +117,12 @@ fun PlaylistDetailNavHost(
         onDispose { detailOpen.value = false }
     }
 
+    // Same drag-the-page-to-close direction as the settings submenus (follows the layout direction).
+    val swipeBackDirection = when (LocalLayoutDirection.current) {
+        LayoutDirection.Rtl -> NavSwipeDirection.RightToLeft
+        else -> NavSwipeDirection.LeftToRight
+    }
+
     NavDisplay(
         backStack = backStack,
         modifier = modifier,
@@ -124,7 +133,7 @@ fun PlaylistDetailNavHost(
         entry<PlaylistListRoute> {
             currentContent(null)
         }
-        entry<PlaylistDetailRoute> {
+        entry<PlaylistDetailRoute>(swipeDismiss = swipeBackDirection) {
             // NONE: no predictive preview; the entry takes the gesture itself (same as NavGraph's entries).
             NavEntryBackHandler(
                 interceptPredictiveBack = animation == PredictiveBackAnimation.NONE && backStack.size > 1,

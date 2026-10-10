@@ -567,6 +567,21 @@ private fun AppleFloatingDock(
         }
     }
 
+    // Same wrapper as the original dock: full-width, centred. The bar itself sizes to its tabs
+    // (intrinsic width, 76dp minimum per tab), so it is not stretched to the screen width.
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {},
+            )
+            .padding(
+                bottom = 12.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            ),
+        contentAlignment = Alignment.Center
+    ) {
     // Miuix dock: InstallerX Revived's FloatingBottomBar (ported to ui/glass).
     FloatingBottomBar(
         items = bottomNavDestinations,
@@ -575,11 +590,6 @@ private fun AppleFloatingDock(
         backdrop = effectiveBackdrop,
         mode = mode,
         colors = barColors,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                bottom = 12.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-            ),
         iconContent = { dest, index ->
             val icon = if (index == selectedIndex()) dest.selectedIcon else dest.unselectedIcon
             if (useMiuix) {
@@ -614,6 +624,7 @@ private fun AppleFloatingDock(
             }
         },
     )
+    }
 }
 
 /**

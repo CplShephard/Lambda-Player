@@ -90,6 +90,9 @@ private val ClassicActivityClose: NavTransition = navGraphicsTransition(
     }
 }
 
+/** Maximum dim of the revealed page while a back gesture is held (AOSP predictive back). */
+private const val REVEALED_SCRIM_MAX = 0.5f
+
 private val CrossActivityPredictive: NavTransition = navGraphicsTransition(
     opaqueDepth = 1f,
     motion = NavMotion(
@@ -99,7 +102,20 @@ private val CrossActivityPredictive: NavTransition = navGraphicsTransition(
     scrim = { scope ->
         val settle = scope.settle
         val gesture = scope.gesture
-        when {
+        if (scope.relativeDepth < 0f) {
+            // The page revealed underneath. It is dimmed by the gesture progress, not by the leaving top
+            // page. The top page leaves the screen when dragged all the way, so a dim tied to it would
+            // disappear while the finger holds there. This dim stays until the gesture is released.
+            val fade = when {
+                settle?.phase == NavSettlePhase.Commit ->
+                    (1f - settle.elapsedMillis / 450f).coerceIn(0f, 1f)
+                settle?.phase == NavSettlePhase.Cancel ->
+                    (1f - settle.elapsedMillis / 300f).coerceIn(0f, 1f)
+                gesture != null -> gesture.progress.coerceIn(0f, 1f)
+                else -> 0f
+            }
+            REVEALED_SCRIM_MAX * fade
+        } else when {
             settle?.phase == NavSettlePhase.Commit ->
                 (1f - settle.elapsedMillis / 450f).coerceIn(0f, 1f)
 

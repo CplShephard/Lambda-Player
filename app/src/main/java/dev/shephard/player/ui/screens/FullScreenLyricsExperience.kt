@@ -35,7 +35,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -130,13 +129,15 @@ import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.min
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.platform.LocalDensity
 
 private val LocalLyricsForeground = staticCompositionLocalOf { Color.White }
 
@@ -161,6 +162,8 @@ fun FullScreenLyricsExperience(
     val autoScroll by preferences.lyricsAutoScrollEnabled.collectAsState(initial = true)
     val scope = rememberCoroutineScope()
     val lyricsListState = rememberLazyListState()
+    val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
     val searchListState = rememberLazyListState()
 
     val track = state.currentTrack
@@ -220,30 +223,31 @@ fun FullScreenLyricsExperience(
 
     LaunchedEffect(activeIndex, autoScroll, showSearch, showSettings, isEditing, track?.id) {
         if (autoScroll && !showSearch && !isEditing && synced.isNotEmpty() && activeIndex >= 0) {
-            val viewportHeight = lyricsListState.layoutInfo.viewportSize.height
+            val viewport = lyricsListState.layoutInfo.viewportSize
             val targetIndex = activeIndex.coerceIn(synced.indices)
-            // Size of the active line before the jump (null if it is not on screen yet).
-            val startSize = lyricsListState.layoutInfo.visibleItemsInfo
-                .firstOrNull { it.index == targetIndex }?.size?.toFloat()
+            // The active line grows (18sp -> 23sp) while the list moves to it. Its top is pinned by the
+            // scroll, so the growth would shift its centre. Both resting heights are measured here with the
+            // same text style, and the list is aimed once at the position that keeps the centre in place.
+            // That makes the jump and the growth a single motion, with no second correction.
+            val linePaddingPx = with(density) { 24.dp.toPx() } // 12dp top + 12dp bottom inside each line
+            val textWidthPx = (viewport.width - with(density) { 28.dp.toPx() }).toInt().coerceAtLeast(1) // 14dp each side
+            val text = synced[targetIndex].text
+            val inactiveHeight = textMeasurer.measure(
+                text = text,
+                style = textStyle.copy(fontSize = 18.sp, lineHeight = 26.sp, fontWeight = FontWeight.Medium),
+                constraints = Constraints(maxWidth = textWidthPx),
+            ).size.height + linePaddingPx
+            val activeHeight = textMeasurer.measure(
+                text = text,
+                style = textStyle.copy(fontSize = 23.sp, lineHeight = 31.sp, fontWeight = FontWeight.Bold),
+                constraints = Constraints(maxWidth = textWidthPx),
+            ).size.height + linePaddingPx
+            // Top of the line at its final size, chosen so its centre matches the resting centre at 34%.
+            val finalTop = viewport.height * 0.34f - (activeHeight - inactiveHeight) / 2f
             lyricsListState.animateScrollToItem(
                 index = targetIndex,
-                scrollOffset = -(viewportHeight * 0.34f).toInt(),
+                scrollOffset = -finalTop.toInt(),
             )
-            val topAfterScroll = lyricsListState.layoutInfo.visibleItemsInfo
-                .firstOrNull { it.index == targetIndex }?.offset?.toFloat()
-            if (startSize != null && topAfterScroll != null) {
-                // The active line grows (18sp -> 23sp) with a spring after the jump. Its top stays put,
-                // so its centre drifts by a few pixels. Once the size animation has settled, move the
-                // list so the centre stays where it was when the line became active.
-                delay(LYRIC_SIZE_SETTLE_MS)
-                val info = lyricsListState.layoutInfo.visibleItemsInfo
-                    .firstOrNull { it.index == targetIndex }
-                if (info != null) {
-                    val desiredTop = topAfterScroll + startSize / 2f - info.size / 2f
-                    val drift = info.offset - desiredTop
-                    if (abs(drift) >= 1f) lyricsListState.animateScrollBy(drift)
-                }
-            }
         }
     }
 
@@ -1113,6 +1117,3 @@ private fun formatLyricsDuration(ms: Long): String {
     val totalSeconds = (ms.coerceAtLeast(0L) / 1_000L)
     return "%d:%02d".format(totalSeconds / 60L, totalSeconds % 60L)
 }
-
-/** Time for the active lyric line's grow/shrink animation to settle (spring, ~350-500 ms). */
-private const val LYRIC_SIZE_SETTLE_MS = 600L

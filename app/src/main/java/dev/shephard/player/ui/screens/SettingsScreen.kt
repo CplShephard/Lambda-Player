@@ -987,6 +987,8 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
             }
             item(key = "about_content") {
                 Column(modifier = Modifier.fillParentMaxHeight()) {
+                    // Title and the three link cards sit 120dp lower than before.
+                    Spacer(Modifier.height(120.dp))
                     SmallTitle(strings.aboutSectionTitle)
                     MiuixNativeCard(
                         modifier = Modifier
@@ -1262,19 +1264,15 @@ internal fun MiuixSpinnerRow(
         items.map { top.yukonga.miuix.kmp.basic.DropdownItem(title = it) }
     }
     // Use WindowSpinnerPreference from miuix-preference
-    // The library draws its pressed highlight edge-to-edge with square corners. Clipping the
-    // row to the device's screen corner radius rounds that highlight the same way the
-    // display corners are rounded (falls back to 28dp when the OS reports none).
-    val pressedShape = RoundedCornerShape(dev.shephard.player.ui.util.rememberDeviceCornerRadius())
+    // Same pressed highlight as the toggle rows (MiuixSwitchRow): no extra corner clip, so the
+    // highlight uses the library's default shape instead of the 30dp device-corner clip.
     top.yukonga.miuix.kmp.preference.WindowSpinnerPreference(
         title = title,
         summary = summary,
         items = dropdownItems,
         selectedIndex = selectedIndex,
         onSelectedIndexChange = onSelectedIndexChange,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(pressedShape)
+        modifier = Modifier.fillMaxWidth()
     )
 }
 
