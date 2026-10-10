@@ -168,54 +168,64 @@ fun MusicScreen(
                     val listState = rememberLazyListState()
                     val gridState = rememberLazyGridState()
 
-                    if (musicsLayout == LayoutMode.GRID) {
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(2),
-                            state = gridState,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .captureForTopBarBlur(topBarState)
-                                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                                .overScrollVertical(),
-                            contentPadding = PaddingValues(
-                                start = 12.dp,
-                                end = 12.dp,
-                                top = innerPadding.calculateTopPadding() + 8.dp,
-                                bottom = 200.dp
-                            ),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            gridItemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
-                                GridTrackCard(
-                                    track = track,
-                                    onClick = { onTrackClick(tracks, index) },
-                                    onMenuClick = { selectedTrackForMenu = track }
-                                )
-                            }
-                        }
-                    } else {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .captureForTopBarBlur(topBarState)
-                                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                                .overScrollVertical(),
-                            contentPadding = PaddingValues(
-                                start = 16.dp,
-                                end = 16.dp,
-                                top = innerPadding.calculateTopPadding() + 8.dp,
-                                bottom = 200.dp
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
-                                TrackRow(
-                                    track = track,
-                                    onClick = { onTrackClick(tracks, index) },
-                                    onMenuClick = { selectedTrackForMenu = track }
-                                )
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        dev.shephard.player.ui.components.MiuixLayoutSelector(
+                            layout = musicsLayout,
+                            strings = strings,
+                            modifier = Modifier.padding(top = innerPadding.calculateTopPadding()),
+                            onLayoutChange = { mode -> scope.launch { prefs.setMusicsLayout(mode) } },
+                        )
+                        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            if (musicsLayout == LayoutMode.GRID) {
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(2),
+                                    state = gridState,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .captureForTopBarBlur(topBarState)
+                                        .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                                        .overScrollVertical(),
+                                    contentPadding = PaddingValues(
+                                        start = 12.dp,
+                                        end = 12.dp,
+                                        top = 8.dp,
+                                        bottom = 200.dp
+                                    ),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    gridItemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+                                        GridTrackCard(
+                                            track = track,
+                                            onClick = { onTrackClick(tracks, index) },
+                                            onMenuClick = { selectedTrackForMenu = track }
+                                        )
+                                    }
+                                }
+                            } else {
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .captureForTopBarBlur(topBarState)
+                                        .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                                        .overScrollVertical(),
+                                    contentPadding = PaddingValues(
+                                        start = 16.dp,
+                                        end = 16.dp,
+                                        top = 8.dp,
+                                        bottom = 200.dp
+                                    ),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+                                        TrackRow(
+                                            track = track,
+                                            onClick = { onTrackClick(tracks, index) },
+                                            onMenuClick = { selectedTrackForMenu = track }
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -700,57 +710,17 @@ private fun EditMusicDrawer(
         }
     }
     if (showRemoveCoverConfirm) {
-        dev.shephard.player.ui.miuix.MiuixDialog(
-            onDismissRequest = { showRemoveCoverConfirm = false },
+        dev.shephard.player.ui.miuix.MiuixDeleteConfirmationDialog(
+            show = true,
             title = strings.removeCover,
-            text = {
-                Text(
-                    text = strings.removeCoverConfirm,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                )
+            message = strings.removeCoverConfirm,
+            confirmText = strings.removeCover,
+            cancelText = strings.cancel,
+            onDismiss = { showRemoveCoverConfirm = false },
+            onConfirm = {
+                showRemoveCoverConfirm = false
+                coverUri = null
             },
-            buttons = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = { showRemoveCoverConfirm = false },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Text(
-                            text = strings.cancel,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Normal,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = {
-                            showRemoveCoverConfirm = false
-                            coverUri = null
-                        },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
-                    ) {
-                        Text(
-                            text = strings.removeCover,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = Color(0xFFE53935),
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
         )
     }
 }

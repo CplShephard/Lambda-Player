@@ -276,7 +276,7 @@ internal fun M3PlaylistDetail(
 
             Scaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = if (LocalWallpaperEnabled.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surface,
             topBar = {
             TopAppBar(
                 title = { Text(text = playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },

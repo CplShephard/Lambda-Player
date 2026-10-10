@@ -50,7 +50,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.ColorLens
@@ -97,7 +96,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import dev.shephard.player.R
-import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.ThemeModePreference
@@ -106,16 +104,12 @@ import dev.shephard.player.theme.PredictiveBackAnimation
 import dev.shephard.player.theme.PredictiveBackExitDirection
 import dev.shephard.player.theme.ThemeColorSpec
 import dev.shephard.player.ui.components.MiuixDrawer
-import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.captureForTopBarBlur
 import dev.shephard.player.ui.components.m3.ColorSwatchPreview
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.components.rememberDrawerDismiss
-import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.bgeffect.BgEffectBackground
-import dev.shephard.player.ui.glass.miuixTopBarBlur
-import dev.shephard.player.ui.glass.rememberMiuixPageBackdrop
 import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -134,11 +128,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.zhanghai.android.appiconloader.AppIconLoader
 import top.yukonga.miuix.kmp.basic.Card as MiuixNativeCard
-import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
-import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 
 @Composable
@@ -230,8 +221,6 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     val wallpaper by prefs.wallpaperUri.collectAsState(initial = "")
     val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = PreferencesManager.cachedWallpaperBrightness)
     val language by prefs.language.collectAsState(initial = "en")
-    val playlistsLayout by prefs.playlistsLayout.collectAsState(initial = LayoutMode.LIST)
-    val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
     val predictiveBack by prefs.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
     val predictiveBackDirection by prefs.predictiveBackExitDirection.collectAsState(initial = PredictiveBackExitDirection.FOLLOW_GESTURE)
 
@@ -654,34 +643,6 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        SectionCard {
-            Text(strings.layout, style = MiuixAppTheme.typography.titleMedium, color = MiuixAppTheme.colorScheme.onBackground)
-            Spacer(Modifier.height(10.dp))
-            val layoutModeOptions = listOf(
-                LayoutMode.LIST to strings.list,
-                LayoutMode.GRID to strings.grid,
-            )
-            val musicsLayoutIndex = layoutModeOptions.indexOfFirst { it.first == musicsLayout }.coerceAtLeast(0)
-            MiuixSpinnerRow(
-                title = strings.musicsLayout,
-                items = layoutModeOptions.map { it.second },
-                selectedIndex = musicsLayoutIndex,
-                onSelectedIndexChange = { index ->
-                    scope.launch { prefs.setMusicsLayout(layoutModeOptions[index].first) }
-                }
-            )
-            Spacer(Modifier.height(4.dp))
-            val playlistsLayoutIndex = layoutModeOptions.indexOfFirst { it.first == playlistsLayout }.coerceAtLeast(0)
-            MiuixSpinnerRow(
-                title = strings.playlistsLayout,
-                items = layoutModeOptions.map { it.second },
-                selectedIndex = playlistsLayoutIndex,
-                onSelectedIndexChange = { index ->
-                    scope.launch { prefs.setPlaylistsLayout(layoutModeOptions[index].first) }
-                }
-            )
-        }
-
         // ── Predictive Back (exactly like InstallerX Revived Miuix page) ─────
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             SmallTitle(
@@ -805,57 +766,17 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     }
 
     if (showRemoveWallpaperConfirm) {
-        dev.shephard.player.ui.miuix.MiuixDialog(
-            onDismissRequest = { showRemoveWallpaperConfirm = false },
+        dev.shephard.player.ui.miuix.MiuixDeleteConfirmationDialog(
+            show = true,
             title = strings.removeWallpaper,
-            text = {
-                Text(
-                    text = strings.removeWallpaperConfirm,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                )
+            message = strings.removeWallpaperConfirm,
+            confirmText = strings.removeWallpaper,
+            cancelText = strings.cancel,
+            onDismiss = { showRemoveWallpaperConfirm = false },
+            onConfirm = {
+                showRemoveWallpaperConfirm = false
+                scope.launch { prefs.setWallpaperUri("") }
             },
-            buttons = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = { showRemoveWallpaperConfirm = false },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Text(
-                            text = strings.cancel,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Normal,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = {
-                            showRemoveWallpaperConfirm = false
-                            scope.launch { prefs.setWallpaperUri("") }
-                        },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
-                    ) {
-                        Text(
-                            text = strings.removeWallpaper,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = Color(0xFFE53935),
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
         )
     }
 }
@@ -898,7 +819,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
     val headerTopPadding = statusBarPadding + appBarHeight + 40.dp
 
     val lazyListState = rememberLazyListState()
-    val topAppBarScrollBehavior = MiuixScrollBehavior()
+    val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
     var logoHeightPx by remember { mutableIntStateOf(0) }
     var headerHeightDp by remember { mutableStateOf(190.dp) }
     var appIconBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -1001,8 +922,9 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
             state = lazyListState,
             modifier = Modifier
                 .fillMaxSize()
+                .captureForTopBarBlur(topBarState)
                 .overScrollVertical()
-                .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection)
+                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
         ) {
             item(key = "logoSpacer") {
                 Box(
@@ -1041,30 +963,12 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        SmallTopAppBar(
+        dev.shephard.player.ui.components.SubmenuTopBar(
             title = strings.aboutSectionTitle,
-            modifier = Modifier.align(Alignment.TopCenter),
-            color = MiuixAppTheme.colorScheme.background.copy(alpha = scrollProgress),
-            titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = scrollProgress),
-            scrollBehavior = topAppBarScrollBehavior,
-            defaultWindowInsetsPadding = false,
-            navigationIcon = {
-                Box(
-                    modifier = Modifier
-                        .padding(start = 12.dp)
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f))
-                        .bounceClick { onBack() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = strings.backContentDescription,
-                        tint = MiuixAppTheme.colorScheme.onBackground
-                    )
-                }
-            }
+            onBack = onBack,
+            state = topBarState,
+            collapseFraction = scrollProgress,
+            modifier = Modifier.align(Alignment.TopCenter)
         )
     }
 
@@ -1098,8 +1002,9 @@ private fun SettingsPageScaffold(
 ) {
     val strings = LocalStrings.current
     val cs = MiuixAppTheme.colorScheme
-    // Solid background for submenus – no wallpaper backdrop, per requirement
-    val topBarState = dev.shephard.player.ui.components.rememberSolidCollapsingTopBarState()
+    // Use the page content as a backdrop when Miuix blur is enabled; otherwise
+    // SubmenuTopBar keeps its normal solid, scroll-collapsing background.
+    val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
     val scrollState = rememberScrollState()
     val scrollProgress by dev.shephard.player.ui.components.rememberScrollFraction(scrollState)
 
@@ -1119,6 +1024,7 @@ private fun SettingsPageScaffold(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .captureForTopBarBlur(topBarState)
                     .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                     .overScrollVertical()
                     .verticalScroll(scrollState)

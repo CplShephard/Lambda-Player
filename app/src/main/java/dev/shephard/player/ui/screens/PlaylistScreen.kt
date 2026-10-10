@@ -1,8 +1,10 @@
-@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalAnimationApi::class)
+@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalAnimationApi::class, androidx.activity.ExperimentalActivityApi::class)
 
 package dev.shephard.player.ui.screens
 
 import android.net.Uri
+import androidx.activity.BackEventCompat
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -82,6 +84,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -117,14 +120,12 @@ import dev.shephard.player.ui.glass.GlassTint
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.blurSurface
 import dev.shephard.player.ui.glass.blurSurfaceCompact
-import dev.shephard.player.ui.glass.miuixTopBarBlur
 import dev.shephard.player.ui.glass.rememberMiuixPageBackdrop
-import top.yukonga.miuix.kmp.blur.LayerBackdrop
-import top.yukonga.miuix.kmp.blur.layerBackdrop
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Scaffold
 import org.json.JSONArray
@@ -430,10 +431,6 @@ LaunchedEffect(playlists) {
         }
     }
 
-androidx.activity.compose.BackHandler(enabled = openIndex != null) {
-        playlistDetailGuard.pop { openIndex = null }
-    }
-
     androidx.compose.animation.AnimatedContent(
         targetState = openIndex,
         transitionSpec = {
@@ -464,6 +461,7 @@ androidx.activity.compose.BackHandler(enabled = openIndex != null) {
                     strings = strings,
                     layout = playlistsLayout,
                     likedIds = likedIds,
+                    onLayoutChange = { mode -> scope.launch { prefs.setPlaylistsLayout(mode) } },
                     onOpen = { openIdx -> playlistDetailGuard.push(openIndex, openIdx) { openIndex = openIdx } },
                     onPlay = { pl ->
                         val plTracks = resolvePlaylistTracks(pl, tracks, likedIds)
@@ -894,118 +892,38 @@ Column(
     }
 
 if (showRemoveCoverConfirm) {
-        dev.shephard.player.ui.miuix.MiuixDialog(
-            onDismissRequest = { showRemoveCoverConfirm = false },
+        dev.shephard.player.ui.miuix.MiuixDeleteConfirmationDialog(
+            show = true,
             title = strings.removeCover,
-            text = {
-                Text(
-                    text = strings.removeCoverConfirm,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            buttons = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = { showRemoveCoverConfirm = false },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Text(
-                            text = strings.cancel,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Normal,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = {
-                            showRemoveCoverConfirm = false
-                            val idx = editPlaylistIndex
-                            if (idx != null && idx in playlists.indices) {
-                                val pl = playlists[idx]
-                                val all = playlists.toMutableList()
-                                all[idx] = pl.copy(coverUri = null)
-                                scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
-                            }
-                        },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
-                    ) {
-                        Text(
-                            text = strings.removeCover,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = Color(0xFFE53935),
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
+            message = strings.removeCoverConfirm,
+            confirmText = strings.removeCover,
+            cancelText = strings.cancel,
+            onDismiss = { showRemoveCoverConfirm = false },
+            onConfirm = {
+                showRemoveCoverConfirm = false
+                val idx = editPlaylistIndex
+                if (idx != null && idx in playlists.indices) {
+                    val playlist = playlists[idx]
+                    val updated = playlists.toMutableList()
+                    updated[idx] = playlist.copy(coverUri = null)
+                    scope.launch { prefs.setPlaylistsJson(encodePlaylists(updated)) }
                 }
-            }
+            },
         )
     }
 
 if (showRemoveCreateCoverConfirm) {
-        dev.shephard.player.ui.miuix.MiuixDialog(
-            onDismissRequest = { showRemoveCreateCoverConfirm = false },
+        dev.shephard.player.ui.miuix.MiuixDeleteConfirmationDialog(
+            show = true,
             title = strings.removeCover,
-            text = {
-                Text(
-                    text = strings.removeCoverConfirm,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                )
+            message = strings.removeCoverConfirm,
+            confirmText = strings.removeCover,
+            cancelText = strings.cancel,
+            onDismiss = { showRemoveCreateCoverConfirm = false },
+            onConfirm = {
+                showRemoveCreateCoverConfirm = false
+                newCoverUri = null
             },
-            buttons = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = { showRemoveCreateCoverConfirm = false },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Text(
-                            text = strings.cancel,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Normal,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    dev.shephard.player.ui.miuix.TextButton(
-                        onClick = {
-                            showRemoveCreateCoverConfirm = false
-                            newCoverUri = null
-                        },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.16f))
-                    ) {
-                        Text(
-                            text = strings.removeCover,
-                            style = MiuixAppTheme.typography.labelLarge,
-                            color = Color(0xFFE53935),
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
         )
     }
 
@@ -1069,12 +987,13 @@ private fun PlaylistListView(
     strings: dev.shephard.player.ui.i18n.Strings,
     layout: Int,
     likedIds: List<Long>,
+    onLayoutChange: (Int) -> Unit,
     onOpen: (Int) -> Unit,
     onPlay: (LocalPlaylist) -> Unit,
     onMenu: (Int) -> Unit,
     onCreate: () -> Unit
 ) {
-    val topBarState = dev.shephard.player.ui.components.rememberSolidCollapsingTopBarState()
+    val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
 
 Box(modifier = Modifier.fillMaxSize()) {
 
@@ -1121,91 +1040,101 @@ Scaffold(
                     pinned + unpinned
                 }
                 val hasPinned = playlists.any { it.pinned }
-                if (layout == LayoutMode.GRID) {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        state = playlistGridState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .captureForTopBarBlur(topBarState)
-                            .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                            .overScrollVertical(),
-                        contentPadding = PaddingValues(
-                            start = 16.dp,
-                            top = innerPadding.calculateTopPadding() + 8.dp,
-                            end = 16.dp,
-                            bottom = 200.dp
-                        ),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        item(key = "pinned_header", span = { GridItemSpan(2) }) {
-                            AnimatedVisibility(
-                                visible = hasPinned,
-                                enter = fadeIn() + expandVertically(),
-                                exit = fadeOut() + shrinkVertically()
+                Column(modifier = Modifier.fillMaxSize()) {
+                    dev.shephard.player.ui.components.MiuixLayoutSelector(
+                        layout = layout,
+                        strings = strings,
+                        modifier = Modifier.padding(top = innerPadding.calculateTopPadding()),
+                        onLayoutChange = onLayoutChange,
+                    )
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        if (layout == LayoutMode.GRID) {
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(2),
+                                state = playlistGridState,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .captureForTopBarBlur(topBarState)
+                                    .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                                    .overScrollVertical(),
+                                contentPadding = PaddingValues(
+                                    start = 16.dp,
+                                    top = 8.dp,
+                                    end = 16.dp,
+                                    bottom = 200.dp
+                                ),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Text(
-                                    text = strings.pinnedPlaylists,
-                                    style = MiuixAppTheme.typography.labelMedium,
-                                    color = MiuixAppTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
+                                item(key = "pinned_header", span = { GridItemSpan(2) }) {
+                                    AnimatedVisibility(
+                                        visible = hasPinned,
+                                        enter = fadeIn() + expandVertically(),
+                                        exit = fadeOut() + shrinkVertically()
+                                    ) {
+                                        Text(
+                                            text = strings.pinnedPlaylists,
+                                            style = MiuixAppTheme.typography.labelMedium,
+                                            color = MiuixAppTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(bottom = 4.dp)
+                                        )
+                                    }
+                                }
+                                items(
+                                    count = sortedPlaylists.size,
+                                    key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }
+                                ) { i ->
+                                    val pl = sortedPlaylists[i]
+                                    val realIdx = playlists.indexOf(pl)
+                                    val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+                                    Box(modifier = Modifier.animateItem()) {
+                                        PlaylistGridCard(playlist = pl, plTracks = plTracks, strings = strings,
+                                            onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                                    }
+                                }
                             }
-                        }
-                        items(
-                            count = sortedPlaylists.size,
-                            key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }
-                        ) { i ->
-                            val pl = sortedPlaylists[i]
-                            val realIdx = playlists.indexOf(pl)
-                            val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                            Box(modifier = Modifier.animateItem()) {
-                                PlaylistGridCard(playlist = pl, plTracks = plTracks, strings = strings,
-                                    onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
-                            }
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        state = playlistListState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .captureForTopBarBlur(topBarState)
-                            .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                            .overScrollVertical(),
-                        contentPadding = PaddingValues(
-                            start = 16.dp,
-                            top = innerPadding.calculateTopPadding() + 8.dp,
-                            end = 16.dp,
-                            bottom = 200.dp
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        item(key = "pinned_header") {
-                            AnimatedVisibility(
-                                visible = hasPinned,
-                                enter = fadeIn() + expandVertically(),
-                                exit = fadeOut() + shrinkVertically()
+                        } else {
+                            LazyColumn(
+                                state = playlistListState,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .captureForTopBarBlur(topBarState)
+                                    .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                                    .overScrollVertical(),
+                                contentPadding = PaddingValues(
+                                    start = 16.dp,
+                                    top = 8.dp,
+                                    end = 16.dp,
+                                    bottom = 200.dp
+                                ),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Text(
-                                    text = strings.pinnedPlaylists,
-                                    style = MiuixAppTheme.typography.labelMedium,
-                                    color = MiuixAppTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(bottom = 4.dp)
-                                )
-                            }
-                        }
-                        items(
-                            count = sortedPlaylists.size,
-                            key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }
-                        ) { i ->
-                            val pl = sortedPlaylists[i]
-                            val realIdx = playlists.indexOf(pl)
-                            val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                            Box(modifier = Modifier.animateItem()) {
-                                PlaylistListCard(playlist = pl, plTracks = plTracks, strings = strings,
-                                    onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                                item(key = "pinned_header") {
+                                    AnimatedVisibility(
+                                        visible = hasPinned,
+                                        enter = fadeIn() + expandVertically(),
+                                        exit = fadeOut() + shrinkVertically()
+                                    ) {
+                                        Text(
+                                            text = strings.pinnedPlaylists,
+                                            style = MiuixAppTheme.typography.labelMedium,
+                                            color = MiuixAppTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(bottom = 4.dp)
+                                        )
+                                    }
+                                }
+                                items(
+                                    count = sortedPlaylists.size,
+                                    key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }
+                                ) { i ->
+                                    val pl = sortedPlaylists[i]
+                                    val realIdx = playlists.indexOf(pl)
+                                    val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+                                    Box(modifier = Modifier.animateItem()) {
+                                        PlaylistListCard(playlist = pl, plTracks = plTracks, strings = strings,
+                                            onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                                    }
+                                }
                             }
                         }
                     }
@@ -1462,11 +1391,27 @@ internal fun PlaylistDetailView(
     onChangeSort: (String) -> Unit = {},
     isHomeSimplified: Boolean = false
 ) {
-    val topBarState = dev.shephard.player.ui.components.rememberSolidCollapsingTopBarState()
+    val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
     val reorderItems = remember { mutableStateListOf<AudioTrack>() }
     var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var isReordering by remember { mutableStateOf(false) }
     var pendingCommittedOrder by remember { mutableStateOf<List<Long>?>(null) }
+    val predictiveBackProgress = remember { androidx.compose.animation.core.Animatable(0f) }
+    var predictiveBackEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
+
+    PredictiveBackHandler { events ->
+        try {
+            events.collect { event ->
+                predictiveBackEdge = event.swipeEdge
+                predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
+            }
+            if (predictiveBackProgress.value < 1f) predictiveBackProgress.animateTo(1f, androidx.compose.animation.core.tween(150))
+            onBack()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            predictiveBackProgress.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 380f))
+            throw cancelled
+        }
+    }
 
     val displayTracks = if (isHomeSimplified) {
         remember(plTracks) { plTracks.shuffled() }
@@ -1526,7 +1471,17 @@ internal fun PlaylistDetailView(
     val detailTitle = if (playlist.isSystem) strings.likedSongs else playlist.name
 
             Scaffold(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val p = predictiveBackProgress.value.coerceIn(0f, 1f)
+                    val direction = if (predictiveBackEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
+                    translationX = size.width * 0.12f * p * direction
+                    val scale = 1f - 0.035f * p
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = 1f - 0.12f * p
+                },
             containerColor = MiuixAppTheme.colorScheme.background,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
@@ -1542,6 +1497,8 @@ internal fun PlaylistDetailView(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
+                .captureForTopBarBlur(topBarState)
+                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                 .overScrollVertical(),
             contentPadding = PaddingValues(
                 start = 16.dp,

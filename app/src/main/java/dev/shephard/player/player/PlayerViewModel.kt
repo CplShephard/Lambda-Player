@@ -21,6 +21,7 @@ import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.ListenEvent
 import dev.shephard.player.data.ListenStatsCalculator
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +36,32 @@ data class SyncedLyricLine(val timeMs: Long, val text: String)
 data class PlaybackProgress(
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
+)
+
+data class LyricsSearchResult(
+    val id: Long?,
+    val title: String,
+    val artist: String,
+    val album: String,
+    val durationSeconds: Double?,
+    val instrumental: Boolean,
+    val plainLyrics: String?,
+    val syncedLyrics: String?,
+) {
+    val rawLyrics: String get() = syncedLyrics?.takeIf(String::isNotBlank) ?: plainLyrics.orEmpty()
+}
+
+data class LyricsSearchUiState(
+    val query: String = "",
+    val isLoading: Boolean = false,
+    val results: List<LyricsSearchResult> = emptyList(),
+    val error: String? = null,
+)
+
+private data class LyricsDocument(
+    val rawText: String,
+    val lines: List<String>,
+    val syncedLines: List<SyncedLyricLine>,
 )
 
 data class PlayerUiState(
@@ -69,6 +96,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _progress = MutableStateFlow(PlaybackProgress())
     val progress: StateFlow<PlaybackProgress> = _progress.asStateFlow()
 
+    private val _lyricsSearchState = MutableStateFlow(LyricsSearchUiState())
+    val lyricsSearchState: StateFlow<LyricsSearchUiState> = _lyricsSearchState.asStateFlow()
+    private var lyricsSearchJob: Job? = null
+    private var lyricsLoadJob: Job? = null
+
+    private val _lyricsSyncOffsetMs = MutableStateFlow(0)
+    val lyricsSyncOffsetMs: StateFlow<Int> = _lyricsSyncOffsetMs.asStateFlow()
+
     private var queueTracks: List<AudioTrack> = emptyList()
     private var originalQueue: List<AudioTrack> = emptyList()
     private var remixActive: Boolean = false
@@ -101,6 +136,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (isPlaying) {
+                val c = controller
+                if (c != null && !isUserSeeking) {
+                    _progress.value = PlaybackProgress(
+                        positionMs = c.currentPosition.coerceAtLeast(0L),
+                        durationMs = currentDurationMs(_uiState.value.currentTrack)
+                    )
+                }
                 val now = System.currentTimeMillis()
                 lastPlaybackTickMs = now
                 lastListeningStoreWriteMs = now
@@ -118,13 +160,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val track = queueTracks.find { it.id.toString() == mediaItem?.mediaId }
             finalizeStatsSession()
             statsSessionTrackId = track?.id
-            _uiState.value = _uiState.value.copy(currentTrack = track)
+            _uiState.value = _uiState.value.copy(
+                currentTrack = track,
+                lyrics = emptyList(),
+                syncedLyrics = emptyList(),
+                lyricsVisible = false,
+            )
             if (track != null) {
                 recordRecentTrackStart(track)
             }
+            // Media3 can report TIME_UNSET for a short period while the next
+            // item is preparing. Use the scanned track duration immediately so
+            // the seek bar does not briefly render the new song as 0:00.
             _progress.value = PlaybackProgress(
                 positionMs = 0L,
-                durationMs = controller?.duration?.coerceAtLeast(0L) ?: 0L
+                durationMs = currentDurationMs(track, preferTrackDuration = true)
             )
             if (_uiState.value.crossfadeEnabled) {
                 performCrossfadeIn()
@@ -134,8 +184,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            _progress.value = _progress.value.copy(
-                durationMs = controller?.duration?.coerceAtLeast(0L) ?: 0L
+            val currentTrack = _uiState.value.currentTrack
+            val durationMs = currentDurationMs(
+                currentTrack,
+                preferTrackDuration = playbackState != Player.STATE_READY
+            )
+            val positionMs = if (playbackState == Player.STATE_READY) {
+                controller?.currentPosition?.coerceAtLeast(0L) ?: _progress.value.positionMs
+            } else {
+                _progress.value.positionMs
+            }
+            _progress.value = PlaybackProgress(
+                positionMs = positionMs,
+                durationMs = durationMs
             )
         }
 
@@ -150,6 +211,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 else -> RepeatMode.OFF
             }
             _uiState.value = _uiState.value.copy(repeatMode = mode)
+        }
+    }
+
+    /**
+     * `Player.duration` is TIME_UNSET while a local item is preparing. Prefer
+     * the MediaStore duration in that window, then switch to Media3's timeline
+     * duration once it is available.
+     */
+    private fun currentDurationMs(
+        track: AudioTrack? = _uiState.value.currentTrack,
+        preferTrackDuration: Boolean = false,
+    ): Long {
+        val playerDuration = controller?.duration?.takeIf { it > 0L && it != C.TIME_UNSET }
+        val indexedDuration = track?.durationMs?.takeIf { it > 0L }
+        return if (preferTrackDuration) {
+            indexedDuration ?: playerDuration ?: 0L
+        } else {
+            playerDuration ?: indexedDuration ?: 0L
         }
     }
 
@@ -230,7 +309,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         )
         _progress.value = PlaybackProgress(
             positionMs = c.currentPosition.coerceAtLeast(0L),
-            durationMs = c.duration.coerceAtLeast(0L)
+            durationMs = currentDurationMs(current)
         )
         if (c.isPlaying) {
             val now = System.currentTimeMillis()
@@ -266,7 +345,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                     _progress.value = PlaybackProgress(
                         positionMs = c.currentPosition.coerceAtLeast(0L),
-                        durationMs = c.duration.coerceAtLeast(0L)
+                        durationMs = currentDurationMs(_uiState.value.currentTrack)
                     )
                 } else if (c?.isPlaying == true) {
                     accrueListeningTime()
@@ -586,12 +665,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         c.prepare()
         c.play()
 
+        val startTrack = tracks.getOrNull(startIndex)
         _uiState.value = _uiState.value.copy(
             queue = tracks,
-            currentTrack = tracks.getOrNull(startIndex),
+            currentTrack = startTrack,
             currentPlaylistName = playlistName
         )
-        _progress.value = PlaybackProgress()
+        _progress.value = PlaybackProgress(
+            durationMs = currentDurationMs(startTrack, preferTrackDuration = true)
+        )
     }
 
     fun togglePlayPause() {
@@ -699,7 +781,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             shuffleEnabled = true,
             currentPlaylistName = playlistName
         )
-        _progress.value = PlaybackProgress()
+        _progress.value = PlaybackProgress(
+            durationMs = currentDurationMs(startTrack, preferTrackDuration = true)
+        )
     }
 
     private fun reorderPlayerPlaylist(
@@ -885,48 +969,74 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun loadLyrics(track: AudioTrack?) {
+        lyricsLoadJob?.cancel()
+        lyricsSearchJob?.cancel()
+        _lyricsSearchState.value = LyricsSearchUiState()
         if (track == null) {
-            _uiState.value = _uiState.value.copy(lyrics = emptyList(), lyricsVisible = false)
+            _lyricsSyncOffsetMs.value = 0
+            _uiState.value = _uiState.value.copy(
+                lyrics = emptyList(),
+                syncedLyrics = emptyList(),
+                lyricsVisible = false,
+            )
             return
         }
-        viewModelScope.launch {
-            val lyrics = withContext(Dispatchers.IO) {
 
+        _lyricsSyncOffsetMs.value = 0
+        lyricsLoadJob = viewModelScope.launch {
+            val document = withContext(Dispatchers.IO) {
                 loadSavedLyrics(track.id)
-
                     ?: runCatching {
-                        loadLyricsFromRetriever(track.uri)
+                        val raw = loadLyricsFromRetriever(track.uri)
                             ?: loadLyricsFromLrcFile(track)
+                        raw?.let(::parseLyricsDocument)
                     }.getOrNull()
-                    ?: emptyList()
+                    ?: LyricsDocument(rawText = "", lines = emptyList(), syncedLines = emptyList())
             }
-            _uiState.value = _uiState.value.copy(lyrics = lyrics, lyricsVisible = lyrics.isNotEmpty())
+            if (_uiState.value.currentTrack?.id != track.id) return@launch
+            _uiState.value = _uiState.value.copy(
+                lyrics = document.lines,
+                syncedLyrics = document.syncedLines,
+                lyricsVisible = document.lines.isNotEmpty(),
+            )
+            _lyricsSyncOffsetMs.value = loadLyricsSyncOffset(track.id)
         }
     }
 
-    private suspend fun loadSavedLyrics(trackId: Long): List<String>? {
-        return runCatching {
-            val json = prefs.lyricsJson.first()
-            val obj = org.json.JSONObject(json)
-            val arr = obj.optJSONArray(trackId.toString()) ?: return null
-            (0 until arr.length()).map { arr.getString(it) }.takeIf { it.isNotEmpty() }
-        }.getOrNull()
-    }
+    private suspend fun loadSavedLyrics(trackId: Long): LyricsDocument? = runCatching {
+        val json = prefs.lyricsJson.first()
+        val value = org.json.JSONObject(json).opt(trackId.toString()) ?: return null
+        when (value) {
+            is org.json.JSONArray -> {
+                val raw = (0 until value.length()).mapNotNull { value.optString(it).takeIf(String::isNotBlank) }
+                    .joinToString("\n")
+                raw.takeIf(String::isNotBlank)?.let(::parseLyricsDocument)
+            }
+            is org.json.JSONObject -> {
+                val raw = value.optString("rawText").takeIf(String::isNotBlank)
+                    ?: value.optJSONArray("lines")?.let { lines ->
+                        (0 until lines.length()).mapNotNull { lines.optString(it).takeIf(String::isNotBlank) }
+                            .joinToString("\n")
+                    }
+                raw?.takeIf(String::isNotBlank)?.let(::parseLyricsDocument)
+            }
+            else -> null
+        }
+    }.getOrNull()
 
-    private fun loadLyricsFromRetriever(uri: android.net.Uri): List<String>? {
+    private fun loadLyricsFromRetriever(uri: android.net.Uri): String? {
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(getApplication(), uri)
-            val lyrics = retriever.extractMetadata(28 )
-            retriever.release()
-            lyrics?.lines()?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }
-        } catch (e: Exception) {
-            retriever.release()
+            retriever.extractMetadata(28)?.takeIf(String::isNotBlank)
+        } catch (_: Exception) {
             null
+        } finally {
+            runCatching { retriever.release() }
         }
     }
 
-    private fun loadLyricsFromLrcFile(track: AudioTrack): List<String>? {
+    private fun loadLyricsFromLrcFile(track: AudioTrack): String? {
         val context = getApplication<Application>()
         val resolver = context.contentResolver
         val projection = arrayOf(MediaStore.Files.FileColumns._ID, MediaStore.Files.FileColumns.DISPLAY_NAME)
@@ -951,7 +1061,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         MediaStore.Files.getContentUri("external"), id
                     )
                     resolver.openInputStream(lrcUri)?.use { stream ->
-                        return parseLrc(stream.bufferedReader().readText())
+                        return stream.bufferedReader().readText()
                     }
                 }
             }
@@ -959,29 +1069,182 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         return null
     }
 
-    private fun parseLrc(content: String): List<String> {
-        val regex = Regex("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})](.*)")
-        val synced = content.lines().mapNotNull { line ->
-            val match = regex.find(line) ?: return@mapNotNull null
-            val min = match.groupValues[1].toLongOrNull() ?: 0L
-            val sec = match.groupValues[2].toLongOrNull() ?: 0L
-            val ms = match.groupValues[3].padEnd(3, '0').take(3).toLongOrNull() ?: 0L
-            val text = match.groupValues[4].trim()
-            if (text.isEmpty()) null else SyncedLyricLine((min * 60 + sec) * 1000 + ms, text)
+    private fun parseLyricsDocument(content: String): LyricsDocument {
+        val timestampRegex = Regex("\\[(\\d{1,3}):(\\d{2})(?:[.:](\\d{1,3}))?]")
+        val metadataRegex = Regex("\\[[A-Za-z]+:[^]]*]")
+        val synced = mutableListOf<SyncedLyricLine>()
+        val plain = mutableListOf<String>()
+
+        content.lineSequence().forEach { sourceLine ->
+            val tags = timestampRegex.findAll(sourceLine).toList()
+            if (tags.isNotEmpty()) {
+                val text = sourceLine
+                    .replace(timestampRegex, "")
+                    .replace(metadataRegex, "")
+                    .trim()
+                if (text.isNotBlank()) {
+                    tags.forEach { tag ->
+                        val minutes = tag.groupValues[1].toLongOrNull() ?: 0L
+                        val seconds = tag.groupValues[2].toLongOrNull() ?: 0L
+                        val fractionText = tag.groupValues.getOrNull(3).orEmpty()
+                        val fraction = fractionText.toLongOrNull() ?: 0L
+                        val millis = when (fractionText.length) {
+                            1 -> fraction * 100L
+                            2 -> fraction * 10L
+                            else -> fraction
+                        }
+                        synced += SyncedLyricLine((minutes * 60L + seconds) * 1000L + millis, text)
+                    }
+                }
+            } else {
+                val text = sourceLine.replace(metadataRegex, "").trim()
+                if (text.isNotBlank()) plain += text
+            }
         }
-        if (synced.isNotEmpty()) {
-            _uiState.value = _uiState.value.copy(syncedLyrics = synced)
-            return synced.map { it.text }
-        }
-        _uiState.value = _uiState.value.copy(syncedLyrics = emptyList())
-        return content.lines().map { it.trim() }.filter { it.isNotBlank() }
+
+        val sortedSynced = synced.sortedBy { it.timeMs }
+        val lines = if (sortedSynced.isNotEmpty()) sortedSynced.map { it.text } else plain
+        return LyricsDocument(content, lines, sortedSynced)
     }
+
+    private suspend fun loadLyricsSyncOffset(trackId: Long): Int = runCatching {
+        val offsets = org.json.JSONObject(prefs.lyricsSyncOffsetsJson.first())
+        offsets.optInt(trackId.toString(), 0).coerceIn(-10_000, 10_000)
+    }.getOrDefault(0)
 
     fun toggleLyricsVisible() {
         _uiState.value = _uiState.value.copy(lyricsVisible = !_uiState.value.lyricsVisible)
     }
 
-    fun parseLrcPublic(content: String): List<String> = parseLrc(content)
+    fun parseLrcPublic(content: String): List<String> = parseLyricsDocument(content).lines
+
+    fun setManualLyrics(lines: List<String>) = setManualLyricsText(lines.joinToString("\n"))
+
+    fun setManualLyricsText(rawText: String) {
+        val document = parseLyricsDocument(rawText)
+        if (document.lines.isEmpty()) return
+        val trackId = _uiState.value.currentTrack?.id ?: return
+        _uiState.value = _uiState.value.copy(
+            lyrics = document.lines,
+            syncedLyrics = document.syncedLines,
+            lyricsVisible = true,
+        )
+        viewModelScope.launch {
+            val json = prefs.lyricsJson.first()
+            val obj = runCatching { org.json.JSONObject(json) }.getOrNull() ?: org.json.JSONObject()
+            val payload = org.json.JSONObject().apply {
+                put("rawText", document.rawText)
+                put("lines", org.json.JSONArray(document.lines))
+                put("syncedLyrics", org.json.JSONArray().apply {
+                    document.syncedLines.forEach { line ->
+                        put(org.json.JSONObject().put("timeMs", line.timeMs).put("text", line.text))
+                    }
+                })
+            }
+            obj.put(trackId.toString(), payload)
+            prefs.setLyricsJson(obj.toString())
+        }
+    }
+
+    fun searchLyrics(query: String) {
+        val cleanedQuery = query.trim()
+        val trackId = _uiState.value.currentTrack?.id
+        lyricsSearchJob?.cancel()
+        if (cleanedQuery.isBlank()) {
+            _lyricsSearchState.value = LyricsSearchUiState(query = cleanedQuery, error = "empty")
+            return
+        }
+        _lyricsSearchState.value = LyricsSearchUiState(query = cleanedQuery, isLoading = true)
+        lyricsSearchJob = viewModelScope.launch {
+            try {
+                val results = withContext(Dispatchers.IO) { searchLrclib(cleanedQuery) }
+                if (trackId != _uiState.value.currentTrack?.id) return@launch
+                _lyricsSearchState.value = LyricsSearchUiState(
+                    query = cleanedQuery,
+                    results = results,
+                    error = if (results.isEmpty()) "not_found" else null,
+                )
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (trackId == _uiState.value.currentTrack?.id) {
+                    _lyricsSearchState.value = LyricsSearchUiState(query = cleanedQuery, error = "network")
+                }
+            }
+        }
+    }
+
+    fun searchLyricsForCurrentTrack() {
+        val track = _uiState.value.currentTrack ?: return
+        searchLyrics("${track.artist} ${track.title}".trim())
+    }
+
+    fun selectLyricsSearchResult(result: LyricsSearchResult) {
+        setManualLyricsText(result.rawLyrics)
+        clearLyricsSearch()
+    }
+
+    fun clearLyricsSearch() {
+        lyricsSearchJob?.cancel()
+        lyricsSearchJob = null
+        _lyricsSearchState.value = LyricsSearchUiState()
+    }
+
+    private fun searchLrclib(query: String): List<LyricsSearchResult> {
+        val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
+        val connection = (java.net.URL("https://lrclib.net/api/search?q=$encodedQuery").openConnection()
+            as java.net.HttpURLConnection).apply {
+            connectTimeout = 8_000
+            readTimeout = 8_000
+            requestMethod = "GET"
+            setRequestProperty("Accept", "application/json")
+            setRequestProperty("User-Agent", "LambdaPlayer/2.5")
+        }
+        return try {
+            val responseCode = connection.responseCode
+            if (responseCode !in 200..299) throw java.io.IOException("LRCLIB returned HTTP $responseCode")
+            val body = connection.inputStream.bufferedReader().use { it.readText() }
+            val array = org.json.JSONArray(body)
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    fun text(key: String): String? = item.optString(key)
+                        .takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+                    val plain = text("plainLyrics")
+                    val synced = text("syncedLyrics")
+                    if (plain == null && synced == null) continue
+                    add(
+                        LyricsSearchResult(
+                            id = item.optLong("id").takeIf { it > 0L },
+                            title = text("trackName") ?: query,
+                            artist = text("artistName") ?: "",
+                            album = text("albumName") ?: "",
+                            durationSeconds = item.optDouble("duration")
+                                .takeIf { it.isFinite() && it > 0.0 },
+                            instrumental = item.optBoolean("instrumental", false),
+                            plainLyrics = plain,
+                            syncedLyrics = synced,
+                        )
+                    )
+                }
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    fun setLyricsSyncOffset(offsetMs: Int) {
+        val trackId = _uiState.value.currentTrack?.id ?: return
+        val safeOffset = offsetMs.coerceIn(-10_000, 10_000)
+        _lyricsSyncOffsetMs.value = safeOffset
+        viewModelScope.launch {
+            val offsets = runCatching {
+                org.json.JSONObject(prefs.lyricsSyncOffsetsJson.first())
+            }.getOrElse { org.json.JSONObject() }
+            offsets.put(trackId.toString(), safeOffset)
+            prefs.setLyricsSyncOffsetsJson(offsets.toString())
+        }
+    }
 
     fun notifyTrackUpdated(updatedTrack: AudioTrack) {
         val current = _uiState.value
@@ -1022,21 +1285,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             .build()
         c.addMediaItem(insertIdx, mediaItem)
         _uiState.value = current.copy(queue = newQueue)
-    }
-
-    fun setManualLyrics(lines: List<String>) {
-        _uiState.value = _uiState.value.copy(lyrics = lines, lyricsVisible = true)
-
-        val trackId = _uiState.value.currentTrack?.id ?: return
-        if (lines.isEmpty()) return
-        viewModelScope.launch {
-            val json = prefs.lyricsJson.first()
-            val obj = runCatching { org.json.JSONObject(json) }.getOrNull() ?: org.json.JSONObject()
-            val arr = org.json.JSONArray()
-            lines.forEach { arr.put(it) }
-            obj.put(trackId.toString(), arr)
-            prefs.setLyricsJson(obj.toString())
-        }
     }
 
     private fun startAmplitudePulse() {

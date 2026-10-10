@@ -22,7 +22,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.activity.compose.BackHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.animation.AnimatedContent
@@ -142,10 +141,6 @@ fun HomeScreen(
     }
     var openPlaylistIndex by remember { mutableStateOf<Int?>(null) }
     val playlistDetailGuard = remember { SubmenuNavGuard() }
-
-    BackHandler(enabled = openPlaylistIndex != null) {
-        playlistDetailGuard.pop { openPlaylistIndex = null }
-    }
 
     AnimatedContent(
         targetState = openPlaylistIndex,

@@ -1,9 +1,10 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.activity.ExperimentalActivityApi::class)
 // SPDX-License-Identifier: GPL-3.0-only
 // LineageOS Twelve 1:1 - Now Playing Screen
 package dev.shephard.player.ui.screens.m3
 
-import androidx.activity.compose.BackHandler
+import androidx.activity.BackEventCompat
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.Spring
@@ -75,6 +76,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -106,6 +108,7 @@ import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import sh.calvin.reorderable.ReorderableItem
@@ -120,6 +123,16 @@ fun M3NowPlayingSheet(
     val state by playerViewModel.uiState.collectAsState()
     val track = state.currentTrack
     val strings = LocalStrings.current
+    val backgroundTarget = androidx.compose.ui.graphics.lerp(
+        MaterialTheme.colorScheme.surface,
+        Color(state.glowColorArgb),
+        0.24f,
+    )
+    val nowPlayingBackground by androidx.compose.animation.animateColorAsState(
+        targetValue = backgroundTarget,
+        animationSpec = tween(620),
+        label = "songAwareNowPlayingBackground",
+    )
 
     var showQueue by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
@@ -142,6 +155,9 @@ fun M3NowPlayingSheet(
 
     var measuredHeightPx by remember { mutableFloatStateOf(with(density) { configuration.screenHeightDp.dp.toPx() }) }
     val screenHeightPx = measuredHeightPx
+    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    val predictiveBackProgress = remember { Animatable(0f) }
+    var predictiveBackEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
 
     var isInteractingWithSheet by remember { mutableStateOf(false) }
     val isFullyExpanded by remember { derivedStateOf { hasEnteredRest && !isInteractingWithSheet && dragOffset.value <= 0.5f } }
@@ -160,15 +176,36 @@ fun M3NowPlayingSheet(
         }
     }
 
-    BackHandler(enabled = !showQueue && !showLyrics) { dismissWithAnimation() }
+    PredictiveBackHandler(enabled = !showQueue && !showLyrics) { events ->
+        try {
+            events.collect { event ->
+                predictiveBackEdge = event.swipeEdge
+                predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
+            }
+            if (predictiveBackProgress.value < 1f) predictiveBackProgress.animateTo(1f, tween(160))
+            onDismiss()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            predictiveBackProgress.animateTo(0f, spring(dampingRatio = 0.82f, stiffness = 380f))
+            throw cancelled
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { measuredHeightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = dragOffset.value.coerceAtLeast(0f) }
+            .graphicsLayer {
+                val p = predictiveBackProgress.value.coerceIn(0f, 1f)
+                val direction = if (predictiveBackEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
+                translationY = dragOffset.value.coerceAtLeast(0f)
+                translationX = screenWidthPx * 0.12f * p * direction
+                val scale = 1f - 0.035f * p
+                scaleX = scale
+                scaleY = scale
+                alpha = 1f - 0.12f * p
+            }
             .clip(RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius))
-            .background(MaterialTheme.colorScheme.surface)
+            .background(nowPlayingBackground)
             .draggable(
                 orientation = Orientation.Vertical,
                 state = rememberDraggableState { delta ->
@@ -490,177 +527,13 @@ fun M3NowPlayingSheet(
     }
 
     if (showLyrics) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        val progress by playerViewModel.progress.collectAsState()
-        val syncedLyrics = state.syncedLyrics
-        val allLyrics = state.lyrics
-        val activeIndex = if (syncedLyrics.isNotEmpty()) syncedLyrics.indexOfLast { it.timeMs <= progress.positionMs }.coerceAtLeast(0) else -1
-        val context = LocalContext.current
-        val lyricsScope = rememberCoroutineScope()
-        var lyricsEditMode by remember { mutableStateOf(false) }
-        var editedLyricsText by remember(allLyrics, syncedLyrics) {
-            mutableStateOf(
-                if (syncedLyrics.isNotEmpty()) syncedLyrics.joinToString("\n") { "[${"%02d".format(it.timeMs/60000)}:${"%02d".format((it.timeMs%60000)/1000)}.${"%02d".format((it.timeMs%1000)/10)}]${it.text}" }
-                else allLyrics.joinToString("\n")
-            )
-        }
-        var isFetchingLyrics by remember { mutableStateOf(false) }
-        fun applyLyricsText(raw: String) {
-            // parseLrcPublic sets syncedLyrics as side effect and returns plain lines
-            val lines = playerViewModel.parseLrcPublic(raw)
-            if (lines.isNotEmpty()) {
-                playerViewModel.setManualLyrics(lines)
-            } else {
-                val plainLines = raw.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
-                if (plainLines.isNotEmpty()) playerViewModel.setManualLyrics(plainLines)
-            }
-        }
-        val lrcLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            uri?.let {
-                lyricsScope.launch(Dispatchers.IO) {
-                    try {
-                        val text = context.contentResolver.openInputStream(it)?.bufferedReader()?.readText() ?: return@launch
-                        withContext(Dispatchers.Main) {
-                            editedLyricsText = text
-                            lyricsEditMode = true
-                        }
-                    } catch(_:Exception){}
-                }
-            }
-        }
-        fun httpGet(urlStr: String, timeoutMs: Int = 8000): String? = try {
-            val conn = java.net.URL(urlStr).openConnection() as java.net.HttpURLConnection
-            conn.connectTimeout = timeoutMs
-            conn.readTimeout = timeoutMs
-            conn.setRequestProperty("Accept", "application/json")
-            conn.setRequestProperty("User-Agent", "LambdaPlayer/2.5")
-            if (conn.responseCode == 200) conn.inputStream.bufferedReader().readText() else null
-        } catch (_: Exception) { null }
-
-        suspend fun fetchLyrics(): String? = withContext(Dispatchers.IO) {
-            val t = track ?: return@withContext null
-            val enc = { s: String -> java.net.URLEncoder.encode(s, "UTF-8") }
-            try {
-                var body = httpGet("https://lrclib.net/api/get?artist_name=${enc(t.artist)}&track_name=${enc(t.title)}")
-                if (body != null) {
-                    val obj = runCatching { org.json.JSONObject(body) }.getOrNull()
-                    if (obj != null) {
-                        val synced = obj.optString("syncedLyrics")
-                        if (synced.isNotBlank()) return@withContext synced
-                        val plain = obj.optString("plainLyrics")
-                        if (plain.isNotBlank()) return@withContext plain
-                    }
-                }
-                body = httpGet("https://api.lyrics.ovh/v1/${enc(t.artist)}/${enc(t.title)}")
-                if (body != null) {
-                    val obj = runCatching { org.json.JSONObject(body) }.getOrNull()
-                    val lyrics = obj?.optString("lyrics")
-                    if (!lyrics.isNullOrBlank()) return@withContext lyrics
-                }
-            } catch(_:Exception){}
-            null
-        }
-
-        M3BottomSheetWrapper(
-            onDismissRequest = { showLyrics = false }, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(strings.lyrics, style = MaterialTheme.typography.titleMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { lrcLauncher.launch(arrayOf("*/*")) }, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Filled.FolderOpen, contentDescription = "Import", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    IconButton(onClick = {
-                        if (!lyricsEditMode) {
-                            editedLyricsText = if (syncedLyrics.isNotEmpty()) syncedLyrics.joinToString("\n"){ it.text } else allLyrics.joinToString("\n")
-                        }
-                        lyricsEditMode = !lyricsEditMode
-                    }, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Edit", tint = if (lyricsEditMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    TextButton(onClick = {
-                        if (!isFetchingLyrics) {
-                            isFetchingLyrics = true
-                            lyricsScope.launch {
-                                val fetched = fetchLyrics()
-                                isFetchingLyrics = false
-                                if (!fetched.isNullOrBlank()) {
-                                    applyLyricsText(fetched)
-                                    editedLyricsText = fetched
-                                }
-                            }
-                        }
-                    }) {
-                        if (isFetchingLyrics) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp) else Text("Download")
-                    }
-                }
-            }
-            if (lyricsEditMode) {
-                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    OutlinedTextField(
-                        value = editedLyricsText,
-                        onValueChange = { editedLyricsText = it },
-                        modifier = Modifier.fillMaxWidth().height(300.dp),
-                        label = { Text(strings.lyrics) }
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { lyricsEditMode = false }) { Text("Cancel") }
-                        TextButton(onClick = {
-                            applyLyricsText(editedLyricsText)
-                            lyricsEditMode = false
-                        }) { Text("Save") }
-                    }
-                }
-            } else {
-                val hasLyrics = allLyrics.isNotEmpty() || syncedLyrics.isNotEmpty()
-                if (!hasLyrics) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(strings.noLyricsFound, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.height(12.dp))
-                        TextButton(onClick = {
-                            isFetchingLyrics = true
-                            lyricsScope.launch {
-                                val fetched = fetchLyrics()
-                                isFetchingLyrics = false
-                                if (!fetched.isNullOrBlank()) applyLyricsText(fetched)
-                            }
-                        }) { Text("Download lyrics") }
-                    }
-                } else {
-                    // Show synced if available else plain lyrics, with click to seek
-                    if (syncedLyrics.isNotEmpty()) {
-                        LazyColumn(modifier = Modifier.fillMaxWidth().height(420.dp)) {
-                            items(syncedLyrics) { line ->
-                                val index = syncedLyrics.indexOf(line)
-                                Text(
-                                    text = line.text,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = if (index == activeIndex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = if (index == activeIndex) FontWeight.Bold else FontWeight.Normal,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .clickable { playerViewModel.seekTo(line.timeMs) }
-                                        .padding(horizontal = 24.dp, vertical = 8.dp)
-                                )
-                            }
-                        }
-                    } else {
-                        LazyColumn(modifier = Modifier.fillMaxWidth().height(420.dp)) {
-                            items(allLyrics) { line ->
-                                Text(
-                                    text = line,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        dev.shephard.player.ui.screens.FullScreenLyricsExperience(
+            playerViewModel = playerViewModel,
+            useMiuix = false,
+            onDismiss = { showLyrics = false },
+        )
     }
+
 }
 
 @Composable
@@ -681,17 +554,22 @@ private fun M3NowPlayingProgressLineage(
     }
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-        androidx.compose.material3.Slider(
-            value = seekFraction ?: baseFraction,
+        dev.shephard.player.ui.components.m3.M3WavySlider(
+            value = { seekFraction ?: baseFraction },
             onValueChange = { fraction ->
                 seekFraction = fraction
                 if (durationMs > 0L) playerViewModel.onSeekPreview((fraction * durationMs).toLong())
             },
-            onValueChangeFinished = {
-                val fraction = seekFraction ?: baseFraction
+            onValueCommit = { fraction ->
+                seekFraction = fraction
                 if (durationMs > 0L) playerViewModel.onSeekCommit((fraction * durationMs).toLong())
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            isPlaying = isPlaying,
+            activeTrackColor = MaterialTheme.colorScheme.primary,
+            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+            thumbColor = MaterialTheme.colorScheme.primary,
+            semanticsLabel = dev.shephard.player.ui.i18n.LocalStrings.current.playbackPosition,
         )
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
@@ -702,6 +580,7 @@ private fun M3NowPlayingProgressLineage(
             Text(text = m3FormatMillisLineage(durationMs), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+
 }
 
 @Composable

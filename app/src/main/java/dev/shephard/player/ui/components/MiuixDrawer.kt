@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -128,12 +130,15 @@ fun MiuixDrawer(
                                 onClick = {}
                             )
                     ) {
-                        androidx.compose.runtime.CompositionLocalProvider(
-                            LocalDismissState provides {
-                                visible = false
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            MiuixDialogDragHandle()
+                            androidx.compose.runtime.CompositionLocalProvider(
+                                LocalDismissState provides {
+                                    visible = false
+                                }
+                            ) {
+                                content()
                             }
-                        ) {
-                            content()
                         }
                     }
                 }
@@ -165,6 +170,24 @@ fun MiuixDrawer(
         onDismissFinished = { currentOnDismissRequest() },
         content = content,
     )
+}
+
+@Composable
+private fun MiuixDialogDragHandle() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, bottom = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(32.dp)
+                .height(4.dp)
+                .clip(CircleShape)
+                .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.32f))
+        )
+    }
 }
 
 @Composable

@@ -49,6 +49,11 @@ object PrefsKeys {
     val PREDICTIVE_BACK_ANIMATION = stringPreferencesKey("predictive_back_animation")
     val PREDICTIVE_BACK_EXIT_DIRECTION = stringPreferencesKey("predictive_back_exit_direction")
     val M3_BLUR_BACKUP = intPreferencesKey("m3_blur_backup")
+    val M3_NAV_BAR_CORNER_RADIUS = intPreferencesKey("m3_nav_bar_corner_radius")
+    val LYRICS_BACKGROUND_BLUR_ENABLED = booleanPreferencesKey("lyrics_background_blur_enabled")
+    val LYRICS_BACKGROUND_BLUR_STRENGTH = floatPreferencesKey("lyrics_background_blur_strength")
+    val LYRICS_AUTO_SCROLL_ENABLED = booleanPreferencesKey("lyrics_auto_scroll_enabled")
+    val LYRICS_SYNC_OFFSETS_JSON = stringPreferencesKey("lyrics_sync_offsets_json")
 }
 
 object ThemeModePreference {
@@ -178,6 +183,26 @@ class PreferencesManager(private val context: Context) {
 
     val musicsLayout: Flow<Int> = context.dataStore.data.map {
         it[PrefsKeys.MUSICS_LAYOUT] ?: LayoutMode.LIST
+    }
+
+    val m3NavBarCornerRadius: Flow<Int> = context.dataStore.data.map {
+        (it[PrefsKeys.M3_NAV_BAR_CORNER_RADIUS] ?: 24).coerceIn(0, 64)
+    }
+
+    val lyricsBackgroundBlurEnabled: Flow<Boolean> = context.dataStore.data.map {
+        it[PrefsKeys.LYRICS_BACKGROUND_BLUR_ENABLED] ?: true
+    }
+
+    val lyricsBackgroundBlurStrength: Flow<Float> = context.dataStore.data.map {
+        (it[PrefsKeys.LYRICS_BACKGROUND_BLUR_STRENGTH] ?: 36f).coerceIn(0f, 64f)
+    }
+
+    val lyricsAutoScrollEnabled: Flow<Boolean> = context.dataStore.data.map {
+        it[PrefsKeys.LYRICS_AUTO_SCROLL_ENABLED] ?: true
+    }
+
+    val lyricsSyncOffsetsJson: Flow<String> = context.dataStore.data.map {
+        it[PrefsKeys.LYRICS_SYNC_OFFSETS_JSON] ?: "{}"
     }
 
     val likedSongIds: Flow<String> = context.dataStore.data.map {
@@ -330,6 +355,26 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setMusicsLayout(mode: Int) {
         context.dataStore.edit { it[PrefsKeys.MUSICS_LAYOUT] = mode }
+    }
+
+    suspend fun setM3NavBarCornerRadius(radius: Int) {
+        context.dataStore.edit { it[PrefsKeys.M3_NAV_BAR_CORNER_RADIUS] = radius.coerceIn(0, 64) }
+    }
+
+    suspend fun setLyricsBackgroundBlurEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[PrefsKeys.LYRICS_BACKGROUND_BLUR_ENABLED] = enabled }
+    }
+
+    suspend fun setLyricsBackgroundBlurStrength(strength: Float) {
+        context.dataStore.edit { it[PrefsKeys.LYRICS_BACKGROUND_BLUR_STRENGTH] = strength.coerceIn(0f, 64f) }
+    }
+
+    suspend fun setLyricsAutoScrollEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[PrefsKeys.LYRICS_AUTO_SCROLL_ENABLED] = enabled }
+    }
+
+    suspend fun setLyricsSyncOffsetsJson(json: String) {
+        context.dataStore.edit { it[PrefsKeys.LYRICS_SYNC_OFFSETS_JSON] = json }
     }
 
     suspend fun setLikedSongIds(json: String) {

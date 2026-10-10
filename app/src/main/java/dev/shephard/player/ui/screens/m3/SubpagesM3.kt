@@ -2,6 +2,7 @@
 // LineageOS Twelve 1:1 - Subpages with M3 padding/radius + solid background
 package dev.shephard.player.ui.screens.m3
 
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -334,7 +335,7 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
         }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalAnimationApi::class)
 @Composable
 fun StatsScreenM3(
     playerViewModel: PlayerViewModel = viewModel(),
@@ -406,24 +407,42 @@ fun StatsScreenM3(
             } else {
                 Text(strings.statsTopTracks, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 snapshot.trackEntries.take(10).forEachIndexed { index, entry ->
-                    val track = remember(entry.trackId, tracks) {
-                        tracks.firstOrNull { it.id == entry.trackId } ?: tracks.firstOrNull { it.title == entry.title && it.artist == entry.artistName }
-                    }
-                    val coverUri = track?.albumArtUri ?: entry.albumArtUri
-                    val displayTitle = track?.title?.takeIf { it.isNotBlank() } ?: entry.title
-                    val displayArtist = track?.artist?.takeIf { it.isNotBlank() } ?: entry.artistName
+                    androidx.compose.animation.AnimatedContent(
+                        targetState = entry,
+                        transitionSpec = {
+                            (androidx.compose.animation.slideInVertically(
+                                animationSpec = androidx.compose.animation.core.tween(340),
+                            ) { height -> height / 3 } +
+                                androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(250)))
+                                .togetherWith(
+                                    androidx.compose.animation.slideOutVertically(
+                                        animationSpec = androidx.compose.animation.core.tween(260),
+                                    ) { height -> -height / 3 } +
+                                        androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(180))
+                                )
+                        },
+                        label = "m3StatsRankSlide$index",
+                    ) { animatedEntry ->
+                        val track = remember(animatedEntry.trackId, tracks) {
+                            tracks.firstOrNull { it.id == animatedEntry.trackId }
+                                ?: tracks.firstOrNull { it.title == animatedEntry.title && it.artist == animatedEntry.artistName }
+                        }
+                        val coverUri = track?.albumArtUri ?: animatedEntry.albumArtUri
+                        val displayTitle = track?.title?.takeIf { it.isNotBlank() } ?: animatedEntry.title
+                        val displayArtist = track?.artist?.takeIf { it.isNotBlank() } ?: animatedEntry.artistName
 
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = m3ItemCardColors()
-                    ) {
-                        LineageListItemWithThumbnail(
-                            headline = "${index + 1}. $displayTitle",
-                            supporting = "$displayArtist • ${formatListeningTimeM3Lineage(entry.listenedMs, strings)}",
-                            thumbnailModel = coverUri,
-                            placeholderIcon = Icons.Filled.MusicNote
-                        )
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = m3ItemCardColors()
+                        ) {
+                            LineageListItemWithThumbnail(
+                                headline = "${index + 1}. $displayTitle",
+                                supporting = "$displayArtist • ${formatListeningTimeM3Lineage(animatedEntry.listenedMs, strings)}",
+                                thumbnailModel = coverUri,
+                                placeholderIcon = Icons.Filled.MusicNote
+                            )
+                        }
                     }
                 }
             }

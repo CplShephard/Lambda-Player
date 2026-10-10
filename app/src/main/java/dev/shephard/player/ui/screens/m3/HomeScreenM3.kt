@@ -1,11 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // LineageOS Twelve 1:1 Material 3 Expressive - Home Screen
+@file:OptIn(androidx.compose.animation.ExperimentalAnimationApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 package dev.shephard.player.ui.screens.m3
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,16 +31,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import dev.shephard.player.ui.components.m3.m3ItemCardColors
 import dev.shephard.player.ui.components.m3.m3TopBarColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.QueueMusic
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -40,16 +57,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.m3.LineageHorizontalMediaItem
-import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
 import dev.shephard.player.ui.components.m3.LineageNoElements
 import dev.shephard.player.ui.components.m3.LineageSectionHeader
 import dev.shephard.player.ui.glass.LocalWallpaperEnabled
@@ -239,34 +263,133 @@ fun HomeScreenM3(
                             }
 
                             if (recentlyPlayedTracks.isNotEmpty()) {
-                                item {
-                                    LineageSectionHeader(title = strings.recentlyPlayed)
-                                }
-                                items(recentlyPlayedTracks, key = { it.id }) { track ->
-                                    Card(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 2.dp),
-                                        shape = RoundedCornerShape(20.dp),
-                                        colors = m3ItemCardColors()
-                                    ) {
-                                        LineageListItemWithThumbnail(
-                                            headline = track.title,
-                                            supporting = "${track.artist} • ${track.album}",
-                                            thumbnailModel = track.albumArtUri,
-                                            placeholderIcon = Icons.Filled.MusicNote,
-                                            onClick = {
-                                                val idx = recentlyPlayedTracks.indexOf(track)
-                                                if (idx >= 0) onTrackClick(recentlyPlayedTracks, idx, strings.recentlyPlayed)
-                                            }
-                                        )
-                                    }
+                                item(key = "recently_played_carousel") {
+                                    RecentlyPlayedSectionM3(
+                                        title = strings.recentlyPlayed,
+                                        tracks = recentlyPlayedTracks,
+                                        onTrackClick = { index ->
+                                            onTrackClick(recentlyPlayedTracks, index, strings.recentlyPlayed)
+                                        },
+                                    )
                                 }
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RecentlyPlayedSectionM3(
+    title: String,
+    tracks: List<AudioTrack>,
+    onTrackClick: (Int) -> Unit,
+) {
+    val pagerState = rememberPagerState(pageCount = { tracks.size })
+    Column(modifier = Modifier.fillMaxWidth()) {
+        LineageSectionHeader(title = title)
+        Spacer(Modifier.height(10.dp))
+        HorizontalPager(
+            state = pagerState,
+            pageSize = PageSize.Fixed(268.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 60.dp),
+            pageSpacing = 16.dp,
+            beyondViewportPageCount = 1,
+        ) { page ->
+            val track = tracks[page]
+            if (page == 0) {
+                AnimatedContent(
+                    targetState = track,
+                    transitionSpec = {
+                        (fadeIn(tween(300)) + scaleIn(
+                            initialScale = 0.82f,
+                            animationSpec = spring(dampingRatio = 0.52f, stiffness = 340f),
+                        )).togetherWith(
+                            fadeOut(tween(200)) + scaleOut(targetScale = 0.82f, animationSpec = tween(200)),
+                        )
+                    },
+                    label = "m3RecentTrackBounceFade",
+                ) { displayedTrack ->
+                    RecentlyPlayedCardM3(displayedTrack) { onTrackClick(0) }
+                }
+            } else {
+                AnimatedContent(
+                    targetState = track,
+                    transitionSpec = {
+                        (fadeIn(tween(300)) + slideInHorizontally(tween(350)) { -it / 3 }).togetherWith(
+                            fadeOut(tween(200)) + slideOutHorizontally(tween(350)) { it / 3 },
+                        )
+                    },
+                    label = "m3RecentTrackSlide",
+                ) { displayedTrack ->
+                    RecentlyPlayedCardM3(displayedTrack) { onTrackClick(page) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecentlyPlayedCardM3(
+    track: AudioTrack,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .width(268.dp)
+            .aspectRatio(1f)
+            .shadow(8.dp, RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .clickable(onClick = onClick),
+    ) {
+        var loaded by remember(track.id) { mutableStateOf(false) }
+        AsyncImage(
+            model = track.albumArtUri,
+            contentDescription = track.title,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+            onState = { loaded = it is AsyncImagePainter.State.Success },
+        )
+        if (!loaded) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                androidx.compose.material3.Icon(
+                    imageVector = Icons.Filled.MusicNote,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp),
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.86f)), startY = 100f)),
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(14.dp),
+        ) {
+            Text(
+                text = track.title,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                text = "${track.artist} • ${track.album}",
+                color = Color.White.copy(alpha = 0.76f),
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

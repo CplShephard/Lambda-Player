@@ -27,7 +27,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -55,13 +54,10 @@ import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.captureForTopBarBlur
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.components.rememberCollapsingTopBarState
-import dev.shephard.player.ui.glass.miuixTopBarBlur
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.Text
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
-import top.yukonga.miuix.kmp.blur.layerBackdrop
 
 @Composable
 fun StatsScreen(
@@ -72,7 +68,7 @@ fun StatsScreen(
     val strings = LocalStrings.current
     val cs = MiuixAppTheme.colorScheme
     val scrollState = rememberScrollState()
-    val topBarState = dev.shephard.player.ui.components.rememberSolidCollapsingTopBarState()
+    val topBarState = rememberCollapsingTopBarState()
     val scrollProgress by dev.shephard.player.ui.components.rememberScrollFraction(scrollState)
 
     val allEvents by playerViewModel.statsEventsFlow.collectAsState()
@@ -100,6 +96,7 @@ fun StatsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .captureForTopBarBlur(topBarState)
                 .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                 .overScrollVertical()
                 .verticalScroll(scrollState)

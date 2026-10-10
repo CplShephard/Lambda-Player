@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalAnimationApi::class)
+@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalAnimationApi::class, androidx.activity.ExperimentalActivityApi::class)
 
 package dev.shephard.player.ui.screens
 
@@ -11,6 +11,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.material.icons.filled.Delete
 
+import androidx.activity.BackEventCompat
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -78,6 +80,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -126,6 +129,7 @@ import dev.shephard.player.ui.components.MinimalSeekBar
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -177,6 +181,9 @@ fun NowPlayingSheet(
     val configuration = LocalConfiguration.current
     var measuredHeightPx by remember { mutableFloatStateOf(with(density) { configuration.screenHeightDp.dp.toPx() }) }
     val screenHeightPx = measuredHeightPx
+    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    val predictiveBackProgress = remember { androidx.compose.animation.core.Animatable(0f) }
+    var predictiveBackEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
 
     val dismissWithAnimation: () -> Unit = {
         dragScope.launch {
@@ -193,8 +200,24 @@ fun NowPlayingSheet(
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = !showQueue && !showLyrics && !showPlaylists) {
-        dismissWithAnimation()
+    PredictiveBackHandler(enabled = !showQueue && !showLyrics && !showPlaylists) { events ->
+        try {
+            events.collect { event ->
+                predictiveBackEdge = event.swipeEdge
+                predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
+            }
+            if (predictiveBackProgress.value < 1f) predictiveBackProgress.animateTo(
+                1f,
+                androidx.compose.animation.core.tween(160)
+            )
+            onDismiss()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            predictiveBackProgress.animateTo(
+                0f,
+                androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 380f)
+            )
+            throw cancelled
+        }
     }
 
 val playButtonScale = remember { androidx.compose.animation.core.Animatable(1f) }
@@ -221,7 +244,16 @@ Box(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { measuredHeightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = dragOffset.value.coerceAtLeast(0f) }
+            .graphicsLayer {
+                val p = predictiveBackProgress.value.coerceIn(0f, 1f)
+                val direction = if (predictiveBackEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
+                translationY = dragOffset.value.coerceAtLeast(0f)
+                translationX = screenWidthPx * 0.12f * p * direction
+                val scale = 1f - 0.035f * p
+                scaleX = scale
+                scaleY = scale
+                alpha = 1f - 0.12f * p
+            }
             .clip(sheetShape)
             .background(MiuixAppTheme.colorScheme.background)
             .draggable(
@@ -570,156 +602,11 @@ SeekBarRow(playerViewModel = playerViewModel)
             }
 
             if (showLyrics) {
-                val lyricsContext = LocalContext.current
-                var isDownloading by remember { mutableStateOf(false) }
-                var downloadError by remember { mutableStateOf<String?>(null) }
-                val lyricListState = rememberLazyListState()
-                val syncedLyrics = state.syncedLyrics
-
-                val lyricsProgress by playerViewModel.progress.collectAsState()
-                val currentMs = lyricsProgress.positionMs
-                val activeIndex = if (syncedLyrics.isNotEmpty()) {
-                    syncedLyrics.indexOfLast { it.timeMs <= currentMs }.coerceAtLeast(0)
-                } else -1
-
-                var isEditing by remember { mutableStateOf(false) }
-                var editText by remember { mutableStateOf("") }
-                val isDarkTheme = MiuixAppTheme.colorScheme.background.luminance() < 0.5f
-
-                val lyricsFilePicker = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.OpenDocument()
-                ) { uri ->
-                    if (uri != null) {
-                        lyricsSheetScope.launch {
-                            val lines = withContext(Dispatchers.IO) {
-                                try {
-                                    lyricsContext.contentResolver.openInputStream(uri)
-                                        ?.bufferedReader()?.readText()
-                                        ?.let { playerViewModel.parseLrcPublic(it) }
-                                } catch (_: Exception) { null }
-                            }
-                            if (lines != null) playerViewModel.setManualLyrics(lines)
-                        }
-                    }
-                }
-
-                MiuixDrawer(
-                    onDismissRequest = { showLyrics = false },
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                            .fillMaxHeight(0.72f)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-
-                            dev.shephard.player.ui.miuix.IconButton(
-                                onClick = { lyricsFilePicker.launch(arrayOf("text/*", "application/octet-stream")) }
-                            ) {
-                                Icon(
-                                    Icons.Filled.FolderOpen,
-                                    contentDescription = strings.addLyricsFromFile,
-                                    tint = MiuixAppTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Text(
-                                strings.lyrics,
-                                style = MiuixAppTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1f).padding(start = 4.dp)
-                            )
-
-                            dev.shephard.player.ui.miuix.IconButton(
-                                onClick = {
-                                    if (!isEditing) {
-                                        editText = state.lyrics.joinToString("\n")
-                                        isEditing = true
-                                    } else {
-                                        val lines = editText.lines()
-                                            .map { it.trimEnd() }
-                                            .filter { it.isNotBlank() }
-                                        playerViewModel.setManualLyrics(lines)
-                                        isEditing = false
-                                    }
-                                }
-                            ) {
-                                Icon(
-                                    Icons.Filled.Edit,
-                                    contentDescription = strings.edit,
-                                    tint = if (isEditing) MiuixAppTheme.colorScheme.primary
-                                    else MiuixAppTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        if (isEditing) {
-                            dev.shephard.player.ui.miuix.OutlinedTextField(
-                                value = editText,
-                                onValueChange = { editText = it },
-                                label = { Text(strings.lyrics) },
-                                modifier = Modifier.fillMaxWidth().weight(1f)
-                            )
-                        } else if (state.lyrics.isEmpty()) {
-                            Text(strings.noLyricsFound, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.height(16.dp))
-                            val currentTrack = state.currentTrack
-                            if (currentTrack != null) {
-                                if (isDownloading) {
-                                    dev.shephard.player.ui.miuix.CircularProgressIndicator(modifier = Modifier.size(28.dp), color = MiuixAppTheme.colorScheme.primary)
-                                } else {
-                                    dev.shephard.player.ui.miuix.FilledTonalButton(
-                                        onClick = {
-                                            isDownloading = true
-                                            downloadError = null
-                                            lyricsSheetScope.launch {
-                                                val result = withContext(Dispatchers.IO) {
-                                                    fetchLyricsFromApi(currentTrack.artist, currentTrack.title)
-                                                }
-                                                isDownloading = false
-                                                if (result != null) playerViewModel.setManualLyrics(result)
-                                                else downloadError = strings.noLyricsFound
-                                            }
-                                        }
-                                    ) {
-                                        Icon(Icons.Filled.Lyrics, null, modifier = Modifier.size(18.dp))
-                                        Spacer(Modifier.width(6.dp))
-                                        Text(strings.downloadLyrics)
-                                    }
-                                }
-                                downloadError?.let {
-                                    Spacer(Modifier.height(8.dp))
-                                    Text(it, color = MiuixAppTheme.colorScheme.error, style = MiuixAppTheme.typography.bodySmall)
-                                }
-                            }
-                        } else {
-                            LazyColumn(
-                                state = lyricListState,
-                                modifier = Modifier.overScrollVertical().weight(1f)
-                            ) {
-                                itemsIndexed(state.lyrics) { idx, line ->
-                                    val isActive = idx == activeIndex
-                                    Text(
-                                        text = line,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .then(
-                                                if (syncedLyrics.isNotEmpty()) Modifier.clickable {
-                                                    playerViewModel.seekTo(syncedLyrics.getOrNull(idx)?.timeMs ?: 0L)
-                                                } else Modifier
-                                            )
-                                            .padding(vertical = 6.dp),
-                                        style = MiuixAppTheme.typography.bodyMedium,
-                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isActive) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.onSurface
-                                    )
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(16.dp))
-                    }
-                }
+                FullScreenLyricsExperience(
+                    playerViewModel = playerViewModel,
+                    useMiuix = true,
+                    onDismiss = { showLyrics = false },
+                )
             }
 
             if (showPlaylists) {
@@ -746,41 +633,40 @@ private fun AmbientGlowBackground(
         label = "darkOverlayAlpha"
     )
     Box(modifier = Modifier.fillMaxSize()) {
-        if (track?.albumArtUri != null) {
-            AsyncImage(
-                model = track.albumArtUri,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-
-scaleX = 1.15f
-                        scaleY = 1.15f
-                    }
-                    .blur(radius = 60.dp),
-                colorFilter = ColorFilter.colorMatrix(
-                    ColorMatrix().apply { setToSaturation(1.35f) }
+        androidx.compose.animation.Crossfade(
+            targetState = track?.albumArtUri,
+            animationSpec = androidx.compose.animation.core.tween(
+                durationMillis = 720,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing
+            ),
+            label = "ambientAlbumArtFade"
+        ) { artUri ->
+            if (artUri != null) {
+                AsyncImage(
+                    model = artUri,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { scaleX = 1.15f; scaleY = 1.15f }
+                        .blur(radius = 60.dp),
+                    colorFilter = ColorFilter.colorMatrix(
+                        ColorMatrix().apply { setToSaturation(1.35f) }
+                    )
                 )
-            )
-
-Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = darkOverlayAlpha))
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MiuixAppTheme.colorScheme.surfaceVariant)
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = darkOverlayAlpha - 0.15f))
-            )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                )
+            }
         }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = darkOverlayAlpha))
+        )
     }
 }
 

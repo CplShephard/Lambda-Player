@@ -15,6 +15,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.shape.RoundedCornerShape
+import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -26,13 +28,19 @@ import kotlinx.coroutines.launch
  * shrink slightly as they leave the viewport and fade back in on the way in —
  * the standard M3 crossfade+depth motion, instead of Miuix's plain slide.
  */
-fun Modifier.m3PagerPageTransition(pagerState: PagerState, page: Int): Modifier = graphicsLayer {
-    val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
-    val absOffset = abs(pageOffset).coerceIn(0f, 1f)
-    alpha = 1f - absOffset * 0.3f
-    val scale = 0.95f + 0.05f * (1f - absOffset)
-    scaleX = scale
-    scaleY = scale
+@Composable
+fun Modifier.m3PagerPageTransition(pagerState: PagerState, page: Int): Modifier {
+    val deviceCornerRadius = rememberDeviceCornerRadius()
+    return graphicsLayer {
+        val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+        val absOffset = abs(pageOffset).coerceIn(0f, 1f)
+        alpha = 1f - absOffset * 0.3f
+        val scale = 0.95f + 0.05f * (1f - absOffset)
+        scaleX = scale
+        scaleY = scale
+        shape = RoundedCornerShape(deviceCornerRadius * absOffset)
+        clip = absOffset > 0.001f
+    }
 }
 
 class MainPagerState(val pagerState: PagerState, private val coroutineScope: CoroutineScope) {

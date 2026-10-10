@@ -13,6 +13,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +42,24 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.theme.PredictiveBackAnimation
+
+@Composable
+private fun MaterialDialogDragHandle() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, bottom = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(32.dp)
+                .height(4.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+        )
+    }
+}
 
 /**
  * M3 bottom sheet that respects predictive back NONE setting.
@@ -108,7 +130,10 @@ fun M3BottomSheetWrapper(
                                 onClick = {}
                             )
                     ) {
-                        Column { content() }
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            MaterialDialogDragHandle()
+                            content()
+                        }
                     }
                 }
             }

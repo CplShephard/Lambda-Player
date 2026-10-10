@@ -73,7 +73,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
-import dev.shephard.player.player.LayoutMode
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.toPreferenceInt
 import dev.shephard.player.theme.PaletteStyle
@@ -112,13 +111,14 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
 
     val wallpaper by prefs.wallpaperUri.collectAsState(initial = "")
     val wallpaperBrightness by prefs.wallpaperBrightness.collectAsState(initial = PreferencesManager.cachedWallpaperBrightness)
-    val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
-    val playlistsLayout by prefs.playlistsLayout.collectAsState(initial = LayoutMode.LIST)
+    val navBarCornerRadius by prefs.m3NavBarCornerRadius.collectAsState(initial = 24)
     val language by prefs.language.collectAsState(initial = "en")
 
     var showRemoveWallpaperConfirm by remember { mutableStateOf(false) }
     var wallpaperBrightnessValue by remember { mutableFloatStateOf(PreferencesManager.cachedWallpaperBrightness) }
+    var navBarCornerRadiusValue by remember { mutableFloatStateOf(navBarCornerRadius.toFloat()) }
     LaunchedEffect(wallpaperBrightness) { wallpaperBrightnessValue = wallpaperBrightness }
+    LaunchedEffect(navBarCornerRadius) { navBarCornerRadiusValue = navBarCornerRadius.toFloat() }
 
     // Fix #4: if dynamicColor true, accent grid should stay closed directly, no closing animation on enter/exit
     // Use null initial to avoid false->true->false flicker
@@ -337,26 +337,32 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                 }
             }
 
-            // Layout - switchers restored #1
             item {
-                SegmentedColumn(title = strings.layout) {
+                SegmentedColumn(title = strings.navBarCornerRadius) {
                     item {
-                        DropDownMenuWidget(
-                            icon = Icons.Filled.ViewList,
-                            title = strings.musicsLayout,
-                            choice = if (musicsLayout == LayoutMode.GRID) 1 else 0,
-                            data = listOf(strings.list, strings.grid),
-                            onChoiceChange = { idx -> scope.launch { prefs.setMusicsLayout(if (idx == 1) LayoutMode.GRID else LayoutMode.LIST) } }
-                        )
-                    }
-                    item {
-                        DropDownMenuWidget(
-                            icon = Icons.Filled.GridView,
-                            title = strings.playlistsLayout,
-                            choice = if (playlistsLayout == LayoutMode.GRID) 1 else 0,
-                            data = listOf(strings.list, strings.grid),
-                            onChoiceChange = { idx -> scope.launch { prefs.setPlaylistsLayout(if (idx == 1) LayoutMode.GRID else LayoutMode.LIST) } }
-                        )
+                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text(strings.navBarCornerRadius, style = MaterialTheme.typography.bodyMedium)
+                                Text("${navBarCornerRadiusValue.toInt()} dp", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Slider(
+                                value = navBarCornerRadiusValue,
+                                onValueChange = { navBarCornerRadiusValue = it },
+                                onValueChangeFinished = { scope.launch { prefs.setM3NavBarCornerRadius(navBarCornerRadiusValue.toInt()) } },
+                                valueRange = 0f..64f,
+                                steps = 63,
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)
+                                    .clip(RoundedCornerShape(topStart = navBarCornerRadiusValue.dp, topEnd = navBarCornerRadiusValue.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(strings.googleUi, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                     }
                 }
             }

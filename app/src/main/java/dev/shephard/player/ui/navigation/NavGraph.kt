@@ -12,6 +12,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -31,6 +33,7 @@ import androidx.compose.material3.NavigationBar as M3NavigationBar
 import androidx.compose.material3.NavigationBarItem as M3NavigationBarItem
 import androidx.compose.material3.Text as M3Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -76,6 +79,7 @@ import dev.shephard.player.ui.glass.FloatingBottomBarMode
 import dev.shephard.player.ui.glass.LocalAppBackdrop
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.LocalContentBackdrop
+import dev.shephard.player.ui.glass.LocalWallpaperEnabled
 import dev.shephard.player.ui.glass.isLiquidGlassSupported
 import dev.shephard.player.ui.glass.rememberCombinedBackdrop
 import dev.shephard.player.ui.glass.wallpaperAdaptiveTextColor
@@ -266,17 +270,40 @@ fun NavGraph(
                 }
             }
             entry<ThemeRoute> {
-                if (useMiuix) ThemeSettingsScreen(onBack = ::pop) else ThemeSettingsScreenM3(onBack = ::pop)
+                if (useMiuix) {
+                    ThemeSettingsScreen(onBack = ::pop)
+                } else {
+                    CompositionLocalProvider(LocalWallpaperEnabled provides false) {
+                        ThemeSettingsScreenM3(onBack = ::pop)
+                    }
+                }
             }
             entry<PlayerRoute> {
-                if (useMiuix) PlayerSettingsScreen(onBack = ::pop) else PlayerSettingsScreenM3(onBack = ::pop)
+                if (useMiuix) {
+                    PlayerSettingsScreen(onBack = ::pop)
+                } else {
+                    CompositionLocalProvider(LocalWallpaperEnabled provides false) {
+                        PlayerSettingsScreenM3(onBack = ::pop)
+                    }
+                }
             }
             entry<AboutRoute> {
-                if (useMiuix) AboutSettingsScreen(onBack = ::pop) else AboutSettingsScreenM3(onBack = ::pop)
+                if (useMiuix) {
+                    AboutSettingsScreen(onBack = ::pop)
+                } else {
+                    CompositionLocalProvider(LocalWallpaperEnabled provides false) {
+                        AboutSettingsScreenM3(onBack = ::pop)
+                    }
+                }
             }
             entry<StatsRoute> {
-                if (useMiuix) StatsScreen(playerViewModel = playerViewModel, onBack = ::pop)
-                else StatsScreenM3(playerViewModel = playerViewModel, onBack = ::pop)
+                if (useMiuix) {
+                    StatsScreen(playerViewModel = playerViewModel, onBack = ::pop)
+                } else {
+                    CompositionLocalProvider(LocalWallpaperEnabled provides false) {
+                        StatsScreenM3(playerViewModel = playerViewModel, onBack = ::pop)
+                    }
+                }
             }
         }
     }
@@ -425,22 +452,26 @@ private fun MainDock(
             selectedIndex = selectedIndex,
             onSelected = onSelected,
         )
-        !useMiuix -> M3NavigationDock(selectedIndex = selectedIndex, onSelected = onSelected)
+        !useMiuix -> M3NavigationDock(preferences = preferences, selectedIndex = selectedIndex, onSelected = onSelected)
         else -> MiuixNavigationDock(selectedIndex = selectedIndex, onSelected = onSelected)
     }
 }
 
 @Composable
 private fun M3NavigationDock(
+    preferences: PreferencesManager,
     selectedIndex: () -> Int,
     onSelected: (Int) -> Unit,
 ) {
     val strings = LocalStrings.current
+    val cornerRadius by preferences.m3NavBarCornerRadius.collectAsState(initial = 24)
     val insets = WindowInsets.safeDrawing.only(
         WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
     )
     M3NavigationBar(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = cornerRadius.dp, topEnd = cornerRadius.dp)),
         windowInsets = insets,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) {
