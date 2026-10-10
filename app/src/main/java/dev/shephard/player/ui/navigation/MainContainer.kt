@@ -49,6 +49,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import top.yukonga.miuix.kmp.blur.layerBackdrop
+import dev.shephard.player.ui.util.OverlayBackState
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -178,7 +179,11 @@ fun MainContainer(
 
         // Submenus are popped by NavDisplay's own predictive back handling (see NavGraph), so this
         // plain BackHandler only covers the now-playing sheet and returning to the first pager page.
-        BackHandler(enabled = showNowPlaying || (!submenuOpen && mainPagerState.selectedPage != 0)) {
+        // Stays off while a drawer/sheet/dialog is open so that overlay handles the back gesture itself.
+        BackHandler(
+            enabled = !OverlayBackState.hasOpenOverlay &&
+                (showNowPlaying || (!submenuOpen && mainPagerState.selectedPage != 0))
+        ) {
             when {
                 showNowPlaying -> showNowPlaying = false
                 else -> mainPagerState.animateToPage(0)

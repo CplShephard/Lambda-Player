@@ -129,6 +129,7 @@ import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -219,10 +220,29 @@ fun FullScreenLyricsExperience(
     LaunchedEffect(activeIndex, autoScroll, showSearch, showSettings, isEditing, track?.id) {
         if (autoScroll && !showSearch && !isEditing && synced.isNotEmpty() && activeIndex >= 0) {
             val viewportHeight = lyricsListState.layoutInfo.viewportSize.height
+            val targetIndex = activeIndex.coerceIn(synced.indices)
+            // Size of the active line before the jump (null if it is not on screen yet).
+            val startSize = lyricsListState.layoutInfo.visibleItemsInfo
+                .firstOrNull { it.index == targetIndex }?.size?.toFloat()
             lyricsListState.animateScrollToItem(
-                index = activeIndex.coerceIn(synced.indices),
+                index = targetIndex,
                 scrollOffset = -(viewportHeight * 0.34f).toInt(),
             )
+            val topAfterScroll = lyricsListState.layoutInfo.visibleItemsInfo
+                .firstOrNull { it.index == targetIndex }?.offset?.toFloat()
+            if (startSize != null && topAfterScroll != null) {
+                // The active line grows (18sp -> 23sp) with a spring after the jump. Its top stays put,
+                // so its centre drifts by a few pixels. Once the size animation has settled, move the
+                // list so the centre stays where it was when the line became active.
+                delay(LYRIC_SIZE_SETTLE_MS)
+                val info = lyricsListState.layoutInfo.visibleItemsInfo
+                    .firstOrNull { it.index == targetIndex }
+                if (info != null) {
+                    val desiredTop = topAfterScroll + startSize / 2f - info.size / 2f
+                    val drift = info.offset - desiredTop
+                    if (abs(drift) >= 1f) lyricsListState.animateScrollBy(drift)
+                }
+            }
         }
     }
 
@@ -1092,3 +1112,6 @@ private fun formatLyricsDuration(ms: Long): String {
     val totalSeconds = (ms.coerceAtLeast(0L) / 1_000L)
     return "%d:%02d".format(totalSeconds / 60L, totalSeconds % 60L)
 }
+
+/** Time for the active lyric line's grow/shrink animation to settle (spring, ~350-500 ms). */
+private const val LYRIC_SIZE_SETTLE_MS = 600L

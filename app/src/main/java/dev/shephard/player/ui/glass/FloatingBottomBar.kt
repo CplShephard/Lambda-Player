@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -307,7 +306,6 @@ fun <T> FloatingBottomBar(
         items.forEachIndexed { index, item ->
             Column(
                 modifier = Modifier
-                    .defaultMinSize(minWidth = 76.dp)
                     .semantics(mergeDescendants = true) {
                         selected = index == currentIndex
                         role = Role.Tab

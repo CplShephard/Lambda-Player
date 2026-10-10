@@ -90,6 +90,16 @@ import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -195,7 +205,23 @@ fun MusicScreenM3(
                             )
                         }
 
-                        if (musicsLayout == LayoutMode.GRID) {
+                        // Grid <-> list: same sideways slide + scale + fade as the M3 Playlists page.
+                        AnimatedContent(
+                            targetState = musicsLayout,
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            transitionSpec = {
+                                val toGrid = targetState == LayoutMode.GRID
+                                (slideInHorizontally(animationSpec = tween(380)) { full -> if (toGrid) full / 5 else -full / 5 } +
+                                    fadeIn(animationSpec = tween(260)) +
+                                    scaleIn(animationSpec = tween(380), initialScale = 0.94f)) togetherWith
+                                    (slideOutHorizontally(animationSpec = tween(380)) { full -> if (toGrid) -full / 5 else full / 5 } +
+                                        fadeOut(animationSpec = tween(200)) +
+                                        scaleOut(animationSpec = tween(380), targetScale = 0.94f)) using
+                                    SizeTransform(clip = false)
+                            },
+                            label = "musicsLayoutSwitch",
+                        ) { layout ->
+                        if (layout == LayoutMode.GRID) {
                             LazyVerticalGrid(
                                 columns = GridCells.Fixed(2),
                                 modifier = Modifier.fillMaxSize(),
@@ -249,6 +275,7 @@ fun MusicScreenM3(
                                     }
                                 }
                             }
+                        }
                         }
                     }
                 }

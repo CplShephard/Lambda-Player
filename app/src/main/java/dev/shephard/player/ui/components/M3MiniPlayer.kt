@@ -176,7 +176,8 @@ private fun M3MiniWavyProgress(
         trackStroke = stroke,
         gapSize = (12f * (1f + 0.1573f * waveAmplitude * waveAmplitude)).dp,
         stopSize = 3.dp,
-        amplitude = { p -> if (p > 0f) waveAmplitude else 0f },
+        // Gentler wave: about 60% of the previous height.
+        amplitude = { p -> if (p > 0f) waveAmplitude * 0.6f else 0f },
         wavelength = WavyProgressIndicatorDefaults.LinearDeterminateWavelength,
         // Slightly slower than the default wave speed (was 1.0x wavelength).
         waveSpeed = WavyProgressIndicatorDefaults.LinearDeterminateWavelength * 0.6f,

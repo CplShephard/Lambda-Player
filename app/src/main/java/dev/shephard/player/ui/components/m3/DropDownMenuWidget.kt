@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import dev.shephard.player.ui.util.TrackOverlayForBack
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -51,6 +52,7 @@ fun DropDownMenuWidget(
             Box(
                 modifier = Modifier.align(Alignment.CenterStart)
             ) {
+                if (expanded) TrackOverlayForBack()
                 DropdownMenuPopup(
                     expanded = expanded,
                     onDismissRequest = { expanded = false },

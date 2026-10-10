@@ -96,6 +96,7 @@ import dev.shephard.player.ui.screens.StatsScreen
 import dev.shephard.player.ui.screens.m3.StatsScreenM3
 import dev.shephard.player.ui.screens.ThemeSettingsScreen
 import dev.shephard.player.ui.screens.m3.ThemeSettingsScreenM3
+import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import top.yukonga.miuix.kmp.nav.core.NavCornerClipMode
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavDisplayEffects
@@ -167,10 +168,14 @@ fun NavGraph(
     } else {
         MaterialTheme.colorScheme.surfaceContainer
     }
-    val effects = remember(roundAllCorners, backdropColor) {
+    // Same rule as InstallerX: clip to the device corner radius (Leading), or 32dp when every
+    // corner is rounded and the device reports no radius (All). Without this the Miuix submenus
+    // had square corners because Leading mode clipped at 0dp.
+    val navCornerRadius = rememberDeviceCornerRadius()
+    val effects = remember(roundAllCorners, backdropColor, navCornerRadius) {
         NavDisplayEffects(
             enableCornerClip = true,
-            cornerClipRadius = if (roundAllCorners) 32.dp else 0.dp,
+            cornerClipRadius = if (roundAllCorners && navCornerRadius <= 0.dp) 32.dp else navCornerRadius,
             cornerClipMode = if (roundAllCorners) NavCornerClipMode.All else NavCornerClipMode.Leading,
             dimAmount = 0.5f,
             backdropColor = backdropColor,
@@ -211,6 +216,9 @@ fun NavGraph(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
+                                // While playlist detail is open it sits above the dock and mini player
+                                // (which stay in place, covered like settings submenus).
+                                .zIndex(if (playlistDetailOpen.value) 2f else 0f)
                                 .then(
                                     if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop)
                                     else Modifier
@@ -218,7 +226,8 @@ fun NavGraph(
                         ) {
                             HorizontalPager(
                                 state = mainPagerState.pagerState,
-                                userScrollEnabled = true,
+                                // Page swiping is disabled while playlist detail is open.
+                                userScrollEnabled = !playlistDetailOpen.value,
                                 beyondViewportPageCount = 1,
                             ) { page ->
                                 Box(
@@ -299,7 +308,7 @@ fun NavGraph(
                         }
 
                         AnimatedVisibility(
-                            visible = !playlistDetailOpen.value,
+                            visible = true,
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
@@ -623,16 +632,21 @@ private fun DetailMiniPlayerHost(
 
     Box(modifier = modifier.navigationBarsPadding()) {
         if (useMiuix) {
-            MiniPlayer(
-                state = playerState,
-                progressFlow = playerViewModel.progress,
-                onClick = onOpenNowPlaying,
-                onPlayPauseClick = { playerViewModel.togglePlayPause() },
-                onNextClick = { playerViewModel.skipToNext() },
-                onPreviousClick = { playerViewModel.skipToPrevious() },
-                large = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            // This mini player lives inside the pager, whose layer is the content backdrop. Blurring
+            // with that same backdrop from inside it is self-referential (native crash), so the
+            // blur is turned off here and the solid surface is used instead.
+            CompositionLocalProvider(LocalContentBackdrop provides null) {
+                MiniPlayer(
+                    state = playerState,
+                    progressFlow = playerViewModel.progress,
+                    onClick = onOpenNowPlaying,
+                    onPlayPauseClick = { playerViewModel.togglePlayPause() },
+                    onNextClick = { playerViewModel.skipToNext() },
+                    onPreviousClick = { playerViewModel.skipToPrevious() },
+                    large = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         } else {
             M3MiniPlayer(
                 state = playerState,

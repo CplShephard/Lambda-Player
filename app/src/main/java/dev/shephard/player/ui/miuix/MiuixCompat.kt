@@ -50,6 +50,7 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
+import dev.shephard.player.ui.util.TrackOverlayForBack
 
 @RequiresOptIn(level = RequiresOptIn.Level.WARNING)
 annotation class ExperimentalMaterial3Api
@@ -424,6 +425,7 @@ fun MiuixDeleteConfirmationDialog(
     confirmText: String = "Delete",
     cancelText: String = "Cancel",
 ) {
+    TrackOverlayForBack(active = show)
     WindowDialog(
         show = show,
         onDismissRequest = onDismiss,
@@ -488,6 +490,7 @@ fun MiuixDialog(
     // can drive the imperative `WindowDialog` API while keeping the existing
     // call sites unchanged.
     var show by remember { mutableStateOf(true) }
+    TrackOverlayForBack(active = show)
     WindowDialog(
         show = show,
         onDismissRequest = {

@@ -9,6 +9,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import dev.shephard.player.ui.util.TrackOverlayForBack
 
 /**
  * Native M3 drawer sheet. Drawer sheets are an intentional exception to the
@@ -24,6 +25,7 @@ fun M3BottomSheetWrapper(
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
     content: @Composable () -> Unit,
 ) {
+    TrackOverlayForBack()
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,

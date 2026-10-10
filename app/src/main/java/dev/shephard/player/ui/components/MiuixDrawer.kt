@@ -39,6 +39,7 @@ import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import dev.shephard.player.ui.i18n.LocalStrings
+import dev.shephard.player.ui.util.TrackOverlayForBack
 
 @Composable
 fun MiuixDrawer(
@@ -54,6 +55,8 @@ fun MiuixDrawer(
     enableNestedScroll: Boolean = true,
     content: @Composable () -> Unit,
 ) {
+    // Composed only while open; keeps the plain app BackHandler out of this drawer's back gesture.
+    TrackOverlayForBack()
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
     val currentOnDismissRequest by rememberUpdatedState(onDismissRequest)
