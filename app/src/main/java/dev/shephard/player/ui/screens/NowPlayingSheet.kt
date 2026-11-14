@@ -618,6 +618,7 @@ private fun SeekBarRow(playerViewModel: PlayerViewModel) {
             },
             modifier = Modifier.padding(horizontal = 22.dp),
             trackHeight = 6.dp,
+            expandOnPress = true,
             activeColor = Color.White,
             inactiveColor = Color.White.copy(alpha = 0.3f)
         )
