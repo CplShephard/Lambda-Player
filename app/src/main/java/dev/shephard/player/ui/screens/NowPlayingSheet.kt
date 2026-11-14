@@ -2,6 +2,9 @@
 
 package dev.shephard.player.ui.screens
 
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionOnScreen
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.slideInHorizontally
@@ -133,6 +136,7 @@ fun NowPlayingSheet(
     var showQueue by remember { mutableStateOf(false) }
     var showPlaylists by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
+    var lyricsButtonBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
 
     val density = LocalDensity.current
     val dismissThresholdPx = with(density) { 140.dp.toPx() }
@@ -323,8 +327,10 @@ Column(modifier = Modifier.padding(horizontal = 24.dp)) {
                 placeholderContentColor = MiuixAppTheme.colorScheme.primary,
             )
         } else {
-            Box(Modifier.fillMaxWidth().height(artHeight).clip(RoundedCornerShape(24.dp)).background(MiuixAppTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
+            Box(Modifier.fillMaxWidth().height(artHeight), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(artHeight).clip(RoundedCornerShape(24.dp)).background(MiuixAppTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
+                }
             }
         }
     }
@@ -458,6 +464,10 @@ SeekBarRow(playerViewModel = playerViewModel)
                     )
                     BouncyIconButton(
                         onClick = { showLyrics = true },
+                        modifier = Modifier.onGloballyPositioned { coordinates ->
+                            val pos = coordinates.positionOnScreen()
+                            if (pos.x.isFinite() && pos.y.isFinite()) lyricsButtonBounds = androidx.compose.ui.geometry.Rect(pos.x, pos.y, pos.x + coordinates.size.width, pos.y + coordinates.size.height)
+                        },
                         icon = Icons.Filled.Lyrics,
                         contentDescription = strings.lyrics,
                         tint = Color.White,
@@ -513,6 +523,7 @@ SeekBarRow(playerViewModel = playerViewModel)
                 FullScreenLyricsExperience(
                     playerViewModel = playerViewModel,
                     useMiuix = true,
+                    sourceBoundsOnScreen = lyricsButtonBounds,
                     onDismiss = { showLyrics = false },
                 )
             }
@@ -726,9 +737,6 @@ itemsIndexed(playlists) { idx, pl ->
                                 all[idx] = updated
                                 scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
 
-if (!containsTrack && track != null) {
-                                    playerViewModel.addTrackToQueue(track)
-                                }
                             }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically

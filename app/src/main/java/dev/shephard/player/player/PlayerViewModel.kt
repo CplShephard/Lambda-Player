@@ -203,8 +203,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 carouselConfirmationJob?.cancel()
                 _pendingCarouselIndex.value = null
             }
-            val track = controller?.currentMediaItemIndex?.let(queueTracks::getOrNull)
-                ?: queueTracks.find { it.id.toString() == mediaItem?.mediaId }
+            // Media3 can dispatch a transition while a batch of move commands is still
+            // being applied. Never trust a stale index over the media item's identity.
+            val indexedTrack = controller?.currentMediaItemIndex?.let(queueTracks::getOrNull)
+            val track = indexedTrack?.takeIf { it.id.toString() == mediaItem.mediaId }
+                ?: queueTracks.find { it.id.toString() == mediaItem.mediaId }
             finalizeStatsSession()
             statsSessionTrackId = track?.id
             _uiState.value = _uiState.value.copy(

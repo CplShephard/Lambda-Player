@@ -78,9 +78,8 @@ fun QueueDrawer(playerViewModel: PlayerViewModel, useMiuix: Boolean, onDismiss: 
     val content: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth().fillMaxHeight(.84f).padding(horizontal = 16.dp)) {
             Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-                Text(strings.queue, style = MaterialTheme.typography.headlineSmall, color = text, fontWeight = FontWeight.Bold)
-                Text("${strings.queueSource}: ${state.currentPlaylistName ?: strings.queue}",
-                    style = MaterialTheme.typography.bodySmall, color = text.copy(alpha = .65f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                LibraryText(strings.queue, useMiuix, color = text, bold = true)
+                LibraryText("${strings.queueSource}: ${state.currentPlaylistName ?: strings.queue}", useMiuix, color = text.copy(alpha = .65f))
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize(),
@@ -90,21 +89,21 @@ fun QueueDrawer(playerViewModel: PlayerViewModel, useMiuix: Boolean, onDismiss: 
                             val actualIndex = current + index
                             val active = actualIndex == current
                             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                                .background(if (active) accent.copy(alpha = .17f) else card)
+                                .background(card)
                                 .clickable { playerViewModel.playQueueItemAbsolute(actualIndex) }
                                 .padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 AsyncImage(model = rememberStaticArtwork(entry.track.albumArtUri), contentDescription = null,
                                     modifier = Modifier.size(46.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
                                 Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                                    Text(entry.track.title, color = if (active) accent else text, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-                                    Text(entry.track.artist, color = text.copy(alpha = .65f), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    LibraryText(entry.track.title, useMiuix, color = if (active) accent else text, bold = true)
+                                    LibraryText(entry.track.artist, useMiuix, color = text.copy(alpha = .65f))
                                 }
                                 if (!active) {
                                     QueueRemoveButton(trackId = entry.key.toLong(), contentDescription = strings.removeFromQueue,
                                         confirmLabel = strings.queueRemoveConfirm, color = Color(0xFFE04F5F),
-                                        labelStyle = MaterialTheme.typography.labelMedium,
+                                        labelStyle = if (useMiuix) MiuixAppTheme.typography.labelMedium else MaterialTheme.typography.labelMedium,
                                         onRemove = { playerViewModel.removeQueueItemAbsolute(actualIndex) })
-                                    Icon(Icons.Filled.DragHandle, strings.reorder, tint = text.copy(alpha = if (dragging) 1f else .65f), modifier = Modifier.size(28.dp).draggableHandle())
+                                    LibraryIcon(Icons.Filled.DragHandle, strings.reorder, useMiuix, text.copy(alpha = if (dragging) 1f else .65f), Modifier.size(28.dp).draggableHandle())
                                 }
                             }
                         }
@@ -113,10 +112,10 @@ fun QueueDrawer(playerViewModel: PlayerViewModel, useMiuix: Boolean, onDismiss: 
                 Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp).clip(RoundedCornerShape(28.dp))
                     .background(dock).padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    QueueDockButton(strings.remix, Icons.Filled.AutoAwesome, isRemixed, accent, text,
+                    QueueDockButton(strings.remix, Icons.Filled.AutoAwesome, isRemixed, accent, text, useMiuix,
                         enabled = state.queue.size > 1 || isRemixed, onClick = playerViewModel::remixQueue)
                     QueueDockButton(strings.repeat, if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-                        state.repeatMode != RepeatMode.OFF, accent, text, onClick = playerViewModel::cycleRepeatMode)
+                        state.repeatMode != RepeatMode.OFF, accent, text, useMiuix, onClick = playerViewModel::cycleRepeatMode)
                 }
             }
         }
@@ -127,11 +126,12 @@ fun QueueDrawer(playerViewModel: PlayerViewModel, useMiuix: Boolean, onDismiss: 
 
 @Composable
 private fun QueueDockButton(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector,
-    selected: Boolean, accent: Color, foreground: Color, enabled: Boolean = true, onClick: () -> Unit) {
+    selected: Boolean, accent: Color, foreground: Color, useMiuix: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
     Row(Modifier.clip(RoundedCornerShape(22.dp)).background(if (selected) accent.copy(alpha = .18f) else Color.Transparent)
         .clickable(enabled = enabled, onClick = onClick).padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon(icon, contentDescription = label, tint = if (!enabled) foreground.copy(alpha = .35f) else if (selected) accent else foreground)
-        Text(label, color = if (!enabled) foreground.copy(alpha = .35f) else if (selected) accent else foreground, style = MaterialTheme.typography.labelLarge)
+        val ink = if (!enabled) foreground.copy(alpha = .35f) else if (selected) accent else foreground
+        LibraryIcon(icon, label, useMiuix, ink)
+        LibraryText(label, useMiuix, color = ink)
     }
 }

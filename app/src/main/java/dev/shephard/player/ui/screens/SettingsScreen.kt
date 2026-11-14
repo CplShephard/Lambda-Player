@@ -221,10 +221,6 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 }
             )
 
-            Spacer(Modifier.height(8.dp))
-            MiuixSwitchRow(label = strings.appleFloatingBar, checked = appleFloatingBar, description = strings.appleFloatingBarDescription) { enabled ->
-                scope.launch { prefs.setUseAppleFloatingBar(enabled) }
-            }
         }
 
         // ── Group 2: Miuix UI + Miuix Custom Colors (InstallerX layout) ──────
@@ -281,7 +277,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
 
             // Fixed re-animation: snap to target on first load to avoid enter animation on re-enter
             if (useMiuixMonetNullable != null) {
-                val monetMenuState = remember(useMiuixMonetNullable) { MutableTransitionState(useMiuixMonet) }
+                val monetMenuState = remember { MutableTransitionState(useMiuixMonet) }
                 LaunchedEffect(useMiuixMonet) {
                     monetMenuState.targetState = useMiuixMonet
                 }
@@ -348,7 +344,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             paletteStyle != PaletteStyle.Monochrome &&
             (!dynamicColor || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) && !dynamicByCover
         val accentGridVisible = useMiuixMonetNullable != null && dynamicColorNullable != null && accentGridTarget
-        val accentGridState = remember(useMiuixMonetNullable, dynamicColorNullable) { MutableTransitionState(accentGridVisible) }
+        val accentGridState = remember { MutableTransitionState(accentGridVisible) }
         LaunchedEffect(accentGridVisible) {
             accentGridState.targetState = accentGridVisible
         }
@@ -419,6 +415,16 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                         }
                     }
                 }
+            }
+        }
+
+        // Layout is placed after accent colors and before predictive back. Grid/list selection
+        // lives in Library; the dock style is the remaining page-layout preference.
+        SmallTitle(text = strings.layout, insideMargin = PaddingValues(16.dp, 8.dp))
+        SectionCard(contentPadding = PaddingValues(0.dp)) {
+            MiuixSwitchRow(label = strings.appleFloatingBar, checked = appleFloatingBar,
+                description = strings.appleFloatingBarDescription) { enabled ->
+                scope.launch { prefs.setUseAppleFloatingBar(enabled) }
             }
         }
 

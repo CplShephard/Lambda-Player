@@ -4,6 +4,9 @@
 
 package dev.shephard.player.ui.screens
 
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionOnScreen
+
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.AnimatedContent
@@ -157,6 +160,7 @@ private val LocalLyricsForeground = staticCompositionLocalOf { Color.White }
 fun FullScreenLyricsExperience(
     playerViewModel: PlayerViewModel,
     useMiuix: Boolean,
+    sourceBoundsOnScreen: androidx.compose.ui.geometry.Rect? = null,
     onDismiss: () -> Unit,
 ) {
     val strings = LocalStrings.current
@@ -248,7 +252,7 @@ fun FullScreenLyricsExperience(
     // Lambda's manual search remains separate; never interrupt it with the prompt.
     LaunchedEffect(track?.id, state.lyricsLoading, state.lyrics, skipLyricsPrompt, showSearch) {
         val current = track
-        if (current != null && skipLyricsPrompt != null && !state.lyricsLoading && current.id !in promptedTracks) {
+        if (current != null && skipLyricsPrompt != null && !state.lyricsLoading && !showSearch && current.id !in promptedTracks) {
             promptedTracks.add(current.id)
             if (!showSearch) {
                 if (state.lyrics.isEmpty() && skipLyricsPrompt != true) {
@@ -263,8 +267,9 @@ fun FullScreenLyricsExperience(
         }
     }
     LaunchedEffect(searchState.autoApplied) {
-        if (searchState.autoApplied && showFetchLyrics) {
+        if (searchState.autoApplied && (showFetchLyrics || showSearch)) {
             showFetchLyrics = false
+            showSearch = false
             playerViewModel.clearLyricsSearch()
         }
     }
@@ -386,20 +391,31 @@ fun FullScreenLyricsExperience(
         androidx.compose.runtime.SideEffect {
             (dialogView.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window?.setWindowAnimations(0)
         }
+        var dialogOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
         CompositionLocalProvider(LocalLyricsForeground provides lyricsForeground) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .onGloballyPositioned { coordinates ->
+                        val origin = coordinates.positionOnScreen()
+                        if (origin.x.isFinite() && origin.y.isFinite()) dialogOrigin = origin
+                    }
                     .zIndex(20f)
                     .graphicsLayer {
                         val p = backProgress.value.coerceIn(0f, 1f)
                         val direction = if (backEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
-                        translationX = size.width * 0.12f * p * direction
                         val entrance = openProgress.value.coerceIn(0f, 1f)
-                        translationY = (1f - entrance) * 24.dp.toPx()
-                        scaleX = (1f - 0.035f * p) * (0.965f + 0.035f * entrance)
-                        scaleY = (1f - 0.035f * p) * (0.965f + 0.035f * entrance)
-                        alpha = 1f - 0.12f * p
+                        val source = sourceBoundsOnScreen?.takeIf { it.width > 0f && it.height > 0f }
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                        val startX = source?.let { it.left - dialogOrigin.x } ?: 0f
+                        val startY = source?.let { it.top - dialogOrigin.y } ?: size.height * .12f
+                        val startWidth = source?.let { (it.width / size.width.coerceAtLeast(1f)).coerceIn(.01f, 1f) } ?: .96f
+                        val startHeight = source?.let { (it.height / size.height.coerceAtLeast(1f)).coerceIn(.01f, 1f) } ?: .96f
+                        translationX = startX * (1f - entrance) + size.width * 0.12f * p * direction
+                        translationY = startY * (1f - entrance)
+                        scaleX = (startWidth + (1f - startWidth) * entrance) * (1f - .035f * p)
+                        scaleY = (startHeight + (1f - startHeight) * entrance) * (1f - .035f * p)
+                        alpha = (0.35f + .65f * entrance) * (1f - 0.12f * p)
                         shape = RoundedCornerShape(deviceCornerRadius * maxOf(p, 1f - entrance))
                         clip = p > 0.001f || entrance < 0.999f
                     }
@@ -458,7 +474,7 @@ fun FullScreenLyricsExperience(
                 bodyStyle = textStyle,
                 onClose = closeAnimated,
                 onOptions = { showOptions = true },
-                onFullScreen = { lyricsOnly = true },
+                onFullScreen = if (showSearch || isEditing) null else ({ lyricsOnly = true }),
                 onSaveEdit = if (isEditing) ({
                     if (editText != editSource) playerViewModel.setManualLyricsText(editText)
                     isEditing = false
@@ -599,7 +615,7 @@ fun FullScreenLyricsExperience(
                         Spacer(Modifier.height(14.dp))
                         BasicText(strings.noLyricsFound, style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.78f)))
                         Spacer(Modifier.height(16.dp))
-                        LyricsPill(
+                        if (!lyricsOnly) LyricsPill(
                             label = strings.downloadLyrics,
                             primary = primary,
                             onClick = {
@@ -607,7 +623,7 @@ fun FullScreenLyricsExperience(
                                 playerViewModel.searchLyrics(searchQuery.ifBlank { track?.title.orEmpty() })
                             },
                         )
-                        if (searchState.isLoading) {
+                        if (!lyricsOnly && searchState.isLoading) {
                             Spacer(Modifier.height(14.dp))
                             CircularProgressIndicator(color = primary, modifier = Modifier.size(26.dp), strokeWidth = 2.dp)
                         }
@@ -741,31 +757,37 @@ fun FullScreenLyricsExperience(
             }
         }
         if (showFetchLyrics) {
-            MaterialTheme(colorScheme = dev.shephard.player.ui.theme.PlayerTheme.colorScheme) {
-            dev.shephard.player.ui.components.FetchLyricsDialog(
-                uiState = searchState,
-                currentSong = track,
-                dontShowAgain = skipLyricsPrompt == true,
-                onDontShowAgainChange = { value -> scope.launch { preferences.setLyricsSkipSearchPrompt(value) } },
-                onConfirm = { forcePick ->
-                    val query = listOfNotNull(track?.title?.takeIf { it.isNotBlank() },
-                        track?.artist?.takeIf { it.isNotBlank() && !it.equals("<unknown>", true) }).joinToString(" ")
-                    playerViewModel.searchLyrics(query, autoApply = !forcePick)
-                },
-                onPickResult = { result ->
-                    playerViewModel.selectLyricsSearchResult(result)
-                    showFetchLyrics = false
-                },
-                onManualSearch = { title, artist ->
-                    playerViewModel.searchLyrics(listOfNotNull(title.trim().takeIf { it.isNotBlank() }, artist?.trim()?.takeIf { it.isNotBlank() }).joinToString(" "))
-                },
-                onDismiss = { showFetchLyrics = false; playerViewModel.clearLyricsSearch() },
-                onImport = {
-                    showFetchLyrics = false
-                    playerViewModel.clearLyricsSearch()
-                    importLauncher.launch(arrayOf("text/*", "application/octet-stream", "application/x-lrc", "application/ttml+xml", "application/xml"))
-                },
-            )
+            val searchFromPrompt: (Boolean) -> Unit = { forcePick ->
+                showFetchLyrics = false
+                showSearch = true
+                searchQuery = track?.title.orEmpty()
+                val query = listOfNotNull(track?.title?.takeIf { it.isNotBlank() },
+                    track?.artist?.takeIf { it.isNotBlank() && !it.equals("<unknown>", true) }).joinToString(" ")
+                playerViewModel.searchLyrics(query, autoApply = !forcePick)
+            }
+            val dismissPrompt = { showFetchLyrics = false; playerViewModel.clearLyricsSearch() }
+            val importLyrics = {
+                showFetchLyrics = false
+                playerViewModel.clearLyricsSearch()
+                importLauncher.launch(arrayOf("text/*", "application/octet-stream", "application/x-lrc", "application/ttml+xml", "application/xml"))
+            }
+            if (useMiuix) {
+                dev.shephard.player.ui.components.MiuixFetchLyricsDialog(
+                    song = track, dontShowAgain = skipLyricsPrompt == true,
+                    onDontShowAgainChange = { value -> scope.launch { preferences.setLyricsSkipSearchPrompt(value) } },
+                    onSearch = searchFromPrompt, onDismiss = dismissPrompt, onImport = importLyrics,
+                )
+            } else {
+                MaterialTheme(colorScheme = dev.shephard.player.ui.theme.PlayerTheme.colorScheme) {
+                    dev.shephard.player.ui.components.FetchLyricsDialog(
+                        uiState = searchState, currentSong = track, dontShowAgain = skipLyricsPrompt == true,
+                        onDontShowAgainChange = { value -> scope.launch { preferences.setLyricsSkipSearchPrompt(value) } },
+                        onConfirm = searchFromPrompt,
+                        onPickResult = { result -> playerViewModel.selectLyricsSearchResult(result); showFetchLyrics = false },
+                        onManualSearch = { title, artist -> playerViewModel.searchLyrics(listOfNotNull(title.trim().takeIf { it.isNotBlank() }, artist?.trim()?.takeIf { it.isNotBlank() }).joinToString(" ")) },
+                        onDismiss = dismissPrompt, onImport = importLyrics,
+                    )
+                }
             }
         }
     }
@@ -779,7 +801,7 @@ private fun LyricsHeader(
     bodyStyle: TextStyle,
     onClose: () -> Unit,
     onOptions: () -> Unit,
-    onFullScreen: () -> Unit,
+    onFullScreen: (() -> Unit)?,
     onSaveEdit: (() -> Unit)?,
     strings: dev.shephard.player.ui.i18n.Strings,
 ) {
@@ -790,7 +812,7 @@ private fun LyricsHeader(
             BasicText(subtitle, style = bodyStyle.copy(color = LocalLyricsForeground.current.copy(alpha = .7f), fontSize = 11.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (onSaveEdit != null) LyricsIconButton(Icons.Filled.Check, strings.lyricsSave, onSaveEdit)
-        if (onSaveEdit == null) LyricsIconButton(Icons.Filled.Fullscreen, strings.lyrics, onFullScreen)
+        if (onFullScreen != null) LyricsIconButton(Icons.Filled.Fullscreen, strings.lyrics, onFullScreen)
         LyricsIconButton(Icons.Filled.MoreVert, strings.lyricsOptions, onOptions)
     }
 }
@@ -821,7 +843,7 @@ private fun LyricsOptionsDrawer(
             Column(Modifier.fillMaxWidth().heightIn(max = 620.dp).verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 12.dp)) {
                 BasicText(strings.lyricsOptions, style = MaterialTheme.typography.titleLarge.copy(color = fg, fontWeight = FontWeight.Bold), modifier = Modifier.padding(bottom = 12.dp))
                 @Composable fun Action(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean = true, action: () -> Unit) {
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(fg.copy(alpha = .06f))
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(if (useMiuix) MiuixAppTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceContainerHigh)
                         .clickable(enabled = enabled, onClick = action).padding(horizontal = 14.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(icon, null, tint = if (enabled) accent else fg.copy(alpha = .3f))
                         Spacer(Modifier.width(14.dp))

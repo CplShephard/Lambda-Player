@@ -54,6 +54,7 @@ import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.captureForTopBarBlur
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.components.rememberCollapsingTopBarState
+import dev.shephard.player.ui.components.MiuixSwitcherPills
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
@@ -104,7 +105,17 @@ fun StatsScreen(
                 .padding(top = innerPadding.calculateTopPadding() + 8.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            StatsPeriodPills(selectedPeriod = selectedPeriod, onPeriodSelected = { selectedPeriod = it })
+            MiuixSwitcherPills(
+                options = listOf(
+                    StatsPeriod.Today to strings.statsPeriodToday,
+                    StatsPeriod.ThisWeek to strings.statsPeriodThisWeek,
+                    StatsPeriod.ThisMonth to strings.statsPeriodThisMonth,
+                    StatsPeriod.ThisYear to strings.statsPeriodThisYear,
+                    StatsPeriod.AllTime to strings.statsPeriodAllTime
+                ),
+                selected = selectedPeriod,
+                onSelected = { selectedPeriod = it }
+            )
 
             StatsSummaryCard(
                 totalListenedMs = snapshot.summary.totalListenedMs,
@@ -122,47 +133,6 @@ fun StatsScreen(
             Spacer(Modifier.height(90.dp))
             }
         }
-}
-
-@Composable
-private fun StatsPeriodPills(
-    selectedPeriod: StatsPeriod,
-    onPeriodSelected: (StatsPeriod) -> Unit
-) {
-    val strings = LocalStrings.current
-    val periods = listOf(
-        StatsPeriod.Today to strings.statsPeriodToday,
-        StatsPeriod.ThisWeek to strings.statsPeriodThisWeek,
-        StatsPeriod.ThisMonth to strings.statsPeriodThisMonth,
-        StatsPeriod.ThisYear to strings.statsPeriodThisYear,
-        StatsPeriod.AllTime to strings.statsPeriodAllTime
-    )
-    val rowScrollState = rememberScrollState()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rowScrollState),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        periods.forEach { (period, label) ->
-            val selected = period == selectedPeriod
-            val cs = MiuixAppTheme.colorScheme
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(if (selected) cs.primary else cs.surfaceVariant.copy(alpha = 0.6f))
-                    .clickable { onPeriodSelected(period) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    text = label,
-                    color = if (selected) cs.onPrimary else cs.onSurfaceVariant,
-                    style = MiuixAppTheme.typography.bodyMedium,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-                )
-            }
-        }
-    }
 }
 
 @Composable

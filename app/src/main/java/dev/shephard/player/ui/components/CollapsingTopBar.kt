@@ -10,7 +10,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -75,6 +80,18 @@ class CollapsingTopBarState(
 fun Modifier.captureForTopBarBlur(state: CollapsingTopBarState): Modifier =
     state.pageBackdrop?.let { this.then(Modifier.layerBackdrop(it)) } ?: this
 
+/**
+ * These full-window headers have no padded ancestor. Apply the actual top safe inset once
+ * to the entire bar, including custom overlays, then mark it consumed so Miuix's own bar
+ * does not insert a second copy. Unlike a hard-coded status bar height this includes cutouts.
+ */
+@Composable
+fun Modifier.miuixHeaderSafeTop(): Modifier {
+    val safeTop = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
+    val padding = safeTop.asPaddingValues().calculateTopPadding()
+    return this.padding(top = padding).consumeWindowInsets(safeTop)
+}
+
 /** Translucent dark scrim; when available the captured page is blurred underneath. */
 @Composable
 private fun BoxScope.TopBarBlurBackground(
@@ -124,7 +141,7 @@ fun CollapsingTopBar(
     modifier: Modifier = Modifier,
 ) {
     val scrollProgress = state.collapseFraction
-    Box(modifier = modifier.fillMaxWidth()) {
+    Box(modifier = modifier.fillMaxWidth().miuixHeaderSafeTop()) {
         TopBarBlurBackground(state, scrollProgress)
         SmallTopAppBar(
             title = title,
@@ -164,7 +181,7 @@ fun MiuixTopBar(
     subtitle: String = "",
 ) {
     val fraction = state.collapseFraction
-    Box(modifier = modifier.fillMaxWidth().statusBarsPadding()) {
+    Box(modifier = modifier.fillMaxWidth().miuixHeaderSafeTop()) {
         TopAppBar(
             title = title,
             largeTitle = title,
@@ -236,13 +253,14 @@ fun SubmenuTopBar(
                 contentDescription = LocalStrings.current.backContentDescription, tint = cs.onBackground)
         }
     }
-    Box(modifier = modifier.fillMaxWidth().statusBarsPadding()) {
+    Box(modifier = modifier.fillMaxWidth().miuixHeaderSafeTop()) {
         if (compact) {
             SmallTopAppBar(title = title, color = Color.Transparent, titleColor = Color.Transparent,
                 scrollBehavior = state.scrollBehavior, defaultWindowInsetsPadding = false)
             TopBarBlurBackground(state, fraction)
             Box(Modifier.align(Alignment.TopStart).height(56.dp), contentAlignment = Alignment.CenterStart) { backIcon() }
-            Box(Modifier.matchParentSize().graphicsLayer { alpha = fraction }, contentAlignment = Alignment.Center) {
+            Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(56.dp).graphicsLayer { alpha = fraction },
+                contentAlignment = Alignment.Center) {
                 Text(title, color = cs.onBackground, style = MiuixAppTheme.typography.titleMedium,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 64.dp))
             }

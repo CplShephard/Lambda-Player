@@ -12,11 +12,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -407,14 +409,13 @@ fun StatsScreenM3(
                 )
             },
         ) { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 72.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item(key = "summary") {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             // Sliding animation like Miuix for Today/ThisMonth filters
             androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxWidth()) {
                 val periods = listOf(StatsPeriod.Today to strings.statsPeriodToday, StatsPeriod.ThisWeek to strings.statsPeriodThisWeek, StatsPeriod.ThisMonth to strings.statsPeriodThisMonth, StatsPeriod.AllTime to strings.statsPeriodAllTime)
@@ -441,59 +442,37 @@ fun StatsScreenM3(
 
             Text(formatListeningTimeM3Lineage(snapshot.summary.totalListenedMs, strings), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
 
-            if (snapshot.trackEntries.isEmpty()) {
+                    }
+                }
+                if (snapshot.trackEntries.isEmpty()) {
+                    item(key = "empty") {
                 Column(modifier = Modifier.fillMaxWidth().padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), modifier = Modifier.size(56.dp))
                     Spacer(Modifier.height(12.dp))
                     Text(strings.statsEmptyTitle, style = MaterialTheme.typography.titleMedium)
                     Text(strings.statsEmptySubtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            } else {
-                Text(strings.statsTopTracks, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                snapshot.trackEntries.take(10).forEachIndexed { index, entry ->
-                    androidx.compose.animation.AnimatedContent(
-                        // The ranking animation is keyed only by song identity, not listenedMs.
-                        // Timer ticks update the duration text without replaying the slide.
-                        targetState = entry.trackId,
-                        transitionSpec = {
-                            (androidx.compose.animation.slideInVertically(
-                                animationSpec = androidx.compose.animation.core.tween(340),
-                            ) { height -> height / 3 } +
-                                androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(250)))
-                                .togetherWith(
-                                    androidx.compose.animation.slideOutVertically(
-                                        animationSpec = androidx.compose.animation.core.tween(260),
-                                    ) { height -> -height / 3 } +
-                                        androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(180))
-                                )
-                        },
-                        label = "m3StatsRankSlide$index",
-                    ) { animatedTrackId ->
-                        val animatedEntry = snapshot.trackEntries.firstOrNull { it.trackId == animatedTrackId } ?: entry
-                        val track = remember(animatedTrackId, tracks) {
-                            tracks.firstOrNull { it.id == animatedTrackId }
-                                ?: tracks.firstOrNull { it.title == animatedEntry.title && it.artist == animatedEntry.artistName }
+                    }
+                } else {
+                    item(key = "top_title") {
+                        Text(strings.statsTopTracks, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    }
+                    itemsIndexed(snapshot.trackEntries.take(10), key = { _, entry -> entry.trackId }) { index, entry ->
+                        val track = remember(entry.trackId, tracks) {
+                            tracks.firstOrNull { it.id == entry.trackId }
+                                ?: tracks.firstOrNull { it.title == entry.title && it.artist == entry.artistName }
                         }
-                        val coverUri = track?.albumArtUri ?: animatedEntry.albumArtUri
-                        val displayTitle = track?.title?.takeIf { it.isNotBlank() } ?: animatedEntry.title
-                        val displayArtist = track?.artist?.takeIf { it.isNotBlank() } ?: animatedEntry.artistName
-
-                        Card(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = m3ItemCardColors()
-                        ) {
-                            LineageListItemWithThumbnail(
-                                headline = "${index + 1}. $displayTitle",
-                                supporting = "$displayArtist • ${formatListeningTimeM3Lineage(animatedEntry.listenedMs, strings)}",
-                                thumbnailModel = coverUri,
-                                placeholderIcon = Icons.Filled.MusicNote
-                            )
+                        val coverUri = track?.albumArtUri ?: entry.albumArtUri
+                        val displayTitle = track?.title?.takeIf { it.isNotBlank() } ?: entry.title
+                        val displayArtist = track?.artist?.takeIf { it.isNotBlank() } ?: entry.artistName
+                        Card(modifier = Modifier.fillMaxWidth().animateItem().padding(vertical = 2.dp),
+                            shape = RoundedCornerShape(20.dp), colors = m3ItemCardColors()) {
+                            LineageListItemWithThumbnail(headline = "${index + 1}. $displayTitle",
+                                supporting = "$displayArtist • ${formatListeningTimeM3Lineage(entry.listenedMs, strings)}",
+                                thumbnailModel = coverUri, placeholderIcon = Icons.Filled.MusicNote)
                         }
                     }
                 }
-            }
-            Spacer(Modifier.height(60.dp))
             }
         }
 }
