@@ -125,15 +125,15 @@ internal fun M3PlaylistDetail(
     onReorder: (List<AudioTrack>) -> Unit = {},
     onChangeSort: (String) -> Unit = {},
     isHomeSimplified: Boolean = false,
+    isAlbum: Boolean = false,
 ) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
 
     // Same rules as the MIUIX detail: system (liked songs) and Home playlists are read-only.
-    val canEdit = !playlist.isSystem && !isHomeSimplified
+    val canEdit = !playlist.isSystem && !isHomeSimplified && !isAlbum
 
-    var showMenu by remember { mutableStateOf(false) }
     var showAddTracks by remember { mutableStateOf(false) }
     var renameDialog by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf(playlist.name) }
@@ -313,13 +313,6 @@ internal fun M3PlaylistDetail(
         )
     }
 
-    if (showMenu) dev.shephard.player.ui.screens.PlaylistDetailMenu(false, playlist,
-        onDismiss = { showMenu = false },
-        onPlay = { showMenu = false; onPlayAll() },
-        onRemix = { showMenu = false; onPlayRemix() },
-        onEdit = { showMenu = false; renameText = playlist.name; renameDialog = true },
-        onAdd = { showMenu = false; showAddTracks = true },
-        onDelete = { showMenu = false; deleteConfirm = true })
     if (renameDialog) dev.shephard.player.ui.screens.PlaylistDetailEditor(false, playlist, plTracks,
         onDismiss = { renameDialog = false },
         onSave = { newName ->
@@ -365,14 +358,21 @@ internal fun M3PlaylistDetail(
         topBar = {
             M3SmallTopBar(
                 state = m3TopBarState,
-                title = { Text(text = playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = { Text(text = if (isAlbum) strings.albumDetail else playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription)
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showMenu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = strings.libraryOptions) }
+                    dev.shephard.player.ui.screens.LibraryPopupButton(false, Icons.Filled.MoreVert, strings.libraryOptions,
+                        MaterialTheme.colorScheme.onSurface,
+                        listOf(Triple(strings.play, false, onPlayAll), Triple(strings.remix, false, onPlayRemix)) +
+                            if (canEdit) listOf(
+                                Triple(strings.editPlaylist, false, { renameText = playlist.name; renameDialog = true }),
+                                Triple(strings.addTracks, false, { showAddTracks = true }),
+                                Triple(strings.delete, false, { deleteConfirm = true })
+                            ) else emptyList())
                 },
                 colors = m3TopBarColors(),
             )
@@ -422,6 +422,13 @@ internal fun M3PlaylistDetail(
                         }
                     }
                     Spacer(Modifier.height(16.dp))
+                    if (isAlbum) {
+                        Text(playlist.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        plTracks.firstOrNull()?.artist?.let { artist ->
+                            Text(artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
                     Text(
                         text = "${plTracks.size} ${strings.trackCount}",
                         style = MaterialTheme.typography.labelLarge,

@@ -15,6 +15,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +44,12 @@ import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.util.TrackOverlayForBack
 
+/** Execute a drawer action only after its native close animation completes. */
+internal val LocalDrawerCloseAction = staticCompositionLocalOf<((() -> Unit) -> Unit)> { { action -> action() } }
+
+@Composable
+internal fun rememberCloseDrawerThen(): ((() -> Unit) -> Unit) = LocalDrawerCloseAction.current
+
 @Composable
 fun MiuixDrawer(
     onDismissRequest: () -> Unit,
@@ -59,6 +67,7 @@ fun MiuixDrawer(
     // Composed only while open; keeps the plain app BackHandler out of this drawer's back gesture.
     TrackOverlayForBack()
     var visible by remember { mutableStateOf(false) }
+    var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     LaunchedEffect(Unit) { visible = true }
     val currentOnDismissRequest by rememberUpdatedState(onDismissRequest)
     WindowBottomSheet(
@@ -73,12 +82,19 @@ fun MiuixDrawer(
         allowDismiss = allowDismiss,
         enableNestedScroll = enableNestedScroll,
         onDismissRequest = { if (allowDismiss) visible = false },
-        onDismissFinished = { currentOnDismissRequest() },
+        onDismissFinished = {
+            val action = pendingAction
+            pendingAction = null
+            currentOnDismissRequest()
+            action?.invoke()
+        },
         content = {
             // The sheet is a separate Android window: forward its predictive back gesture to the
             // dispatcher the miuix sheet's back handler is registered on (see MiuixSpinnerRow).
             WindowNavigationEventBridge()
-            content()
+            CompositionLocalProvider(LocalDrawerCloseAction provides { action ->
+                if (visible) { pendingAction = action; visible = false }
+            }) { content() }
         },
     )
 }

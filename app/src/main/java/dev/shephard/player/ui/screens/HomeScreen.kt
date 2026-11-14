@@ -90,32 +90,13 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         if (tracks.isEmpty()) {
-            libraryViewModel.loadTracks()
+            libraryViewModel.ensureTracksLoaded()
         }
     }
 
-    val featuredTracks = remember(tracks) {
-        if (tracks.isNotEmpty()) {
-            tracks.shuffled().take(5)
-        } else {
-            emptyList()
-        }
-    }
+    val featuredTracks = dev.shephard.player.ui.components.rememberFeaturedTracks(tracks, 5)
 
-    val recentlyPlayedTracks = remember(recentEvents, tracks) {
-        val matched = recentEvents
-            .sortedByDescending { it.timestampMs }
-            .mapNotNull { ev ->
-                tracks.firstOrNull { it.id == ev.trackId }
-                    ?: tracks.firstOrNull { it.title == ev.title && it.artist == ev.artist }
-            }
-            .distinctBy { it.id }
-        if (matched.isNotEmpty()) {
-            matched.take(10)
-        } else {
-            tracks.take(10)
-        }
-    }
+    val recentlyPlayedTracks = dev.shephard.player.ui.components.rememberRecentTracks(tracks, recentEvents, 10)
 
     val topBarState = rememberCollapsingTopBarState()
     val scrollState = rememberScrollState()

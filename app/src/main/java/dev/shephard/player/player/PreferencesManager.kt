@@ -442,6 +442,11 @@ class PreferencesManager(private val context: Context) {
                 }
                 prefs[PrefsKeys.LIQUID_GLASS_ENABLED] = false
             } else {
+                // A cover-based palette is incompatible with Miuix while custom colors are off.
+                // Make the transition atomic so the switch and the rendered theme agree.
+                if (!(prefs[PrefsKeys.USE_MIUIX_MONET] ?: false)) {
+                    prefs[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = false
+                }
                 // Switching back to Miuix: restore the backup if one exists,
                 // then forget it.
                 val backup = prefs[PrefsKeys.M3_BLUR_BACKUP]

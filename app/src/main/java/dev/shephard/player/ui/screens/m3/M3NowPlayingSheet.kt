@@ -357,12 +357,15 @@ private fun M3NowPlayingSheetContent(
                 releaseDelay = 0L,
             )
             Row(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                IconButton(onClick = playerViewModel::remixQueue) {
-                    Icon(Icons.Filled.Shuffle, strings.remix, tint = if (isRemixed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-                }
-                IconButton(onClick = playerViewModel::cycleRepeatMode) {
-                    Icon(if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat, strings.repeat, tint = if (state.repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-                }
+                dev.shephard.player.ui.components.m3.M3PlaybackModeButton(
+                    icon = Icons.Filled.Shuffle, description = strings.remix,
+                    active = isRemixed, onClick = playerViewModel::remixQueue,
+                )
+                dev.shephard.player.ui.components.m3.M3PlaybackModeButton(
+                    icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                    description = strings.repeat, active = state.repeatMode != RepeatMode.OFF,
+                    onClick = playerViewModel::cycleRepeatMode,
+                )
             }
 
             // Bottom bar card - fixed colors and removed non-working buttons #3

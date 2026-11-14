@@ -101,20 +101,9 @@ fun HomeScreenM3(
     val recentEvents by playerViewModel.statsEventsFlow.collectAsState()
     val totalListeningMs by playerViewModel.totalListeningMsLive.collectAsState()
 
-    val featuredTracks = remember(tracks) {
-        if (tracks.isNotEmpty()) tracks.shuffled().take(10) else emptyList()
-    }
+    val featuredTracks = dev.shephard.player.ui.components.rememberFeaturedTracks(tracks, 10)
 
-    val recentlyPlayedTracks = remember(recentEvents, tracks) {
-        val matched = recentEvents
-            .sortedByDescending { it.timestampMs }
-            .mapNotNull { ev ->
-                tracks.firstOrNull { it.id == ev.trackId }
-                    ?: tracks.firstOrNull { it.title == ev.title && it.artist == ev.artist }
-            }
-            .distinctBy { it.id }
-        if (matched.isNotEmpty()) matched.take(15) else tracks.take(15)
-    }
+    val recentlyPlayedTracks = dev.shephard.player.ui.components.rememberRecentTracks(tracks, recentEvents, 15)
 
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }

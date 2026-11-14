@@ -123,6 +123,7 @@ class Strings internal constructor(private val texts: Map<String, String>) {
     val nothingPlaying: String get() = texts.getValue("nothingPlaying")
     val pickASong: String get() = texts.getValue("pickASong")
     val albumsEmpty: String get() = texts.getValue("albumsEmpty")
+    val albumDetail: String get() = texts.getValue("albumDetail")
     val noPlaylistsYet: String get() = texts.getValue("noPlaylistsYet")
     val noSongsToPlay: String get() = texts.getValue("noSongsToPlay")
     val customColor: String get() = texts.getValue("customColor")
@@ -434,6 +435,7 @@ private fun createEN(): Strings = Strings(mapOf(
     "nothingPlaying" to "Nothing playing",
     "pickASong" to "Pick a song from your library",
     "albumsEmpty" to "Your albums will appear here",
+    "albumDetail" to "Album Detail",
     "noPlaylistsYet" to "No playlists yet",
     "noSongsToPlay" to "No songs to play",
     "customColor" to "Custom",
@@ -636,6 +638,7 @@ private fun createTR(base: Strings): Strings = base.withOverrides(mapOf(
     "nothingPlaying" to "Hiçbir şey çalmıyor",
     "pickASong" to "Kitaplığından bir şarkı seç",
     "albumsEmpty" to "Albümlerin burada görünecek",
+    "albumDetail" to "Albüm Detayı",
     "noPlaylistsYet" to "Henüz çalma listesi yok",
     "noSongsToPlay" to "Çalınacak şarkı yok",
     "customColor" to "Özel",
@@ -825,6 +828,7 @@ private fun createZH(base: Strings): Strings = base.withOverrides(mapOf(
     "nothingPlaying" to "没有播放内容",
     "pickASong" to "从音乐库中选择歌曲",
     "albumsEmpty" to "您的专辑将显示在此处",
+    "albumDetail" to "专辑详情",
     "noPlaylistsYet" to "暂无播放列表",
     "noSongsToPlay" to "没有可播放的歌曲",
     "customColor" to "自定义",
@@ -998,6 +1002,7 @@ private fun createES(base: Strings): Strings = base.withOverrides(mapOf(
     "nothingPlaying" to "Nada en reproducción",
     "pickASong" to "Elige una canción de tu biblioteca",
     "albumsEmpty" to "Tus álbumes aparecerán aquí",
+    "albumDetail" to "Detalles del álbum",
     "noPlaylistsYet" to "Aún no hay listas",
     "noSongsToPlay" to "No hay canciones para reproducir",
     "customColor" to "Personalizado",
@@ -1171,6 +1176,7 @@ private fun createRU(base: Strings): Strings = base.withOverrides(mapOf(
     "nothingPlaying" to "Ничего не играет",
     "pickASong" to "Выберите трек из библиотеки",
     "albumsEmpty" to "Ваши альбомы появятся здесь",
+    "albumDetail" to "Информация об альбоме",
     "noPlaylistsYet" to "Пока нет плейлистов",
     "noSongsToPlay" to "Нет треков для воспроизведения",
     "customColor" to "Свой",
@@ -1344,6 +1350,7 @@ private fun createKA(base: Strings): Strings = base.withOverrides(mapOf(
     "nothingPlaying" to "არაფერი უკრავს",
     "pickASong" to "აარჩიე სიმღერა ბიბლიოთეკიდან",
     "albumsEmpty" to "შენი ალბომები აქ გამოჩნდება",
+    "albumDetail" to "ალბომის დეტალები",
     "noPlaylistsYet" to "ჯერ პლეილისტი არ არის",
     "noSongsToPlay" to "დასაკრავი სიმღერები არ არის",
     "customColor" to "საკუთარი",
@@ -1517,6 +1524,7 @@ private fun createAR(base: Strings): Strings = base.withOverrides(mapOf(
     "nothingPlaying" to "لا يوجد تشغيل",
     "pickASong" to "اختر أغنية من مكتبتك",
     "albumsEmpty" to "ستظهر ألبوماتك هنا",
+    "albumDetail" to "تفاصيل الألبوم",
     "noPlaylistsYet" to "لا توجد قوائم بعد",
     "noSongsToPlay" to "لا توجد أغاني للتشغيل",
     "customColor" to "مخصص",

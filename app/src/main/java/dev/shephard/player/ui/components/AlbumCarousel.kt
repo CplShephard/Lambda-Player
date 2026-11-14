@@ -58,13 +58,18 @@ fun AlbumCarousel(
     val pagerState = rememberPagerState(initialPage = actualIndex) { queue.size }
     val targetIndex = requestedIndex?.takeIf { it in queue.indices } ?: actualIndex
     val requestedTargetIndex = requestedIndex?.takeIf { it in queue.indices }
-    val queueKeys = remember(queue) {
+    // The original player kept the cover bound to the current track, not its queue position.
+    // A key containing the index destroys/recreates that cover when remix moves the item.
+    // Give duplicates distinct keys, reserving a stable key for the currently playing copy.
+    val (queueKeys, duplicateIds) = remember(queue) {
+        val counts = queue.groupingBy { it.id }.eachCount()
         val occurrences = HashMap<Long, Int>()
-        queue.mapIndexed { index, track ->
+        val keys = queue.map { track ->
             val occurrence = occurrences.getOrDefault(track.id, 0)
             occurrences[track.id] = occurrence + 1
-            "queue_carousel_${track.id}_${occurrence}_${track.albumArtUri.hashCode()}_$index"
+            "queue_carousel_${track.id}_$occurrence"
         }
+        keys to counts.filterValues { it > 1 }.keys
     }
     val context = LocalContext.current
     DisposableEffect(context, queue, targetIndex) {
@@ -131,7 +136,12 @@ fun AlbumCarousel(
             itemCornerRadius = 24.dp,
             carouselStyle = if (pagerState.pageCount == 1) CarouselStyle.NO_PEEK else carouselStyle,
             carouselWidth = maxWidth,
-            itemKey = { index -> queueKeys.getOrNull(index) ?: "queue_item_$index" },
+            itemKey = { index ->
+                val track = queue.getOrNull(index)
+                if (index == actualIndex && track != null && track.id in duplicateIds)
+                    "queue_carousel_${track.id}_playing"
+                else queueKeys.getOrNull(index) ?: "queue_item_$index"
+            },
         ) { index ->
             val track = queue[index]
             val isFocused = pagerState.currentPage == index

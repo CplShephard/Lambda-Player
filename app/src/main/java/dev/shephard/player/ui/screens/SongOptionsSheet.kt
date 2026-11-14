@@ -56,6 +56,7 @@ internal fun SongOptionsSheet(
     val foreground = if (useMiuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
     val card = if (useMiuix) MiuixAppTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceContainerHigh
     val content: @Composable () -> Unit = {
+        val closeThen = dev.shephard.player.ui.components.rememberCloseDrawerThen()
         Column(Modifier.fillMaxWidth().heightIn(max = 660.dp).padding(horizontal = 16.dp).padding(bottom = 18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
                 AsyncImage(dev.shephard.player.ui.components.rememberStaticArtwork(track.albumArtUri), null, Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)))
@@ -66,45 +67,35 @@ internal fun SongOptionsSheet(
                 }
             }
             when (page) {
-                0 -> Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-                    @Composable fun Action(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, action: () -> Unit) {
-                        Row(Modifier.fillMaxWidth().padding(bottom = 4.dp).clip(RoundedCornerShape(15.dp)).background(card)
-                            .clickable(onClick = action).padding(vertical = 13.dp, horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            LibraryIcon(icon, null, useMiuix, foreground); Spacer(Modifier.width(16.dp)); LibraryText(label, useMiuix, color = foreground)
+                0 -> Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val actions = mutableListOf<Triple<String, androidx.compose.ui.graphics.vector.ImageVector, () -> Unit>>()
+                    actions += Triple(strings.play, Icons.Default.PlayArrow) { closeThen { player.setQueueAndPlay(listOf(track), 0) } }
+                    actions += Triple(strings.likedSongs, if (track.id in state.likedSongIds) Icons.Default.Favorite else Icons.Default.FavoriteBorder) { player.toggleLike(track.id) }
+                    actions += Triple(strings.playNext, Icons.Default.QueueMusic) { closeThen { player.addTrackToPlayNext(track) } }
+                    actions += Triple(strings.addToQueue, Icons.Default.PlaylistAdd) { closeThen { player.addTrackToQueue(track) } }
+                    actions += Triple(strings.addToPlaylist, Icons.Default.LibraryMusic) { page = 1 }
+                    actions += Triple(strings.shareTrack, Icons.Default.Share) {
+                        closeThen {
+                            val intent = Intent(Intent.ACTION_SEND).setType("audio/*").putExtra(Intent.EXTRA_STREAM, track.uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            runCatching { context.startActivity(Intent.createChooser(intent, strings.shareTrack)) }
                         }
                     }
-                    Action(strings.play, Icons.Default.PlayArrow) { player.setQueueAndPlay(listOf(track), 0); onDismiss() }
-                    Action(strings.likedSongs, if (track.id in state.likedSongIds) Icons.Default.Favorite else Icons.Default.FavoriteBorder) { player.toggleLike(track.id) }
-                    Action(strings.playNext, Icons.Default.QueueMusic) { player.addTrackToPlayNext(track); onDismiss() }
-                    Action(strings.addToQueue, Icons.Default.PlaylistAdd) { player.addTrackToQueue(track); onDismiss() }
-                    Action(strings.addToPlaylist, Icons.Default.LibraryMusic) { page = 1 }
-                    Action(strings.shareTrack, Icons.Default.Share) {
-                        val intent = Intent(Intent.ACTION_SEND).setType("audio/*").putExtra(Intent.EXTRA_STREAM, track.uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        runCatching { context.startActivity(Intent.createChooser(intent, strings.shareTrack)) }
-                        onDismiss()
-                    }
-                    Action(strings.musicBrainzSearch, Icons.Default.Search) {
-                        val search = android.net.Uri.parse("https://musicbrainz.org/search").buildUpon()
-                            .appendQueryParameter("query", "${track.artist} ${track.title}")
-                            .appendQueryParameter("type", "recording").appendQueryParameter("method", "indexed").build()
-                        if (runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, search)) }.isFailure)
-                            android.widget.Toast.makeText(context, strings.actionFailed, android.widget.Toast.LENGTH_SHORT).show()
-                        onDismiss()
-                    }
-                    Action(strings.setRingtone, Icons.Default.Notifications) {
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M && !android.provider.Settings.System.canWrite(context)) {
-                            android.widget.Toast.makeText(context, strings.ringtonePermission, android.widget.Toast.LENGTH_LONG).show()
-                            runCatching { context.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_WRITE_SETTINGS, android.net.Uri.parse("package:${context.packageName}"))) }
-                        } else {
-                            val success = runCatching { android.media.RingtoneManager.setActualDefaultRingtoneUri(context, android.media.RingtoneManager.TYPE_RINGTONE, track.uri) }.isSuccess
-                            android.widget.Toast.makeText(context, if (success) strings.ringtoneSet else strings.actionFailed, android.widget.Toast.LENGTH_SHORT).show()
+                    actions += Triple(strings.libraryDetails, Icons.Default.Info) { page = 2 }
+                    actions += Triple(strings.editMusic, Icons.Default.Edit) { closeThen(onEdit) }
+                    if (onRemoveFromPlaylist != null) actions += Triple(strings.removeFromPlaylist, Icons.Default.RemoveCircleOutline) { closeThen(onRemoveFromPlaylist) }
+                    if (onDelete != null) actions += Triple(strings.delete, Icons.Default.Delete) { closeThen(onDelete) }
+                    actions.chunked(2).forEach { row ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            row.forEach { (label, icon, action) ->
+                                Row(Modifier.weight(1f).heightIn(min = 58.dp).clip(RoundedCornerShape(15.dp)).background(card)
+                                    .clickable(onClick = action).padding(vertical = 12.dp, horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    LibraryIcon(icon, null, useMiuix, foreground, Modifier.size(21.dp))
+                                    LibraryText(label, useMiuix, Modifier.padding(start = 10.dp), color = foreground, maxLines = 2)
+                                }
+                            }
+                            if (row.size == 1) Spacer(Modifier.weight(1f))
                         }
-                        onDismiss()
                     }
-                    Action(strings.libraryDetails, Icons.Default.Info) { page = 2 }
-                    Action(strings.editMusic, Icons.Default.Edit, onEdit)
-                    if (onRemoveFromPlaylist != null) Action(strings.removeFromPlaylist, Icons.Default.RemoveCircleOutline, onRemoveFromPlaylist)
-                    if (onDelete != null) Action(strings.delete, Icons.Default.Delete, onDelete)
                 }
                 1 -> {
                     Row(verticalAlignment = Alignment.CenterVertically) {

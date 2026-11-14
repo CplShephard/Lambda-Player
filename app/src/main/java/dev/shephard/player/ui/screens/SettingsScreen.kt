@@ -939,9 +939,10 @@ private fun MiuixLicensesDialog(onDismiss: () -> Unit) {
             }
         },
         buttons = {
+            val dismiss = top.yukonga.miuix.kmp.theme.LocalDismissState.current
             top.yukonga.miuix.kmp.basic.TextButton(
                 text = strings.close,
-                onClick = onDismiss,
+                onClick = { if (dismiss != null) dismiss.invoke() else onDismiss() },
                 modifier = Modifier.fillMaxWidth()
             )
         }

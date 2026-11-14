@@ -426,10 +426,16 @@ fun MiuixDeleteConfirmationDialog(
     confirmText: String = "Delete",
     cancelText: String = "Cancel",
 ) {
-    TrackOverlayForBack(active = show)
+    var visible by remember { mutableStateOf(show) }
+    var confirmed by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(show) { if (show) visible = true else visible = false }
+    TrackOverlayForBack(active = visible)
     WindowDialog(
-        show = show,
-        onDismissRequest = onDismiss,
+        show = visible,
+        onDismissRequest = { visible = false },
+        onDismissFinished = {
+            if (confirmed) { confirmed = false; onConfirm() } else onDismiss()
+        },
         title = title,
         content = {
             // Separate Android window: forward its predictive back gesture (see MiuixSpinnerRow).
@@ -448,7 +454,7 @@ fun MiuixDeleteConfirmationDialog(
                 ) {
                     top.yukonga.miuix.kmp.basic.TextButton(
                         modifier = Modifier.weight(1f),
-                        onClick = onDismiss,
+                        onClick = { visible = false },
                         text = cancelText
                     )
 
@@ -456,7 +462,7 @@ fun MiuixDeleteConfirmationDialog(
 
                     top.yukonga.miuix.kmp.basic.TextButton(
                         modifier = Modifier.weight(1f),
-                        onClick = onConfirm,
+                        onClick = { confirmed = true; visible = false },
                         text = confirmText,
                         colors = ButtonDefaults.textButtonColors(
                             color = MiuixTheme.colorScheme.errorContainer,
@@ -496,10 +502,8 @@ fun MiuixDialog(
     TrackOverlayForBack(active = show)
     WindowDialog(
         show = show,
-        onDismissRequest = {
-            show = false
-            onDismissRequest()
-        },
+        onDismissRequest = { show = false },
+        onDismissFinished = onDismissRequest,
         title = title,
         content = {
             // Separate Android window: forward its predictive back gesture (see MiuixSpinnerRow).

@@ -85,7 +85,8 @@ class MainActivity : ComponentActivity() {
             // Material 3 always uses the Monet (wallpaper-dynamic) palette — the
             // M3 UI has no "Miuix custom colors" switch. The setting is only
             // honoured by the Miuix engine.
-            val hasCoverColor = dynamicByCover && playerState.currentTrack?.albumArtUri != null && playerState.coverColorAvailable
+            val hasCoverColor = dynamicByCover && (!useMiuix || useMiuixMonet) &&
+                playerState.currentTrack?.albumArtUri != null && playerState.coverColorAvailable
             val themeState = ThemeState(
                 useMiuix = useMiuix,
                 themeMode = themeMode,

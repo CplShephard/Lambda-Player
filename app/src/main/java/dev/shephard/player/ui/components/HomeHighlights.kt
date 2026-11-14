@@ -40,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
@@ -65,15 +66,51 @@ import dev.shephard.player.ui.miuix.MiuixAppTheme
 import java.util.Calendar
 import dev.shephard.player.player.PreferencesManager
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** A local daily mix based on favourites, listening history and the current library. */
 @Composable
 fun rememberHomeMix(tracks: List<AudioTrack>, likedIds: List<Long>, history: List<ListenEvent>): List<AudioTrack> {
     val calendar = Calendar.getInstance()
     val day = calendar.get(Calendar.YEAR) * 1000 + calendar.get(Calendar.DAY_OF_YEAR)
-    return remember(tracks, likedIds, history, day) {
-        dev.shephard.player.data.buildYourMix(tracks, likedIds.toSet(), history)
+    // Ranking sorts the whole library and can run while the pager is animating.
+    // Keep the last result visible, and compute the new one off the UI thread.
+    val mix by produceState(tracks.take(60), tracks, likedIds, history, day) {
+        value = withContext(Dispatchers.Default) {
+            dev.shephard.player.data.buildYourMix(tracks, likedIds.toSet(), history)
+        }
     }
+    return mix
+}
+
+/** Shuffle on a worker so opening Home does not copy a large library on the UI thread. */
+@Composable
+fun rememberFeaturedTracks(tracks: List<AudioTrack>, limit: Int): List<AudioTrack> {
+    val featured by produceState(tracks.take(limit), tracks, limit) {
+        value = withContext(Dispatchers.Default) { tracks.shuffled().take(limit) }
+    }
+    return featured
+}
+
+/** History matching/sorting must not run on the frame thread when a pager page is composed. */
+@Composable
+fun rememberRecentTracks(tracks: List<AudioTrack>, history: List<ListenEvent>, limit: Int): List<AudioTrack> {
+    val recent by produceState(tracks.take(limit), tracks, history, limit) {
+        value = withContext(Dispatchers.Default) {
+            val byId = HashMap<Long, AudioTrack>(tracks.size)
+            val byTitleArtist = HashMap<Pair<String, String>, AudioTrack>(tracks.size)
+            tracks.forEach { track ->
+                byId.putIfAbsent(track.id, track)
+                byTitleArtist.putIfAbsent(track.title to track.artist, track)
+            }
+            val matched = history.sortedByDescending { it.timestampMs }
+                .mapNotNull { event -> byId[event.trackId] ?: byTitleArtist[event.title to event.artist] }
+                .distinctBy { it.id }
+            if (matched.isNotEmpty()) matched.take(limit) else tracks.take(limit)
+        }
+    }
+    return recent
 }
 
 /** Pixel-inspired mix header and album-art preview, using Lambda's actual local queue. */

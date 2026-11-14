@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -40,7 +41,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import dev.shephard.player.ui.util.OverlayBackState
 
@@ -56,15 +56,15 @@ fun MainContainer(
     val strings = remember(languageCode) { stringsFor(languageCode) }
 
     val blurEnabled = LocalBlurEnabled.current
-    val initialUseMiuix = remember { runBlocking { prefs.useMiuix.first() } }
-    val useMiuix by prefs.useMiuix.collectAsState(initial = initialUseMiuix)
-
-    // Resolve the persisted "last main page" synchronously on the very first
-    // composition so rememberPagerState is built with a stable initial value.
-    // We deliberately do NOT collect lastMainPage as state — doing so would
-    // cause a recomposition loop and re-create the pager state on every page
-    // change, which in turn causes a noticeable hitch when leaving Settings.
-    val initialLastMainPage = remember { runBlocking { prefs.migrateLibraryNavigation(); prefs.lastMainPage.first() } }
+    // Resolve the startup page before creating the pager without blocking the UI thread.
+    // The value is loaded once, so later page writes never recreate the pager.
+    val startup by produceState<Pair<Boolean, Int>?>(null, prefs) {
+        prefs.migrateLibraryNavigation()
+        value = prefs.useMiuix.first() to prefs.lastMainPage.first()
+    }
+    val initial = startup ?: return
+    val useMiuix by prefs.useMiuix.collectAsState(initial = initial.first)
+    val initialLastMainPage = initial.second
 
     // The custom wallpaper feature was removed: clear its leftover settings and image files once.
     LaunchedEffect(Unit) { prefs.clearRemovedWallpaperData() }
@@ -114,10 +114,8 @@ fun MainContainer(
         // every intermediate frame of a swipe gesture. This is the main fix for
         // the Settings -> Playlists transition hitch.
         LaunchedEffect(settledPage) {
-            if (initialLastMainPage != settledPage) {
-                delay(250)
-                prefs.setLastMainPage(settledPage)
-            }
+            delay(250)
+            prefs.setLastMainPage(settledPage)
         }
 
         val topKey = backStack.last()

@@ -92,6 +92,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         )
     }
 
+    /** Start an initial scan only when none is already in progress or completed. */
+    fun ensureTracksLoaded() {
+        if (!_hasScanned.value && scanJob?.isActive != true) loadTracks()
+    }
+
     fun loadTracks() {
         val generation = ++scanGeneration
         scanJob?.cancel()

@@ -2,6 +2,7 @@
 package dev.shephard.player.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -42,11 +43,13 @@ internal fun LibrarySelectionSheet(tracks: List<AudioTrack>, useMiuix: Boolean, 
     val foreground = if (useMiuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
     fun onError() = android.widget.Toast.makeText(context, strings.actionFailed, android.widget.Toast.LENGTH_SHORT).show()
     val content: @Composable () -> Unit = {
+        val closeThen = dev.shephard.player.ui.components.rememberCloseDrawerThen()
+        val actionCard = if (useMiuix) MiuixAppTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceContainerHigh
         Column(Modifier.fillMaxWidth().heightIn(max = 700.dp).padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(if (playlistMode) strings.addToPlaylist else "${strings.selectSongs} (${selectedTracks.size})", color = foreground,
                     fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                TextButton(onClick = { if (playlistMode) playlistMode = false else onDismiss() }) { Text(if (playlistMode) "‹" else "✕") }
+                TextButton(onClick = { if (playlistMode) playlistMode = false else closeThen {} }) { Text(if (playlistMode) "‹" else "✕") }
             }
             OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text(strings.search) })
             if (!playlistMode) {
@@ -57,7 +60,7 @@ internal fun LibrarySelectionSheet(tracks: List<AudioTrack>, useMiuix: Boolean, 
                 }
                 LazyColumn(Modifier.weight(1f, fill = false).heightIn(max = 360.dp)) {
                     items(visible, key = { it.id }) { track ->
-                        Row(Modifier.fillMaxWidth().clickable {
+                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(14.dp)).background(actionCard).clickable {
                             selected = if (track.id in selected) selected - track.id else selected + track.id
                         }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(checked = track.id in selected, onCheckedChange = null)
@@ -69,9 +72,9 @@ internal fun LibrarySelectionSheet(tracks: List<AudioTrack>, useMiuix: Boolean, 
                         }
                     }
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    TextButton(enabled = selectedTracks.isNotEmpty(), onClick = { player.setQueueAndPlay(selectedTracks, 0); onDismiss() }) { Text(strings.play) }
-                    TextButton(enabled = selectedTracks.isNotEmpty(), onClick = { player.appendTracksToQueue(selectedTracks); onDismiss() }) { Text(strings.addToQueue) }
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(actionCard), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    TextButton(enabled = selectedTracks.isNotEmpty(), onClick = { closeThen { player.setQueueAndPlay(selectedTracks, 0) } }) { Text(strings.play) }
+                    TextButton(enabled = selectedTracks.isNotEmpty(), onClick = { closeThen { player.appendTracksToQueue(selectedTracks) } }) { Text(strings.addToQueue) }
                     TextButton(enabled = selectedTracks.isNotEmpty(), onClick = {
                         scope.launch { runCatching { prefs.addLikedTrackIds(selectedTracks.map { it.id }) }.onFailure { onError() } }
                     }) { Text("♥") }
@@ -81,7 +84,7 @@ internal fun LibrarySelectionSheet(tracks: List<AudioTrack>, useMiuix: Boolean, 
                 LazyColumn(Modifier.weight(1f, fill = false).heightIn(max = 300.dp)) {
                     items(playlists.filter { it.name.contains(query, true) }) { playlist ->
                         val included = selectedTracks.all { it.id in playlist.trackIds }
-                        Row(Modifier.fillMaxWidth().clickable {
+                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(14.dp)).background(actionCard).clickable {
                             scope.launch {
                                 runCatching {
                                     prefs.updatePlaylistsJson { json ->

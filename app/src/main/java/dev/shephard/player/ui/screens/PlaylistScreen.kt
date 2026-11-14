@@ -540,7 +540,7 @@ val menuIdx = playlistMenuIndex
         MiuixDrawer(
             onDismissRequest = { playlistMenuIndex = null },
         ) {
-
+        val closeThen = dev.shephard.player.ui.components.rememberCloseDrawerThen()
 Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -581,10 +581,12 @@ Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
+                        .background(MiuixAppTheme.colorScheme.surfaceVariant)
                         .bounceClick {
-                            editPlaylistIndex = menuIdx
-                            editPlaylistName = pl.name
-                            playlistMenuIndex = null
+                            closeThen {
+                                editPlaylistIndex = menuIdx
+                                editPlaylistName = pl.name
+                            }
                         }
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -597,7 +599,9 @@ Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
+                        .background(MiuixAppTheme.colorScheme.surfaceVariant)
                         .bounceClick {
+                            closeThen {
                             val pinnedCount = playlists.count { it.pinned }
                             val all = playlists.toMutableList()
                             if (pl.pinned) {
@@ -606,7 +610,7 @@ Column(
                                 all[menuIdx] = pl.copy(pinned = true)
                             }
                             scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
-                            playlistMenuIndex = null
+                            }
                         }
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -620,10 +624,12 @@ Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
+                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
                             .bounceClick {
-                                playlistToDelete = pl
-                                showDeletePlaylistConfirm = true
-                                playlistMenuIndex = null
+                                closeThen {
+                                    playlistToDelete = pl
+                                    showDeletePlaylistConfirm = true
+                                }
                             }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -817,7 +823,10 @@ Scaffold(
                 val hasPinned = playlists.any { it.pinned }
                 Column(modifier = Modifier.fillMaxSize()) {
                     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                        if (layout == LayoutMode.GRID) {
+                        if (query.isNotBlank() && sortedPlaylists.isEmpty()) {
+                            LibraryEmptyResults(true, "${strings.noSearchResults} ${strings.playlists}")
+                        } else dev.shephard.player.ui.components.LayoutSwitchAnimation(layout, Modifier.fillMaxSize()) { displayLayout ->
+if (displayLayout == LayoutMode.GRID) {
                             LazyVerticalGrid(
                                 columns = GridCells.Fixed(2),
                                 state = playlistGridState,
@@ -916,6 +925,7 @@ Scaffold(
                                 }
                             }
                         }
+}
                     }
                 }
             }
@@ -1125,7 +1135,7 @@ internal fun PlaylistDetailView(
     plTracks: List<AudioTrack>,
     strings: dev.shephard.player.ui.i18n.Strings,
     onBack: () -> Unit,
-    onMore: () -> Unit,
+    menuChoices: List<Triple<String, Boolean, () -> Unit>>,
     onTrackClick: (List<AudioTrack>, Int) -> Unit,
     onPlayAll: () -> Unit,
     onPlayRemix: () -> Unit,
@@ -1135,7 +1145,8 @@ internal fun PlaylistDetailView(
     onPickCover: () -> Unit = {},
     onReorder: (List<AudioTrack>) -> Unit = {},
     onChangeSort: (String) -> Unit = {},
-    isHomeSimplified: Boolean = false
+    isHomeSimplified: Boolean = false,
+    isAlbum: Boolean = false
 ) {
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
     val reorderItems = remember { mutableStateListOf<AudioTrack>() }
@@ -1197,7 +1208,7 @@ internal fun PlaylistDetailView(
         }
     }
 
-    val detailTitle = if (playlist.isSystem) strings.likedSongs else playlist.name
+    val detailTitle = if (isAlbum) strings.albumDetail else if (playlist.isSystem) strings.likedSongs else playlist.name
 
     // Top-level submenu (like the settings submenus): the pager, dock and mini player stay
     // underneath by z-order, so no detail mini player is needed here.
@@ -1213,7 +1224,7 @@ internal fun PlaylistDetailView(
                     )
                     Box(Modifier.align(Alignment.TopEnd).miuixHeaderSafeTop().padding(end = 8.dp).height(56.dp),
                         contentAlignment = Alignment.Center) {
-                        LibraryHeaderButton(true, Icons.Filled.MoreVert, strings.libraryOptions, MiuixAppTheme.colorScheme.onBackground, onMore)
+                        LibraryPopupButton(true, Icons.Filled.MoreVert, strings.libraryOptions, MiuixAppTheme.colorScheme.onBackground, menuChoices)
                     }
                 }
             }
@@ -1242,7 +1253,7 @@ internal fun PlaylistDetailView(
                         .aspectRatio(1f)
                         .clip(RoundedCornerShape(20.dp))
                         .background(MiuixAppTheme.colorScheme.surfaceVariant)
-                        .then(if (!playlist.isSystem && !isHomeSimplified) Modifier.clickable { onPickCover() } else Modifier),
+                        .then(if (!playlist.isSystem && !isHomeSimplified && !isAlbum) Modifier.clickable { onPickCover() } else Modifier),
                     contentAlignment = Alignment.Center
                 ) {
                     if (playlist.isSystem) {
@@ -1269,7 +1280,7 @@ internal fun PlaylistDetailView(
                                 Icon(Icons.Filled.LibraryMusic, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
                             }
                         )
-                        if (!playlist.isSystem && !isHomeSimplified) {
+                        if (!playlist.isSystem && !isHomeSimplified && !isAlbum) {
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.BottomEnd)
@@ -1282,6 +1293,14 @@ internal fun PlaylistDetailView(
                                 Icon(Icons.Filled.Edit, null, tint = MiuixAppTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
                             }
                         }
+                    }
+                }
+                if (isAlbum) {
+                    Text(playlist.name, style = MiuixAppTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold, color = MiuixAppTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(top = 8.dp))
+                    displayTracks.firstOrNull()?.artist?.let { artist ->
+                        Text(artist, style = MiuixAppTheme.typography.bodyMedium, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Row(
@@ -1317,7 +1336,7 @@ internal fun PlaylistDetailView(
                         Spacer(Modifier.width(8.dp))
                         Text(text = strings.remix, color = MiuixAppTheme.colorScheme.onBackground, fontWeight = FontWeight.SemiBold)
                     }
-                    if (!playlist.isSystem && !isHomeSimplified) {
+                    if (!playlist.isSystem && !isHomeSimplified && !isAlbum) {
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(14.dp))
@@ -1332,7 +1351,7 @@ internal fun PlaylistDetailView(
                         }
                     }
                 }
-                if (!playlist.isSystem && !isHomeSimplified) {
+                if (!playlist.isSystem && !isHomeSimplified && !isAlbum) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1371,7 +1390,7 @@ internal fun PlaylistDetailView(
                     )
                 }
             } else {
-                if (playlist.sortMode == "custom" && !playlist.isSystem && !isHomeSimplified) {
+                if (playlist.sortMode == "custom" && !playlist.isSystem && !isHomeSimplified && !isAlbum) {
                     itemsIndexed(reorderItems, key = { _, t -> t.id }) { i, t ->
                         ReorderableItem(state = reorderableState, key = t.id) { isDragging ->
                             Box(modifier = Modifier.animateItem()) {
@@ -1582,7 +1601,6 @@ fun PlaylistDetailScreen(
     var trackOptions by remember { mutableStateOf<AudioTrack?>(null) }
     var trackToEditInPlaylist by remember { mutableStateOf<AudioTrack?>(null) }
     var showTrackPicker by remember { mutableStateOf(false) }
-    var showDetailMenu by remember { mutableStateOf(false) }
     var showDetailEdit by remember { mutableStateOf(false) }
     var showDetailDelete by remember { mutableStateOf(false) }
     var pickerSelected by remember { mutableStateOf<Set<Long>>(emptySet()) }
@@ -1692,7 +1710,14 @@ fun PlaylistDetailScreen(
         plTracks = plTracks,
         strings = strings,
         onBack = onBack,
-        onMore = { showDetailMenu = true },
+        menuChoices = listOf(
+            Triple(strings.play, false, { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, pl.name) }),
+            Triple(strings.remix, false, { if (plTracks.isNotEmpty()) onPlaylistRemixClick(plTracks, pl.name) })
+        ) + if (!pl.isSystem) listOf(
+            Triple(strings.editPlaylist, false, { showDetailEdit = true }),
+            Triple(strings.addTracks, false, { pickerSelected = pl.trackIds.toSet(); showTrackPicker = true }),
+            Triple(strings.delete, false, { showDetailDelete = true })
+        ) else emptyList(),
         onTrackClick = { list, i -> onTrackClick(list, i, if (pl.isSystem) strings.likedSongs else pl.name) },
         onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name) },
         onPlayRemix = { if (plTracks.isNotEmpty()) onPlaylistRemixClick(plTracks, if (pl.isSystem) strings.likedSongs else pl.name) },
@@ -1731,12 +1756,6 @@ fun PlaylistDetailScreen(
         }
     )
 
-    if (showDetailMenu) PlaylistDetailMenu(true, pl, onDismiss = { showDetailMenu = false },
-        onPlay = { showDetailMenu = false; if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, pl.name) },
-        onRemix = { showDetailMenu = false; if (plTracks.isNotEmpty()) onPlaylistRemixClick(plTracks, pl.name) },
-        onEdit = { showDetailMenu = false; showDetailEdit = true },
-        onAdd = { showDetailMenu = false; pickerSelected = pl.trackIds.toSet(); showTrackPicker = true },
-        onDelete = { showDetailMenu = false; showDetailDelete = true })
     if (showDetailEdit) PlaylistDetailEditor(true, pl, plTracks, onDismiss = { showDetailEdit = false },
         onSave = { name ->
             showDetailEdit = false

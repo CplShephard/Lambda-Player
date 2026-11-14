@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -129,5 +130,15 @@ internal fun LibrarySongRow(track: AudioTrack, miuix: Boolean, onClick: () -> Un
             LibraryText(track.artist, miuix, color = fg.copy(alpha = .65f))
         }
         LibraryHeaderButton(miuix, Icons.Default.MoreVert, LocalStrings.current.libraryOptions, fg, onMore)
+    }
+}
+
+@Composable
+internal fun LibraryEmptyResults(miuix: Boolean, message: String) {
+    val fg = if (miuix) MiuixAppTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant
+    Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center) {
+        LibraryIcon(Icons.Default.FolderOff, null, miuix, fg, Modifier.size(56.dp))
+        LibraryText(message, miuix, Modifier.padding(top = 16.dp), color = fg, bold = true, maxLines = 2)
     }
 }

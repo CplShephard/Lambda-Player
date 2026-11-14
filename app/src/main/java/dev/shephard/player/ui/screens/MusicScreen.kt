@@ -112,7 +112,7 @@ fun MusicScreen(
 
     LaunchedEffect(Unit) {
         if (permissionState.hasPermission) {
-            libraryViewModel.loadTracks()
+            libraryViewModel.ensureTracksLoaded()
         }
     }
 
@@ -155,7 +155,7 @@ fun MusicScreen(
                 !permissionState.hasPermission -> {
                     PermissionRequest(onRequest = permissionState.requestPermission)
                 }
-                isLoading -> {
+                isLoading && tracks.isEmpty() -> {
                     LoadingState()
                 }
                 hasScanned && tracks.isEmpty() -> {
@@ -167,7 +167,8 @@ fun MusicScreen(
 
                     Column(modifier = Modifier.fillMaxSize()) {
                         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                            if (musicsLayout == LayoutMode.GRID) {
+                            dev.shephard.player.ui.components.LayoutSwitchAnimation(musicsLayout, Modifier.fillMaxSize()) { displayLayout ->
+if (displayLayout == LayoutMode.GRID) {
                                 LazyVerticalGrid(
                                     columns = GridCells.Fixed(2),
                                     state = gridState,
@@ -189,11 +190,11 @@ fun MusicScreen(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     gridItemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
-                                        GridTrackCard(
+                                        Box(Modifier.animateItem()) { GridTrackCard(
                                             track = track,
                                             onClick = { onTrackClick(tracks, index) },
                                             onMenuClick = { selectedTrackForMenu = track }
-                                        )
+                                        ) }
                                     }
                                 }
                             } else {
@@ -216,14 +217,15 @@ fun MusicScreen(
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
-                                        TrackRow(
+                                        Box(Modifier.animateItem()) { TrackRow(
                                             track = track,
                                             onClick = { onTrackClick(tracks, index) },
                                             onMenuClick = { selectedTrackForMenu = track }
-                                        )
+                                        ) }
                                     }
                                 }
                             }
+}
                         }
                     }
                 }

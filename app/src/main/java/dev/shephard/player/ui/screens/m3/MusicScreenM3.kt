@@ -116,7 +116,7 @@ fun MusicScreenM3(
 
     LaunchedEffect(Unit) {
         if (permissionState.hasPermission) {
-            libraryViewModel.loadTracks()
+            libraryViewModel.ensureTracksLoaded()
         }
     }
 
@@ -168,7 +168,7 @@ fun MusicScreenM3(
                         }
                     }
                 }
-                isLoading -> {
+                isLoading && tracks.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
@@ -226,7 +226,7 @@ fun MusicScreenM3(
                                 ),
                             ) {
                                 gridItems(tracks, key = { it.id }) { track ->
-                                    LineageGridMediaItem(
+                                    Box(Modifier.animateItem()) { LineageGridMediaItem(
                                         headline = track.title,
                                         subhead = track.artist,
                                         thumbnailModel = track.albumArtUri,
@@ -237,7 +237,7 @@ fun MusicScreenM3(
                                             val idx = tracks.indexOf(track)
                                             if (idx >= 0) onTrackClick(tracks, idx)
                                         }
-                                    )
+                                    ) }
                                 }
                             }
                         } else {
@@ -251,7 +251,7 @@ fun MusicScreenM3(
                                 itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
                                     Card(
                                         modifier = Modifier
-                                            .fillMaxWidth()
+                                            .fillMaxWidth().animateItem()
                                             .padding(horizontal = 12.dp, vertical = 2.dp),
                                         shape = RoundedCornerShape(20.dp),
                                         colors = m3ItemCardColors()

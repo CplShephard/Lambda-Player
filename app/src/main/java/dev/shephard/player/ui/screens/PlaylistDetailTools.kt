@@ -13,6 +13,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
@@ -39,11 +41,12 @@ internal fun PlaylistDetailMenu(miuix: Boolean, playlist: LocalPlaylist, onDismi
     val fg = if (miuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
     val card = if (miuix) MiuixAppTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceContainerHigh
     val body: @Composable () -> Unit = {
+        val closeThen = dev.shephard.player.ui.components.rememberCloseDrawerThen()
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             LibraryText(s.libraryOptions, miuix, Modifier.padding(start = 8.dp, bottom = 4.dp), color = fg, bold = true)
             LibraryText(playlist.name, miuix, Modifier.padding(start = 8.dp, bottom = 12.dp), color = fg.copy(alpha = .66f))
             @Composable fun Action(icon: ImageVector, text: String, action: () -> Unit) {
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(card).clickable(onClick = action)
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(card).clickable { closeThen(action) }
                     .padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     LibraryIcon(icon, null, miuix, fg, Modifier.size(22.dp))
                     LibraryText(text, miuix, Modifier.padding(start = 16.dp), color = fg)
@@ -72,10 +75,22 @@ internal fun PlaylistDetailEditor(miuix: Boolean, playlist: LocalPlaylist, track
     val bg = if (miuix) MiuixAppTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceContainerHigh
     val accent = if (miuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
     var name by remember(playlist.createdAt) { mutableStateOf(playlist.name) }
+    var pendingName by remember { mutableStateOf<String?>(null) }
     val body: @Composable () -> Unit = {
+        val dismissDrawer = if (miuix) dev.shephard.player.ui.components.rememberDrawerDismiss() else onDismiss
+        val closeThen = dev.shephard.player.ui.components.rememberCloseDrawerThen()
         Column(Modifier.fillMaxWidth().heightIn(max = 620.dp).verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            LibraryText(s.editPlaylist, miuix, Modifier.fillMaxWidth(), color = fg, bold = true)
+            if (miuix) dev.shephard.player.ui.components.MiuixDrawerActionHeader(
+                title = s.editPlaylist, onCancel = dismissDrawer, confirmEnabled = name.isNotBlank(),
+                onConfirm = { pendingName = name.trim(); dismissDrawer() })
+            else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.IconButton(onClick = { closeThen {} }) { androidx.compose.material3.Icon(Icons.Default.Close, s.cancel) }
+                LibraryText(s.editPlaylist, false, color = fg, bold = true)
+                androidx.compose.material3.IconButton(onClick = { val saved = name.trim(); closeThen { onSave(saved) } }, enabled = name.isNotBlank()) {
+                    androidx.compose.material3.Icon(Icons.Default.Check, s.save)
+                }
+            }
             Box(Modifier.size(168.dp).clip(RoundedCornerShape(22.dp)).background(bg).clickable(onClick = onPickCover), contentAlignment = Alignment.Center) {
                 PlaylistCoverArt(playlist.coverUri, tracks, placeholderColor = bg, placeholderIconColor = accent, animateVideo = true,
                     fallback = { LibraryIcon(Icons.Default.MusicNote, null, miuix, accent, Modifier.size(48.dp)) })
@@ -88,13 +103,13 @@ internal fun PlaylistDetailEditor(miuix: Boolean, playlist: LocalPlaylist, track
                 label = { dev.shephard.player.ui.miuix.Text(s.playlistName, color = fg) })
             else androidx.compose.material3.OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true,
                 label = { androidx.compose.material3.Text(s.playlistName) })
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LibraryText(s.cancel, miuix, Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(bg).clickable(onClick = onDismiss).padding(14.dp), color = fg)
-                LibraryText(s.save, miuix, Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(accent.copy(alpha = if (name.isBlank()) .35f else 1f))
-                    .clickable(enabled = name.isNotBlank()) { onSave(name.trim()) }.padding(14.dp), color = Color.White, bold = true)
-            }
+
         }
     }
-    if (miuix) MiuixDrawer(onDismissRequest = onDismiss, content = body)
+    if (miuix) MiuixDrawer(onDismissRequest = {
+        val saved = pendingName
+        pendingName = null
+        if (saved != null) onSave(saved) else onDismiss()
+    }, content = body)
     else M3BottomSheetWrapper(onDismissRequest = onDismiss, content = body)
 }

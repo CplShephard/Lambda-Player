@@ -6,6 +6,7 @@ import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,6 +28,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -56,6 +59,7 @@ import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.util.TrackOverlayForBack
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.cos
@@ -109,8 +113,18 @@ fun Modifier.comradeEasterEggTrigger(onTrigger: () -> Unit): Modifier {
 @Composable
 fun ComradeEasterEggDialog(useMiuix: Boolean, onDismiss: () -> Unit) {
     TrackOverlayForBack()
+    val alpha = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    var closing by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { alpha.animateTo(1f, tween(180)) }
+    val dismissAnimated: () -> Unit = {
+        if (!closing) {
+            closing = true
+            scope.launch { alpha.animateTo(0f, tween(180)); onDismiss() }
+        }
+    }
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = dismissAnimated,
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             decorFitsSystemWindows = false,
@@ -120,12 +134,13 @@ fun ComradeEasterEggDialog(useMiuix: Boolean, onDismiss: () -> Unit) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer { this.alpha = alpha.value }
                 .background(Color.Black.copy(alpha = 0.45f))
-                .clickable(interactionSource = noRipple, indication = null, onClick = onDismiss),
+                .clickable(interactionSource = noRipple, indication = null, onClick = dismissAnimated),
             contentAlignment = Alignment.Center,
         ) {
             CelebrationBursts(modifier = Modifier.fillMaxSize())
-            EasterEggCard(useMiuix = useMiuix, onDismiss = onDismiss)
+            EasterEggCard(useMiuix = useMiuix, onDismiss = dismissAnimated)
         }
     }
 }

@@ -40,11 +40,9 @@ import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.screens.m3.MusicScreenM3
 import dev.shephard.player.ui.screens.m3.PlaylistScreenM3
 import dev.shephard.player.ui.screens.m3.M3EditTrackDialogLineage
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.runBlocking
 
 /** A single dock destination. Existing editors and playlists remain the source of truth. */
 @Composable
@@ -56,18 +54,20 @@ fun LibraryScreen(
     onTrackClick: (List<AudioTrack>, Int, String?) -> Unit,
     onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit,
     onOpenPlaylistDetail: (Int) -> Unit,
+    onOpenAlbumDetail: (Long, String, String) -> Unit,
 ) {
     val strings = LocalStrings.current
     val context = LocalContext.current
     val prefs = remember(context) { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
-    var selectedTab by remember { mutableIntStateOf(runBlocking { prefs.librarySelectedTab.first() }.let { if (it in listOf(0, 1, 3)) it else 0 }) }
+    // Do not block the UI thread while DataStore opens during a page transition.
+    val initialTab by prefs.librarySelectedTab.collectAsState(initial = -1)
+    if (initialTab < 0) { Box(Modifier.fillMaxSize()); return }
+    var selectedTab by remember { mutableIntStateOf(initialTab.let { if (it in listOf(0, 1, 3)) it else 0 }) }
     var group by remember(selectedTab) { mutableStateOf<String?>(null) }
     var showSelection by remember { mutableStateOf(false) }
     var songSearch by remember { mutableStateOf("") }
-    var showSort by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
-    var showLayout by remember { mutableStateOf(false) }
     val musicLayout by prefs.musicsLayout.collectAsState(initial = dev.shephard.player.player.LayoutMode.LIST)
     val playlistLayout by prefs.playlistsLayout.collectAsState(initial = dev.shephard.player.player.LayoutMode.LIST)
     val albumLayout by prefs.albumsLayout.collectAsState(initial = dev.shephard.player.player.LayoutMode.LIST)
@@ -92,21 +92,53 @@ fun LibraryScreen(
             }
         }
     }
-    LaunchedEffect(Unit) { if (permission.hasPermission) libraryViewModel.loadTracks() }
+    LaunchedEffect(Unit) { if (permission.hasPermission) libraryViewModel.ensureTracksLoaded() }
     BackHandler(enabled = group != null) { group = null }
-    val labels = listOf(0 to strings.librarySongs, 1 to strings.libraryAlbums, 3 to strings.playlists)
+    val labels = listOf(0 to strings.librarySongs, 3 to strings.playlists, 1 to strings.libraryAlbums)
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(
+        initialPage = labels.indexOfFirst { it.first == selectedTab }.coerceAtLeast(0),
+        pageCount = { labels.size }
+    )
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }.collect { page ->
+            val tab = labels.getOrNull(page)?.first ?: return@collect
+            if (selectedTab != tab) {
+                selectedTab = tab
+                prefs.setLibrarySelectedTab(tab)
+            }
+        }
+    }
+    val selectTab: (Int) -> Unit = { tab ->
+        val target = labels.indexOfFirst { it.first == tab }
+        if (target >= 0) scope.launch { pagerState.animateScrollToPage(target) }
+    }
     val foreground = if (useMiuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
     val accent = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
-    Column(Modifier.fillMaxSize().then(if (useMiuix) Modifier.miuixHeaderSafeTop() else Modifier.statusBarsPadding())) {
+    Column(Modifier.fillMaxSize().background(if (useMiuix) MiuixAppTheme.colorScheme.background else MaterialTheme.colorScheme.surface)
+        .then(if (useMiuix) Modifier.miuixHeaderSafeTop() else Modifier.statusBarsPadding())) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             LibraryText(strings.library, useMiuix, Modifier.weight(1f), color = foreground, fontSize = 30.sp, bold = true)
             LibraryHeaderButton(useMiuix, Icons.Default.Search, strings.search, foreground) {
                 showSearch = !showSearch; if (!showSearch) songSearch = ""
             }
-            LibraryHeaderButton(useMiuix, Icons.Default.Sort, strings.sortLibrary, foreground) { showSort = true }
-            LibraryHeaderButton(useMiuix, Icons.Default.MoreVert, strings.libraryOptions, foreground) { showLayout = true }
+            val sortChoices = if (selectedTab == 3) listOf(0 to strings.title, 3 to strings.dateAdded, 4 to strings.trackCount)
+                else listOf(0 to strings.title, 1 to strings.artist, 2 to strings.album, 3 to strings.dateAdded, 4 to strings.durationLabel)
+            LibraryPopupButton(useMiuix, Icons.Default.Sort, strings.sortLibrary, foreground,
+                sortChoices.map { (index, label) -> Triple(label, songSort == index, { scope.launch { prefs.setLibrarySongSort(index) }; Unit }) } +
+                    Triple(if (sortDescending) "Z–A" else "A–Z", false, { scope.launch { prefs.setLibrarySortDescending(!sortDescending) }; Unit }))
+            val currentLayout = when (selectedTab) { 1 -> albumLayout; 3 -> playlistLayout; else -> musicLayout }
+            LibraryPopupButton(useMiuix, Icons.Default.MoreVert, strings.libraryOptions, foreground,
+                listOf(dev.shephard.player.player.LayoutMode.LIST to strings.list, dev.shephard.player.player.LayoutMode.GRID to strings.grid).map { (mode, label) ->
+                    Triple(label, currentLayout == mode, { scope.launch {
+                        when (selectedTab) { 1 -> prefs.setAlbumsLayout(mode); 3 -> prefs.setPlaylistsLayout(mode); else -> prefs.setMusicsLayout(mode) }
+                    }; Unit })
+                })
         }
-        if (showSearch) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showSearch,
+            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+        ) {
             if (useMiuix) dev.shephard.player.ui.miuix.OutlinedTextField(songSearch, { songSearch = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp), singleLine = true, placeholder = { dev.shephard.player.ui.miuix.Text(strings.search) })
             else OutlinedTextField(songSearch, { songSearch = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp), singleLine = true, label = { Text(strings.search) })
         }
@@ -115,37 +147,41 @@ fun LibraryScreen(
                 options = labels,
                 selected = selectedTab,
                 onSelected = { index ->
-                    selectedTab = index
-                    scope.launch { prefs.setLibrarySelectedTab(index) }
+                    selectTab(index)
                 },
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
             )
         } else {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 labels.forEach { (index, label) ->
-                    FilterChip(selected = selectedTab == index, onClick = { selectedTab = index; scope.launch { prefs.setLibrarySelectedTab(index) } }, label = { Text(label, maxLines = 1) })
+                    FilterChip(selected = selectedTab == index, onClick = { selectTab(index) }, label = { Text(label, maxLines = 1) })
                 }
             }
         }
-        val filteredSongs = remember(tracks, songSearch, songSort, sortDescending, folderFilter) {
-            val filtered = tracks.filter { track ->
-                (songSearch.isBlank() || track.title.contains(songSearch, true) || track.artist.contains(songSearch, true) || track.album.contains(songSearch, true))
+        val filteredSongs by produceState(tracks, tracks, songSearch, songSort, sortDescending, folderFilter) {
+            value = withContext(Dispatchers.Default) {
+                val filtered = tracks.filter { track ->
+                    songSearch.isBlank() || track.title.contains(songSearch, true) || track.artist.contains(songSearch, true) || track.album.contains(songSearch, true)
+                }
+                val sorted = when (songSort) {
+                    1 -> filtered.sortedBy { it.artist.lowercase() }
+                    2 -> filtered.sortedBy { it.album.lowercase() }
+                    3 -> filtered.sortedBy { it.dateAdded }
+                    4 -> filtered.sortedBy { it.durationMs }
+                    else -> filtered.sortedBy { it.title.lowercase() }
+                }
+                if (sortDescending) sorted.reversed() else sorted
             }
-            val sorted = when (songSort) {
-                1 -> filtered.sortedBy { it.artist.lowercase() }
-                2 -> filtered.sortedBy { it.album.lowercase() }
-                3 -> filtered.sortedBy { it.dateAdded }
-                4 -> filtered.sortedBy { it.durationMs }
-                else -> filtered.sortedBy { it.title.lowercase() }
-            }
-            if (sortDescending) sorted.reversed() else sorted
         }
         androidx.compose.material3.pulltorefresh.PullToRefreshBox(
             isRefreshing = refreshing,
             onRefresh = { if (permission.hasPermission) libraryViewModel.loadTracks() else permission.requestPermission() },
             modifier = Modifier.weight(1f).fillMaxWidth(),
         ) {
-            when (selectedTab) {
+            androidx.compose.foundation.pager.HorizontalPager(
+                state = pagerState, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 1
+            ) { page ->
+            when (labels[page].first) {
                 0 -> if (useMiuix) MusicScreen(libraryViewModel, playerViewModel, { list, index -> onTrackClick(list, index, null) }, hasMiniPlayer, filteredSongs, embedded = true)
                      else MusicScreenM3(libraryViewModel, playerViewModel, { list, index -> onTrackClick(list, index, null) }, hasMiniPlayer, filteredSongs, embedded = true)
                 3 -> if (useMiuix) PlaylistScreen(libraryViewModel, hasMiniPlayer, onTrackClick, onPlaylistRemixClick, onOpenPlaylistDetail, embedded = true, query = songSearch, sortMode = songSort, descending = sortDescending)
@@ -156,18 +192,22 @@ fun LibraryScreen(
                         else Button(onClick = permission.requestPermission) { Text(strings.libraryRefresh) }
                     }
                 } else {
-                    val groups = remember(tracks, strings.libraryUnknown) {
-                        tracks.groupBy { "${it.album.takeIf(String::isNotBlank) ?: strings.libraryUnknown} • ${it.artist}" }
-                    }
-                    val matchingGroups = remember(groups, songSearch, songSort, sortDescending) {
-                        val filtered = groups.entries.filter { it.key.contains(songSearch, ignoreCase = true) }
-                        val sorted = when (songSort) {
-                            1 -> filtered.sortedBy { it.value.firstOrNull()?.artist.orEmpty().lowercase() }
-                            3 -> filtered.sortedBy { it.value.maxOfOrNull { track -> track.dateAdded } ?: 0L }
-                            4 -> filtered.sortedBy { it.value.sumOf { track -> track.durationMs } }
-                            else -> filtered.sortedBy { it.key.lowercase() }
+                    val groups by produceState(emptyMap<String, List<AudioTrack>>(), tracks, strings.libraryUnknown) {
+                        value = withContext(Dispatchers.Default) {
+                            tracks.groupBy { "${it.album.takeIf(String::isNotBlank) ?: strings.libraryUnknown} • ${it.artist}" }
                         }
-                        if (sortDescending) sorted.reversed() else sorted
+                    }
+                    val matchingGroups by produceState(emptyList<Map.Entry<String, List<AudioTrack>>>(), groups, songSearch, songSort, sortDescending) {
+                        value = withContext(Dispatchers.Default) {
+                            val filtered = groups.entries.filter { it.key.contains(songSearch, ignoreCase = true) }
+                            val sorted = when (songSort) {
+                                1 -> filtered.sortedBy { it.value.firstOrNull()?.artist.orEmpty().lowercase() }
+                                3 -> filtered.sortedBy { it.value.maxOfOrNull { track -> track.dateAdded } ?: 0L }
+                                4 -> filtered.sortedBy { it.value.sumOf { track -> track.durationMs } }
+                                else -> filtered.sortedBy { it.key.lowercase() }
+                            }
+                            if (sortDescending) sorted.reversed() else sorted
+                        }
                     }
                     val visibleTracks = group?.let { groups[it] }.orEmpty().filter {
                         songSearch.isBlank() || it.title.contains(songSearch, true) || it.artist.contains(songSearch, true)
@@ -182,7 +222,10 @@ fun LibraryScreen(
                     }
                     var options by remember { mutableStateOf<AudioTrack?>(null) }
                     var edit by remember { mutableStateOf<AudioTrack?>(null) }
-                    if (group == null && albumLayout == dev.shephard.player.player.LayoutMode.GRID) {
+                    if (group == null && matchingGroups.isEmpty()) {
+                        LibraryEmptyResults(useMiuix, "${strings.noSearchResults} ${strings.libraryAlbums}")
+                    } else dev.shephard.player.ui.components.LayoutSwitchAnimation(albumLayout, Modifier.fillMaxSize()) { displayLayout ->
+if (group == null && displayLayout == dev.shephard.player.player.LayoutMode.GRID) {
                         androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
                             columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
                             contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = if (hasMiniPlayer) 150.dp else 96.dp),
@@ -190,7 +233,7 @@ fun LibraryScreen(
                         ) {
                             items(matchingGroups.size, key = { matchingGroups[it].key }) { i ->
                                 val entry = matchingGroups[i]
-                                LibraryAlbumTile(entry.key, entry.value, useMiuix) { group = entry.key; songSearch = "" }
+                                Box(Modifier.animateItem()) { LibraryAlbumTile(entry.key, entry.value, useMiuix) { entry.value.firstOrNull()?.let { track -> onOpenAlbumDetail(track.albumId ?: 0L, track.album, track.artist) } } }
                             }
                         }
                     } else {
@@ -198,16 +241,17 @@ fun LibraryScreen(
                             verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             if (group == null) {
                                 items(matchingGroups, key = { it.key }) { entry ->
-                                    LibraryAlbumRow(entry.key, entry.value, useMiuix) { group = entry.key; songSearch = "" }
+                                    Box(Modifier.animateItem()) { LibraryAlbumRow(entry.key, entry.value, useMiuix) { entry.value.firstOrNull()?.let { track -> onOpenAlbumDetail(track.albumId ?: 0L, track.album, track.artist) } } }
                                 }
                             } else {
                                 item { LibraryText("‹  ${group.orEmpty()}", useMiuix, Modifier.clickable { group = null; songSearch = "" }.padding(12.dp), color = accent) }
                                 items(visibleTracks, key = { it.id }) { track ->
-                                    LibrarySongRow(track, useMiuix, onClick = { onTrackClick(visibleTracks, visibleTracks.indexOf(track), group) }, onMore = { options = track })
+                                    Box(Modifier.animateItem()) { LibrarySongRow(track, useMiuix, onClick = { onTrackClick(visibleTracks, visibleTracks.indexOf(track), group) }, onMore = { options = track }) }
                                 }
                             }
                         }
                     }
+}
                     options?.let { track ->
                         SongOptionsSheet(track, useMiuix, playerViewModel,
                             onDismiss = { options = null }, onEdit = { options = null; edit = track },
@@ -219,23 +263,8 @@ fun LibraryScreen(
                     }
                 }
             }
+            }
         }
-    }
-    if (showSort) {
-        val choices = if (selectedTab == 3) listOf(0 to strings.title, 3 to strings.dateAdded, 4 to strings.trackCount)
-            else listOf(0 to strings.title, 1 to strings.artist, 2 to strings.album, 3 to strings.dateAdded, 4 to strings.durationLabel)
-        LibraryChoiceDrawer(useMiuix, strings.sortLibrary, choices.map { (index, label) ->
-            Triple(label, songSort == index, { showSort = false; scope.launch { prefs.setLibrarySongSort(index) }; Unit })
-        } + Triple(if (sortDescending) "Z–A" else "A–Z", false, { showSort = false; scope.launch { prefs.setLibrarySortDescending(!sortDescending) }; Unit })) { showSort = false }
-    }
-    if (showLayout) {
-        val currentLayout = when (selectedTab) { 1 -> albumLayout; 3 -> playlistLayout; else -> musicLayout }
-        LibraryChoiceDrawer(useMiuix, strings.layout,
-            listOf(dev.shephard.player.player.LayoutMode.LIST to strings.list, dev.shephard.player.player.LayoutMode.GRID to strings.grid).map { (mode, label) ->
-                Triple(label, currentLayout == mode, { showLayout = false; scope.launch {
-                    when (selectedTab) { 1 -> prefs.setAlbumsLayout(mode); 3 -> prefs.setPlaylistsLayout(mode); else -> prefs.setMusicsLayout(mode) }
-                }; Unit })
-            }) { showLayout = false }
     }
     if (showSelection) LibrarySelectionSheet(tracks, useMiuix, playerViewModel) { showSelection = false }
     deleteTrack?.let { track ->

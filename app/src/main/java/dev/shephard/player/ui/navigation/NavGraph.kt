@@ -104,9 +104,7 @@ import top.yukonga.miuix.kmp.nav.core.NavKey
 import top.yukonga.miuix.kmp.nav.core.NavEntryBuilder
 import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
@@ -252,6 +250,7 @@ fun NavGraph(
                                             onTrackClick = onTrackClick,
                                             onPlaylistRemixClick = onPlaylistRemixClick,
                                             onOpenPlaylistDetail = { push(PlaylistDetailRoute(it)) },
+                                            onOpenAlbumDetail = { id, album, artist -> push(AlbumDetailRoute(id, album, artist)) },
                                         )
                                         2 -> if (useMiuix) {
                                             SettingsScreen(
@@ -406,8 +405,7 @@ private fun MainDock(
     selectedIndex: () -> Int,
     onSelected: (Int) -> Unit,
 ) {
-    val initialAppleStyle = remember { runBlocking { preferences.useAppleFloatingBar.first() } }
-    val appleStyle by preferences.useAppleFloatingBar.collectAsState(initial = initialAppleStyle)
+    val appleStyle by preferences.useAppleFloatingBar.collectAsState(initial = false)
     when {
         appleStyle && useMiuix -> AppleFloatingDock(
             useMiuix = true,

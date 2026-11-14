@@ -516,6 +516,7 @@ fun FullScreenLyricsExperience(
                     onToggleTranslation = { scope.launch { preferences.setLyricsTranslationVisible(!showTranslation) } },
                     onSettings = { showSettings = !showSettings },
                     settingsContent = {
+                        val closeThen = dev.shephard.player.ui.components.rememberCloseDrawerThen()
                         LyricsSettingsPanel(
                             useMiuix = useMiuix, primary = primary, textStyle = textStyle,
                             blurEnabled = blurEnabled, blurStrength = blurStrength, autoScroll = autoScroll,
@@ -526,9 +527,10 @@ fun FullScreenLyricsExperience(
                             onAutoScrollChange = { enabled -> scope.launch { preferences.setLyricsAutoScrollEnabled(enabled) } },
                             onOffsetChange = playerViewModel::setLyricsSyncOffset,
                             onExport = {
-                                showOptions = false
-                                val safeTitle = track?.title?.replace(Regex("[^A-Za-z0-9._ -]"), "_")?.ifBlank { "lyrics" } ?: "lyrics"
-                                exportLauncher.launch("$safeTitle.lrc")
+                                closeThen {
+                                    val safeTitle = track?.title?.replace(Regex("[^A-Za-z0-9._ -]"), "_")?.ifBlank { "lyrics" } ?: "lyrics"
+                                    exportLauncher.launch("$safeTitle.lrc")
+                                }
                             },
                             exportEnabled = exportText.isNotBlank(), strings = strings,
                         )
@@ -743,9 +745,9 @@ fun FullScreenLyricsExperience(
                     if (durationMs > 0L) playerViewModel.onSeekCommit((fraction * durationMs).toLong())
                 },
                 useMiuix = useMiuix,
-                // Miuix's sheet uses "remix" in the first slot, M3's sheet uses "shuffle".
-                shuffleActive = if (useMiuix) isRemixed else state.shuffleEnabled,
-                onShuffle = if (useMiuix) playerViewModel::remixQueue else playerViewModel::toggleShuffle,
+                // Both Now Playing and lyrics use the same queue remix state and action.
+                shuffleActive = isRemixed,
+                onShuffle = playerViewModel::remixQueue,
                 repeatMode = state.repeatMode,
                 onRepeat = playerViewModel::cycleRepeatMode,
                 onPrevious = playerViewModel::skipToPrevious,
@@ -839,6 +841,7 @@ private fun LyricsOptionsDrawer(
     val fg = if (useMiuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
     val accent = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
     val content: @Composable () -> Unit = {
+        val closeThen = dev.shephard.player.ui.components.rememberCloseDrawerThen()
         CompositionLocalProvider(LocalLyricsForeground provides fg) {
             Column(Modifier.fillMaxWidth().heightIn(max = 620.dp).verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 12.dp)) {
                 BasicText(strings.lyricsOptions, style = MaterialTheme.typography.titleLarge.copy(color = fg, fontWeight = FontWeight.Bold), modifier = Modifier.padding(bottom = 12.dp))
@@ -851,12 +854,12 @@ private fun LyricsOptionsDrawer(
                     }
                     Spacer(Modifier.height(4.dp))
                 }
-                Action(Icons.Filled.Search, strings.search, action = onSearch)
-                Action(Icons.Filled.FolderOpen, strings.lyricsImport, action = onImport)
-                Action(if (isEditing) Icons.Filled.Check else Icons.Filled.Edit, if (isEditing) strings.lyricsSave else strings.lyricsEdit, action = onEdit)
+                Action(Icons.Filled.Search, strings.search, action = { closeThen(onSearch) })
+                Action(Icons.Filled.FolderOpen, strings.lyricsImport, action = { closeThen(onImport) })
+                Action(if (isEditing) Icons.Filled.Check else Icons.Filled.Edit, if (isEditing) strings.lyricsSave else strings.lyricsEdit, action = { closeThen(onEdit) })
                 if (hasTranslation) Action(Icons.Filled.Translate, if (showTranslation) strings.lyricsHideTranslation else strings.lyricsShowTranslation, action = onToggleTranslation)
-                Action(Icons.Filled.ContentCopy, strings.lyricsCopy, hasLyrics, onCopy)
-                Action(Icons.Filled.FileDownload, strings.lyricsExport, hasLyrics, onExport)
+                Action(Icons.Filled.ContentCopy, strings.lyricsCopy, hasLyrics, { closeThen(onCopy) })
+                Action(Icons.Filled.FileDownload, strings.lyricsExport, hasLyrics, { closeThen(onExport) })
                 Action(Icons.Filled.Tune, strings.lyricsSettingsTitle, action = onSettings)
                 androidx.compose.animation.AnimatedVisibility(visible = showSettings,
                     enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
@@ -1250,7 +1253,6 @@ private fun LyricsPlaybackControls(
                 isPlaying = isPlaying,
                 shuffleActive = shuffleActive,
                 repeatMode = repeatMode,
-                foreground = foreground,
                 onShuffle = onShuffle,
                 onPrevious = onPrevious,
                 onPlayPause = onPlayPause,
@@ -1361,7 +1363,6 @@ private fun LyricsM3Transport(
     isPlaying: Boolean,
     shuffleActive: Boolean,
     repeatMode: RepeatMode,
-    foreground: Color,
     onShuffle: () -> Unit,
     onPrevious: () -> Unit,
     onPlayPause: () -> Unit,
@@ -1374,13 +1375,10 @@ private fun LyricsM3Transport(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onShuffle, modifier = Modifier.size(48.dp)) {
-            Icon(
-                Icons.Filled.Shuffle,
-                strings.shuffle,
-                tint = if (shuffleActive) MaterialTheme.colorScheme.primary else foreground,
-            )
-        }
+        dev.shephard.player.ui.components.m3.M3PlaybackModeButton(
+            icon = Icons.Filled.Shuffle, description = strings.remix,
+            active = shuffleActive, onClick = onShuffle,
+        )
         FilledTonalIconButton(
             onClick = onPrevious,
             modifier = Modifier.size(56.dp),
@@ -1418,13 +1416,10 @@ private fun LyricsM3Transport(
         ) {
             Icon(Icons.Filled.SkipNext, strings.next, modifier = Modifier.size(28.dp))
         }
-        IconButton(onClick = onRepeat, modifier = Modifier.size(48.dp)) {
-            Icon(
-                imageVector = if (repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-                contentDescription = strings.repeat,
-                tint = if (repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else foreground,
-            )
-        }
+        dev.shephard.player.ui.components.m3.M3PlaybackModeButton(
+            icon = if (repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+            description = strings.repeat, active = repeatMode != RepeatMode.OFF, onClick = onRepeat,
+        )
     }
 }
 

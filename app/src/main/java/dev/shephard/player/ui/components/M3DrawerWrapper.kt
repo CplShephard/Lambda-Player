@@ -7,6 +7,14 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import dev.shephard.player.ui.util.TrackOverlayForBack
@@ -28,6 +36,9 @@ fun M3BottomSheetWrapper(
     content: @Composable () -> Unit,
 ) {
     TrackOverlayForBack()
+    val scope = rememberCoroutineScope()
+    val currentOnDismiss by rememberUpdatedState(onDismissRequest)
+    var closing by remember { mutableStateOf(false) }
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
@@ -39,6 +50,19 @@ fun M3BottomSheetWrapper(
         // dispatcher). Without this bridge that handler never sees the sheet window's back
         // gesture, so the sheet closed instantly with no predictive scale/slide preview.
         WindowNavigationEventBridge()
-        content()
+        CompositionLocalProvider(LocalDrawerCloseAction provides { action ->
+            if (!closing) {
+                closing = true
+                scope.launch {
+                    try {
+                        sheetState.hide()
+                        if (!sheetState.isVisible) {
+                            currentOnDismiss()
+                            action()
+                        }
+                    } finally { closing = false }
+                }
+            }
+        }) { content() }
     }
 }

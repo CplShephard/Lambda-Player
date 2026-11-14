@@ -32,6 +32,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.math.sin
 
 private const val DEFAULT_GLOW_COLOR = -14498466 // ARGB #22C55E
@@ -154,6 +156,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var statsListenedMsByDayStart: LinkedHashMap<Long, Long> = LinkedHashMap()
     private var statsEvents: List<ListenEvent> = emptyList()
     private var statsEventsLoaded: Boolean = false
+    private val statsWriteMutex = Mutex()
     private val _statsEventsFlow = MutableStateFlow<List<ListenEvent>>(emptyList())
     val statsEventsFlow: StateFlow<List<ListenEvent>> = _statsEventsFlow.asStateFlow()
 
@@ -575,7 +578,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (!statsEventsLoaded) return
         val snapshot = statsEvents
         viewModelScope.launch {
-            prefs.setListenStatsEventsJson(ListenStatsCalculator.encodeEvents(snapshot))
+            // Preserve write order, including clear, while moving large JSON encoding off Main.
+            statsWriteMutex.withLock {
+                val json = withContext(Dispatchers.Default) { ListenStatsCalculator.encodeEvents(snapshot) }
+                prefs.setListenStatsEventsJson(json)
+            }
         }
     }
 
@@ -839,6 +846,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val c = controller ?: return
         val current = _uiState.value.queue
         if (c.currentMediaItemIndex !in current.indices || (!remixActive && current.size <= 1)) return
+        // Keep the current MediaItem alive: the original remix implementation rearranged
+        // the playlist with moveMediaItem instead of replacing it or seeking to it.
+        clearCarouselPrediction()
         if (remixActive) {
             // Restore the original order while preserving multiplicity and later queue edits.
             val remaining = current.toMutableList()
@@ -856,22 +866,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             originalQueue = emptyList()
             return
         }
-        clearCarouselPrediction()
         if (c.shuffleModeEnabled) c.shuffleModeEnabled = false
         originalQueue = current.toList()
         val currentIndex = c.currentMediaItemIndex
         val order = listOf(currentIndex) + current.indices.filter { it != currentIndex }.shuffled()
-        val workingIndices = current.indices.toMutableList()
-        for ((target, originalIndex) in order.withIndex()) {
-            val from = workingIndices.indexOf(originalIndex)
-            if (from != target) {
-                c.moveMediaItem(from, target)
-                workingIndices.add(target, workingIndices.removeAt(from))
-            }
-        }
         val newOrder = order.map { current[it] }
+        // Use the original move-based reorder, but identify occurrences by position so
+        // duplicate tracks aren't dropped or mistaken for the currently playing copy.
+        val remixedCurrent = reorderPlayerPlaylist(c, current, newOrder, order)
         queueTracks = newOrder
-        _uiState.value = _uiState.value.copy(queue = newOrder, currentQueueIndex = 0, shuffleEnabled = false)
+        _uiState.value = _uiState.value.copy(queue = newOrder, currentQueueIndex = remixedCurrent, shuffleEnabled = false)
         remixActive = true
         _isRemixed.value = true
     }
@@ -922,16 +926,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun reorderPlayerPlaylist(
         c: Player,
         fromOrder: List<AudioTrack>,
-        toOrder: List<AudioTrack>
+        toOrder: List<AudioTrack>,
+        sourceIndices: List<Int>? = null,
     ): Int {
         val working = fromOrder.toMutableList()
+        val workingIndices = fromOrder.indices.toMutableList()
         var currentIndex = c.currentMediaItemIndex.coerceIn(0, (working.size - 1).coerceAtLeast(0))
         for (target in toOrder.indices) {
-            val desiredId = toOrder[target].id
-            val currentPos = (target until working.size).firstOrNull { working[it].id == desiredId } ?: -1
+            val currentPos = if (sourceIndices != null) {
+                workingIndices.indexOf(sourceIndices[target])
+            } else {
+                val desiredId = toOrder[target].id
+                (target until working.size).firstOrNull { working[it].id == desiredId } ?: -1
+            }
             if (currentPos < 0 || currentPos == target) continue
-            runCatching { c.moveMediaItem(currentPos, target) }
+            c.moveMediaItem(currentPos, target)
             working.add(target, working.removeAt(currentPos))
+            workingIndices.add(target, workingIndices.removeAt(currentPos))
             currentIndex = when {
                 currentIndex == currentPos -> target
                 currentPos > target && currentIndex in target until currentPos -> currentIndex + 1

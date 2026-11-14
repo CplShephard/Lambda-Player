@@ -410,7 +410,11 @@ fun PlaylistScreenM3(
 
                             // Grid <-> list: the content slides sideways while it scales and fades, so the
                             // switch reads as one motion instead of a cut.
-                            AnimatedContent(
+                            if (query.isNotBlank() && sortedPlaylists.isEmpty()) {
+                                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                    dev.shephard.player.ui.screens.LibraryEmptyResults(false, "${strings.noSearchResults} ${strings.playlists}")
+                                }
+                            } else AnimatedContent(
                                 targetState = playlistsLayout,
                                 modifier = Modifier.weight(1f).fillMaxWidth(),
                                 transitionSpec = {
@@ -487,6 +491,7 @@ fun PlaylistScreenM3(
                 sheetState = sheetState,
                 containerColor = MaterialTheme.colorScheme.surfaceContainer
             ) {
+                val closeThen = dev.shephard.player.ui.components.rememberCloseDrawerThen()
                 Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
                     Text(pl.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                     SegmentedColumn {
@@ -494,25 +499,28 @@ fun PlaylistScreenM3(
                         if (!pl.isSystem) {
                             item {
                                 BaseWidget(icon = Icons.Filled.Edit, title = strings.editPlaylist, onClick = {
-                                    playlistMenuIndex = null
-                                    editPlaylistName = pl.name
-                                    editPlaylistIndex = menuIdx
+                                    closeThen {
+                                        editPlaylistName = pl.name
+                                        editPlaylistIndex = menuIdx
+                                    }
                                 })
                             }
                             item {
                                 BaseWidget(icon = if (pl.pinned) Icons.Filled.Pin else Icons.Filled.PushPin, title = if (pl.pinned) strings.unpinPlaylist else strings.pinPlaylist, onClick = {
-                                    playlistMenuIndex = null
+                                    closeThen {
                                     val all = rawPlaylists.toMutableList()
                                     val rawIdx = all.indexOfFirst { it.name == pl.name && it.createdAt == pl.createdAt }
                                     if (rawIdx >= 0) all[rawIdx] = all[rawIdx].copy(pinned = !pl.pinned)
                                     writePlaylists(all)
+                                    }
                                 })
                             }
                             item {
                                 BaseWidget(icon = Icons.Filled.Delete, title = strings.delete, onClick = {
-                                    playlistMenuIndex = null
-                                    playlistToDelete = pl
-                                    showDeletePlaylistConfirm = true
+                                    closeThen {
+                                        playlistToDelete = pl
+                                        showDeletePlaylistConfirm = true
+                                    }
                                 })
                             }
                         }

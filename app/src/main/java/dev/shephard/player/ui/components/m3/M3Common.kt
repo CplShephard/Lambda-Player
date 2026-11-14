@@ -47,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -93,7 +94,8 @@ fun M3SmallTopBar(
     val titleStart = androidx.compose.ui.unit.lerp(20.dp, if (navigationIcon != null) 80.dp else 20.dp, fraction)
     val height = androidx.compose.ui.unit.lerp(140.dp, 64.dp, fraction)
     Box(
-        modifier = modifier.fillMaxWidth().background(colors.containerColor)
+        modifier = modifier.fillMaxWidth().background(Brush.verticalGradient(
+            0f to colors.containerColor, .9f to colors.containerColor, 1f to colors.containerColor.copy(alpha = 0f)))
             .statusBarsPadding().height(height)
     ) {
         Box(
