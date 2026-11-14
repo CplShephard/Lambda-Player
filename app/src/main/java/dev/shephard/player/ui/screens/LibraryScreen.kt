@@ -1,6 +1,8 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package dev.shephard.player.ui.screens
 
+import dev.shephard.player.ui.components.m3.m3CardPress
+
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -188,7 +190,8 @@ fun LibraryScreen(
                                 ListItem(headlineContent = { Text(name, color = foreground, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                     supportingContent = { Text("${list.size} ${strings.librarySongs}") },
                                     leadingContent = { AsyncImage(dev.shephard.player.ui.components.rememberStaticArtwork(list.firstOrNull()?.albumArtUri), null, Modifier.size(52.dp).clip(RoundedCornerShape(10.dp))) },
-                                    modifier = Modifier.clickable { group = name; search = "" }, colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent))
+                                    modifier = if (useMiuix) Modifier.clickable { group = name; search = "" }
+                                    else Modifier.m3CardPress(RoundedCornerShape(16.dp)) { group = name; search = "" }, colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent))
                             }
                         } else {
                             if (selectedTab != 4) item { TextButton(onClick = { group = null; search = "" }) { Text("‹  ${group.orEmpty()}", color = accent) } }
@@ -197,7 +200,8 @@ fun LibraryScreen(
                                     supportingContent = { Text(track.artist, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                     leadingContent = { AsyncImage(dev.shephard.player.ui.components.rememberStaticArtwork(track.albumArtUri), null, Modifier.size(48.dp).clip(RoundedCornerShape(8.dp))) },
                                     trailingContent = { IconButton(onClick = { options = track }) { Icon(Icons.Default.MoreVert, strings.libraryOptions, tint = foreground) } },
-                                    modifier = Modifier.clickable { onTrackClick(visibleTracks, visibleTracks.indexOf(track), group) },
+                                    modifier = if (useMiuix) Modifier.clickable { onTrackClick(visibleTracks, visibleTracks.indexOf(track), group) }
+                                    else Modifier.m3CardPress(RoundedCornerShape(16.dp)) { onTrackClick(visibleTracks, visibleTracks.indexOf(track), group) },
                                     colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent))
                             }
                         }

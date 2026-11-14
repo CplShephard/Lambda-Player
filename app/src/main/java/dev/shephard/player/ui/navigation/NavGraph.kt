@@ -375,12 +375,8 @@ fun NavGraph(
         block
     }
 
-    val submenuNavConfig = remember(predictiveBackAnimation, transition, effects) {
-        SubmenuNavConfig(animation = predictiveBackAnimation, transition = transition, effects = effects)
-    }
     CompositionLocalProvider(
         LocalBottomOverlayHeight provides overlayHeight,
-        LocalSubmenuNavConfig provides submenuNavConfig,
     ) {
         Box(modifier = modifier) {
             key(useMiuix) {

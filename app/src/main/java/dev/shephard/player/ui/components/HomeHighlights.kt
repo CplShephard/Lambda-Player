@@ -1,5 +1,7 @@
 package dev.shephard.player.ui.components
 
+import dev.shephard.player.ui.components.m3.m3CardPress
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -126,7 +128,7 @@ fun HomeYourMix(
                 Text(strings.noSongsToPlay, color = ink.copy(alpha = .65f), modifier = Modifier.padding(16.dp))
             }
         } else {
-            PixelMixCollage(tracks = tracks, surface = surface, accent = accent, pattern = pattern, onPlay = onPlay)
+            PixelMixCollage(tracks = tracks, surface = surface, accent = accent, pattern = pattern, useMiuix = useMiuix, onPlay = onPlay)
         }
     }
     if (showStyles) {
@@ -162,13 +164,17 @@ private fun PixelMixCollage(
     surface: Color,
     accent: Color,
     pattern: CollagePattern,
+    useMiuix: Boolean,
     onPlay: (List<AudioTrack>, Int) -> Unit,
 ) {
     @Composable
     fun Tile(index: Int, width: Dp, height: Dp, modifier: Modifier, shape: Shape, rotation: Float) {
         val track = tracks.getOrNull(index) ?: return
         Box(modifier.size(width, height).graphicsLayer { rotationZ = rotation }.clip(shape)
-            .background(surface).clickable { onPlay(tracks, index) }, contentAlignment = Alignment.Center) {
+            .background(surface).then(
+                if (useMiuix) Modifier.clickable { onPlay(tracks, index) }
+                else Modifier.m3CardPress(shape = shape, overlayColor = Color.White) { onPlay(tracks, index) }
+            ), contentAlignment = Alignment.Center) {
             Icon(Icons.Filled.MusicNote, null, tint = accent.copy(alpha = .5f), modifier = Modifier.size(32.dp))
             AsyncImage(model = dev.shephard.player.ui.components.rememberStaticArtwork(track.albumArtUri), contentDescription = track.title,
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -206,7 +212,9 @@ fun HomeListeningTime(totalMs: Long, useMiuix: Boolean, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(26.dp))
             .background(Brush.linearGradient(listOf(surface, accent.copy(alpha = .24f))))
-            .clickable(onClick = onClick).padding(18.dp),
+            .then(if (useMiuix) Modifier.clickable(onClick = onClick)
+                else Modifier.m3CardPress(shape = RoundedCornerShape(26.dp), onClick = onClick))
+            .padding(18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(50.dp).clip(CircleShape).background(accent.copy(alpha = .16f)), contentAlignment = Alignment.Center) {

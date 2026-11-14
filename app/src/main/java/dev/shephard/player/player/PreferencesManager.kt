@@ -64,6 +64,7 @@ object PrefsKeys {
     val LYRICS_BACKGROUND_BLUR_ENABLED = booleanPreferencesKey("lyrics_background_blur_enabled")
     val LYRICS_BACKGROUND_BLUR_STRENGTH = floatPreferencesKey("lyrics_background_blur_strength")
     val LYRICS_AUTO_SCROLL_ENABLED = booleanPreferencesKey("lyrics_auto_scroll_enabled")
+    val LYRICS_SKIP_SEARCH_PROMPT = booleanPreferencesKey("lyrics_skip_search_prompt")
     val LYRICS_TRANSLATION_VISIBLE = booleanPreferencesKey("lyrics_translation_visible")
     val CAROUSEL_STYLE = stringPreferencesKey("carousel_style")
     val LYRICS_SYNC_OFFSETS_JSON = stringPreferencesKey("lyrics_sync_offsets_json")
@@ -263,6 +264,10 @@ class PreferencesManager(private val context: Context) {
 
     val carouselStyle: Flow<String> = context.dataStore.data.map {
         it[PrefsKeys.CAROUSEL_STYLE]?.takeIf { style -> style in CarouselStyle.all } ?: CarouselStyle.NO_PEEK
+    }
+
+    val lyricsSkipSearchPrompt: Flow<Boolean> = context.dataStore.data.map {
+        it[PrefsKeys.LYRICS_SKIP_SEARCH_PROMPT] ?: false
     }
 
     val lyricsTranslationVisible: Flow<Boolean> = context.dataStore.data.map {
@@ -517,6 +522,10 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setCarouselStyle(style: String) {
         if (style in CarouselStyle.all) context.dataStore.edit { it[PrefsKeys.CAROUSEL_STYLE] = style }
+    }
+
+    suspend fun setLyricsSkipSearchPrompt(skip: Boolean) {
+        context.dataStore.edit { it[PrefsKeys.LYRICS_SKIP_SEARCH_PROMPT] = skip }
     }
 
     suspend fun setLyricsTranslationVisible(visible: Boolean) {

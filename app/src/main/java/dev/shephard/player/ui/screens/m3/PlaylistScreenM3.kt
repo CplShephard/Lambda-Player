@@ -2,6 +2,10 @@
 // LineageOS Twelve 1:1 + M3 padding/radius + grid 3-dot
 package dev.shephard.player.ui.screens.m3
 
+import dev.shephard.player.ui.components.m3.m3CardPress
+import dev.shephard.player.ui.components.m3.m3CardPressLayer
+import androidx.compose.foundation.interaction.MutableInteractionSource
+
 import dev.shephard.player.ui.components.LocalBottomOverlayHeight
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
@@ -555,7 +559,7 @@ private fun PlaylistRowM3(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
+                .m3CardPress(shape = RoundedCornerShape(20.dp), onClick = onClick)
                 .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -614,19 +618,20 @@ private fun PlaylistGridCardM3(
     onMore: () -> Unit,
     onPlay: () -> Unit,
 ) {
+    val cardInteractions = remember { MutableInteractionSource() }
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
+            .m3CardPress(shape = RoundedCornerShape(12.dp), overlayColor = Color.White,
+                interactionSource = cardInteractions, showOverlay = false, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(12.dp))
+                .m3CardPressLayer(cardInteractions, RoundedCornerShape(12.dp), Color.White)
         ) {
             PlaylistCoverArt(
                 coverUri = playlist.coverUri,

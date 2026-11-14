@@ -238,7 +238,7 @@ fun M3CoverEditor(
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(16.dp))
                 .background(cs.secondaryContainer)
-                .clickable(onClick = onPick),
+                .m3CardPress(shape = RoundedCornerShape(16.dp), overlayColor = androidx.compose.ui.graphics.Color.White, onClick = onPick),
             contentAlignment = Alignment.Center
         ) {
             var loaded by remember(model) { mutableStateOf(false) }

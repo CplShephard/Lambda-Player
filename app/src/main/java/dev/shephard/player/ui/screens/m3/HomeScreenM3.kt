@@ -4,6 +4,7 @@
 package dev.shephard.player.ui.screens.m3
 
 import dev.shephard.player.ui.components.PlaylistCoverArt
+import dev.shephard.player.ui.components.m3.m3CardPress
 import dev.shephard.player.ui.components.HomeYourMix
 import dev.shephard.player.ui.components.HomeListeningTime
 import dev.shephard.player.ui.components.rememberHomeMix
@@ -299,7 +300,7 @@ private fun RecentlyPlayedCardM3(
             .shadow(8.dp, RoundedCornerShape(18.dp))
             .clip(RoundedCornerShape(18.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .clickable(onClick = onClick),
+            .m3CardPress(shape = RoundedCornerShape(18.dp), overlayColor = Color.White, onClick = onClick),
     ) {
         var loaded by remember(track.id) { mutableStateOf(false) }
         AsyncImage(

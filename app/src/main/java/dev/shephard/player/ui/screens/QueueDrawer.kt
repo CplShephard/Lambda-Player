@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package dev.shephard.player.ui.screens
 
 import androidx.compose.foundation.background

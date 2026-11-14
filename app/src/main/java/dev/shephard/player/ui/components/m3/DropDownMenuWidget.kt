@@ -4,7 +4,7 @@ package dev.shephard.player.ui.components.m3
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.DropdownMenuGroup
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.SelectableDropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MenuDefaults
@@ -65,7 +65,7 @@ fun DropDownMenuWidget(
                         data.forEachIndexed { index, item ->
                             val isSelected = index == choice
 
-                            DropdownMenuItem(
+                            SelectableDropdownMenuItem(
                                 selected = isSelected,
                                 onClick = {
                                     onChoiceChange(index)

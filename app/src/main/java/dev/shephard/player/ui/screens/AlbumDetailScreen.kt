@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package dev.shephard.player.ui.screens
 
+import dev.shephard.player.ui.components.m3.m3CardPress
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -73,7 +75,8 @@ fun AlbumDetailScreen(
                     headlineContent = { Text(song.title, color = foreground, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     supportingContent = { Text(song.artist, color = foreground.copy(alpha = .65f), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     leadingContent = { AsyncImage(rememberStaticArtwork(song.albumArtUri), null, Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop) },
-                    modifier = Modifier.clickable { player.setQueueAndPlay(songs, index, albumName) },
+                    modifier = if (useMiuix) Modifier.clickable { player.setQueueAndPlay(songs, index, albumName) }
+                    else Modifier.m3CardPress(RoundedCornerShape(16.dp)) { player.setQueueAndPlay(songs, index, albumName) },
                     colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                 )
             }

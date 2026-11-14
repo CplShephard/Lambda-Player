@@ -5,6 +5,8 @@
 // shuffled order and no add button when opened from Home, and 220dp bottom space for the mini player.
 package dev.shephard.player.ui.screens.m3
 
+import dev.shephard.player.ui.components.m3.m3CardPress
+
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -577,7 +579,7 @@ private fun M3PlaylistTrackRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
+                .m3CardPress(shape = RoundedCornerShape(20.dp), onClick = onClick)
                 .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

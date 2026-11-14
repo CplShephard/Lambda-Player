@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Full-screen, shared lyrics experience for Material 3 and Miuix Now Playing.
-@file:OptIn(androidx.activity.ExperimentalActivityApi::class)
+@file:OptIn(androidx.activity.ExperimentalActivityApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package dev.shephard.player.ui.screens
 
@@ -172,6 +172,7 @@ fun FullScreenLyricsExperience(
     val savedBlurStrength by preferences.lyricsBackgroundBlurStrength.collectAsState(initial = 36f)
     val autoScroll by preferences.lyricsAutoScrollEnabled.collectAsState(initial = true)
     val showTranslation by preferences.lyricsTranslationVisible.collectAsState(initial = true)
+    val skipLyricsPrompt by preferences.lyricsSkipSearchPrompt.collectAsState(initial = null)
     val scope = rememberCoroutineScope()
     val lyricsListState = rememberLazyListState()
     val density = LocalDensity.current
@@ -194,6 +195,8 @@ fun FullScreenLyricsExperience(
     LaunchedEffect(savedBlurStrength) { blurStrength = savedBlurStrength.coerceIn(0f, 64f) }
 
     var showSearch by remember { mutableStateOf(false) }
+    var showFetchLyrics by remember { mutableStateOf(false) }
+    val promptedTracks = remember { mutableSetOf<Long>() }
     var showSettings by remember { mutableStateOf(false) }
     var showOptions by remember { mutableStateOf(false) }
     var isEditing by remember { mutableStateOf(false) }
@@ -234,15 +237,32 @@ fun FullScreenLyricsExperience(
 
     LaunchedEffect(track?.id) {
         searchQuery = track?.title.orEmpty()
+        showFetchLyrics = false
         playerViewModel.clearLyricsSearch()
     }
 
-    // "Online first" lyrics mode: the first time lyrics are opened for a track, go straight to online results.
-    // Declared after the reset above so the search it starts is not cleared.
-    LaunchedEffect(track?.id) {
-        if (track != null && playerViewModel.consumeFirstLyricsOpenSearch()) {
-            showSearch = true
-            playerViewModel.searchLyrics(track.title)
+    // Decide only after saved, embedded and automatic lyrics have finished loading.
+    // Lambda's manual search remains separate; never interrupt it with the prompt.
+    LaunchedEffect(track?.id, state.lyricsLoading, state.lyrics, skipLyricsPrompt, showSearch) {
+        val current = track
+        if (current != null && skipLyricsPrompt != null && !state.lyricsLoading && current.id !in promptedTracks) {
+            promptedTracks.add(current.id)
+            if (!showSearch) {
+                if (state.lyrics.isEmpty() && skipLyricsPrompt != true) {
+                    playerViewModel.clearLyricsSearch()
+                    showFetchLyrics = true
+                } else if (playerViewModel.consumeFirstLyricsOpenSearch()) {
+                    // Keep the existing Online First mode if the prompt is suppressed or lyrics exist.
+                    showSearch = true
+                    playerViewModel.searchLyrics(current.title)
+                }
+            }
+        }
+    }
+    LaunchedEffect(searchState.autoApplied) {
+        if (searchState.autoApplied && showFetchLyrics) {
+            showFetchLyrics = false
+            playerViewModel.clearLyricsSearch()
         }
     }
 
@@ -331,7 +351,7 @@ fun FullScreenLyricsExperience(
     }
     var backEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
     if (useClassicPredictiveBack) {
-        PredictiveBackHandler(enabled = !showOptions && !closing) { events ->
+        PredictiveBackHandler(enabled = !showOptions && !showFetchLyrics && !closing) { events ->
             try {
                 events.collect { event ->
                     backEdge = event.swipeEdge
@@ -492,6 +512,25 @@ fun FullScreenLyricsExperience(
                             },
                             exportEnabled = exportText.isNotBlank(), strings = strings,
                         )
+                        // The prompt is automatic only, so expose a way to re-enable it here.
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            BasicText(strings.lyricsNeverPrompt, style = textStyle.copy(color = LocalLyricsForeground.current),
+                                modifier = Modifier.weight(1f))
+                            if (useMiuix) {
+                                top.yukonga.miuix.kmp.basic.Switch(
+                                    checked = skipLyricsPrompt == true,
+                                    onCheckedChange = { value -> scope.launch { preferences.setLyricsSkipSearchPrompt(value) } },
+                                )
+                            } else {
+                                androidx.compose.material3.Switch(
+                                    checked = skipLyricsPrompt == true,
+                                    onCheckedChange = { value -> scope.launch { preferences.setLyricsSkipSearchPrompt(value) } },
+                                )
+                            }
+                        }
                     },
                 )
             }
@@ -695,6 +734,34 @@ fun FullScreenLyricsExperience(
                 strings = strings,
             )
         }
+            }
+        }
+        if (showFetchLyrics) {
+            MaterialTheme(colorScheme = dev.shephard.player.ui.theme.PlayerTheme.colorScheme) {
+            dev.shephard.player.ui.components.FetchLyricsDialog(
+                uiState = searchState,
+                currentSong = track,
+                dontShowAgain = skipLyricsPrompt == true,
+                onDontShowAgainChange = { value -> scope.launch { preferences.setLyricsSkipSearchPrompt(value) } },
+                onConfirm = { forcePick ->
+                    val query = listOfNotNull(track?.title?.takeIf { it.isNotBlank() },
+                        track?.artist?.takeIf { it.isNotBlank() && !it.equals("<unknown>", true) }).joinToString(" ")
+                    playerViewModel.searchLyrics(query, autoApply = !forcePick)
+                },
+                onPickResult = { result ->
+                    playerViewModel.selectLyricsSearchResult(result)
+                    showFetchLyrics = false
+                },
+                onManualSearch = { title, artist ->
+                    playerViewModel.searchLyrics(listOfNotNull(title.trim().takeIf { it.isNotBlank() }, artist?.trim()?.takeIf { it.isNotBlank() }).joinToString(" "))
+                },
+                onDismiss = { showFetchLyrics = false; playerViewModel.clearLyricsSearch() },
+                onImport = {
+                    showFetchLyrics = false
+                    playerViewModel.clearLyricsSearch()
+                    importLauncher.launch(arrayOf("text/*", "application/octet-stream", "application/x-lrc", "application/ttml+xml", "application/xml"))
+                },
+            )
             }
         }
     }

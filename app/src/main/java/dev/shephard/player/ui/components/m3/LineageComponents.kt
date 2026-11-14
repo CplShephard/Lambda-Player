@@ -4,6 +4,7 @@ package dev.shephard.player.ui.components.m3
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,7 +59,7 @@ fun LineageListItem(
             .fillMaxWidth()
             // No background of its own: the surrounding Card (m3ItemCardColors) provides the
             // colour. An opaque surface fill here used to hide the card entirely.
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.m3CardPress(shape = RoundedCornerShape(20.dp), onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Start
@@ -187,18 +189,21 @@ fun LineageHorizontalMediaItem(
     // Custom thumbnail (e.g. a playlist collage). Takes precedence over thumbnailModel.
     thumbnailContent: (@Composable () -> Unit)? = null
 ) {
+    val cardInteractions = remember { MutableInteractionSource() }
     Column(
         modifier = modifier
             .width(thumbnailSize + 16.dp)
             .padding(8.dp)
-            .then(if (onClick != null) Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick) else Modifier),
+            .then(if (onClick != null) Modifier.m3CardPress(shape = RoundedCornerShape(12.dp), overlayColor = Color.White,
+                interactionSource = cardInteractions, showOverlay = false, onClick = onClick) else Modifier),
         verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Card(
             modifier = Modifier
                 .size(thumbnailSize)
-                .padding(bottom = 8.dp),
+                .padding(bottom = 8.dp)
+                .m3CardPressLayer(cardInteractions, RoundedCornerShape(8.dp), Color.White),
             shape = RoundedCornerShape(8.dp),
             colors = CardDefaults.cardColors(
                 containerColor = Color.Transparent
@@ -288,18 +293,21 @@ fun LineageGridMediaItem(
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val cardInteractions = remember { MutableInteractionSource() }
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(8.dp)
-            .then(if (onClick != null) Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick) else Modifier),
+            .then(if (onClick != null) Modifier.m3CardPress(shape = RoundedCornerShape(12.dp), overlayColor = Color.White,
+                interactionSource = cardInteractions, showOverlay = false, onClick = onClick) else Modifier),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .padding(bottom = 8.dp),
+                .padding(bottom = 8.dp)
+                .m3CardPressLayer(cardInteractions, RoundedCornerShape(8.dp), Color.White),
             shape = RoundedCornerShape(8.dp),
             colors = CardDefaults.cardColors(containerColor = Color.Transparent)
         ) {

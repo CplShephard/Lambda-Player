@@ -78,6 +78,7 @@ data class LyricsSearchUiState(
     val isLoading: Boolean = false,
     val results: List<LyricsSearchResult> = emptyList(),
     val error: String? = null,
+    val autoApplied: Boolean = false,
 )
 
 private data class LyricsDocument(
@@ -106,7 +107,8 @@ data class PlayerUiState(
     val likedSongIds: List<Long> = emptyList(),
     val lyrics: List<String> = emptyList(),
     val syncedLyrics: List<SyncedLyricLine> = emptyList(),
-    val lyricsVisible: Boolean = false
+    val lyricsVisible: Boolean = false,
+    val lyricsLoading: Boolean = false,
 )
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
@@ -129,6 +131,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val lyricsSearchState: StateFlow<LyricsSearchUiState> = _lyricsSearchState.asStateFlow()
     private var lyricsSearchJob: Job? = null
     private var lyricsLoadJob: Job? = null
+    private var lyricsLoadGeneration = 0
     private var glowColorJob: Job? = null
 
     private val _lyricsSyncOffsetMs = MutableStateFlow(0)
@@ -211,6 +214,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 lyrics = emptyList(),
                 syncedLyrics = emptyList(),
                 lyricsVisible = false,
+                lyricsLoading = track != null,
             )
             if (track != null) {
                 recordRecentTrackStart(track)
@@ -746,6 +750,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun clearClosedPlayerState() {
         clearCarouselPrediction()
+        lyricsLoadGeneration++
         lyricsLoadJob?.cancel()
         lyricsSearchJob?.cancel()
         glowColorJob?.cancel()
@@ -757,7 +762,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.value = _uiState.value.copy(
             currentTrack = null, currentQueueIndex = 0, queue = emptyList(),
             currentPlaylistName = null, isPlaying = false, lyrics = emptyList(),
-            syncedLyrics = emptyList(), lyricsVisible = false,
+            syncedLyrics = emptyList(), lyricsVisible = false, lyricsLoading = false,
             glowColorArgb = DEFAULT_GLOW_COLOR, coverColorAvailable = false,
         )
     }
@@ -1115,6 +1120,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun loadLyrics(track: AudioTrack?) {
+        val generation = ++lyricsLoadGeneration
         lyricsLoadJob?.cancel()
         lyricsSearchJob?.cancel()
         _lyricsSearchState.value = LyricsSearchUiState()
@@ -1124,10 +1130,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 lyrics = emptyList(),
                 syncedLyrics = emptyList(),
                 lyricsVisible = false,
+                lyricsLoading = false,
             )
             return
         }
 
+        _uiState.value = _uiState.value.copy(lyricsLoading = true)
         _lyricsSyncOffsetMs.value = 0
         lyricsLoadJob = viewModelScope.launch {
             // This coroutine is not wrapped by anything else. An uncaught exception here (bad
@@ -1163,6 +1171,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 throw cancelled
             } catch (_: Exception) {
                 runCatching { applyLyricsDocument(track, null) }
+            } finally {
+                if (lyricsLoadGeneration == generation && _uiState.value.currentTrack?.id == track.id) {
+                    _uiState.value = _uiState.value.copy(lyricsLoading = false)
+                }
             }
         }
     }
@@ -1426,7 +1438,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val document = parseLyricsDocument(rawText)
         if (document.lines.isEmpty()) return
         val trackId = _uiState.value.currentTrack?.id ?: return
+        lyricsLoadGeneration++
+        lyricsLoadJob?.cancel()
         _uiState.value = _uiState.value.copy(
+            lyricsLoading = false,
             lyrics = document.lines,
             syncedLyrics = document.syncedLines,
             lyricsVisible = true,
@@ -1450,7 +1465,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         prefs.setLyricsJson(obj.toString())
     }
 
-    fun searchLyrics(query: String) {
+    fun searchLyrics(query: String, autoApply: Boolean = false) {
         val cleanedQuery = query.trim()
         val trackId = _uiState.value.currentTrack?.id
         lyricsSearchJob?.cancel()
@@ -1479,6 +1494,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     .distinctBy { "${it.source}|${it.sourceId ?: it.id ?: (it.title.trim().lowercase() + "|" + it.artist.trim().lowercase())}" }
                     .take(30)
                 val networkFailed = results.isEmpty() && lrclibAttempt.isFailure && qqAttempt.isFailure
+                val applicable = results.filter { it.rawLyrics.isNotBlank() }
+                if (autoApply && applicable.isNotEmpty()) {
+                    val track = _uiState.value.currentTrack
+                    val chosen = track?.let { pickBestLyricsCandidate(applicable, it) } ?: applicable.first()
+                    setManualLyricsText(chosen.rawLyrics)
+                    _lyricsSearchState.value = LyricsSearchUiState(query = cleanedQuery, autoApplied = true)
+                    return@launch
+                }
                 _lyricsSearchState.value = LyricsSearchUiState(
                     query = cleanedQuery,
                     results = results,
