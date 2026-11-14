@@ -104,19 +104,6 @@ fun StatsScreen(
                 .padding(top = innerPadding.calculateTopPadding() + 8.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Text(
-                text = strings.statsTitle,
-                style = MiuixAppTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = cs.onBackground,
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .graphicsLayer {
-                        alpha = 1f - scrollProgress
-                        scaleX = 1f - scrollProgress * 0.05f
-                        scaleY = 1f - scrollProgress * 0.05f
-                    }
-            )
             StatsPeriodPills(selectedPeriod = selectedPeriod, onPeriodSelected = { selectedPeriod = it })
 
             StatsSummaryCard(
@@ -251,7 +238,7 @@ private fun StatsTrackList(entries: List<StatsTrackEntry>, tracks: List<AudioTra
                 ) {
                     var loaded by remember(coverUri) { mutableStateOf(false) }
                     AsyncImage(
-                        model = coverUri,
+                        model = dev.shephard.player.ui.components.rememberStaticArtwork(coverUri),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
                         contentScale = ContentScale.Crop,

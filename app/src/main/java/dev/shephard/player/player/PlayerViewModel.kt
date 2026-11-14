@@ -48,7 +48,10 @@ private val QQ_INSTRUMENTAL_MARKERS = listOf("此歌曲为没有填词的纯音�
 data class LyricWord(val startMs: Long, val endMs: Long, val startChar: Int, val endChar: Int)
 
 /** [words] is filled for word-synced (karaoke) lyrics, e.g. QQ Music QRC / enhanced LRC. */
-data class SyncedLyricLine(val timeMs: Long, val text: String, val words: List<LyricWord> = emptyList())
+data class SyncedLyricLine(
+    val timeMs: Long, val text: String, val words: List<LyricWord> = emptyList(),
+    val translation: String? = null,
+)
 
 data class PlaybackProgress(
     val positionMs: Long = 0L,
@@ -89,6 +92,7 @@ data class PlayerUiState(
     val shuffleEnabled: Boolean = false,
     val repeatMode: RepeatMode = RepeatMode.OFF,
     val queue: List<AudioTrack> = emptyList(),
+    val currentQueueIndex: Int = 0,
     val crossfadeEnabled: Boolean = false,
     val gaplessEnabled: Boolean = true,
     val lyricsAutoSearchMode: LyricsAutoSearchMode = LyricsAutoSearchMode.OFF,
@@ -96,6 +100,7 @@ data class PlayerUiState(
     val playWithOthers: Boolean = false,
     val totalListeningMs: Long = 0L,
     val glowColorArgb: Int = DEFAULT_GLOW_COLOR,
+    val coverColorAvailable: Boolean = false,
     val amplitude: Float = 0f,
     val currentPlaylistName: String? = null,
     val likedSongIds: List<Long> = emptyList(),
@@ -155,6 +160,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _totalListeningMsLive = MutableStateFlow(0L)
     val totalListeningMsLive: StateFlow<Long> = _totalListeningMsLive.asStateFlow()
 
+    private val _pendingCarouselIndex = MutableStateFlow<Int?>(null)
+    val pendingCarouselIndex: StateFlow<Int?> = _pendingCarouselIndex.asStateFlow()
+    private var carouselConfirmationJob: Job? = null
     private val _navigationDirection = MutableStateFlow(1)
     val navigationDirection: StateFlow<Int> = _navigationDirection.asStateFlow()
 
@@ -183,11 +191,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             flushListeningTime()
             VolumeNormalizer.requestReset()
-            val track = queueTracks.find { it.id.toString() == mediaItem?.mediaId }
+            if (mediaItem == null) {
+                finalizeStatsSession()
+                clearClosedPlayerState()
+                return
+            }
+            if (_pendingCarouselIndex.value == controller?.currentMediaItemIndex) {
+                carouselConfirmationJob?.cancel()
+                _pendingCarouselIndex.value = null
+            }
+            val track = controller?.currentMediaItemIndex?.let(queueTracks::getOrNull)
+                ?: queueTracks.find { it.id.toString() == mediaItem?.mediaId }
             finalizeStatsSession()
             statsSessionTrackId = track?.id
             _uiState.value = _uiState.value.copy(
                 currentTrack = track,
+                coverColorAvailable = false,
+                currentQueueIndex = controller?.currentMediaItemIndex?.coerceAtLeast(0) ?: 0,
                 lyrics = emptyList(),
                 syncedLyrics = emptyList(),
                 lyricsVisible = false,
@@ -328,6 +348,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         _uiState.value = _uiState.value.copy(
             queue = restored,
+            currentQueueIndex = currentIndex,
             currentTrack = current,
             isPlaying = c.playWhenReady,
             shuffleEnabled = c.shuffleModeEnabled,
@@ -365,6 +386,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             while (true) {
                 val c = controller
                 if (c != null && !isUserSeeking) {
+                    val index = c.currentMediaItemIndex.coerceAtLeast(0)
+                    if (_uiState.value.currentQueueIndex != index) _uiState.value = _uiState.value.copy(currentQueueIndex = index)
                     if (c.isPlaying) {
                         accrueListeningTime()
                     }
@@ -617,6 +640,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun playExternalUri(uri: Uri) {
+        clearCarouselPrediction()
         val c = controller
         if (c == null) {
             pendingExternalUri = uri
@@ -682,6 +706,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun setQueueAndPlay(tracks: List<AudioTrack>, startIndex: Int, playlistName: String? = null) {
+        clearCarouselPrediction()
         val c = controller ?: return
         remixActive = false
         _isRemixed.value = false
@@ -710,6 +735,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val startTrack = tracks.getOrNull(startIndex)
         _uiState.value = _uiState.value.copy(
             queue = tracks,
+            currentQueueIndex = startIndex,
             currentTrack = startTrack,
             currentPlaylistName = playlistName
         )
@@ -718,18 +744,66 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
+    private fun clearClosedPlayerState() {
+        clearCarouselPrediction()
+        lyricsLoadJob?.cancel()
+        lyricsSearchJob?.cancel()
+        glowColorJob?.cancel()
+        queueTracks = emptyList()
+        originalQueue = emptyList()
+        remixActive = false
+        _isRemixed.value = false
+        _progress.value = PlaybackProgress()
+        _uiState.value = _uiState.value.copy(
+            currentTrack = null, currentQueueIndex = 0, queue = emptyList(),
+            currentPlaylistName = null, isPlaying = false, lyrics = emptyList(),
+            syncedLyrics = emptyList(), lyricsVisible = false,
+            glowColorArgb = DEFAULT_GLOW_COLOR, coverColorAvailable = false,
+        )
+    }
+
+    fun closePlayer() {
+        val c = controller ?: return
+        flushListeningTime()
+        finalizeStatsSession()
+        c.pause()
+        c.stop()
+        c.clearMediaItems()
+        clearClosedPlayerState()
+    }
+
     fun togglePlayPause() {
         val c = controller ?: return
         if (c.playWhenReady) c.pause() else c.play()
     }
 
+    private fun clearCarouselPrediction() {
+        carouselConfirmationJob?.cancel()
+        carouselConfirmationJob = null
+        _pendingCarouselIndex.value = null
+    }
+
+    private fun predictCarouselSkip(next: Boolean) {
+        val c = controller ?: return
+        val target = if (next) c.nextMediaItemIndex else c.previousMediaItemIndex
+        if (target !in _uiState.value.queue.indices) return
+        carouselConfirmationJob?.cancel()
+        _pendingCarouselIndex.value = target
+        carouselConfirmationJob = viewModelScope.launch {
+            delay(900)
+            if (_pendingCarouselIndex.value == target) _pendingCarouselIndex.value = null
+        }
+    }
+
     fun skipToNext() {
         _navigationDirection.value = 1
+        predictCarouselSkip(next = true)
         controller?.seekToNextMediaItem()
     }
 
     fun skipToPrevious() {
         _navigationDirection.value = -1
+        predictCarouselSkip(next = false)
         controller?.seekToPreviousMediaItem()
     }
 
@@ -756,39 +830,44 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun remixQueue() {
         val c = controller ?: return
         val current = _uiState.value.queue
-        val currentTrack = _uiState.value.currentTrack
-        if (current.size <= 1 || currentTrack == null) return
-
+        if (current.size <= 1 || c.currentMediaItemIndex !in current.indices) return
         if (remixActive) {
-
-            val queueIds = current.map(AudioTrack::id).toSet()
-            val restored = originalQueue.filter { it.id in queueIds }
-
-            val extras = current.filterNot { it.id in restored.map { it.id }.toSet() }
-            val restoreQueue = restored + extras
-            if (restoreQueue != current) {
-                reorderPlayerPlaylist(c, current, restoreQueue)
+            // Restore the original order while preserving multiplicity and later queue edits.
+            val remaining = current.toMutableList()
+            val restored = mutableListOf<AudioTrack>()
+            for (track in originalQueue) {
+                val index = remaining.indexOfFirst { it.id == track.id }
+                if (index >= 0) restored += remaining.removeAt(index)
             }
-            queueTracks = restoreQueue
-            _uiState.value = _uiState.value.copy(queue = restoreQueue, shuffleEnabled = false)
+            restored += remaining
+            reorderPlayerPlaylist(c, current, restored)
+            queueTracks = restored
+            _uiState.value = _uiState.value.copy(queue = restored, currentQueueIndex = c.currentMediaItemIndex.coerceAtLeast(0))
             remixActive = false
             _isRemixed.value = false
             originalQueue = emptyList()
             return
         }
-
-        originalQueue = current
-        val rest = current.filterNot { it.id == currentTrack.id }.shuffled()
-        val newOrder = listOf(currentTrack) + rest
-        reorderPlayerPlaylist(c, current, newOrder)
-
+        originalQueue = current.toList()
+        val currentIndex = c.currentMediaItemIndex
+        val order = listOf(currentIndex) + current.indices.filter { it != currentIndex }.shuffled()
+        val workingIndices = current.indices.toMutableList()
+        for ((target, originalIndex) in order.withIndex()) {
+            val from = workingIndices.indexOf(originalIndex)
+            if (from != target) {
+                c.moveMediaItem(from, target)
+                workingIndices.add(target, workingIndices.removeAt(from))
+            }
+        }
+        val newOrder = order.map { current[it] }
         queueTracks = newOrder
-        _uiState.value = _uiState.value.copy(queue = newOrder, shuffleEnabled = true)
+        _uiState.value = _uiState.value.copy(queue = newOrder, currentQueueIndex = c.currentMediaItemIndex.coerceAtLeast(0))
         remixActive = true
         _isRemixed.value = true
     }
 
     fun setQueueAndPlayRemixed(tracks: List<AudioTrack>, playlistName: String? = null) {
+        clearCarouselPrediction()
         val c = controller ?: return
         if (tracks.isEmpty()) return
 
@@ -836,7 +915,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val working = fromOrder.toMutableList()
         for (target in toOrder.indices) {
             val desiredId = toOrder[target].id
-            val currentPos = working.indexOfFirst { it.id == desiredId }
+            val currentPos = (target until working.size).firstOrNull { working[it].id == desiredId } ?: -1
             if (currentPos < 0 || currentPos == target) continue
             runCatching { c.moveMediaItem(currentPos, target) }
             working.add(target, working.removeAt(currentPos))
@@ -864,9 +943,41 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch { prefs.setPlayWithOthers(enabled) }
     }
 
+    fun playQueueItemAbsolute(index: Int) {
+        clearCarouselPrediction()
+        val c = controller ?: return
+        if (index in queueTracks.indices) { c.seekTo(index, 0L); c.play() }
+    }
+
+    fun removeQueueItemAbsolute(index: Int) {
+        val c = controller ?: return
+        if (index !in queueTracks.indices || index == c.currentMediaItemIndex) return
+        queueTracks = queueTracks.toMutableList().apply { removeAt(index) }
+        c.removeMediaItem(index)
+        _uiState.value = _uiState.value.copy(queue = queueTracks, currentQueueIndex = c.currentMediaItemIndex.coerceAtLeast(0))
+    }
+
+    fun clearUpcomingQueue() {
+        val c = controller ?: return
+        val next = c.currentMediaItemIndex + 1
+        if (next !in 0 until queueTracks.size) return
+        queueTracks = queueTracks.take(next)
+        c.removeMediaItems(next, c.mediaItemCount)
+        _uiState.value = _uiState.value.copy(queue = queueTracks, currentQueueIndex = c.currentMediaItemIndex.coerceAtLeast(0))
+    }
+
+    fun playQueueItemNext(index: Int) {
+        val c = controller ?: return
+        val current = c.currentMediaItemIndex
+        if (index !in queueTracks.indices || index == current || index == current + 1) return
+        val target = if (index < current) current else current + 1
+        moveQueueItem(index, target)
+        _uiState.value = _uiState.value.copy(currentQueueIndex = c.currentMediaItemIndex.coerceAtLeast(0))
+    }
+
     fun playQueueItem(index: Int) {
         val c = controller ?: return
-        val currentStart = queueTracks.indexOfFirst { it.id == _uiState.value.currentTrack?.id }.coerceAtLeast(0)
+        val currentStart = c.currentMediaItemIndex.coerceAtLeast(0)
         val actualIndex = currentStart + index
         if (actualIndex in queueTracks.indices) {
             _navigationDirection.value = actualIndex.compareTo(currentStart).let { if (it < 0) -1 else 1 }
@@ -877,7 +988,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun removeFromQueue(index: Int) {
         val c = controller ?: return
-        val currentStart = queueTracks.indexOfFirst { it.id == _uiState.value.currentTrack?.id }.coerceAtLeast(0)
+        val currentStart = c.currentMediaItemIndex.coerceAtLeast(0)
         val actualIndex = currentStart + index
         if (actualIndex in queueTracks.indices) {
             val newList = queueTracks.toMutableList().apply { removeAt(actualIndex) }
@@ -889,7 +1000,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun playNext(queueIndex: Int) {
         val c = controller ?: return
-        val currentStart = queueTracks.indexOfFirst { it.id == _uiState.value.currentTrack?.id }.coerceAtLeast(0)
+        val currentStart = c.currentMediaItemIndex.coerceAtLeast(0)
         val actualIndex = currentStart + queueIndex
         if (actualIndex in queueTracks.indices) {
             val track = queueTracks[actualIndex]
@@ -906,6 +1017,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     override fun onCleared() {
         flushListeningTime()
         finalizeStatsSession()
+        carouselConfirmationJob?.cancel()
         controller?.removeListener(playerListener)
         controllerFuture?.let { MediaController.releaseFuture(it) }
         controller = null
@@ -946,73 +1058,58 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun toggleLike(trackId: Long) {
-        viewModelScope.launch {
-            val current = _uiState.value.likedSongIds.toMutableList()
-            val newList = if (current.contains(trackId)) current.filter { it != trackId } else current + trackId
-            val json = org.json.JSONArray().apply { newList.forEach { put(it) } }.toString()
-            prefs.setLikedSongIds(json)
-        }
+        viewModelScope.launch { prefs.updateLikedTrackId(trackId, "toggle") }
     }
 
     fun isLiked(trackId: Long): Boolean = _uiState.value.likedSongIds.contains(trackId)
 
     fun addToLiked(trackId: Long) {
-        viewModelScope.launch {
-            val current = _uiState.value.likedSongIds.toMutableList()
-            if (!current.contains(trackId)) {
-                current.add(trackId)
-                val json = org.json.JSONArray().apply { current.forEach { put(it) } }.toString()
-                prefs.setLikedSongIds(json)
-            }
-        }
+        viewModelScope.launch { prefs.updateLikedTrackId(trackId, "add") }
     }
 
     fun removeFromLiked(trackId: Long) {
-        viewModelScope.launch {
-            val current = _uiState.value.likedSongIds.toMutableList()
-            if (current.contains(trackId)) {
-                current.removeAll { it == trackId }
-                val json = org.json.JSONArray().apply { current.forEach { put(it) } }.toString()
-                prefs.setLikedSongIds(json)
-            }
-        }
+        viewModelScope.launch { prefs.updateLikedTrackId(trackId, "remove") }
     }
 
     private fun extractGlowColor(track: AudioTrack?) {
         glowColorJob?.cancel()
+        _uiState.value = _uiState.value.copy(coverColorAvailable = false)
         val uri = track?.albumArtUri
         if (track == null || uri == null) {
-            _uiState.value = _uiState.value.copy(glowColorArgb = DEFAULT_GLOW_COLOR)
+            _uiState.value = _uiState.value.copy(glowColorArgb = DEFAULT_GLOW_COLOR, coverColorAvailable = false)
             return
         }
         val trackId = track.id
         glowColorJob = viewModelScope.launch {
             val color = withContext(Dispatchers.IO) {
                 runCatching {
-                    val resolver = getApplication<Application>().contentResolver
-
-                    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    resolver.openInputStream(uri)?.use { s -> BitmapFactory.decodeStream(s, null, bounds) }
-                    val (w, h) = bounds.outWidth to bounds.outHeight
-                    val targetSize = 128
-                    var sampleSize = 1
-                    if (w > 0 && h > 0) {
-                        while ((w / (sampleSize * 2)) >= targetSize && (h / (sampleSize * 2)) >= targetSize) {
-                            sampleSize *= 2
-                        }
+                    val app = getApplication<Application>()
+                    val resolver = app.contentResolver
+                    val bitmap = if (ImagePersistence.isMp4(app, uri)) {
+                        val retriever = MediaMetadataRetriever()
+                        try {
+                            retriever.setDataSource(app, uri)
+                            if (android.os.Build.VERSION.SDK_INT >= 27)
+                                retriever.getScaledFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 128, 128)
+                            else retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        } finally { retriever.release() }
+                    } else {
+                        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+                        var sampleSize = 1
+                        while (bounds.outWidth / (sampleSize * 2) >= 128 && bounds.outHeight / (sampleSize * 2) >= 128) sampleSize *= 2
+                        val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+                        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
                     }
-                    val decodeOptions = android.graphics.BitmapFactory.Options().apply { inSampleSize = sampleSize }
-                    resolver.openInputStream(uri)?.use { stream ->
-                        val bmp = BitmapFactory.decodeStream(stream, null, decodeOptions) ?: return@use null
-                        val palette = Palette.from(bmp).generate()
-                        val swatch = palette.vibrantSwatch ?: palette.dominantSwatch
-                        swatch?.rgb
-                    }
+                    if (bitmap == null) null else try {
+                        val palette = Palette.from(bitmap).generate()
+                        (palette.vibrantSwatch ?: palette.dominantSwatch)?.rgb
+                    } finally { bitmap.recycle() }
                 }.getOrNull()
             }
             val current = _uiState.value.currentTrack
             if (current != null && current.id == trackId && current.albumArtUri == uri) {
-                _uiState.value = _uiState.value.copy(glowColorArgb = color ?: DEFAULT_GLOW_COLOR)
+                _uiState.value = _uiState.value.copy(glowColorArgb = color ?: DEFAULT_GLOW_COLOR, coverColorAvailable = color != null)
             }
         }
     }
@@ -1219,7 +1316,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val synced = mutableListOf<SyncedLyricLine>()
         val plain = mutableListOf<String>()
 
-        content.lineSequence().forEach { sourceLine ->
+        val text = content.trimStart().removePrefix("\uFEFF").trimStart()
+        val looksLikeTtml = text.startsWith("<?xml", ignoreCase = true) ||
+            Regex("^<(?:[A-Za-z0-9_-]+:)?tt(?:\\s|>)", RegexOption.IGNORE_CASE).containsMatchIn(text)
+        val input = if (looksLikeTtml) TtmlLyricsParser.parseToEnhancedLrc(text)
+            ?: return LyricsDocument(content, emptyList(), emptyList()) else content
+        input.lineSequence().forEach { sourceLine ->
             val tags = timestampRegex.findAll(sourceLine).toList()
             if (tags.isNotEmpty()) {
                 val body = sourceLine
@@ -1242,9 +1344,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
 
+        // Pixel-compatible LRC: two consecutive lines with the same timestamp mean
+        // original + translation. Distinct duet voice markers are not translations.
         val sortedSynced = synced.sortedBy { it.timeMs }
-        val lines = if (sortedSynced.isNotEmpty()) sortedSynced.map { it.text } else plain
-        return LyricsDocument(content, lines, sortedSynced)
+        val paired = mutableListOf<SyncedLyricLine>()
+        var i = 0
+        val voiceTag = Regex("^v(\\d+):", RegexOption.IGNORE_CASE)
+        while (i < sortedSynced.size) {
+            val current = sortedSynced[i]
+            val next = sortedSynced.getOrNull(i + 1)
+            val currentVoice = voiceTag.find(current.text)?.groupValues?.get(1)
+            val nextVoice = next?.let { voiceTag.find(it.text)?.groupValues?.get(1) }
+            if (next != null && current.timeMs == next.timeMs &&
+                (nextVoice == null || nextVoice == currentVoice)) {
+                paired += current.copy(translation = next.text)
+                i += 2
+            } else {
+                paired += current
+                i++
+            }
+        }
+        val lines = if (paired.isNotEmpty()) paired.map { it.text } else plain
+        return LyricsDocument(content, lines, paired)
     }
 
     /** Milliseconds of a `mm:ss(.xxx)` match whose groups 1..3 are minutes, seconds and fraction. */
@@ -1651,6 +1772,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // colours every word/character exactly while it is sung, like QQ Music does.
             val karaoke = candidate.songId?.let { id -> runCatching { QqQrc.download(id) }.getOrNull() }
                 ?.takeUnless { qrc -> QQ_INSTRUMENTAL_MARKERS.any { qrc.contains(it) } }
+            val translated = json.optString("trans").takeIf {
+                it.isNotBlank() && !it.equals("null", true) && !it.equals("无", true)
+            }?.let { decodeQqLyricText(it).replace("\r", "").trim() }
             if (karaoke != null) {
                 return LyricsSearchResult(
                     id = candidate.songId,
@@ -1660,7 +1784,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     durationSeconds = candidate.durationSeconds,
                     instrumental = false,
                     plainLyrics = null,
-                    syncedLyrics = karaoke,
+                    syncedLyrics = mergeQqTranslations(karaoke, translated),
                     source = "QQ Music",
                     sourceId = candidate.songMid,
                 )
@@ -1673,13 +1797,34 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 durationSeconds = candidate.durationSeconds,
                 instrumental = false,
                 plainLyrics = decodedLyrics.takeUnless { hasTimestamps },
-                syncedLyrics = decodedLyrics.takeIf { hasTimestamps },
+                syncedLyrics = decodedLyrics.takeIf { hasTimestamps }?.let { mergeQqTranslations(it, translated) },
                 source = "QQ Music",
                 sourceId = candidate.songMid,
             )
         } finally {
             connection.disconnect()
         }
+    }
+
+    /** QQ exposes a separately timed translation; match each line once, without altering karaoke timing. */
+    private fun mergeQqTranslations(original: String, translated: String?): String {
+        if (translated.isNullOrBlank()) return original
+        val main = parseLyricsDocument(original).syncedLines
+        val translations = parseLyricsDocument(translated).syncedLines
+        if (main.isEmpty() || translations.isEmpty()) return original
+        val used = mutableSetOf<Int>()
+        val additions = buildList {
+            for (line in translations) {
+                val index = main.indices.filter { it !in used && main[it].translation == null }
+                    .minByOrNull { kotlin.math.abs(main[it].timeMs - line.timeMs) } ?: continue
+                if (kotlin.math.abs(main[index].timeMs - line.timeMs) > 800L) continue
+                used.add(index)
+                val ms = main[index].timeMs.coerceAtLeast(0L)
+                val time = "%02d:%02d.%03d".format(java.util.Locale.US, ms / 60_000L, (ms / 1_000L) % 60L, ms % 1_000L)
+                add("[$time]${line.text.replace('\n', ' ')}")
+            }
+        }
+        return if (additions.isEmpty()) original else original.trimEnd() + "\n" + additions.joinToString("\n")
     }
 
     /**
@@ -1730,11 +1875,31 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun addTrackToQueue(track: AudioTrack) {
+    /** Append a batch in display order, independent of the active remix insertion policy. */
+    fun appendTracksToQueue(tracks: List<AudioTrack>) {
+        if (tracks.isEmpty()) return
+        val c = controller ?: return
+        val mediaItems = tracks.map { track ->
+            MediaItem.Builder().setMediaId(track.id.toString()).setUri(track.uri)
+                .setMediaMetadata(MediaMetadata.Builder().setTitle(track.title).setArtist(track.artist)
+                    .setAlbumTitle(track.album).setArtworkUri(track.albumArtUri).build()).build()
+        }
+        c.addMediaItems(mediaItems)
+        queueTracks = queueTracks + tracks
+        _uiState.value = _uiState.value.copy(queue = queueTracks)
+    }
+
+    fun addTrackToQueue(track: AudioTrack) = insertTrackInQueue(track, playNext = false)
+
+    fun addTrackToPlayNext(track: AudioTrack) = insertTrackInQueue(track, playNext = true)
+
+    private fun insertTrackInQueue(track: AudioTrack, playNext: Boolean) {
         val c = controller ?: return
         val current = _uiState.value
         val currentIdx = queueTracks.indexOfFirst { it.id == current.currentTrack?.id }.coerceAtLeast(0)
-        val insertIdx = if (remixActive) {
+        val insertIdx = if (playNext) {
+            (currentIdx + 1).coerceAtMost(queueTracks.size)
+        } else if (remixActive) {
             val remaining = queueTracks.size - currentIdx - 1
             if (remaining > 0) currentIdx + 1 + (0 until remaining).random()
             else queueTracks.size

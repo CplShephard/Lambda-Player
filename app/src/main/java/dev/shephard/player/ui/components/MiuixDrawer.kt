@@ -61,7 +61,6 @@ fun MiuixDrawer(
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
     val currentOnDismissRequest by rememberUpdatedState(onDismissRequest)
-
     WindowBottomSheet(
         show = visible,
         modifier = modifier,

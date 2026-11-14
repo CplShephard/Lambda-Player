@@ -24,16 +24,9 @@ sealed class Destination(
         unselectedIcon = Icons.Outlined.Home
     )
 
-    data object Music : Destination(
-        route = "music",
-        label = "Music",
-        selectedIcon = Icons.Filled.MusicNote,
-        unselectedIcon = Icons.Outlined.MusicNote
-    )
-
-    data object Playlists : Destination(
-        route = "playlists",
-        label = "Playlists",
+    data object Library : Destination(
+        route = "library",
+        label = "Library",
         selectedIcon = Icons.Filled.LibraryMusic,
         unselectedIcon = Icons.Outlined.LibraryMusic
     )
@@ -48,7 +41,6 @@ sealed class Destination(
 
 val bottomNavDestinations = listOf(
     Destination.Home,
-    Destination.Music,
-    Destination.Playlists,
+    Destination.Library,
     Destination.Settings
 )

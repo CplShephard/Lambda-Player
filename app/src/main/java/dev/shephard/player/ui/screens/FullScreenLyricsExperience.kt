@@ -10,6 +10,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
@@ -18,7 +20,6 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.ui.res.painterResource
 import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.components.BouncyIconButton
 import dev.shephard.player.ui.components.MinimalSeekBar
@@ -44,6 +45,8 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,6 +56,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -75,11 +79,14 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Lyrics
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -164,6 +171,7 @@ fun FullScreenLyricsExperience(
     val blurEnabled by preferences.lyricsBackgroundBlurEnabled.collectAsState(initial = true)
     val savedBlurStrength by preferences.lyricsBackgroundBlurStrength.collectAsState(initial = 36f)
     val autoScroll by preferences.lyricsAutoScrollEnabled.collectAsState(initial = true)
+    val showTranslation by preferences.lyricsTranslationVisible.collectAsState(initial = true)
     val scope = rememberCoroutineScope()
     val lyricsListState = rememberLazyListState()
     val density = LocalDensity.current
@@ -187,6 +195,7 @@ fun FullScreenLyricsExperience(
 
     var showSearch by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var showOptions by remember { mutableStateOf(false) }
     var isEditing by remember { mutableStateOf(false) }
     var editText by remember { mutableStateOf("") }
     var searchQuery by remember(track?.id) {
@@ -213,11 +222,10 @@ fun FullScreenLyricsExperience(
         (progress.positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
     } else 0f
 
-    // Plain LRC for the editor (word tags would be noise there). Saving an unchanged text is
-    // skipped so opening the editor never throws away word-by-word timings.
+    // Keep word timings and same-timestamp translations when editing or exporting lyrics.
     val editSource = remember(state.lyrics, synced) {
         if (synced.isNotEmpty()) {
-            synced.joinToString("\n") { line -> "[${formatLrcTime(line.timeMs)}]${line.text}" }
+            synced.joinToString("\n") { line -> line.toLrcLine() }
         } else state.lyrics.joinToString("\n")
     }
     LaunchedEffect(track?.id, editSource, isEditing) {
@@ -309,16 +317,28 @@ fun FullScreenLyricsExperience(
     }
 
     val backProgress = remember { Animatable(0f) }
+    val openProgress = remember { Animatable(0f) }
+    var closing by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { openProgress.animateTo(1f, spring(dampingRatio = 0.78f, stiffness = 300f)) }
+    val closeAnimated: () -> Unit = {
+        if (!closing) {
+            closing = true
+            scope.launch {
+                openProgress.animateTo(0f, tween(220, easing = FastOutSlowInEasing))
+                onDismiss()
+            }
+        }
+    }
     var backEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
     if (useClassicPredictiveBack) {
-        PredictiveBackHandler(enabled = true) { events ->
+        PredictiveBackHandler(enabled = !showOptions && !closing) { events ->
             try {
                 events.collect { event ->
                     backEdge = event.swipeEdge
                     backProgress.snapTo(event.progress.coerceIn(0f, 1f))
                 }
                 if (backProgress.value < 1f) backProgress.animateTo(1f, tween(150))
-                onDismiss()
+                closeAnimated()
             } catch (cancelled: CancellationException) {
                 backProgress.animateTo(0f, spring(dampingRatio = 0.82f, stiffness = 380f))
                 throw cancelled
@@ -331,12 +351,18 @@ fun FullScreenLyricsExperience(
     // The content already applies statusBarsPadding()/navigationBarsPadding(), so the header
     // is laid out in the status bar's inset area instead of starting below it.
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = closeAnimated,
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             decorFitsSystemWindows = false,
         ),
     ) {
+        // Let the Compose scale/slide transition own the opening and closing, rather than
+        // layering the platform Dialog fade over it.
+        val dialogView = androidx.compose.ui.platform.LocalView.current
+        androidx.compose.runtime.SideEffect {
+            (dialogView.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window?.setWindowAnimations(0)
+        }
         CompositionLocalProvider(LocalLyricsForeground provides lyricsForeground) {
             Box(
                 modifier = Modifier
@@ -346,11 +372,13 @@ fun FullScreenLyricsExperience(
                         val p = backProgress.value.coerceIn(0f, 1f)
                         val direction = if (backEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
                         translationX = size.width * 0.12f * p * direction
-                        scaleX = 1f - 0.035f * p
-                        scaleY = 1f - 0.035f * p
+                        val entrance = openProgress.value.coerceIn(0f, 1f)
+                        translationY = (1f - entrance) * 24.dp.toPx()
+                        scaleX = (1f - 0.035f * p) * (0.965f + 0.035f * entrance)
+                        scaleY = (1f - 0.035f * p) * (0.965f + 0.035f * entrance)
                         alpha = 1f - 0.12f * p
-                        shape = RoundedCornerShape(deviceCornerRadius * p)
-                        clip = p > 0.001f
+                        shape = RoundedCornerShape(deviceCornerRadius * maxOf(p, 1f - entrance))
+                        clip = p > 0.001f || entrance < 0.999f
                     }
             ) {
                 if (useMiuix) {
@@ -405,46 +433,66 @@ fun FullScreenLyricsExperience(
                 subtitle = track?.let { "${it.title} · ${it.artist}" }.orEmpty(),
                 titleStyle = titleStyle,
                 bodyStyle = textStyle,
-                primary = primary,
-                onClose = onDismiss,
-                onSearch = {
-                    showSettings = false
-                    showSearch = !showSearch
-                },
-                onImport = { importLauncher.launch(arrayOf("text/*", "application/octet-stream", "application/x-lrc")) },
-                onEdit = {
-                    if (isEditing) {
-                        if (editText != editSource) playerViewModel.setManualLyricsText(editText)
-                        isEditing = false
-                    } else {
-                        showSearch = false
-                        isEditing = true
-                    }
-                },
-                isEditing = isEditing,
-                onSettings = { showSettings = !showSettings; showSearch = false },
+                onClose = closeAnimated,
+                onOptions = { showOptions = true },
+                onSaveEdit = if (isEditing) ({
+                    if (editText != editSource) playerViewModel.setManualLyricsText(editText)
+                    isEditing = false
+                }) else null,
+                strings = strings,
             )
 
-            if (showSettings) {
-                LyricsSettingsPanel(
+            if (showOptions) {
+                LyricsOptionsDrawer(
                     useMiuix = useMiuix,
-                    primary = primary,
-                    textStyle = textStyle,
-                    blurEnabled = blurEnabled,
-                    blurStrength = blurStrength,
-                    autoScroll = autoScroll,
-                    syncOffsetMs = syncOffsetMs,
-                    onBlurEnabledChange = { enabled -> scope.launch { preferences.setLyricsBackgroundBlurEnabled(enabled) } },
-                    onBlurStrengthChange = { blurStrength = it },
-                    onBlurStrengthChangeFinished = { scope.launch { preferences.setLyricsBackgroundBlurStrength(blurStrength) } },
-                    onAutoScrollChange = { enabled -> scope.launch { preferences.setLyricsAutoScrollEnabled(enabled) } },
-                    onOffsetChange = playerViewModel::setLyricsSyncOffset,
+                    strings = strings,
+                    isEditing = isEditing,
+                    showSettings = showSettings,
+                    onDismiss = { showOptions = false },
+                    onSearch = { showOptions = false; showSettings = false; showSearch = true },
+                    onImport = { showOptions = false; importLauncher.launch(arrayOf("text/*", "application/octet-stream", "application/x-lrc", "application/ttml+xml", "application/xml")) },
+                    onEdit = {
+                        showOptions = false; showSearch = false
+                        if (isEditing) { if (editText != editSource) playerViewModel.setManualLyricsText(editText); isEditing = false }
+                        else isEditing = true
+                    },
+                    onCopy = {
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        val copied = if (synced.isNotEmpty()) synced.joinToString("\n") { line ->
+                            line.text + if (showTranslation && !line.translation.isNullOrBlank()) "\n${line.translation}" else ""
+                        } else state.lyrics.joinToString("\n")
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText(strings.lyrics, copied))
+                        android.widget.Toast.makeText(context, strings.lyricsCopied, android.widget.Toast.LENGTH_SHORT).show()
+                        showOptions = false
+                    },
                     onExport = {
+                        showOptions = false
                         val safeTitle = track?.title?.replace(Regex("[^A-Za-z0-9._ -]"), "_")?.ifBlank { "lyrics" } ?: "lyrics"
                         exportLauncher.launch("$safeTitle.lrc")
                     },
-                    exportEnabled = exportText.isNotBlank(),
-                    strings = strings,
+                    hasLyrics = exportText.isNotBlank(),
+                    hasTranslation = synced.any { !it.translation.isNullOrBlank() },
+                    showTranslation = showTranslation,
+                    onToggleTranslation = { scope.launch { preferences.setLyricsTranslationVisible(!showTranslation) } },
+                    onSettings = { showSettings = !showSettings },
+                    settingsContent = {
+                        LyricsSettingsPanel(
+                            useMiuix = useMiuix, primary = primary, textStyle = textStyle,
+                            blurEnabled = blurEnabled, blurStrength = blurStrength, autoScroll = autoScroll,
+                            syncOffsetMs = syncOffsetMs,
+                            onBlurEnabledChange = { enabled -> scope.launch { preferences.setLyricsBackgroundBlurEnabled(enabled) } },
+                            onBlurStrengthChange = { blurStrength = it },
+                            onBlurStrengthChangeFinished = { scope.launch { preferences.setLyricsBackgroundBlurStrength(blurStrength) } },
+                            onAutoScrollChange = { enabled -> scope.launch { preferences.setLyricsAutoScrollEnabled(enabled) } },
+                            onOffsetChange = playerViewModel::setLyricsSyncOffset,
+                            onExport = {
+                                showOptions = false
+                                val safeTitle = track?.title?.replace(Regex("[^A-Za-z0-9._ -]"), "_")?.ifBlank { "lyrics" } ?: "lyrics"
+                                exportLauncher.launch("$safeTitle.lrc")
+                            },
+                            exportEnabled = exportText.isNotBlank(), strings = strings,
+                        )
+                    },
                 )
             }
 
@@ -563,35 +611,43 @@ fun FullScreenLyricsExperience(
                                     label = "lyricLineColor",
                                 )
                                 var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
-                                BasicText(
-                                    text = line.text,
-                                    onTextLayout = { textLayout = it },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
+                                Column(
+                                    modifier = Modifier.fillMaxWidth()
                                         .clip(RoundedCornerShape(18.dp))
                                         .clickable { playerViewModel.seekTo((line.timeMs + syncOffsetMs).coerceAtLeast(0)) }
                                         .graphicsLayer {
                                             val scale = LyricInactiveScale + (1f - LyricInactiveScale) * activeAmount
                                             scaleX = scale
                                             scaleY = scale
+                                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
                                         }
                                         .blur(animatedBlur)
-                                        .padding(horizontal = LyricLineHorizontalPadding, vertical = LyricLineVerticalPadding)
-                                        .drawWithContent {
+                                        .padding(horizontal = LyricLineHorizontalPadding, vertical = LyricLineVerticalPadding),
+                                ) {
+                                    BasicText(
+                                        text = line.text,
+                                        onTextLayout = { textLayout = it },
+                                        modifier = Modifier.fillMaxWidth().drawWithContent {
                                             drawContent()
-                                            if (karaoke) {
-                                                textLayout?.let { layout ->
-                                                    drawKaraokeHighlight(
-                                                        layout = layout,
-                                                        line = line,
-                                                        positionMs = smoothPositionMs.longValue - syncOffsetMs,
-                                                        color = foreground,
-                                                    )
-                                                }
+                                            if (karaoke) textLayout?.let { layout ->
+                                                drawKaraokeHighlight(
+                                                    layout = layout, line = line,
+                                                    positionMs = smoothPositionMs.longValue - syncOffsetMs,
+                                                    color = foreground,
+                                                )
                                             }
                                         },
-                                    style = lyricLineLayoutStyle(textStyle).copy(color = animatedColor),
-                                )
+                                        style = lyricLineLayoutStyle(textStyle).copy(color = animatedColor),
+                                    )
+                                    if (showTranslation && !line.translation.isNullOrBlank()) {
+                                        BasicText(
+                                            text = line.translation,
+                                            modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
+                                            style = textStyle.copy(color = animatedColor.copy(alpha = animatedColor.alpha * .78f),
+                                                fontSize = 16.sp, lineHeight = 22.sp, textAlign = TextAlign.Left),
+                                        )
+                                    }
+                                }
                             }
                         } else {
                             itemsIndexed(state.lyrics, key = { index, line -> "plain_${index}_$line" }) { _, line ->
@@ -602,7 +658,7 @@ fun FullScreenLyricsExperience(
                                         color = LocalLyricsForeground.current.copy(alpha = 0.86f),
                                         fontSize = 19.sp,
                                         lineHeight = 28.sp,
-                                        textAlign = TextAlign.Center,
+                                        textAlign = TextAlign.Left,
                                     ),
                                 )
                             }
@@ -650,29 +706,69 @@ private fun LyricsHeader(
     subtitle: String,
     titleStyle: TextStyle,
     bodyStyle: TextStyle,
-    primary: Color,
     onClose: () -> Unit,
+    onOptions: () -> Unit,
+    onSaveEdit: (() -> Unit)?,
+    strings: dev.shephard.player.ui.i18n.Strings,
+) {
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        LyricsIconButton(Icons.AutoMirrored.Filled.ArrowBack, strings.cancel, onClose)
+        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            BasicText(title, style = titleStyle.copy(color = LocalLyricsForeground.current, fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            BasicText(subtitle, style = bodyStyle.copy(color = LocalLyricsForeground.current.copy(alpha = .7f), fontSize = 11.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (onSaveEdit != null) LyricsIconButton(Icons.Filled.Check, strings.lyricsSave, onSaveEdit)
+        LyricsIconButton(Icons.Filled.MoreVert, strings.lyricsOptions, onOptions)
+    }
+}
+
+@Composable
+private fun LyricsOptionsDrawer(
+    useMiuix: Boolean,
+    strings: dev.shephard.player.ui.i18n.Strings,
+    isEditing: Boolean,
+    showSettings: Boolean,
+    hasLyrics: Boolean,
+    hasTranslation: Boolean,
+    showTranslation: Boolean,
+    onToggleTranslation: () -> Unit,
+    onDismiss: () -> Unit,
     onSearch: () -> Unit,
     onImport: () -> Unit,
     onEdit: () -> Unit,
-    isEditing: Boolean,
+    onCopy: () -> Unit,
+    onExport: () -> Unit,
     onSettings: () -> Unit,
+    settingsContent: @Composable () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        LyricsIconButton(Icons.AutoMirrored.Filled.ArrowBack, title, onClose)
-        Column(modifier = Modifier.weight(1f).padding(start = 4.dp, end = 4.dp)) {
-            BasicText(title, style = titleStyle.copy(color = LocalLyricsForeground.current, fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            BasicText(subtitle, style = bodyStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.70f), fontSize = 11.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    val fg = if (useMiuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
+    val accent = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
+    val content: @Composable () -> Unit = {
+        CompositionLocalProvider(LocalLyricsForeground provides fg) {
+            Column(Modifier.fillMaxWidth().heightIn(max = 620.dp).verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 12.dp)) {
+                BasicText(strings.lyricsOptions, style = MaterialTheme.typography.titleLarge.copy(color = fg, fontWeight = FontWeight.Bold), modifier = Modifier.padding(bottom = 12.dp))
+                @Composable fun Action(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean = true, action: () -> Unit) {
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(fg.copy(alpha = .06f))
+                        .clickable(enabled = enabled, onClick = action).padding(horizontal = 14.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(icon, null, tint = if (enabled) accent else fg.copy(alpha = .3f))
+                        Spacer(Modifier.width(14.dp))
+                        BasicText(label, style = MaterialTheme.typography.bodyLarge.copy(color = if (enabled) fg else fg.copy(alpha = .3f)))
+                    }
+                    Spacer(Modifier.height(4.dp))
+                }
+                Action(Icons.Filled.Search, strings.search, action = onSearch)
+                Action(Icons.Filled.FolderOpen, strings.lyricsImport, action = onImport)
+                Action(if (isEditing) Icons.Filled.Check else Icons.Filled.Edit, if (isEditing) strings.lyricsSave else strings.lyricsEdit, action = onEdit)
+                if (hasTranslation) Action(Icons.Filled.Translate, if (showTranslation) strings.lyricsHideTranslation else strings.lyricsShowTranslation, action = onToggleTranslation)
+                Action(Icons.Filled.ContentCopy, strings.lyricsCopy, hasLyrics, onCopy)
+                Action(Icons.Filled.FileDownload, strings.lyricsExport, hasLyrics, onExport)
+                Action(Icons.Filled.Tune, strings.lyricsSettingsTitle, action = onSettings)
+                if (showSettings) { Spacer(Modifier.height(8.dp)); settingsContent() }
+            }
         }
-        LyricsIconButton(Icons.Filled.Search, "Search lyrics", onSearch)
-        LyricsIconButton(Icons.Filled.FolderOpen, "Import lyrics", onImport)
-        LyricsIconButton(if (isEditing) Icons.Filled.Check else Icons.Filled.Edit, if (isEditing) "Save lyrics" else "Edit lyrics", onEdit, selected = isEditing, primary = primary)
-        LyricsIconButton(Icons.Filled.Tune, "Lyrics settings", onSettings, selected = false, primary = primary)
     }
+    if (useMiuix) dev.shephard.player.ui.components.MiuixDrawer(onDismissRequest = onDismiss, content = content)
+    else dev.shephard.player.ui.components.M3BottomSheetWrapper(onDismissRequest = onDismiss, content = content)
 }
 
 @Composable
@@ -1106,7 +1202,7 @@ private fun LyricsMiuixTransport(
         )
         BouncyIconButton(
             onClick = onPrevious,
-            painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_rewind),
+            icon = Icons.Filled.FastRewind,
             contentDescription = strings.previous,
             tint = Color.White,
             iconSize = 36.dp,
@@ -1136,9 +1232,7 @@ private fun LyricsMiuixTransport(
                 label = "lyricsMiuixPlayPause",
             ) { playing ->
                 Icon(
-                    painter = painterResource(
-                        id = if (playing) dev.shephard.player.R.drawable.ic_nowplaying_pause else dev.shephard.player.R.drawable.ic_nowplaying_play,
-                    ),
+                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = if (playing) strings.pause else strings.play,
                     tint = Color.White,
                     modifier = Modifier.size(40.dp),
@@ -1147,7 +1241,7 @@ private fun LyricsMiuixTransport(
         }
         BouncyIconButton(
             onClick = onNext,
-            painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_fforward),
+            icon = Icons.Filled.FastForward,
             contentDescription = strings.next,
             tint = Color.White,
             iconSize = 36.dp,
@@ -1293,7 +1387,7 @@ private fun lyricLineLayoutStyle(base: TextStyle): TextStyle = base.copy(
     fontSize = 23.sp,
     lineHeight = 31.sp,
     fontWeight = FontWeight.Bold,
-    textAlign = TextAlign.Center,
+    textAlign = TextAlign.Left,
 )
 
 /**
@@ -1374,15 +1468,20 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawKaraokeHighligh
 
 /** `[mm:ss.xx]text`, or enhanced LRC (`[t]<t1>word<t2>word<end>`) for word-synced lines. */
 private fun SyncedLyricLine.toLrcLine(): String {
-    if (words.isEmpty()) return "[${formatLrcTime(timeMs)}]$text"
     val builder = StringBuilder("[${formatLrcTime(timeMs)}]")
-    builder.append(text, 0, words.first().startChar)
-    words.forEachIndexed { index, word ->
-        builder.append('<').append(formatLrcTime(word.startMs)).append('>')
-        val next = words.getOrNull(index + 1)?.startChar ?: text.length
-        builder.append(text, word.startChar, next.coerceAtLeast(word.startChar))
+    if (words.isEmpty()) builder.append(text)
+    else {
+        builder.append(text, 0, words.first().startChar)
+        words.forEachIndexed { index, word ->
+            builder.append('<').append(formatLrcTime(word.startMs)).append('>')
+            val next = words.getOrNull(index + 1)?.startChar ?: text.length
+            builder.append(text, word.startChar, next.coerceAtLeast(word.startChar))
+        }
+        builder.append('<').append(formatLrcTime(words.last().endMs)).append('>')
     }
-    builder.append('<').append(formatLrcTime(words.last().endMs)).append('>')
+    translation?.takeIf { it.isNotBlank() }?.let {
+        builder.append('\n').append('[').append(formatLrcTime(timeMs)).append(']').append(it.replace('\n', ' '))
+    }
     return builder.toString()
 }
 

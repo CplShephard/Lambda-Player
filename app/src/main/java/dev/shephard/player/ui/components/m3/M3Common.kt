@@ -10,6 +10,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,6 +52,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
@@ -73,37 +78,47 @@ fun m3TopBarColors(): TopAppBarColors {
     )
 }
 
-/**
- * Small Material 3 top bar used by every M3 page. Mirrors InstallerX Revived's small top bars:
- * - 12dp extra start inset so the title/back button sit like InstallerX,
- * - a back/navigation button (when [navigationIcon] is provided) followed by a 16dp gap,
- * - trailing [actions] rendered as plain icon buttons inside the bar,
- * - the solid [m3TopBarColors] container.
- */
+/** One title moves and scales as the page header collapses. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun M3SmallTopBar(
     title: @Composable () -> Unit,
+    state: ExpressiveTopBarState,
     modifier: Modifier = Modifier,
     navigationIcon: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
     colors: TopAppBarColors = m3TopBarColors(),
 ) {
-    TopAppBar(
-        modifier = modifier,
-        windowInsets = TopAppBarDefaults.windowInsets.add(WindowInsets(left = 12.dp)),
-        title = title,
-        navigationIcon = {
-            if (navigationIcon != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    navigationIcon()
-                    Spacer(modifier = Modifier.size(16.dp))
-                }
+    val fraction = state.fraction
+    val titleStart = androidx.compose.ui.unit.lerp(20.dp, if (navigationIcon != null) 80.dp else 20.dp, fraction)
+    val height = androidx.compose.ui.unit.lerp(152.dp, 64.dp, fraction)
+    Box(
+        modifier = modifier.fillMaxWidth().background(colors.containerColor)
+            .statusBarsPadding().height(height)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize()
+                .padding(start = titleStart, end = androidx.compose.ui.unit.lerp(24.dp, 64.dp, fraction)),
+            contentAlignment = androidx.compose.ui.BiasAlignment(-1f, 1f - 2f * fraction)
+        ) {
+            Box(modifier = Modifier.height(64.dp), contentAlignment = Alignment.CenterStart) {
+                androidx.compose.material3.ProvideTextStyle(
+                    MaterialTheme.typography.titleLarge.copy(
+                        fontSize = androidx.compose.ui.unit.lerp(30.sp, 22.sp, fraction),
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    )
+                ) { title() }
             }
-        },
-        actions = actions,
-        colors = colors,
-    )
+        }
+        if (navigationIcon != null) {
+            Box(Modifier.align(Alignment.TopStart).padding(start = 12.dp).height(64.dp), contentAlignment = Alignment.Center) {
+                navigationIcon()
+            }
+        }
+        Row(modifier = Modifier.align(Alignment.TopEnd).height(64.dp), verticalAlignment = Alignment.CenterVertically) {
+            actions()
+        }
+    }
 }
 
 /**
@@ -142,7 +157,7 @@ fun rememberCoverPicker(onCover: (Uri) -> Unit): () -> Unit {
     }
 
     fun launchCrop(source: Uri) {
-        if (context.contentResolver.getType(source) == "image/gif") {
+        if (dev.shephard.player.player.ImagePersistence.isAnimatedCover(context, source)) {
             persistAsIs(source)
             return
         }
@@ -190,7 +205,7 @@ fun rememberCoverPicker(onCover: (Uri) -> Unit): () -> Unit {
         }
     }
 
-    return remember(picker) { { picker.launch(arrayOf("image/*")) } }
+    return remember(picker) { { picker.launch(arrayOf("image/*", "video/mp4")) } }
 }
 
 /**
@@ -239,6 +254,7 @@ fun M3CoverEditor(
             if (model == null || !loaded) {
                 Icon(placeholderIcon, null, tint = cs.onSecondaryContainer, modifier = Modifier.size(48.dp))
             }
+            dev.shephard.player.ui.components.SilentVideoCover(model, Modifier.matchParentSize())
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)

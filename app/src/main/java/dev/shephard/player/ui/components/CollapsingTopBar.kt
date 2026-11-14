@@ -6,6 +6,8 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
@@ -17,6 +19,10 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
@@ -68,19 +74,46 @@ class CollapsingTopBarState(
 fun Modifier.captureForTopBarBlur(state: CollapsingTopBarState): Modifier =
     state.pageBackdrop?.let { this.then(Modifier.layerBackdrop(it)) } ?: this
 
-/** Draw the glass behind the bar, and fade only that background with collapse. */
+/** Translucent dark scrim; when available the captured page is blurred underneath. */
 @Composable
 private fun BoxScope.TopBarBlurBackground(
     state: CollapsingTopBarState,
     collapseFraction: Float,
 ) {
-    val backdrop = state.pageBackdrop ?: return
     Box(
-        modifier = Modifier
-            .matchParentSize()
+        modifier = Modifier.fillMaxWidth().height(56.dp).align(Alignment.TopCenter)
             .graphicsLayer { alpha = collapseFraction.coerceIn(0f, 1f) }
-            .miuixTopBarBlur(backdrop = backdrop)
+            .then(
+                if (state.pageBackdrop != null)
+                    Modifier.miuixTopBarBlur(state.pageBackdrop, tintAlpha = 0.48f, tintColor = Color.Black)
+                else Modifier.background(Color.Black.copy(alpha = 0.48f))
+            )
     )
+}
+
+/** Single title moves from the large left title to the centered small title. */
+@Composable
+private fun BoxScope.MovingMiuixTitle(title: String, fraction: Float) {
+    val f = fraction.coerceIn(0f, 1f)
+    Box(
+        modifier = Modifier.matchParentSize().padding(horizontal = 20.dp),
+        contentAlignment = BiasAlignment(-1f + f, 1f - 2f * f),
+    ) {
+        Box(modifier = Modifier.height(56.dp).fillMaxWidth(),
+            contentAlignment = BiasAlignment(-1f + f, 0f)) {
+            Text(
+                text = title,
+                style = MiuixAppTheme.typography.headlineSmall.copy(
+                    fontSize = androidx.compose.ui.unit.lerp(28.sp, 18.sp, f),
+                    fontWeight = FontWeight.Bold,
+                ),
+                color = MiuixAppTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 48.dp * f),
+            )
+        }
+    }
 }
 
 @Composable
@@ -129,24 +162,20 @@ fun MiuixTopBar(
     modifier: Modifier = Modifier,
     subtitle: String = "",
 ) {
-    val cs = MiuixAppTheme.colorScheme
-    val collapseFraction = state.collapseFraction
+    val fraction = state.collapseFraction
     Box(modifier = modifier.fillMaxWidth()) {
-        TopBarBlurBackground(state, collapseFraction)
         TopAppBar(
             title = title,
             largeTitle = title,
-            largeTitleColor = MiuixAppTheme.colorScheme.onBackground,
-            titleColor = MiuixAppTheme.colorScheme.onBackground.copy(alpha = collapseFraction),
+            titleColor = Color.Transparent,
+            largeTitleColor = Color.Transparent,
             subtitle = subtitle,
-            subtitleColor = cs.onSurfaceVariant,
-            color = if (state.pageBackdrop != null)
-                androidx.compose.ui.graphics.Color.Transparent
-            else
-                cs.background.copy(alpha = collapseFraction),
+            color = Color.Transparent,
             scrollBehavior = state.scrollBehavior,
             defaultWindowInsetsPadding = false,
         )
+        TopBarBlurBackground(state, fraction)
+        MovingMiuixTitle(title, fraction)
     }
 }
 
@@ -192,37 +221,37 @@ fun SubmenuTopBar(
     state: CollapsingTopBarState,
     collapseFraction: Float,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val cs = MiuixAppTheme.colorScheme
-    val fraction = collapseFraction.coerceIn(0f, 1f)
+    val fraction = if (compact) collapseFraction.coerceIn(0f, 1f) else state.collapseFraction
+    val backIcon: @Composable () -> Unit = {
+        Box(
+            modifier = Modifier.padding(start = 12.dp).size(40.dp).clip(CircleShape)
+                .background(cs.surfaceVariant.copy(alpha = 0.75f)).bounceClick { onBack() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = LocalStrings.current.backContentDescription, tint = cs.onBackground)
+        }
+    }
     Box(modifier = modifier.fillMaxWidth()) {
-        TopBarBlurBackground(state, fraction)
-        SmallTopAppBar(
-            title = title,
-            color = if (state.pageBackdrop != null)
-                androidx.compose.ui.graphics.Color.Transparent
-            else
-                cs.background.copy(alpha = fraction),
-            titleColor = cs.onBackground.copy(alpha = fraction),
-            scrollBehavior = state.scrollBehavior,
-            defaultWindowInsetsPadding = false,
-            navigationIcon = {
-                Box(
-                    modifier = Modifier
-                        .padding(start = 12.dp)
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(cs.surfaceVariant.copy(alpha = 0.75f))
-                        .bounceClick { onBack() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = LocalStrings.current.backContentDescription,
-                        tint = cs.onBackground
-                    )
-                }
+        if (compact) {
+            SmallTopAppBar(title = title, color = Color.Transparent, titleColor = Color.Transparent,
+                scrollBehavior = state.scrollBehavior, defaultWindowInsetsPadding = false)
+            TopBarBlurBackground(state, fraction)
+            Box(Modifier.align(Alignment.TopStart).height(56.dp), contentAlignment = Alignment.CenterStart) { backIcon() }
+            Box(Modifier.matchParentSize().graphicsLayer { alpha = fraction }, contentAlignment = Alignment.Center) {
+                Text(title, color = cs.onBackground, style = MiuixAppTheme.typography.titleMedium,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 64.dp))
             }
-        )
+        } else {
+            TopAppBar(title = title, largeTitle = title, titleColor = Color.Transparent,
+                largeTitleColor = Color.Transparent, color = Color.Transparent,
+                scrollBehavior = state.scrollBehavior, defaultWindowInsetsPadding = false)
+            TopBarBlurBackground(state, fraction)
+            MovingMiuixTitle(title, fraction)
+            Box(Modifier.align(Alignment.TopStart).height(56.dp), contentAlignment = Alignment.CenterStart) { backIcon() }
+        }
     }
 }

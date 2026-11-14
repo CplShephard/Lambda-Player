@@ -202,11 +202,11 @@ private fun MiniPlayerM3Row(
             .padding(start = 10.dp, end = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 44dp circular album art (keyed by track id like PixelPlayer)
+        // 44dp rounded album art (same 8dp corner as the Miuix mini player)
         Box(
             modifier = Modifier
                 .size(44.dp)
-                .clip(CircleShape)
+                .clip(RoundedCornerShape(8.dp))
                 .background(lerp(MaterialTheme.colorScheme.surfaceContainerHighest, accentColor, 0.30f)),
             contentAlignment = Alignment.Center
         ) {
@@ -215,7 +215,7 @@ private fun MiniPlayerM3Row(
                     AsyncImage(
                         model = track.albumArtUri,
                         contentDescription = null,
-                        modifier = Modifier.size(44.dp).clip(CircleShape),
+                        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)),
                         contentScale = ContentScale.Crop,
                     )
                 }
@@ -227,6 +227,7 @@ private fun MiniPlayerM3Row(
                     modifier = Modifier.size(20.dp),
                 )
             }
+            SilentVideoCover(track.albumArtUri, Modifier.matchParentSize())
         }
 
         Spacer(Modifier.width(12.dp))

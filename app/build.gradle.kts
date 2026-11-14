@@ -87,13 +87,14 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.navigationevent:navigationevent-compose:1.1.2")
 
-    implementation(platform("androidx.compose:compose-bom:2026.08.00"))
+    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.graphics:graphics-shapes:1.1.0")
 
-    implementation("androidx.compose.material3:material3:1.5.0-alpha26")
+    implementation("androidx.compose.material3:material3:1.5.0-beta02")
 
     implementation("com.materialkolor:material-kolor:5.0.0")
 
@@ -127,6 +128,7 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.6.0")
 
     implementation("io.coil-kt:coil-gif:2.6.0")
+    implementation("io.coil-kt:coil-video:2.6.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.palette:palette-ktx:1.0.0")
 

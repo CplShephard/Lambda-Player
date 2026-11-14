@@ -19,7 +19,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.Text
@@ -37,7 +41,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -72,9 +75,9 @@ fun MiniPlayer(
     val liquidGlassOn = LocalBlurEnabled.current
     val contentBackdrop = LocalContentBackdrop.current
     val miniPlayerShape = RoundedCornerShape(14.dp)
-    val artSize = if (large) 52.dp else 40.dp
-    val buttonSize = if (large) 48.dp else 40.dp
-    val iconSize = if (large) 28.dp else 24.dp
+    val artSize = if (large) 52.dp else 48.dp
+    val buttonSize = if (large) 48.dp else 48.dp
+    val iconSize = if (large) 28.dp else 28.dp
     // Deterministic theme detection: a light surface means a light theme, so the bar is black;
     // a dark surface means a dark theme, so the bar is white.
     val isLightSurface = MiuixAppTheme.colorScheme.surfaceVariant.luminance() > 0.5f
@@ -155,9 +158,10 @@ fun MiniPlayer(
                                     imageVector = Icons.Filled.MusicNote,
                                     contentDescription = null,
                                     tint = MiuixAppTheme.colorScheme.primary,
-                                    modifier = Modifier.size(if (large) 26.dp else 20.dp)
+                                    modifier = Modifier.size(if (large) 26.dp else 24.dp)
                                 )
                             }
+                            SilentVideoCover(displayTrack.albumArtUri, Modifier.matchParentSize())
                         }
                         Column(modifier = Modifier.padding(horizontal = 12.dp)) {
                             Text(
@@ -187,7 +191,7 @@ fun MiniPlayer(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_rewind),
+                        imageVector = Icons.Filled.FastRewind,
                         contentDescription = LocalStrings.current.previous,
                         tint = MiuixAppTheme.colorScheme.onBackground,
                         modifier = Modifier.size(iconSize)
@@ -210,10 +214,7 @@ fun MiniPlayer(
                         label = "miniPlayPauseIcon"
                     ) { isPlaying ->
                         Icon(
-                            painter = painterResource(
-                                id = if (isPlaying) dev.shephard.player.R.drawable.ic_nowplaying_pause
-                                else dev.shephard.player.R.drawable.ic_nowplaying_play
-                            ),
+                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (isPlaying) LocalStrings.current.pause else LocalStrings.current.play,
                             tint = MiuixAppTheme.colorScheme.onBackground,
                             modifier = Modifier.size(iconSize)
@@ -229,7 +230,7 @@ fun MiniPlayer(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_fforward),
+                        imageVector = Icons.Filled.FastForward,
                         contentDescription = LocalStrings.current.next,
                         tint = MiuixAppTheme.colorScheme.onBackground,
                         modifier = Modifier.size(iconSize)

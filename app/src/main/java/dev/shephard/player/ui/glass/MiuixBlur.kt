@@ -17,10 +17,13 @@ import top.yukonga.miuix.kmp.blur.BlurColors
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
+import top.yukonga.miuix.kmp.blur.drawBackdrop
+import top.yukonga.miuix.kmp.blur.blur
 import top.yukonga.miuix.kmp.shader.isRenderEffectSupported
 import dev.shephard.player.ui.theme.LocalUseMiuix
 
 val LocalBlurEnabled = staticCompositionLocalOf { false }
+val LocalLiquidGlassEnabled = staticCompositionLocalOf { false }
 
 val LocalContentBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 
@@ -61,10 +64,18 @@ fun Modifier.miuixTopBarBlur(
     backdrop: LayerBackdrop?,
     blurRadius: Float = 25f,
     tintAlpha: Float = 0.8f,
+    tintColor: Color = MiuixAppTheme.colorScheme.surface,
 ): Modifier {
     if (backdrop == null) return this
 
-    val blendColor = MiuixAppTheme.colorScheme.surface.copy(alpha = tintAlpha)
+    val blendColor = tintColor.copy(alpha = tintAlpha)
+    if (LocalLiquidGlassEnabled.current && isLiquidGlassSupported) {
+        return this.then(Modifier.drawBackdrop(
+            backdrop = backdrop, shape = { RectangleShape },
+            effects = { vibrancy(); blur(4.dp.toPx(), 4.dp.toPx()); lens(refractionHeight = 12.dp.toPx(), refractionAmount = 12.dp.toPx()) },
+            onDrawSurface = { drawRect(blendColor) },
+        ))
+    }
     return this.then(
         Modifier.textureBlur(
             backdrop = backdrop,
@@ -89,7 +100,7 @@ fun Modifier.miuixTopBarBlur(
  */
 @Composable
 fun rememberAppBlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
-    if (!enableBlur || !isLiquidGlassSupported || !isRenderEffectSupported()) return null
+    if (!enableBlur || !isBlurSupported || !isRenderEffectSupported()) return null
     val useMiuix = LocalUseMiuix.current
     val surfaceColor = if (useMiuix) {
         top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.surface
@@ -113,6 +124,13 @@ fun Modifier.miuixBlurSurface(
     if (backdrop == null) return this.background(fallbackColor, shape)
 
     val blendColor = MiuixAppTheme.colorScheme.surface.copy(alpha = tintAlpha)
+    if (LocalLiquidGlassEnabled.current && isLiquidGlassSupported) {
+        return this.then(Modifier.drawBackdrop(
+            backdrop = backdrop, shape = { shape },
+            effects = { vibrancy(); blur(4.dp.toPx(), 4.dp.toPx()); lens(refractionHeight = 18.dp.toPx(), refractionAmount = 18.dp.toPx()) },
+            onDrawSurface = { drawRect(blendColor.copy(alpha = tintAlpha * .6f)) },
+        ))
+    }
     return this.then(
         Modifier.textureBlur(
             backdrop = backdrop,
@@ -136,6 +154,13 @@ fun Modifier.miuixBlurAccent(
     if (backdrop == null) return this.background(fallbackColor, shape)
 
     val blendColor = MiuixAppTheme.colorScheme.primary.copy(alpha = tintAlpha)
+    if (LocalLiquidGlassEnabled.current && isLiquidGlassSupported) {
+        return this.then(Modifier.drawBackdrop(
+            backdrop = backdrop, shape = { shape },
+            effects = { vibrancy(); blur(4.dp.toPx(), 4.dp.toPx()); lens(refractionHeight = 12.dp.toPx(), refractionAmount = 12.dp.toPx()) },
+            onDrawSurface = { drawRect(blendColor.copy(alpha = tintAlpha * .6f)) },
+        ))
+    }
     return this.then(
         Modifier.textureBlur(
             backdrop = backdrop,

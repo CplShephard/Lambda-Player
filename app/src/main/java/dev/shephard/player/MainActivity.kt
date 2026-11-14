@@ -27,6 +27,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.shephard.player.player.GithubReleaseInfo
 import dev.shephard.player.player.PreferencesManager
+import dev.shephard.player.player.PlayerViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.shephard.player.ui.glass.LocalLiquidGlassEnabled
 import dev.shephard.player.player.UpdateChecker
 import dev.shephard.player.theme.ThemeState
 import dev.shephard.player.ui.components.MiuixDrawer
@@ -62,6 +65,9 @@ class MainActivity : ComponentActivity() {
             val paletteStyle by prefs.paletteStyle.collectAsState(initial = dev.shephard.player.theme.PaletteStyle.TonalSpot)
             val colorSpec by prefs.colorSpec.collectAsState(initial = dev.shephard.player.theme.ThemeColorSpec.SPEC_2025)
             val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
+            val dynamicByCover by prefs.dynamicColorByCover.collectAsState(initial = false)
+            val playerViewModel: PlayerViewModel = viewModel()
+            val playerState by playerViewModel.uiState.collectAsState()
             val useMiuixMonet by prefs.useMiuixMonet.collectAsState(initial = false)
             val initialMiuixGreenAccent = remember { runBlocking { prefs.miuixGreenAccent.first() } }
             val miuixGreenAccent by prefs.miuixGreenAccent.collectAsState(initial = initialMiuixGreenAccent)
@@ -71,6 +77,7 @@ class MainActivity : ComponentActivity() {
             // every launch while DataStore warms up.
             val initialBlurEnabled = remember { runBlocking { prefs.liquidGlassEnabled.first() } }
             val blurEnabled by prefs.liquidGlassEnabled.collectAsState(initial = initialBlurEnabled)
+            val glassEnabled by prefs.liquidGlassEffect.collectAsState(initial = false)
             val appleFloatingBar by prefs.useAppleFloatingBar.collectAsState(initial = false)
             val languageCode by prefs.language.collectAsState(initial = "en")
             val strings = remember(languageCode) { stringsFor(languageCode) }
@@ -78,28 +85,32 @@ class MainActivity : ComponentActivity() {
             // Material 3 always uses the Monet (wallpaper-dynamic) palette — the
             // M3 UI has no "Miuix custom colors" switch. The setting is only
             // honoured by the Miuix engine.
+            val hasCoverColor = dynamicByCover && playerState.currentTrack?.albumArtUri != null && playerState.coverColorAvailable
             val themeState = ThemeState(
                 useMiuix = useMiuix,
                 themeMode = themeMode,
                 paletteStyle = paletteStyle,
                 colorSpec = colorSpec,
                 useDynamicColor = dynamicColor,
-                useMiuixMonet = if (useMiuix) useMiuixMonet else true,
+                useMiuixMonet = if (useMiuix) useMiuixMonet || hasCoverColor else true,
                 // Only meaningful for the stock Miuix palette (custom colors off).
                 useMiuixGreenAccent = useMiuix && !useMiuixMonet && miuixGreenAccent,
-                seedColor = seedColor,
+                seedColor = if (hasCoverColor) playerState.glowColorArgb else seedColor,
                 useBlur = blurEnabled,
                 useAppleFloatingBar = appleFloatingBar,
             )
 
             PlayerTheme(themeState) {
-                CompositionLocalProvider(LocalBlurEnabled provides blurEnabled) {
+                CompositionLocalProvider(
+                    LocalBlurEnabled provides blurEnabled,
+                    LocalLiquidGlassEnabled provides (useMiuix && blurEnabled && glassEnabled),
+                ) {
                     var availableRelease by remember { mutableStateOf<GithubReleaseInfo?>(null) }
                     LaunchedEffect(Unit) {
                         availableRelease = UpdateChecker.checkLatestRelease()
                     }
 
-                    MainContainer(initialAudioUri = externalAudioUriState.value)
+                    MainContainer(playerViewModel = playerViewModel, initialAudioUri = externalAudioUriState.value)
 
                     val release = availableRelease
                     if (release != null) {

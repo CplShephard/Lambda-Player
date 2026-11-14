@@ -37,7 +37,10 @@ object PrefsKeys {
     val LIKED_SONG_IDS = stringPreferencesKey("liked_song_ids")
     val TRACK_OVERRIDES_JSON = stringPreferencesKey("track-overrides_json")
     val LYRICS_JSON = stringPreferencesKey("lyrics_json")
+    // The old key stores blur; retain it so existing preferences migrate without surprises.
     val LIQUID_GLASS_ENABLED = booleanPreferencesKey("liquid_glass_enabled")
+    val LIQUID_GLASS_EFFECT = booleanPreferencesKey("liquid_glass_effect")
+    val DYNAMIC_COLOR_BY_COVER = booleanPreferencesKey("dynamic_color_by_cover")
     val LISTEN_STATS_EVENTS_JSON = stringPreferencesKey("listen_stats_events_json")
 
     val USE_MIUIX = booleanPreferencesKey("use_miuix")
@@ -47,6 +50,13 @@ object PrefsKeys {
     val MIUIX_GREEN_ACCENT = booleanPreferencesKey("miuix_green_accent")
     val USE_APPLE_FLOATING_BAR = booleanPreferencesKey("use_apple_floating_bar")
     val LAST_MAIN_PAGE = intPreferencesKey("last_main_page")
+    val LIBRARY_NAV_MIGRATED = booleanPreferencesKey("library_nav_migrated")
+    val LIBRARY_SELECTED_TAB = intPreferencesKey("library_selected_tab")
+    val LIBRARY_SONG_SORT = intPreferencesKey("library_song_sort")
+    val LIBRARY_SONG_SORT_DESC = booleanPreferencesKey("library_song_sort_desc")
+    val LIBRARY_FOLDER_FILTER = stringPreferencesKey("library_folder_filter")
+    val MIX_COLLAGE_PATTERN = stringPreferencesKey("mix_collage_pattern")
+    val MIX_COLLAGE_AUTO_ROTATE = booleanPreferencesKey("mix_collage_auto_rotate")
     val PREDICTIVE_BACK_ANIMATION = stringPreferencesKey("predictive_back_animation")
     val PREDICTIVE_BACK_EXIT_DIRECTION = stringPreferencesKey("predictive_back_exit_direction")
     val M3_BLUR_BACKUP = intPreferencesKey("m3_blur_backup")
@@ -54,7 +64,17 @@ object PrefsKeys {
     val LYRICS_BACKGROUND_BLUR_ENABLED = booleanPreferencesKey("lyrics_background_blur_enabled")
     val LYRICS_BACKGROUND_BLUR_STRENGTH = floatPreferencesKey("lyrics_background_blur_strength")
     val LYRICS_AUTO_SCROLL_ENABLED = booleanPreferencesKey("lyrics_auto_scroll_enabled")
+    val LYRICS_TRANSLATION_VISIBLE = booleanPreferencesKey("lyrics_translation_visible")
+    val CAROUSEL_STYLE = stringPreferencesKey("carousel_style")
     val LYRICS_SYNC_OFFSETS_JSON = stringPreferencesKey("lyrics_sync_offsets_json")
+}
+
+object CarouselStyle {
+    const val NO_PEEK = "no_peek"
+    const val ONE_PEEK = "one_peek"
+    const val TWO_PEEK = "two_peek"
+    val all = listOf(NO_PEEK, ONE_PEEK, TWO_PEEK)
+    val visibleOptions = listOf(NO_PEEK, ONE_PEEK)
 }
 
 object ThemeModePreference {
@@ -139,6 +159,10 @@ class PreferencesManager(private val context: Context) {
         it[PrefsKeys.DYNAMIC_COLOR] ?: false
     }
 
+    val dynamicColorByCover: Flow<Boolean> = context.dataStore.data.map {
+        (it[PrefsKeys.DYNAMIC_COLOR_BY_COVER] ?: false) && !(it[PrefsKeys.DYNAMIC_COLOR] ?: false)
+    }
+
     val useMiuix: Flow<Boolean> = context.dataStore.data.map {
         it[PrefsKeys.USE_MIUIX] ?: true
     }
@@ -167,6 +191,36 @@ class PreferencesManager(private val context: Context) {
         it[PrefsKeys.LAST_MAIN_PAGE] ?: 0
     }
 
+    val mixCollagePattern: Flow<String> = context.dataStore.data.map { it[PrefsKeys.MIX_COLLAGE_PATTERN] ?: "COSMIC_SWIRL" }
+    val mixCollageAutoRotate: Flow<Boolean> = context.dataStore.data.map { it[PrefsKeys.MIX_COLLAGE_AUTO_ROTATE] ?: false }
+    suspend fun setMixCollagePattern(value: String) { context.dataStore.edit { it[PrefsKeys.MIX_COLLAGE_PATTERN] = value } }
+    suspend fun setMixCollageAutoRotate(value: Boolean) { context.dataStore.edit { it[PrefsKeys.MIX_COLLAGE_AUTO_ROTATE] = value } }
+
+    val librarySongSort: Flow<Int> = context.dataStore.data.map { (it[PrefsKeys.LIBRARY_SONG_SORT] ?: 0).coerceIn(0, 4) }
+    val librarySortDescending: Flow<Boolean> = context.dataStore.data.map { it[PrefsKeys.LIBRARY_SONG_SORT_DESC] ?: false }
+    val libraryFolderFilter: Flow<String> = context.dataStore.data.map { it[PrefsKeys.LIBRARY_FOLDER_FILTER] ?: "" }
+    suspend fun setLibrarySongSort(value: Int) { context.dataStore.edit { it[PrefsKeys.LIBRARY_SONG_SORT] = value.coerceIn(0, 4) } }
+    suspend fun setLibrarySortDescending(value: Boolean) { context.dataStore.edit { it[PrefsKeys.LIBRARY_SONG_SORT_DESC] = value } }
+    suspend fun setLibraryFolderFilter(value: String) { context.dataStore.edit { it[PrefsKeys.LIBRARY_FOLDER_FILTER] = value } }
+
+    val librarySelectedTab: Flow<Int> = context.dataStore.data.map { (it[PrefsKeys.LIBRARY_SELECTED_TAB] ?: 0).coerceIn(0, 6) }
+
+    suspend fun setLibrarySelectedTab(index: Int) {
+        context.dataStore.edit { it[PrefsKeys.LIBRARY_SELECTED_TAB] = index.coerceIn(0, 6) }
+    }
+
+    suspend fun migrateLibraryNavigation() {
+        context.dataStore.edit { preferences ->
+            if (preferences[PrefsKeys.LIBRARY_NAV_MIGRATED] != true) {
+                when (preferences[PrefsKeys.LAST_MAIN_PAGE] ?: 0) {
+                    2 -> { preferences[PrefsKeys.LAST_MAIN_PAGE] = 1; preferences[PrefsKeys.LIBRARY_SELECTED_TAB] = 3 }
+                    3 -> preferences[PrefsKeys.LAST_MAIN_PAGE] = 2
+                }
+                preferences[PrefsKeys.LIBRARY_NAV_MIGRATED] = true
+            }
+        }
+    }
+
     suspend fun setLastMainPage(index: Int) {
         context.dataStore.edit { it[PrefsKeys.LAST_MAIN_PAGE] = index }
     }
@@ -191,6 +245,10 @@ class PreferencesManager(private val context: Context) {
         (it[PrefsKeys.M3_NAV_BAR_CORNER_RADIUS] ?: 24).coerceIn(0, 64)
     }
 
+    val liquidGlassEffect: Flow<Boolean> = context.dataStore.data.map {
+        it[PrefsKeys.LIQUID_GLASS_EFFECT] ?: false
+    }
+
     val lyricsBackgroundBlurEnabled: Flow<Boolean> = context.dataStore.data.map {
         it[PrefsKeys.LYRICS_BACKGROUND_BLUR_ENABLED] ?: true
     }
@@ -201,6 +259,14 @@ class PreferencesManager(private val context: Context) {
 
     val lyricsAutoScrollEnabled: Flow<Boolean> = context.dataStore.data.map {
         it[PrefsKeys.LYRICS_AUTO_SCROLL_ENABLED] ?: true
+    }
+
+    val carouselStyle: Flow<String> = context.dataStore.data.map {
+        it[PrefsKeys.CAROUSEL_STYLE]?.takeIf { style -> style in CarouselStyle.all } ?: CarouselStyle.NO_PEEK
+    }
+
+    val lyricsTranslationVisible: Flow<Boolean> = context.dataStore.data.map {
+        it[PrefsKeys.LYRICS_TRANSLATION_VISIBLE] ?: true
     }
 
     val lyricsSyncOffsetsJson: Flow<String> = context.dataStore.data.map {
@@ -285,6 +351,39 @@ class PreferencesManager(private val context: Context) {
         }
     }
 
+    suspend fun updateLikedTrackId(trackId: Long, mode: String) {
+        context.dataStore.edit { preferences ->
+            val array = org.json.JSONArray(preferences[PrefsKeys.LIKED_SONG_IDS] ?: "[]")
+            val ids = LinkedHashSet<Long>()
+            for (i in 0 until array.length()) ids.add(array.getLong(i))
+            when (mode) {
+                "toggle" -> if (!ids.add(trackId)) ids.remove(trackId)
+                "remove" -> ids.remove(trackId)
+                else -> ids.add(trackId)
+            }
+            val result = org.json.JSONArray(); ids.forEach { result.put(it) }
+            preferences[PrefsKeys.LIKED_SONG_IDS] = result.toString()
+        }
+    }
+
+    suspend fun addLikedTrackIds(ids: Collection<Long>) {
+        context.dataStore.edit { preferences ->
+            val array = org.json.JSONArray(preferences[PrefsKeys.LIKED_SONG_IDS] ?: "[]")
+            val merged = LinkedHashSet<Long>()
+            for (i in 0 until array.length()) merged.add(array.getLong(i))
+            merged.addAll(ids)
+            val result = org.json.JSONArray()
+            merged.forEach { result.put(it) }
+            preferences[PrefsKeys.LIKED_SONG_IDS] = result.toString()
+        }
+    }
+
+    suspend fun updatePlaylistsJson(transform: (String) -> String) {
+        context.dataStore.edit { preferences ->
+            preferences[PrefsKeys.PLAYLISTS_JSON] = transform(preferences[PrefsKeys.PLAYLISTS_JSON] ?: "[]")
+        }
+    }
+
     suspend fun setPlaylistsJson(json: String) {
         context.dataStore.edit { it[PrefsKeys.PLAYLISTS_JSON] = json }
     }
@@ -309,7 +408,17 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun setDynamicColor(enabled: Boolean) {
-        context.dataStore.edit { it[PrefsKeys.DYNAMIC_COLOR] = enabled }
+        context.dataStore.edit {
+            it[PrefsKeys.DYNAMIC_COLOR] = enabled
+            if (enabled) it[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = false
+        }
+    }
+
+    suspend fun setDynamicColorByCover(enabled: Boolean) {
+        context.dataStore.edit {
+            it[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = enabled
+            if (enabled) it[PrefsKeys.DYNAMIC_COLOR] = false
+        }
     }
 
     suspend fun setUseMiuix(useMiuix: Boolean) {
@@ -390,6 +499,10 @@ class PreferencesManager(private val context: Context) {
         context.dataStore.edit { it[PrefsKeys.M3_NAV_BAR_CORNER_RADIUS] = radius.coerceIn(0, 64) }
     }
 
+    suspend fun setLiquidGlassEffect(enabled: Boolean) {
+        context.dataStore.edit { it[PrefsKeys.LIQUID_GLASS_EFFECT] = enabled }
+    }
+
     suspend fun setLyricsBackgroundBlurEnabled(enabled: Boolean) {
         context.dataStore.edit { it[PrefsKeys.LYRICS_BACKGROUND_BLUR_ENABLED] = enabled }
     }
@@ -402,6 +515,14 @@ class PreferencesManager(private val context: Context) {
         context.dataStore.edit { it[PrefsKeys.LYRICS_AUTO_SCROLL_ENABLED] = enabled }
     }
 
+    suspend fun setCarouselStyle(style: String) {
+        if (style in CarouselStyle.all) context.dataStore.edit { it[PrefsKeys.CAROUSEL_STYLE] = style }
+    }
+
+    suspend fun setLyricsTranslationVisible(visible: Boolean) {
+        context.dataStore.edit { it[PrefsKeys.LYRICS_TRANSLATION_VISIBLE] = visible }
+    }
+
     suspend fun setLyricsSyncOffsetsJson(json: String) {
         context.dataStore.edit { it[PrefsKeys.LYRICS_SYNC_OFFSETS_JSON] = json }
     }
@@ -412,6 +533,24 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setTrackOverridesJson(json: String) {
         context.dataStore.edit { it[PrefsKeys.TRACK_OVERRIDES_JSON] = json }
+    }
+
+    /** Merge one edit atomically instead of overwriting edits made by another screen. */
+    suspend fun updateTrackOverride(trackId: Long, overrideData: TrackOverride) {
+        context.dataStore.edit { preferences ->
+            // Fail rather than replacing malformed stored data with an empty object.
+            val all = org.json.JSONObject(preferences[PrefsKeys.TRACK_OVERRIDES_JSON] ?: "{}")
+            val entry = all.optJSONObject(trackId.toString()) ?: org.json.JSONObject()
+            fun putOrRemove(key: String, value: String?) {
+                if (value == null) entry.remove(key) else entry.put(key, value)
+            }
+            putOrRemove("title", overrideData.title)
+            putOrRemove("artist", overrideData.artist)
+            putOrRemove("album", overrideData.album)
+            putOrRemove("coverUri", overrideData.coverUri)
+            all.put(trackId.toString(), entry)
+            preferences[PrefsKeys.TRACK_OVERRIDES_JSON] = all.toString()
+        }
     }
 
     suspend fun setLyricsJson(json: String) {

@@ -91,9 +91,12 @@ fun MusicScreen(
     libraryViewModel: LibraryViewModel = viewModel(),
     playerViewModel: PlayerViewModel = viewModel(),
     onTrackClick: (List<AudioTrack>, Int) -> Unit = { _, _ -> },
-    hasMiniPlayer: Boolean = false
+    hasMiniPlayer: Boolean = false,
+    tracksOverride: List<AudioTrack>? = null,
+    embedded: Boolean = false,
 ) {
-    val tracks by libraryViewModel.tracks.collectAsState()
+    val allTracks by libraryViewModel.tracks.collectAsState()
+    val tracks = tracksOverride ?: allTracks
     val isLoading by libraryViewModel.isLoading.collectAsState()
     val hasScanned by libraryViewModel.hasScanned.collectAsState()
 
@@ -141,7 +144,7 @@ fun MusicScreen(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            dev.shephard.player.ui.components.MiuixTopBar(
+            if (!embedded) dev.shephard.player.ui.components.MiuixTopBar(
                 title = strings.music,
                 state = topBarState
             )
@@ -223,73 +226,14 @@ fun MusicScreen(
     }
 
     selectedTrackForMenu?.let { track ->
-        val menuLiquidGlassOn = LocalBlurEnabled.current
-        MiuixDrawer(
-            onDismissRequest = { selectedTrackForMenu = null },
-        ) {
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MiuixAppTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        var loaded by remember { mutableStateOf(false) }
-                        AsyncImage(
-                            model = track.albumArtUri,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                            onState = { loaded = it is AsyncImagePainter.State.Success }
-                        )
-                        if (!loaded) {
-                            Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary)
-                        }
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text(track.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(track.artist, style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
-                        Text(track.album, style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-                HorizontalDivider()
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .bounceClick { trackToEdit = track; selectedTrackForMenu = null }
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Filled.Edit, null, tint = MiuixAppTheme.colorScheme.primary)
-                    Spacer(Modifier.width(12.dp))
-                    Text(strings.editMusic, color = MiuixAppTheme.colorScheme.onBackground)
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .bounceClick { trackToDelete = track; selectedTrackForMenu = null }
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Filled.Delete, null, tint = MiuixAppTheme.colorScheme.error)
-                    Spacer(Modifier.width(12.dp))
-                    Text(strings.delete, color = MiuixAppTheme.colorScheme.error)
-                }
-                Spacer(Modifier.height(16.dp))
-            }
-        }
+        dev.shephard.player.ui.screens.SongOptionsSheet(
+            track = track,
+            useMiuix = true,
+            player = playerViewModel,
+            onDismiss = { selectedTrackForMenu = null },
+            onEdit = { selectedTrackForMenu = null; trackToEdit = track },
+            onDelete = { selectedTrackForMenu = null; trackToDelete = track },
+        )
     }
 
     trackToDelete?.let { track ->
@@ -377,7 +321,7 @@ private fun GridTrackCard(
         ) {
             var artLoaded by remember(track.id) { mutableStateOf(false) }
             AsyncImage(
-                model = track.albumArtUri,
+                model = dev.shephard.player.ui.components.rememberStaticArtwork(track.albumArtUri),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
@@ -444,7 +388,7 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
         ) {
             var artLoaded by remember(track.id) { mutableStateOf(false) }
             AsyncImage(
-                model = track.albumArtUri,
+                model = dev.shephard.player.ui.components.rememberStaticArtwork(track.albumArtUri),
                 contentDescription = null,
                 modifier = Modifier
                     .size(48.dp)
@@ -495,7 +439,7 @@ private fun TrackRow(track: AudioTrack, onClick: () -> Unit, onMenuClick: () -> 
 }
 
 @Composable
-private fun EditMusicDrawer(
+internal fun EditMusicDrawer(
     track: AudioTrack,
     libraryViewModel: LibraryViewModel,
     playerViewModel: PlayerViewModel,
@@ -525,8 +469,7 @@ private fun EditMusicDrawer(
 
     fun launchCoverCrop(sourceUri: android.net.Uri) {
 
-        val mimeType = context.contentResolver.getType(sourceUri)
-        if (mimeType == "image/gif") {
+        if (dev.shephard.player.player.ImagePersistence.isAnimatedCover(context, sourceUri)) {
             coverScope.launch {
                 val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, sourceUri)
                 if (persisted != null) coverUri = persisted
@@ -634,7 +577,7 @@ private fun EditMusicDrawer(
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(16.dp))
                     .background(MiuixAppTheme.colorScheme.surfaceVariant)
-                    .bounceClick { coverPicker.launch(arrayOf("image/*")) },
+                    .bounceClick { coverPicker.launch(arrayOf("image/*", "video/mp4")) },
                 contentAlignment = Alignment.Center
             ) {
                 var loaded by remember { mutableStateOf(false) }
@@ -649,6 +592,7 @@ private fun EditMusicDrawer(
                 if (!loaded) {
                     Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
                 }
+                dev.shephard.player.ui.components.SilentVideoCover(displayUri, Modifier.matchParentSize())
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)

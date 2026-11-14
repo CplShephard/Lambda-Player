@@ -125,7 +125,7 @@ fun LineageListItemWithThumbnail(
             ) {
                 if (thumbnailModel != null) {
                     AsyncImage(
-                        model = thumbnailModel,
+                        model = dev.shephard.player.ui.components.rememberStaticArtwork(thumbnailModel),
                         contentDescription = null,
                         modifier = Modifier.fillMaxWidth(),
                         contentScale = ContentScale.Crop
@@ -215,7 +215,7 @@ fun LineageHorizontalMediaItem(
                     thumbnailContent()
                 } else if (thumbnailModel != null) {
                     AsyncImage(
-                        model = thumbnailModel,
+                        model = dev.shephard.player.ui.components.rememberStaticArtwork(thumbnailModel),
                         contentDescription = null,
                         modifier = Modifier.fillMaxWidth(),
                         contentScale = ContentScale.Crop
@@ -311,7 +311,7 @@ fun LineageGridMediaItem(
             ) {
                 if (thumbnailModel != null) {
                     AsyncImage(
-                        model = thumbnailModel,
+                        model = dev.shephard.player.ui.components.rememberStaticArtwork(thumbnailModel),
                         contentDescription = null,
                         modifier = Modifier.fillMaxWidth().aspectRatio(1f),
                         contentScale = ContentScale.Crop

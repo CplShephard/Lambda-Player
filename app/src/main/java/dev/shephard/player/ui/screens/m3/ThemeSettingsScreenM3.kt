@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import dev.shephard.player.ui.components.m3.rememberExpressiveTopBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import dev.shephard.player.ui.components.m3.M3SmallTopBar
 import dev.shephard.player.ui.components.m3.m3TopBarColors
 import androidx.compose.material.icons.Icons
@@ -78,6 +80,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
     val paletteStyle by prefs.paletteStyle.collectAsState(initial = PaletteStyle.TonalSpot)
     val colorSpec by prefs.colorSpec.collectAsState(initial = ThemeColorSpec.SPEC_2025)
     val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
+    val dynamicByCover by prefs.dynamicColorByCover.collectAsState(initial = false)
     val seedColor by prefs.seedColor.collectAsState(initial = PresetColors.first().color.toArgb())
     val blurEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
     val predictiveBack by prefs.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
@@ -92,7 +95,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
     // Use null initial to avoid false->true->false flicker
     val dynamicColorNullable by prefs.dynamicColor.collectAsState(initial = null)
     val isDynamicColorOn = dynamicColorNullable == true
-    val accentGridTarget = paletteStyle != PaletteStyle.Monochrome && (!isDynamicColorOn || Build.VERSION.SDK_INT < Build.VERSION_CODES.S)
+    val accentGridTarget = paletteStyle != PaletteStyle.Monochrome && (!isDynamicColorOn || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) && !dynamicByCover
 
     val themeModeOptions = listOf(ThemeMode.LIGHT, ThemeMode.DARK, ThemeMode.SYSTEM)
     val themeModeList = listOf(strings.lightMode, strings.darkMode, strings.autoMode)
@@ -106,11 +109,13 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
     val activeSpec = if (!isSpec2025Supported) ThemeColorSpec.SPEC_2021 else colorSpec
     val specIndex = availableSpecs.indexOf(activeSpec).coerceAtLeast(0)
 
+            val m3TopBarState = rememberExpressiveTopBarState()
             Scaffold(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().nestedScroll(m3TopBarState.connection),
             containerColor = MaterialTheme.colorScheme.surface,
             topBar = {
                 M3SmallTopBar(
+                    state = m3TopBarState,
                     title = { Text(strings.themeSettings) },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
                     colors = m3TopBarColors(),
@@ -159,6 +164,15 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                                 onCheckedChange = { scope.launch { prefs.setDynamicColor(it) } }
                             )
                         }
+                    }
+                    item {
+                        SwitchWidget(
+                            icon = Icons.TwoTone.InvertColors,
+                            title = strings.dynamicColorByCover,
+                            description = strings.dynamicColorByCoverDescription,
+                            checked = dynamicByCover,
+                            onCheckedChange = { scope.launch { prefs.setDynamicColorByCover(it) } }
+                        )
                     }
                     item {
                         DropDownMenuWidget(

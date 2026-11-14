@@ -45,8 +45,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
@@ -80,7 +84,6 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -113,14 +116,19 @@ import org.json.JSONArray
 @Composable
 fun NowPlayingSheet(
     playerViewModel: PlayerViewModel = viewModel(),
+    collapsedBounds: androidx.compose.ui.geometry.Rect? = null,
+    onAlbumClick: (AudioTrack) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val state by playerViewModel.uiState.collectAsState()
     val navigationDirection by playerViewModel.navigationDirection.collectAsState()
+    val pendingCarouselIndex by playerViewModel.pendingCarouselIndex.collectAsState()
     val track = state.currentTrack
     val strings = LocalStrings.current
     val nowPlayingLiquidGlassOn = LocalBlurEnabled.current
     val context = LocalContext.current
+    val carouselPrefs = remember(context) { PreferencesManager(context) }
+    val carouselStyle by carouselPrefs.carouselStyle.collectAsState(initial = dev.shephard.player.player.CarouselStyle.NO_PEEK)
 
     var showQueue by remember { mutableStateOf(false) }
     var showPlaylists by remember { mutableStateOf(false) }
@@ -207,17 +215,27 @@ var isInteractingWithSheet by remember { mutableStateOf(false) }
         ),
         label = "sheetCornerRadius"
     )
-    val sheetShape = androidx.compose.foundation.shape.RoundedCornerShape(
-        topStart = sheetCornerRadius,
-        topEnd = sheetCornerRadius
-    )
+    val sheetShape = androidx.compose.foundation.shape.RoundedCornerShape(sheetCornerRadius)
 
 Box(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { measuredHeightPx = it.height.toFloat() }
             .graphicsLayer {
-                translationY = dragOffset.value.coerceAtLeast(0f)
+                val p = (dragOffset.value / screenHeightPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
+                val bounds = collapsedBounds?.takeIf { it.width > 0f && it.height > 0f }
+                if (bounds != null && size.width > 0f && size.height > 0f) {
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                    scaleX = 1f - (1f - bounds.width / size.width) * p
+                    scaleY = 1f - (1f - bounds.height / size.height) * p
+                    translationX = bounds.left * p
+                    translationY = bounds.top * p
+                } else {
+                    translationY = dragOffset.value.coerceAtLeast(0f)
+                }
+                // At the collapsed end the real mini-player remains visible underneath;
+                // fade the full content in as the surface grows instead of flashing tiny text.
+                alpha = if (bounds != null) ((1f - p) * 4f).coerceIn(0f, 1f) else 1f
                 shape = sheetShape
                 clip = true
             }
@@ -298,115 +316,50 @@ Row(
             }
 
 Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-
-BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                    val maxArtHeight = maxHeight * 0.42f
-
-androidx.compose.animation.AnimatedContent(
-                        targetState = track,
-                        transitionSpec = {
-
-val forward = navigationDirection >= 0
-                            val enter = slideInHorizontally(
-                                animationSpec = artSlideSpec,
-                                initialOffsetX = { fullWidth -> if (forward) fullWidth else -fullWidth }
-                            ) + fadeIn(animationSpec = artFadeSpec)
-                            val exit = slideOutHorizontally(
-                                animationSpec = artSlideSpec,
-                                targetOffsetX = { fullWidth -> if (forward) -fullWidth else fullWidth }
-                            ) + fadeOut(animationSpec = artFadeSpec)
-                            enter togetherWith exit
-                        },
-                        label = "nowPlayingArt",
-                        modifier = Modifier.fillMaxWidth()
-                    ) { animatedTrack ->
-                        if (animatedTrack == null) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 24.dp)
-                                    .aspectRatio(1f)
-                                    .heightIn(max = maxArtHeight)
-                                    .clip(RoundedCornerShape(30.dp))
-                                    .background(MiuixAppTheme.colorScheme.surfaceVariant),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.MusicNote,
-                                    contentDescription = null,
-                                    tint = MiuixAppTheme.colorScheme.primary,
-                                    modifier = Modifier.size(72.dp)
-                                )
-                            }
-                        } else {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 24.dp)
-                                        .aspectRatio(1f)
-                                        .heightIn(max = maxArtHeight)
-                                        .clip(RoundedCornerShape(30.dp))
-                                        .background(MiuixAppTheme.colorScheme.surfaceVariant),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    var artLoaded by remember(animatedTrack.id) { mutableStateOf(false) }
-                                    AsyncImage(
-                                        model = animatedTrack.albumArtUri,
-                                        contentDescription = null,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop,
-                                        onState = { artLoaded = it is AsyncImagePainter.State.Success }
-                                    )
-                                    if (!artLoaded) {
-                                        Icon(
-                                            imageVector = Icons.Filled.MusicNote,
-                                            contentDescription = null,
-                                            tint = MiuixAppTheme.colorScheme.primary,
-                                            modifier = Modifier.size(72.dp)
-                                        )
-                                    }
-                                }
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 24.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = animatedTrack.title,
-                                        style = MiuixAppTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(horizontal = 24.dp)
-                                    )
-                                    Text(
-                                        text = animatedTrack.artist,
-                                        style = MiuixAppTheme.typography.bodyMedium,
-                                        color = Color.White.copy(alpha = 0.7f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(horizontal = 24.dp)
-                                    )
-                                    // Album under the artist, like the Material 3 Now Playing screen.
-                                    if (animatedTrack.album.isNotBlank()) {
-                                        Text(
-                                            text = animatedTrack.album,
-                                            style = MiuixAppTheme.typography.bodyMedium,
-                                            color = Color.White.copy(alpha = 0.55f),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.padding(horizontal = 24.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 24.dp)) {
+        val pageFraction = when (carouselStyle) {
+            dev.shephard.player.player.CarouselStyle.NO_PEEK -> 1f
+            dev.shephard.player.player.CarouselStyle.TWO_PEEK -> .6f
+            else -> .8f
+        }
+        val artHeight = minOf(maxWidth * pageFraction, configuration.screenHeightDp.dp * .38f)
+        if (state.queue.isNotEmpty()) {
+            dev.shephard.player.ui.components.AlbumCarousel(
+                queue = state.queue, currentIndex = state.currentQueueIndex,
+                requestedIndex = pendingCarouselIndex, isPlaying = state.isPlaying, carouselStyle = carouselStyle,
+                onSongSelected = playerViewModel::playQueueItemAbsolute,
+                onAlbumClick = onAlbumClick,
+                modifier = Modifier.fillMaxWidth().height(artHeight),
+                placeholderColor = MiuixAppTheme.colorScheme.surfaceVariant,
+                placeholderContentColor = MiuixAppTheme.colorScheme.primary,
+            )
+        } else {
+            Box(Modifier.fillMaxWidth().height(artHeight).clip(RoundedCornerShape(24.dp)).background(MiuixAppTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
             }
+        }
+    }
+    androidx.compose.animation.AnimatedContent(
+        targetState = track,
+        transitionSpec = {
+            val forward = navigationDirection >= 0
+            (slideInHorizontally(artSlideSpec) { if (forward) it else -it } + fadeIn(artFadeSpec)) togetherWith
+                (slideOutHorizontally(artSlideSpec) { if (forward) -it else it } + fadeOut(artFadeSpec))
+        },
+        label = "nowPlayingMetadata",
+    ) { current ->
+        Column(Modifier.fillMaxWidth().padding(top = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            if (current != null) {
+                Text(current.title, style = MiuixAppTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
+                    color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 24.dp))
+                Text(current.artist, style = MiuixAppTheme.typography.bodyMedium, color = Color.White.copy(alpha = .7f),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 24.dp))
+                if (current.album.isNotBlank()) Text(current.album, style = MiuixAppTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = .55f), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 24.dp))
+            }
+        }
+    }
+}
 
 Spacer(modifier = Modifier.weight(1f))
 
@@ -430,7 +383,7 @@ SeekBarRow(playerViewModel = playerViewModel)
                 )
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToPrevious() },
-                    painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_rewind),
+                    icon = Icons.Filled.FastRewind,
                     contentDescription = strings.previous,
                     tint = Color.White,
                     iconSize = 36.dp
@@ -464,7 +417,7 @@ SeekBarRow(playerViewModel = playerViewModel)
                         label = "playPauseIcon"
                     ) { isPlaying ->
                         Icon(
-                            painter = painterResource(id = if (isPlaying) dev.shephard.player.R.drawable.ic_nowplaying_pause else dev.shephard.player.R.drawable.ic_nowplaying_play),
+                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (isPlaying) strings.pause else strings.play,
                             tint = Color.White,
                             modifier = Modifier.size(40.dp)
@@ -473,7 +426,7 @@ SeekBarRow(playerViewModel = playerViewModel)
                 }
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToNext() },
-                    painter = painterResource(id = dev.shephard.player.R.drawable.ic_nowplaying_fforward),
+                    icon = Icons.Filled.FastForward,
                     contentDescription = strings.next,
                     tint = Color.White,
                     iconSize = 36.dp
@@ -564,18 +517,7 @@ SeekBarRow(playerViewModel = playerViewModel)
             }
 
             if (showQueue) {
-                MiuixDrawer(
-                    onDismissRequest = { showQueue = false },
-                ) {
-                    QueueList(
-                        queue = state.queue,
-                        currentTrackId = state.currentTrack?.id,
-                        onMove = { from, to -> playerViewModel.moveQueueItem(from, to) },
-                        onPlay = { playerViewModel.playQueueItem(it) },
-                        onRemove = { playerViewModel.removeFromQueue(it) },
-                        strings = strings
-                    )
-                }
+                QueueDrawer(playerViewModel = playerViewModel, useMiuix = true, onDismiss = { showQueue = false })
             }
 
             if (showLyrics) {
@@ -962,7 +904,7 @@ private fun QueueTrackItem(
         ) {
             var loaded by remember { mutableStateOf(false) }
             AsyncImage(
-                model = track.albumArtUri,
+                model = dev.shephard.player.ui.components.rememberStaticArtwork(track.albumArtUri),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp)),
                 contentScale = ContentScale.Crop,

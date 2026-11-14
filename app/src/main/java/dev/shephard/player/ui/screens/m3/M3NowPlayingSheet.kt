@@ -3,6 +3,7 @@
 // LineageOS Twelve 1:1 - Now Playing Screen
 package dev.shephard.player.ui.screens.m3
 
+
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -110,6 +111,8 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 @Composable
 fun M3NowPlayingSheet(
     playerViewModel: PlayerViewModel = viewModel(),
+    collapsedBounds: androidx.compose.ui.geometry.Rect? = null,
+    onAlbumClick: (dev.shephard.player.data.AudioTrack) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val state by playerViewModel.uiState.collectAsState()
@@ -147,6 +150,8 @@ fun M3NowPlayingSheet(
         M3NowPlayingSheetContent(
             playerViewModel = playerViewModel,
             state = state,
+            collapsedBounds = collapsedBounds,
+            onAlbumClick = onAlbumClick,
             onDismiss = onDismiss,
         )
     }
@@ -157,9 +162,15 @@ fun M3NowPlayingSheet(
 private fun M3NowPlayingSheetContent(
     playerViewModel: PlayerViewModel,
     state: PlayerUiState,
+    collapsedBounds: androidx.compose.ui.geometry.Rect?,
+    onAlbumClick: (dev.shephard.player.data.AudioTrack) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val track = state.currentTrack
+    val pendingCarouselIndex by playerViewModel.pendingCarouselIndex.collectAsState()
+    val carouselContext = androidx.compose.ui.platform.LocalContext.current
+    val carouselPrefs = remember(carouselContext) { dev.shephard.player.player.PreferencesManager(carouselContext) }
+    val carouselStyle by carouselPrefs.carouselStyle.collectAsState(initial = dev.shephard.player.player.CarouselStyle.NO_PEEK)
     val strings = LocalStrings.current
     val nowPlayingBackground = MaterialTheme.colorScheme.surface
 
@@ -185,8 +196,6 @@ private fun M3NowPlayingSheetContent(
 
     var measuredHeightPx by remember { mutableFloatStateOf(with(density) { configuration.screenHeightDp.dp.toPx() }) }
     val screenHeightPx = measuredHeightPx
-    // Raw predictive back progress (0..1), turned into the ModalBottomSheet transform below.
-    val predictiveBackProgress = remember { Animatable(0f) }
 
     var isInteractingWithSheet by remember { mutableStateOf(false) }
     val isFullyExpanded by remember { derivedStateOf { hasEnteredRest && !isInteractingWithSheet && dragOffset.value <= 0.5f } }
@@ -211,11 +220,11 @@ private fun M3NowPlayingSheetContent(
     PredictiveBackHandler(enabled = !showQueue && !showLyrics && !showAddToPlaylist) { events ->
         try {
             events.collect { event ->
-                predictiveBackProgress.snapTo(event.progress.coerceIn(0f, 1f))
+                dragOffset.snapTo(event.progress.coerceIn(0f, 1f) * screenHeightPx)
             }
             dismissWithAnimation()
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            dragScope.launch { predictiveBackProgress.animateTo(0f) }
+            dragScope.launch { dragOffset.animateTo(0f, animationSpec = enterSpring) }
             throw cancelled
         }
     }
@@ -225,21 +234,19 @@ private fun M3NowPlayingSheetContent(
             .fillMaxSize()
             .onSizeChanged { measuredHeightPx = it.height.toFloat() }
             .graphicsLayer {
-                translationY = dragOffset.value.coerceAtLeast(0f)
-                // ModalBottomSheet's predictive back: eased progress, up to 48dp narrower and
-                // 24dp shorter, scaled around the bottom centre; top corners round to 28dp.
-                val p = M3PredictiveBackEasing.transform(predictiveBackProgress.value.coerceIn(0f, 1f))
-                if (p > 0f && size.width > 0f && size.height > 0f) {
-                    scaleX = 1f - (min(48.dp.toPx(), size.width) / size.width) * p
-                    scaleY = 1f - (min(24.dp.toPx(), size.height) / size.height) * p
-                    transformOrigin = TransformOrigin(0.5f, 1f)
-                }
-                val topCorner = if (p > 0f) {
-                    sheetCornerRadius + (28.dp - sheetCornerRadius) * min(1f, p * 3f)
+                val p = (dragOffset.value / screenHeightPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
+                val bounds = collapsedBounds?.takeIf { it.width > 0f && it.height > 0f }
+                if (bounds != null && size.width > 0f && size.height > 0f) {
+                    transformOrigin = TransformOrigin(0f, 0f)
+                    scaleX = 1f - (1f - bounds.width / size.width) * p
+                    scaleY = 1f - (1f - bounds.height / size.height) * p
+                    translationX = bounds.left * p
+                    translationY = bounds.top * p
                 } else {
-                    sheetCornerRadius
+                    translationY = dragOffset.value.coerceAtLeast(0f)
                 }
-                shape = RoundedCornerShape(topStart = topCorner, topEnd = topCorner)
+                alpha = if (bounds != null) ((1f - p) * 4f).coerceIn(0f, 1f) else 1f
+                shape = RoundedCornerShape(sheetCornerRadius)
                 clip = true
             }
             .background(nowPlayingBackground)
@@ -279,35 +286,29 @@ private fun M3NowPlayingSheetContent(
                 overflow = TextOverflow.Ellipsis,
             )
 
-            // Album art card - 16dp radius, margin 40dp like Twelve
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 40.dp)
-                    .padding(top = 8.dp, bottom = 16.dp),
-                contentAlignment = Alignment.Center
+            androidx.compose.foundation.layout.BoxWithConstraints(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (track?.albumArtUri != null) {
-                            AsyncImage(
-                                model = track.albumArtUri,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
-                            )
-                        } else {
-                            Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(72.dp))
-                        }
+                val pageFraction = when (carouselStyle) {
+                    dev.shephard.player.player.CarouselStyle.NO_PEEK -> 1f
+                    dev.shephard.player.player.CarouselStyle.TWO_PEEK -> .6f
+                    else -> .8f
+                }
+                val artHeight = minOf(maxWidth * pageFraction, configuration.screenHeightDp.dp * .38f)
+                if (state.queue.isNotEmpty()) {
+                    dev.shephard.player.ui.components.AlbumCarousel(
+                        queue = state.queue, currentIndex = state.currentQueueIndex,
+                        requestedIndex = pendingCarouselIndex, isPlaying = state.isPlaying, carouselStyle = carouselStyle,
+                        onSongSelected = playerViewModel::playQueueItemAbsolute,
+                        onAlbumClick = onAlbumClick,
+                        modifier = Modifier.fillMaxWidth().height(artHeight),
+                        placeholderColor = MaterialTheme.colorScheme.secondaryContainer,
+                        placeholderContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                } else {
+                    Box(Modifier.fillMaxWidth().height(artHeight).clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(64.dp))
                     }
                 }
             }
@@ -347,61 +348,22 @@ private fun M3NowPlayingSheetContent(
             // Progress slider
             M3NowPlayingProgressLineage(playerViewModel = playerViewModel, isPlaying = state.isPlaying)
 
-            // Fixed: prev/next have squircle background smaller like pause
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 22.dp)
-                    .padding(top = 8.dp, bottom = 24.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { playerViewModel.toggleShuffle() }, modifier = Modifier.size(48.dp)) {
+            dev.shephard.player.ui.components.m3.AnimatedPlaybackControls(
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
+                isPlayingProvider = { state.isPlaying },
+                onPrevious = playerViewModel::skipToPrevious,
+                onPlayPause = playerViewModel::togglePlayPause,
+                onNext = playerViewModel::skipToNext,
+                height = 80.dp,
+                pressAnimationSpec = androidx.compose.animation.core.tween(240, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                releaseDelay = 220L,
+            )
+            Row(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                IconButton(onClick = playerViewModel::toggleShuffle) {
                     Icon(Icons.Filled.Shuffle, strings.shuffle, tint = if (state.shuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                 }
-                androidx.compose.material3.FilledTonalIconButton(
-                    onClick = { playerViewModel.skipToPrevious() },
-                    modifier = Modifier.size(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                ) {
-                    Icon(Icons.Filled.SkipPrevious, strings.previous, modifier = Modifier.size(28.dp))
-                }
-                androidx.compose.material3.FilledIconButton(
-                    onClick = { playerViewModel.togglePlayPause() },
-                    modifier = Modifier.size(72.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                ) {
-                    Icon(
-                        imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (state.isPlaying) strings.pause else strings.play,
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
-                androidx.compose.material3.FilledTonalIconButton(
-                    onClick = { playerViewModel.skipToNext() },
-                    modifier = Modifier.size(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                ) {
-                    Icon(Icons.Filled.SkipNext, strings.next, modifier = Modifier.size(28.dp))
-                }
-                IconButton(onClick = { playerViewModel.cycleRepeatMode() }, modifier = Modifier.size(48.dp)) {
-                    val icon = when (state.repeatMode) {
-                        RepeatMode.ONE -> Icons.Filled.RepeatOne
-                        else -> Icons.Filled.Repeat
-                    }
-                    Icon(icon, strings.repeat, tint = if (state.repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                IconButton(onClick = playerViewModel::cycleRepeatMode) {
+                    Icon(if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat, strings.repeat, tint = if (state.repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                 }
             }
 
@@ -461,105 +423,7 @@ private fun M3NowPlayingSheetContent(
     }
 
     if (showQueue) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        val queue = state.queue
-        val currentStartIndex = remember(queue, state.currentTrack?.id) {
-            queue.indexOfFirst { it.id == state.currentTrack?.id }.coerceAtLeast(0)
-        }
-        val items = remember { mutableStateListOf<dev.shephard.player.data.AudioTrack>() }
-        LaunchedEffect(queue, currentStartIndex) {
-            val sliced = queue.drop(currentStartIndex)
-            if (items.map { it.id } != sliced.map { it.id }) {
-                items.clear(); items.addAll(sliced)
-            }
-        }
-        val listState = rememberLazyListState()
-        var dragInfo by remember { mutableStateOf<Pair<Int,Int>?>(null) }
-        val reorderableState = rememberReorderableLazyListState(lazyListState = listState) { from, to ->
-            val cur = dragInfo
-            dragInfo = if (cur == null) from.index to to.index else cur.first to to.index
-            items.add(to.index, items.removeAt(from.index))
-        }
-        LaunchedEffect(reorderableState.isAnyItemDragging) {
-            if (!reorderableState.isAnyItemDragging) {
-                dragInfo?.let { (from,to) ->
-                    dragInfo=null
-                    if (from!=to) {
-                        val f = from+currentStartIndex; val t = to+currentStartIndex
-                        if (f!=t) playerViewModel.moveQueueItem(f,t)
-                    }
-                }
-            }
-        }
-        M3BottomSheetWrapper(
-            onDismissRequest = { showQueue = false }, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surface) {
-            Text(strings.queue, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                itemsIndexed(items, key = { _, t -> t.id }) { idx, queueTrack ->
-                    ReorderableItem(state = reorderableState, key = queueTrack.id) { isDragging ->
-                        val isCurrent = queueTrack.id == state.currentTrack?.id
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .shadow(if (isDragging) 8.dp else 0.dp, RoundedCornerShape(12.dp))
-                                .zIndex(if (isDragging) 1f else 0f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    if (isCurrent) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                )
-                                .clickable {
-                                    // The view model takes indexes relative to the current track
-                                    // (the list starts there), not absolute queue positions.
-                                    val index = queue.indexOfFirst { it.id == queueTrack.id }
-                                    if (index >= 0) playerViewModel.playQueueItem(index - currentStartIndex)
-                                }
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(modifier = Modifier.size(44.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                                if (queueTrack.albumArtUri != null) {
-                                    AsyncImage(model = queueTrack.albumArtUri, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                                } else {
-                                    Icon(Icons.Filled.MusicNote, null, modifier = Modifier.size(20.dp))
-                                }
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(queueTrack.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(queueTrack.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            // Trash (tap twice: "Confirm?" then remove) then drag handle. The
-                            // playing track can't be removed or moved, so it gets neither.
-                            if (!isCurrent) {
-                                QueueRemoveButton(
-                                    trackId = queueTrack.id,
-                                    contentDescription = strings.removeFromQueue,
-                                    confirmLabel = strings.queueRemoveConfirm,
-                                    color = MaterialTheme.colorScheme.error,
-                                    labelStyle = MaterialTheme.typography.labelMedium,
-                                    onRemove = {
-                                        val index = queue.indexOfFirst { it.id == queueTrack.id }
-                                        if (index > currentStartIndex) playerViewModel.removeFromQueue(index - currentStartIndex)
-                                    },
-                                )
-                                Icon(
-                                    Icons.Filled.DragHandle,
-                                    contentDescription = strings.reorder,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(28.dp).draggableHandle()
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { showQueue = false })
     }
 
     if (showLyrics) {

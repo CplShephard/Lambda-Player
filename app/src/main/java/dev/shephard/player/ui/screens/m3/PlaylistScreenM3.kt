@@ -42,6 +42,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import dev.shephard.player.ui.components.m3.rememberExpressiveTopBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import dev.shephard.player.ui.components.m3.M3SmallTopBar
 import dev.shephard.player.ui.components.m3.M3CoverEditor
 import dev.shephard.player.ui.components.m3.m3ItemCardColors
@@ -93,14 +95,12 @@ import dev.shephard.player.ui.components.m3.LineageNoElements
 import dev.shephard.player.ui.components.m3.LineageSortingChip
 import dev.shephard.player.ui.components.m3.SegmentedColumn
 import dev.shephard.player.ui.i18n.LocalStrings
-import dev.shephard.player.ui.navigation.SubmenuNavGuard
 import dev.shephard.player.ui.screens.LocalPlaylist
 import dev.shephard.player.ui.screens.encodePlaylists
 import dev.shephard.player.ui.screens.ensureLikedSongsPlaylist
 import dev.shephard.player.ui.screens.parsePlaylists
 import dev.shephard.player.ui.screens.resolvePlaylistTracks
 import kotlinx.coroutines.launch
-import dev.shephard.player.ui.navigation.PlaylistDetailNavHost
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,7 +108,9 @@ fun PlaylistScreenM3(
     libraryViewModel: LibraryViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     hasMiniPlayer: Boolean = false,
     onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
-    onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> }
+    onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> },
+    onOpenPlaylistDetail: (Int) -> Unit = {},
+    embedded: Boolean = false,
 ) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
@@ -133,9 +135,6 @@ fun PlaylistScreenM3(
 
     var showCreate by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
-    var openIndex by remember { mutableStateOf<Int?>(null) }
-
-    val playlistDetailGuard = remember { SubmenuNavGuard() }
     var playlistMenuIndex by remember { mutableStateOf<Int?>(null) }
     var editPlaylistIndex by remember { mutableStateOf<Int?>(null) }
     var editPlaylistName by remember { mutableStateOf("") }
@@ -176,7 +175,6 @@ fun PlaylistScreenM3(
     fun deletePlaylist(pl: LocalPlaylist) {
         val all = rawPlaylists.filterNot { it.name == pl.name && it.createdAt == pl.createdAt && it.isSystem == pl.isSystem }
         writePlaylists(all)
-        if (openIndex == rawPlaylists.indexOf(pl)) openIndex = null
     }
 
     val newCoverCropLauncher = rememberLauncherForActivityResult(
@@ -190,7 +188,7 @@ fun PlaylistScreenM3(
     }
 
     fun launchNewCoverCrop(sourceUri: Uri) {
-        if (context.contentResolver.getType(sourceUri) == "image/gif") {
+        if (dev.shephard.player.player.ImagePersistence.isAnimatedCover(context, sourceUri)) {
             scope.launch {
                 val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, sourceUri)
                 if (persisted != null) newCoverUri = persisted
@@ -255,7 +253,7 @@ fun PlaylistScreenM3(
                         model = newCoverUri,
                         placeholderIcon = Icons.Filled.QueueMusic,
                         hasCustomCover = newCoverUri != null,
-                        onPick = { newCoverPicker.launch(arrayOf("image/*")) },
+                        onPick = { newCoverPicker.launch(arrayOf("image/*", "video/mp4")) },
                         onRemove = { newCoverUri = null },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -348,7 +346,6 @@ fun PlaylistScreenM3(
         )
     }
 
-    if (openIndex != null && openIndex !in playlists.indices) openIndex = null
     if (playlistMenuIndex != null && playlistMenuIndex !in playlists.indices) playlistMenuIndex = null
 
     // Real height of the mini player + dock (measured in NavGraph), so the FAB always clears them.
@@ -359,17 +356,16 @@ fun PlaylistScreenM3(
         label = "playlistFabLift"
     )
 
-    PlaylistDetailNavHost(
-        openIndex = openIndex,
-        onClosed = { openIndex = null }
-    ) { idx ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (idx == null) {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
+    // Playlist detail is a top-level submenu (PlaylistDetailRoute in NavGraph), exactly like the
+    // settings submenus: it covers the pager, dock and mini player by z-order instead of living
+    // inside this page. Opening it just pushes the route.
+    val m3TopBarState = rememberExpressiveTopBarState()
+    Scaffold(
+                    modifier = Modifier.fillMaxSize().nestedScroll(m3TopBarState.connection),
                     containerColor = MaterialTheme.colorScheme.surface,
                     topBar = {
-                        M3SmallTopBar(
+                        if (!embedded) M3SmallTopBar(
+                            state = m3TopBarState,
                             title = { Text(strings.playlists) },
                             colors = m3TopBarColors(),
                         )
@@ -460,7 +456,7 @@ fun PlaylistScreenM3(
                                                     playlist = pl,
                                                     plTracks = plTracks,
                                                     strings = strings,
-                                                    onClick = { playlistDetailGuard.push(openIndex, realIdx) { openIndex = realIdx } },
+                                                    onClick = { onOpenPlaylistDetail(realIdx) },
                                                     onMore = { playlistMenuIndex = realIdx },
                                                     onPlay = { playPlaylist(pl, plTracks) },
                                                 )
@@ -481,7 +477,7 @@ fun PlaylistScreenM3(
                                                     playlist = pl,
                                                     plTracks = plTracks,
                                                     strings = strings,
-                                                    onClick = { playlistDetailGuard.push(openIndex, realIdx) { openIndex = realIdx } },
+                                                    onClick = { onOpenPlaylistDetail(realIdx) },
                                                     onMore = { playlistMenuIndex = realIdx },
                                                     onPlay = { playPlaylist(pl, plTracks) },
                                                 )
@@ -493,48 +489,6 @@ fun PlaylistScreenM3(
                         }
                     }
                 }
-            } else {
-                val selectedPl = playlists.getOrNull(idx)
-                if (selectedPl != null) {
-                    val plTracks = remember(selectedPl, tracks, likedIds) { resolvePlaylistTracks(selectedPl, tracks, likedIds) }
-                    fun sameRawPlaylist(pl: LocalPlaylist) = pl.name == selectedPl.name && pl.createdAt == selectedPl.createdAt
-                    M3PlaylistDetail(
-                        playlist = selectedPl,
-                        allTracks = tracks,
-                        plTracks = plTracks,
-                        strings = strings,
-                        onBack = { playlistDetailGuard.pop { openIndex = null } },
-                        onTrackClick = { list, i -> onTrackClick(list, i, if (selectedPl.isSystem) strings.likedSongs else selectedPl.name) },
-                        onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (selectedPl.isSystem) strings.likedSongs else selectedPl.name) },
-                        onPlayRemix = {
-                            if (plTracks.isNotEmpty()) {
-                                if (selectedPl.isSystem) onPlaylistRemixClick(plTracks.shuffled(), strings.likedSongs)
-                                else onPlaylistRemixClick(plTracks.shuffled(), selectedPl.name)
-                            }
-                        },
-                        onRemoveTrack = { trackId ->
-                            val newTrackIds = selectedPl.trackIds - trackId
-                            val all = rawPlaylists.toMutableList()
-                            val rawIdx = all.indexOfFirst { it.name == selectedPl.name && it.createdAt == selectedPl.createdAt }
-                            if (rawIdx >= 0) {
-                                all[rawIdx] = all[rawIdx].copy(trackIds = newTrackIds)
-                                writePlaylists(all)
-                            }
-                        },
-                        onReorder = { newOrder ->
-                            writePlaylists(rawPlaylists.map { pl ->
-                                if (sameRawPlaylist(pl)) pl.copy(trackIds = newOrder.map { it.id }, sortMode = "custom") else pl
-                            })
-                        },
-                        onChangeSort = { mode ->
-                            writePlaylists(rawPlaylists.map { pl -> if (sameRawPlaylist(pl)) pl.copy(sortMode = mode) else pl })
-                        },
-                    )
-                }
-            }
-        }
-    }
-
     playlistMenuIndex?.let { menuIdx ->
         val pl = playlists.getOrNull(menuIdx)
         if (pl != null) {

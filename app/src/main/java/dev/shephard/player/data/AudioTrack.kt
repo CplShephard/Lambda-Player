@@ -9,7 +9,12 @@ data class AudioTrack(
     val album: String,
     val durationMs: Long,
     val uri: Uri,
-    val albumArtUri: Uri?
+    val albumArtUri: Uri?,
+    val albumId: Long? = null,
+    val artistId: Long? = null,
+    val genre: String? = null,
+    val folder: String? = null,
+    val dateAdded: Long = 0L
 )
 
 fun AudioTrack.formattedDuration(): String {

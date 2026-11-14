@@ -8,6 +8,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
+import coil.decode.VideoFrameDecoder
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
@@ -44,6 +45,8 @@ class LambdaPlayerApplication : Application(), ImageLoaderFactory {
         .memoryCachePolicy(CachePolicy.ENABLED)
         .diskCachePolicy(CachePolicy.ENABLED)
         .components {
+            // Static first-frame thumbnails for video covers in lists and notifications.
+            add(VideoFrameDecoder.Factory())
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 add(ImageDecoderDecoder.Factory())
             } else {

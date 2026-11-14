@@ -3,6 +3,9 @@
 package dev.shephard.player.ui.screens
 
 import dev.shephard.player.ui.components.PlaylistCoverArt
+import dev.shephard.player.ui.components.HomeYourMix
+import dev.shephard.player.ui.components.HomeListeningTime
+import dev.shephard.player.ui.components.rememberHomeMix
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,7 +36,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import dev.shephard.player.ui.components.overScrollVertical
-import dev.shephard.player.ui.navigation.SubmenuNavGuard
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
@@ -47,7 +49,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -72,18 +73,20 @@ import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.Text
 import top.yukonga.miuix.kmp.basic.Scaffold
-import dev.shephard.player.ui.navigation.PlaylistDetailNavHost
 
 @Composable
 fun HomeScreen(
     libraryViewModel: LibraryViewModel = viewModel(),
     playerViewModel: PlayerViewModel = viewModel(),
     hasMiniPlayer: Boolean = false,
-    onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> }
+    onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
+    onOpenPlaylistDetail: (Int) -> Unit = {},
+    onOpenStats: () -> Unit = {}
 ) {
     val strings = LocalStrings.current
     val tracks by libraryViewModel.tracks.collectAsState()
     val recentEvents by playerViewModel.statsEventsFlow.collectAsState()
+    val totalListeningMs by playerViewModel.totalListeningMsLive.collectAsState()
 
     LaunchedEffect(Unit) {
         if (tracks.isEmpty()) {
@@ -128,6 +131,7 @@ fun HomeScreen(
             org.json.JSONArray(likedSongIdsJson).let { arr -> (0 until arr.length()).map { arr.getLong(it) } }
         } catch (_: Exception) { emptyList() }
     }
+    val yourMix = rememberHomeMix(tracks, likedIds, recentEvents)
     val featuredPlaylists = remember(rawPlaylists, strings) {
         rawPlaylists.filter {
             !it.isSystem &&
@@ -137,45 +141,9 @@ fun HomeScreen(
                 it.name != "Favoriler"
         }.shuffled().take(5)
     }
-    var openPlaylistIndex by remember { mutableStateOf<Int?>(null) }
-    val playlistDetailGuard = remember { SubmenuNavGuard() }
-
-    PlaylistDetailNavHost(
-        openIndex = openPlaylistIndex,
-        onClosed = { openPlaylistIndex = null }
-    ) { idx ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-        ) {
-            val selectedPl = idx?.let { featuredPlaylists.getOrNull(it) }
-            if (selectedPl != null) {
-                val plTracks = remember(selectedPl, tracks, likedIds) { resolvePlaylistTracks(selectedPl, tracks, likedIds) }
-                PlaylistDetailView(
-                    playlist = selectedPl,
-                    allTracks = tracks,
-                    plTracks = plTracks,
-                    strings = strings,
-                    onBack = { playlistDetailGuard.pop { openPlaylistIndex = null } },
-                    onTrackClick = { list, i -> onTrackClick(list, i, selectedPl.name) },
-                    onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, selectedPl.name) },
-                    onPlayRemix = { if (plTracks.isNotEmpty()) onTrackClick(plTracks.shuffled(), 0, selectedPl.name) },
-                    onRemoveTrack = { trackId ->
-                        val newTrackIds = selectedPl.trackIds - trackId
-                        val rawIdx = rawPlaylists.indexOf(selectedPl)
-                        if (rawIdx >= 0) {
-                            val next = rawPlaylists.toMutableList()
-                            next[rawIdx] = selectedPl.copy(trackIds = newTrackIds)
-                            scope.launch { prefs.setPlaylistsJson(encodePlaylists(next)) }
-                        }
-                    },
-                    onAddTracks = { },
-                    onPickCover = { },
-                    onReorder = { },
-                    onChangeSort = { },
-                    isHomeSimplified = true
-                )
-            } else {
+    // Playlist detail is a top-level submenu (PlaylistDetailRoute in NavGraph), exactly like the
+    // settings submenus: it covers the pager, dock and mini player by z-order instead of living
+    // inside this page. Opening it just pushes the route.
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = Color.Transparent,
@@ -187,9 +155,6 @@ fun HomeScreen(
                         )
                     }
                 ) { innerPadding ->
-                    if (tracks.isEmpty()) {
-                        HomeEmptyState()
-                    } else {
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -203,6 +168,8 @@ fun HomeScreen(
                                 ),
                             verticalArrangement = Arrangement.spacedBy(24.dp)
                         ) {
+                            HomeYourMix(yourMix, useMiuix = true) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
+                            HomeListeningTime(totalListeningMs, useMiuix = true, onClick = onOpenStats)
                             if (featuredTracks.isNotEmpty()) {
                                 FeaturedSongsSection(
                                     title = strings.featuredSongs,
@@ -220,10 +187,8 @@ fun HomeScreen(
                                     tracks = tracks,
                                     likedIds = likedIds,
                                     onPlaylistClick = { pl ->
-                                        val i = featuredPlaylists.indexOf(pl)
-                                        if (i >= 0) {
-                                            playlistDetailGuard.push(openPlaylistIndex, i) { openPlaylistIndex = i }
-                                        }
+                                        val i = dev.shephard.player.ui.screens.ensureLikedSongsPlaylist(rawPlaylists, strings).indexOf(pl)
+                                        if (i >= 0) onOpenPlaylistDetail(i)
                                     }
                                 )
                             }
@@ -238,11 +203,7 @@ fun HomeScreen(
                                 )
                             }
                         }
-                    }
                 }
-            }
-        }
-    }
 }
 
 @Composable
@@ -325,7 +286,7 @@ private fun FeaturedSongCard(
     ) {
         var loaded by remember(track.id) { mutableStateOf(false) }
         AsyncImage(
-            model = track.albumArtUri,
+            model = dev.shephard.player.ui.components.rememberStaticArtwork(track.albumArtUri),
             contentDescription = track.title,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
@@ -462,7 +423,7 @@ private fun RecentlyPlayedCard(
     ) {
         var loaded by remember(track.id) { mutableStateOf(false) }
         AsyncImage(
-            model = track.albumArtUri,
+            model = dev.shephard.player.ui.components.rememberStaticArtwork(track.albumArtUri),
             contentDescription = track.title,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,

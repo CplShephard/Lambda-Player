@@ -10,11 +10,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.MediaStoreScanner
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -51,12 +53,29 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     val overrides: StateFlow<Map<String, TrackOverride>> = _overrides.asStateFlow()
 
     private var contentObserver: ContentObserver? = null
+    private var scanJob: Job? = null
+    private var scanGeneration = 0L
+    private var rawTracks: List<AudioTrack> = emptyList()
+    private val overridesReady = CompletableDeferred<Unit>()
 
     init {
         registerObserver()
         viewModelScope.launch {
-            val json = prefs.trackOverridesJson.first()
-            _overrides.value = parseOverrides(json)
+            try {
+                prefs.trackOverridesJson.collect { json ->
+                    _overrides.value = parseOverrides(json)
+                    if (!overridesReady.isCompleted) overridesReady.complete(Unit)
+                    if (_hasScanned.value) {
+                        _tracks.value = applyOverridesToList(rawTracks, _overrides.value)
+                        applyFilter()
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("LibraryViewModel", "Could not read track overrides", e)
+                if (!overridesReady.isCompleted) overridesReady.complete(Unit)
+            }
         }
     }
 
@@ -74,15 +93,28 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun loadTracks() {
-        viewModelScope.launch {
+        val generation = ++scanGeneration
+        scanJob?.cancel()
+        scanJob = viewModelScope.launch {
             _isLoading.value = true
-            val result = withContext(Dispatchers.IO) {
-                MediaStoreScanner.queryAudioTracks(getApplication())
+            try {
+                // Never publish raw MediaStore metadata before persisted edits are loaded.
+                overridesReady.await()
+                val result = withContext(Dispatchers.IO) {
+                    MediaStoreScanner.queryAudioTracks(getApplication())
+                }
+                rawTracks = result
+                _tracks.value = applyOverridesToList(result, _overrides.value)
+                _hasScanned.value = true
+                applyFilter()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A failed scan must not replace a previously valid library with an empty one.
+                android.util.Log.e("LibraryViewModel", "Library scan failed", e)
+            } finally {
+                if (generation == scanGeneration) _isLoading.value = false
             }
-            _tracks.value = applyOverridesToList(result, _overrides.value)
-            _isLoading.value = false
-            _hasScanned.value = true
-            applyFilter()
         }
     }
 
@@ -93,19 +125,14 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     fun saveTrackOverride(trackId: Long, title: String, artist: String, album: String, coverUri: String?) {
         viewModelScope.launch {
-            val current = _overrides.value.toMutableMap()
-            current[trackId.toString()] = TrackOverride(title, artist, album, coverUri)
-            _overrides.value = current
-            val json = encodeOverrides(current)
-            prefs.setTrackOverridesJson(json)
-
-            val rawJson = prefs.trackOverridesJson.first()
-            val newOverrides = parseOverrides(rawJson)
-            val raw = withContext(Dispatchers.IO) {
-                MediaStoreScanner.queryAudioTracks(getApplication())
+            try {
+                prefs.updateTrackOverride(trackId, TrackOverride(title, artist, album, coverUri))
+                // DataStore's flow updates all active library screens with the merged result.
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("LibraryViewModel", "Could not save track override", e)
             }
-            _tracks.value = applyOverridesToList(raw, newOverrides)
-            applyFilter()
         }
     }
 

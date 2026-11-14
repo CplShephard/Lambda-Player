@@ -38,6 +38,7 @@ fun PlaylistCoverArt(
     modifier: Modifier = Modifier.fillMaxSize(),
     placeholderColor: Color = MaterialTheme.colorScheme.secondaryContainer,
     placeholderIconColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
+    animateVideo: Boolean = false,
     fallback: @Composable () -> Unit = {}
 ) {
     Box(
@@ -46,11 +47,12 @@ fun PlaylistCoverArt(
     ) {
         if (coverUri != null) {
             AsyncImage(
-                model = coverUri,
+                model = if (animateVideo) coverUri else rememberStaticArtwork(coverUri),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
+            if (animateVideo) SilentVideoCover(coverUri, Modifier.matchParentSize())
         } else {
             val arts = tracks.take(4).map { it.albumArtUri }
             when (arts.size) {
@@ -100,7 +102,7 @@ private fun ArtTile(
     ) {
         if (model != null) {
             AsyncImage(
-                model = model,
+                model = rememberStaticArtwork(model),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop

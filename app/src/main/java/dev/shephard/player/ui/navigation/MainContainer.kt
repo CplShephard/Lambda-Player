@@ -64,7 +64,7 @@ fun MainContainer(
     // We deliberately do NOT collect lastMainPage as state — doing so would
     // cause a recomposition loop and re-create the pager state on every page
     // change, which in turn causes a noticeable hitch when leaving Settings.
-    val initialLastMainPage = remember { runBlocking { prefs.lastMainPage.first() } }
+    val initialLastMainPage = remember { runBlocking { prefs.migrateLibraryNavigation(); prefs.lastMainPage.first() } }
 
     // The custom wallpaper feature was removed: clear its leftover settings and image files once.
     LaunchedEffect(Unit) { prefs.clearRemovedWallpaperData() }
@@ -87,6 +87,7 @@ fun MainContainer(
     ) {
         val backStack = remember { mutableStateListOf<NavKey>(MainRoute) }
         var showNowPlaying by remember { mutableStateOf(false) }
+        var miniPlayerBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
 
         // Build the pager state once with a stable initial value. The
         // rememberPagerState factory is keyed only on pageCount, so this won't
@@ -125,7 +126,7 @@ fun MainContainer(
         // mini player no longer react to it because they live inside the MainRoute
         // entry of NavGraph, where the pushed submenu covers them by z-order.
         val submenuOpen = topKey is ThemeRoute || topKey is PlayerRoute ||
-            topKey is AboutRoute || topKey is StatsRoute
+            topKey is AboutRoute || topKey is StatsRoute || topKey is PlaylistDetailRoute || topKey is AlbumDetailRoute
 
         val hasMiniPlayer by remember(playerViewModel) {
             playerViewModel.uiState
@@ -184,6 +185,7 @@ fun MainContainer(
                         .background(themeBackground),
                     hasMiniPlayer = hasMiniPlayer,
                     onOpenNowPlaying = { showNowPlaying = true },
+                    onMiniPlayerBoundsChanged = { miniPlayerBounds = it },
                     onTrackClick = { tracks, index, playlistName ->
                         playerViewModel.setQueueAndPlay(tracks, index, playlistName)
                     },
@@ -195,18 +197,36 @@ fun MainContainer(
 
             AnimatedVisibility(
                 visible = showNowPlaying,
-                enter = fadeIn(tween(160)),
-                exit = fadeOut(tween(0)),
+                // The sheet owns its bidirectional bounds animation; keep it mounted until
+                // its collapse completes instead of applying a second fade on top.
+                enter = androidx.compose.animation.EnterTransition.None,
+                exit = androidx.compose.animation.ExitTransition.None,
                 modifier = Modifier.fillMaxSize()
             ) {
                 if (useMiuix) {
                     NowPlayingSheet(
                         playerViewModel = playerViewModel,
+                        collapsedBounds = miniPlayerBounds,
+                        onAlbumClick = { track ->
+                            if ((track.albumId ?: 0L) > 0L || track.album.isNotBlank()) {
+                                showNowPlaying = false
+                                val destination = AlbumDetailRoute(track.albumId ?: 0L, track.album, track.artist)
+                                if (backStack.lastOrNull() != destination) backStack.add(destination)
+                            }
+                        },
                         onDismiss = { showNowPlaying = false }
                     )
                 } else {
                     M3NowPlayingSheet(
                         playerViewModel = playerViewModel,
+                        collapsedBounds = miniPlayerBounds,
+                        onAlbumClick = { track ->
+                            if ((track.albumId ?: 0L) > 0L || track.album.isNotBlank()) {
+                                showNowPlaying = false
+                                val destination = AlbumDetailRoute(track.albumId ?: 0L, track.album, track.artist)
+                                if (backStack.lastOrNull() != destination) backStack.add(destination)
+                            }
+                        },
                         onDismiss = { showNowPlaying = false }
                     )
                 }

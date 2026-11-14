@@ -24,6 +24,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import dev.shephard.player.ui.components.m3.rememberExpressiveTopBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import dev.shephard.player.ui.components.m3.M3SmallTopBar
 import dev.shephard.player.ui.components.m3.M3CoverEditor
 import dev.shephard.player.ui.components.m3.m3ItemCardColors
@@ -94,9 +96,12 @@ fun MusicScreenM3(
     libraryViewModel: LibraryViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     playerViewModel: PlayerViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     onTrackClick: (List<AudioTrack>, Int) -> Unit = { _, _ -> },
-    hasMiniPlayer: Boolean = false
+    hasMiniPlayer: Boolean = false,
+    tracksOverride: List<AudioTrack>? = null,
+    embedded: Boolean = false,
 ) {
-    val tracks by libraryViewModel.tracks.collectAsState()
+    val allTracks by libraryViewModel.tracks.collectAsState()
+    val tracks = tracksOverride ?: allTracks
     val isLoading by libraryViewModel.isLoading.collectAsState()
     val hasScanned by libraryViewModel.hasScanned.collectAsState()
 
@@ -135,11 +140,13 @@ fun MusicScreenM3(
         pendingDeleteUri = null
     }
 
+    val m3TopBarState = rememberExpressiveTopBarState()
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().nestedScroll(m3TopBarState.connection),
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            M3SmallTopBar(
+            if (!embedded) M3SmallTopBar(
+                state = m3TopBarState,
                 title = { Text(strings.music) },
                 colors = m3TopBarColors(),
             )
@@ -272,46 +279,14 @@ fun MusicScreenM3(
 
     // Bottom sheet with M3 switcher style #7 instead of popup
     selectedTrackForMenu?.let { track ->
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        M3BottomSheetWrapper(
-            onDismissRequest = { selectedTrackForMenu = null },
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = m3ItemCardColors()
-                ) {
-                    LineageListItemWithThumbnail(
-                        headline = track.title,
-                        supporting = track.artist,
-                        thumbnailModel = track.albumArtUri,
-                        placeholderIcon = Icons.Filled.MusicNote,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                SegmentedColumn {
-                    item {
-                        BaseWidget(
-                            icon = Icons.Filled.Edit,
-                            title = strings.editMusic,
-                            onClick = { trackToEdit = track; selectedTrackForMenu = null }
-                        )
-                    }
-                    item {
-                        BaseWidget(
-                            icon = Icons.Filled.Delete,
-                            title = strings.delete,
-                            onClick = { trackToDelete = track; selectedTrackForMenu = null }
-                        )
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-            }
-        }
+        dev.shephard.player.ui.screens.SongOptionsSheet(
+            track = track,
+            useMiuix = false,
+            player = playerViewModel,
+            onDismiss = { selectedTrackForMenu = null },
+            onEdit = { selectedTrackForMenu = null; trackToEdit = track },
+            onDelete = { selectedTrackForMenu = null; trackToDelete = track },
+        )
     }
 
     trackToDelete?.let { track ->
@@ -372,7 +347,7 @@ fun MusicScreenM3(
 }
 
 @Composable
-private fun M3EditTrackDialogLineage(
+internal fun M3EditTrackDialogLineage(
     track: AudioTrack,
     libraryViewModel: dev.shephard.player.player.LibraryViewModel,
     playerViewModel: dev.shephard.player.player.PlayerViewModel,

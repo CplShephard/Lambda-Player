@@ -6,8 +6,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.mutableStateOf
 import dev.shephard.player.ui.components.LocalBottomOverlayHeight
-import dev.shephard.player.ui.components.LocalDetailMiniPlayer
-import dev.shephard.player.ui.components.LocalPlaylistDetailOpen
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -28,7 +26,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -51,6 +48,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.navigationevent.NavigationEventInfo
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,12 +65,15 @@ import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.theme.PredictiveBackAnimation
 import dev.shephard.player.theme.effectiveExitDirection
 import dev.shephard.player.ui.animation.predictiveback.installerNavTransition
+import dev.shephard.player.ui.components.swipeDownToStop
 import dev.shephard.player.ui.components.MiniPlayer
 import dev.shephard.player.ui.components.M3MiniPlayer
 import dev.shephard.player.ui.glass.FloatingBottomBar
 import dev.shephard.player.ui.glass.FloatingBottomBarDefaults
 import dev.shephard.player.ui.glass.FloatingBottomBarMode
 import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.LocalLiquidGlassEnabled
+import dev.shephard.player.ui.glass.miuixBlurSurface
 import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.isLiquidGlassSupported
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -84,7 +86,9 @@ import dev.shephard.player.ui.screens.MusicScreen
 import dev.shephard.player.ui.screens.m3.MusicScreenM3
 import dev.shephard.player.ui.screens.PlayerSettingsScreen
 import dev.shephard.player.ui.screens.m3.PlayerSettingsScreenM3
+import dev.shephard.player.ui.screens.PlaylistDetailScreen
 import dev.shephard.player.ui.screens.PlaylistScreen
+import dev.shephard.player.ui.screens.m3.PlaylistDetailScreenM3
 import dev.shephard.player.ui.screens.m3.PlaylistScreenM3
 import dev.shephard.player.ui.screens.SettingsScreen
 import dev.shephard.player.ui.screens.m3.SettingsScreenM3
@@ -117,6 +121,10 @@ data object PlayerRoute : NavKey
 data object AboutRoute : NavKey
 data object StatsRoute : NavKey
 
+/** Playlist detail is a first-class submenu, exactly like the settings submenus above. */
+data class PlaylistDetailRoute(val index: Int) : NavKey
+data class AlbumDetailRoute(val albumId: Long, val title: String, val artist: String) : NavKey
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NavGraph(
@@ -128,6 +136,7 @@ fun NavGraph(
     preferences: PreferencesManager,
     mainPagerState: MainPagerState,
     onOpenNowPlaying: () -> Unit = {},
+    onMiniPlayerBoundsChanged: (androidx.compose.ui.geometry.Rect) -> Unit = {},
     onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
     onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> }
 ) {
@@ -186,18 +195,15 @@ fun NavGraph(
         backStack.removeAt(backStack.lastIndex)
     }
 
+    fun push(route: NavKey) {
+        // Guard against duplicate pushes from rapid taps on a settings card.
+        // Avoid adding the same entry more than once on rapid taps.
+        if (backStack.lastOrNull() == route) return
+        backStack.add(route)
+    }
+
     val overlayHeight = remember { mutableStateOf(0.dp) }
     val overlayDensity = LocalDensity.current
-    // True while a playlist detail is open; hides the global mini player + dock (like submenus do).
-    val playlistDetailOpen = remember { mutableStateOf(false) }
-    val detailMiniPlayer: @Composable (Modifier) -> Unit = { detailModifier ->
-        DetailMiniPlayerHost(
-            playerViewModel = playerViewModel,
-            useMiuix = useMiuix,
-            onOpenNowPlaying = onOpenNowPlaying,
-            modifier = detailModifier
-        )
-    }
     // DSL block for NavDisplay (the public overload). entryProvider() itself is internal in miuix-nav.
     val entryContent = remember(backStack, useMiuix, swipeBackDirection, interceptPredictiveBack) {
         val block: NavEntryBuilder.() -> Unit = {
@@ -208,9 +214,6 @@ fun NavGraph(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                // While playlist detail is open it sits above the dock and mini player
-                                // (which stay in place, covered like settings submenus).
-                                .zIndex(if (playlistDetailOpen.value) 2f else 0f)
                                 .then(
                                     if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop)
                                     else Modifier
@@ -218,19 +221,9 @@ fun NavGraph(
                         ) {
                             HorizontalPager(
                                 state = mainPagerState.pagerState,
-                                // Page swiping is disabled while playlist detail is open.
-                                userScrollEnabled = !playlistDetailOpen.value,
                                 beyondViewportPageCount = 1,
                             ) { page ->
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .then(
-                                            if (!useMiuix) {
-                                                Modifier.m3PagerPageTransition(mainPagerState.pagerState, page)
-                                            } else Modifier
-                                        )
-                                ) {
+                                Box(modifier = Modifier.fillMaxSize()) {
                                     when (page) {
                                         0 -> if (useMiuix) {
                                             HomeScreen(
@@ -238,6 +231,8 @@ fun NavGraph(
                                                 playerViewModel = playerViewModel,
                                                 hasMiniPlayer = hasMiniPlayer,
                                                 onTrackClick = onTrackClick,
+                                                onOpenPlaylistDetail = { push(PlaylistDetailRoute(it)) },
+                                                onOpenStats = { push(StatsRoute) },
                                             )
                                         } else {
                                             HomeScreenM3(
@@ -245,53 +240,34 @@ fun NavGraph(
                                                 playerViewModel = playerViewModel,
                                                 hasMiniPlayer = hasMiniPlayer,
                                                 onTrackClick = onTrackClick,
+                                                onOpenPlaylistDetail = { push(PlaylistDetailRoute(it)) },
+                                                onOpenStats = { push(StatsRoute) },
                                             )
                                         }
-                                        1 -> if (useMiuix) {
-                                            MusicScreen(
-                                                libraryViewModel = viewModel(),
-                                                playerViewModel = playerViewModel,
-                                                onTrackClick = { tracks, index -> onTrackClick(tracks, index, null) },
-                                                hasMiniPlayer = hasMiniPlayer,
-                                            )
-                                        } else {
-                                            MusicScreenM3(
-                                                libraryViewModel = viewModel(),
-                                                playerViewModel = playerViewModel,
-                                                onTrackClick = { tracks, index -> onTrackClick(tracks, index, null) },
-                                                hasMiniPlayer = hasMiniPlayer,
-                                            )
-                                        }
+                                        1 -> dev.shephard.player.ui.screens.LibraryScreen(
+                                            useMiuix = useMiuix,
+                                            libraryViewModel = viewModel(),
+                                            playerViewModel = playerViewModel,
+                                            hasMiniPlayer = hasMiniPlayer,
+                                            onTrackClick = onTrackClick,
+                                            onPlaylistRemixClick = onPlaylistRemixClick,
+                                            onOpenPlaylistDetail = { push(PlaylistDetailRoute(it)) },
+                                        )
                                         2 -> if (useMiuix) {
-                                            PlaylistScreen(
-                                                libraryViewModel = viewModel(),
-                                                onTrackClick = onTrackClick,
-                                                onPlaylistRemixClick = onPlaylistRemixClick,
-                                                hasMiniPlayer = hasMiniPlayer,
-                                            )
-                                        } else {
-                                            PlaylistScreenM3(
-                                                libraryViewModel = viewModel(),
-                                                onTrackClick = onTrackClick,
-                                                onPlaylistRemixClick = onPlaylistRemixClick,
-                                                hasMiniPlayer = hasMiniPlayer,
-                                            )
-                                        }
-                                        3 -> if (useMiuix) {
                                             SettingsScreen(
                                                 playerViewModel = playerViewModel,
-                                                onOpenThemeSettings = { backStack.add(ThemeRoute) },
-                                                onOpenPlayerSettings = { backStack.add(PlayerRoute) },
-                                                onOpenAbout = { backStack.add(AboutRoute) },
-                                                onOpenStats = { backStack.add(StatsRoute) },
+                                                onOpenThemeSettings = { push(ThemeRoute) },
+                                                onOpenPlayerSettings = { push(PlayerRoute) },
+                                                onOpenAbout = { push(AboutRoute) },
+                                                onOpenStats = { push(StatsRoute) },
                                             )
                                         } else {
                                             SettingsScreenM3(
                                                 playerViewModel = playerViewModel,
-                                                onOpenThemeSettings = { backStack.add(ThemeRoute) },
-                                                onOpenPlayerSettings = { backStack.add(PlayerRoute) },
-                                                onOpenAbout = { backStack.add(AboutRoute) },
-                                                onOpenStats = { backStack.add(StatsRoute) },
+                                                onOpenThemeSettings = { push(ThemeRoute) },
+                                                onOpenPlayerSettings = { push(PlayerRoute) },
+                                                onOpenAbout = { push(AboutRoute) },
+                                                onOpenStats = { push(StatsRoute) },
                                             )
                                         }
                                     }
@@ -317,6 +293,7 @@ fun NavGraph(
                                     playerViewModel = playerViewModel,
                                     useMiuix = useMiuix,
                                     onOpenNowPlaying = onOpenNowPlaying,
+                                    onBoundsChanged = onMiniPlayerBoundsChanged,
                                 )
                                 MainDock(
                                     preferences = preferences,
@@ -365,6 +342,35 @@ fun NavGraph(
                     }
                 }
             }
+            entry<AlbumDetailRoute>(swipeDismiss = swipeBackDirection) { route ->
+                NavEntryBackHandler(interceptPredictiveBack, ::pop) {
+                    dev.shephard.player.ui.screens.AlbumDetailScreen(
+                        albumId = route.albumId, albumName = route.title, artist = route.artist,
+                        useMiuix = useMiuix, player = playerViewModel, onBack = ::pop,
+                    )
+                }
+            }
+            entry<PlaylistDetailRoute>(swipeDismiss = swipeBackDirection) { route ->
+                NavEntryBackHandler(interceptPredictiveBack, ::pop) {
+                    if (useMiuix) {
+                        PlaylistDetailScreen(
+                            playerViewModel = playerViewModel,
+                            index = route.index,
+                            onBack = ::pop,
+                            onTrackClick = onTrackClick,
+                            onPlaylistRemixClick = onPlaylistRemixClick,
+                        )
+                    } else {
+                        PlaylistDetailScreenM3(
+                            playerViewModel = playerViewModel,
+                            index = route.index,
+                            onBack = ::pop,
+                            onTrackClick = onTrackClick,
+                            onPlaylistRemixClick = onPlaylistRemixClick,
+                        )
+                    }
+                }
+            }
         }
         block
     }
@@ -374,8 +380,6 @@ fun NavGraph(
     }
     CompositionLocalProvider(
         LocalBottomOverlayHeight provides overlayHeight,
-        LocalPlaylistDetailOpen provides playlistDetailOpen,
-        LocalDetailMiniPlayer provides detailMiniPlayer,
         LocalSubmenuNavConfig provides submenuNavConfig,
     ) {
         Box(modifier = modifier) {
@@ -434,8 +438,7 @@ private fun M3NavigationDock(
         bottomNavDestinations.forEachIndexed { index, dest ->
             val label = when (dest) {
                 Destination.Home -> strings.home
-                Destination.Music -> strings.music
-                Destination.Playlists -> strings.playlists
+                Destination.Library -> strings.library
                 Destination.Settings -> strings.settings
             }
             M3NavigationBarItem(
@@ -474,16 +477,8 @@ private fun MiuixNavigationDock(
         modifier = Modifier
             .then(
                 if (blurActive && backdrop != null) {
-                    Modifier.textureBlur(
-                        backdrop = backdrop,
-                        shape = RectangleShape,
-                        blurRadius = 25f,
-                        colors = BlurColors(
-                            blendColors = listOf(
-                                BlendColorEntry(color = MiuixAppTheme.colorScheme.surface.copy(0.8f)),
-                            ),
-                        ),
-                    )
+                    Modifier.miuixBlurSurface(backdrop = backdrop, shape = RectangleShape, blurRadius = 25f, tintAlpha = .8f,
+                        fallbackColor = MiuixAppTheme.colorScheme.surface)
                 } else Modifier
             )
             .background(barColor)
@@ -492,14 +487,13 @@ private fun MiuixNavigationDock(
             bottomNavDestinations.forEachIndexed { index, dest ->
                 val label = when (dest) {
                     Destination.Home -> strings.home
-                    Destination.Music -> strings.music
-                    Destination.Playlists -> strings.playlists
+                    Destination.Library -> strings.library
                     Destination.Settings -> strings.settings
                 }
                 NavigationBarItem(
                     selected = selectedIndex() == index,
                     onClick = { onSelected(index) },
-                    icon = if (selectedIndex() == index) dest.selectedIcon else dest.unselectedIcon,
+                    icon = dest.selectedIcon,
                     label = label,
                 )
             }
@@ -514,14 +508,15 @@ private fun AppleFloatingDock(
     onSelected: (Int) -> Unit,
 ) {
     val blurOn = LocalBlurEnabled.current
+    val glassOn = LocalLiquidGlassEnabled.current
     val contentBackdrop = LocalContentBackdrop.current
     val effectiveBackdrop: top.yukonga.miuix.kmp.blur.Backdrop = when {
         contentBackdrop != null -> contentBackdrop
         else -> rememberLayerBackdrop()
     }
     val mode = when {
-        useMiuix && blurOn && effectiveBackdrop != null && isLiquidGlassSupported -> FloatingBottomBarMode.LiquidGlass
-        useMiuix && blurOn && effectiveBackdrop != null -> FloatingBottomBarMode.Blur
+        useMiuix && blurOn && glassOn && isLiquidGlassSupported -> FloatingBottomBarMode.LiquidGlass
+        useMiuix && blurOn -> FloatingBottomBarMode.Blur
         else -> FloatingBottomBarMode.None
     }
     val strings = LocalStrings.current
@@ -539,8 +534,7 @@ private fun AppleFloatingDock(
     val labelOf: (Destination) -> String = { dest ->
         when (dest) {
             Destination.Home -> strings.home
-            Destination.Music -> strings.music
-            Destination.Playlists -> strings.playlists
+            Destination.Library -> strings.library
             Destination.Settings -> strings.settings
         }
     }
@@ -569,7 +563,9 @@ private fun AppleFloatingDock(
         mode = mode,
         colors = barColors,
         iconContent = { dest, index ->
-            val icon = if (index == selectedIndex()) dest.selectedIcon else dest.unselectedIcon
+            // The outlined/filled selection change is specific to Material; Miuix uses
+            // the same solid icon in both states and indicates selection by tint instead.
+            val icon = if (useMiuix || index == selectedIndex()) dest.selectedIcon else dest.unselectedIcon
             if (useMiuix) {
                 dev.shephard.player.ui.miuix.Icon(
                     imageVector = icon,
@@ -605,56 +601,12 @@ private fun AppleFloatingDock(
     }
 }
 
-/**
- * Mini player for playlist detail screens. Uses the large Miuix variant; M3 keeps its normal size.
- * Respects the navigation bar inset itself, so nothing is composed (and no space reserved) without a track.
- */
-@Composable
-private fun DetailMiniPlayerHost(
-    playerViewModel: PlayerViewModel,
-    useMiuix: Boolean,
-    onOpenNowPlaying: () -> Unit,
-    modifier: Modifier
-) {
-    val playerState by playerViewModel.uiState.collectAsState()
-    if (playerState.currentTrack == null) return
-
-    Box(modifier = modifier.navigationBarsPadding()) {
-        if (useMiuix) {
-            // This mini player lives inside the pager, whose layer is the content backdrop. Blurring
-            // with that same backdrop from inside it is self-referential (native crash), so the
-            // blur is turned off here and the solid surface is used instead.
-            CompositionLocalProvider(LocalContentBackdrop provides null) {
-                MiniPlayer(
-                    state = playerState,
-                    progressFlow = playerViewModel.progress,
-                    onClick = onOpenNowPlaying,
-                    onPlayPauseClick = { playerViewModel.togglePlayPause() },
-                    onNextClick = { playerViewModel.skipToNext() },
-                    onPreviousClick = { playerViewModel.skipToPrevious() },
-                    large = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        } else {
-            M3MiniPlayer(
-                state = playerState,
-                progressFlow = playerViewModel.progress,
-                onClick = onOpenNowPlaying,
-                onPlayPauseClick = { playerViewModel.togglePlayPause() },
-                onNextClick = { playerViewModel.skipToNext() },
-                onPreviousClick = { playerViewModel.skipToPrevious() },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-}
-
 @Composable
 private fun MiniPlayerHost(
     playerViewModel: PlayerViewModel,
     useMiuix: Boolean,
-    onOpenNowPlaying: () -> Unit
+    onOpenNowPlaying: () -> Unit,
+    onBoundsChanged: (androidx.compose.ui.geometry.Rect) -> Unit,
 ) {
     val visible by remember(playerViewModel) {
         playerViewModel.uiState
@@ -668,6 +620,9 @@ private fun MiniPlayerHost(
 
     AnimatedVisibility(
         visible = visible,
+        modifier = Modifier.onGloballyPositioned { coordinates ->
+            onBoundsChanged(coordinates.boundsInRoot())
+        }.swipeDownToStop { playerViewModel.closePlayer() },
         enter = fadeIn(tween(200)) + slideInVertically(
             initialOffsetY = { it / 2 },
             animationSpec = androidx.compose.animation.core.spring(0.85f, 300f)

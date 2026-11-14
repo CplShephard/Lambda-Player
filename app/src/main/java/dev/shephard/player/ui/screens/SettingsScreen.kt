@@ -144,7 +144,7 @@ fun SettingsScreen(
                     .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                     .overScrollVertical()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp)
+                    .padding(horizontal = 12.dp)
                     .padding(top = innerPadding.calculateTopPadding() + 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -185,6 +185,8 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     val useMiuix by prefs.useMiuix.collectAsState(initial = true)
     val themeMode by prefs.themeMode.collectAsState(initial = ThemeModePreference.LIGHT)
     val liquidGlassEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
+    val glassEffect by prefs.liquidGlassEffect.collectAsState(initial = false)
+    val dynamicByCover by prefs.dynamicColorByCover.collectAsState(initial = false)
     val appleFloatingBar by prefs.useAppleFloatingBar.collectAsState(initial = false)
 
     // Fix custom colors re-animation: use nullable initial to avoid false->true flicker on enter
@@ -254,6 +256,12 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 MiuixSwitchRow(label = strings.blurEffect, checked = liquidGlassEnabled, description = strings.blurEffectDescription) { enabled ->
                     scope.launch { prefs.setLiquidGlassEnabled(enabled) }
                 }
+                if (liquidGlassEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    Spacer(Modifier.height(8.dp))
+                    MiuixSwitchRow(label = strings.liquidGlass, checked = glassEffect, description = strings.liquidGlassDescription) { enabled ->
+                        scope.launch { prefs.setLiquidGlassEffect(enabled) }
+                    }
+                }
             }
 
             Spacer(Modifier.height(8.dp))
@@ -296,6 +304,10 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                         }
                     }
 
+                    Spacer(Modifier.height(8.dp))
+                    MiuixSwitchRow(label = strings.dynamicColorByCover, checked = dynamicByCover, description = strings.dynamicColorByCoverDescription) { enabled ->
+                        scope.launch { prefs.setDynamicColorByCover(enabled) }
+                    }
                     Spacer(Modifier.height(8.dp))
                     val paletteStyleOptions = PaletteStyle.entries
                     val paletteSelectedIndex = paletteStyleOptions.indexOf(paletteStyle).coerceAtLeast(0)
@@ -363,7 +375,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
         // Fixed: avoid re-animation on enter/exit, only show when data loaded, snap on first load
         val accentGridTarget = useMiuixMonet &&
             paletteStyle != PaletteStyle.Monochrome &&
-            (!dynamicColor || Build.VERSION.SDK_INT < Build.VERSION_CODES.S)
+            (!dynamicColor || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) && !dynamicByCover
         val accentGridVisible = useMiuixMonetNullable != null && dynamicColorNullable != null && accentGridTarget
         val accentGridState = remember(useMiuixMonetNullable, dynamicColorNullable) { MutableTransitionState(accentGridVisible) }
         LaunchedEffect(accentGridVisible) {
@@ -504,6 +516,7 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
     val playWith by prefs.playWithOthers.collectAsState(initial = false)
     val lyricsAutoSearch by prefs.lyricsAutoSearchMode.collectAsState(initial = LyricsAutoSearchMode.OFF)
     val volumeNormalization by prefs.volumeNormalization.collectAsState(initial = VolumeNormalization.NONE)
+    val carouselStyle by prefs.carouselStyle.collectAsState(initial = dev.shephard.player.player.CarouselStyle.NO_PEEK)
 
     SettingsPageScaffold(title = strings.playbackSettings, onBack = onBack) {
         SmallTitle(
@@ -516,6 +529,14 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
             MiuixSwitchRow(label = strings.gapless, checked = gapless) { scope.launch { prefs.setGaplessEnabled(it) } }
             Spacer(Modifier.height(8.dp))
             MiuixSwitchRow(label = strings.playWithOthers, checked = playWith) { scope.launch { prefs.setPlayWithOthers(it) } }
+            Spacer(Modifier.height(8.dp))
+            val carouselModes = dev.shephard.player.player.CarouselStyle.visibleOptions
+            MiuixSpinnerRow(
+                title = strings.carouselTitle, summary = strings.carouselDescription,
+                items = listOf(strings.carouselNoPeek, strings.carouselOnePeek),
+                selectedIndex = carouselModes.indexOf(carouselStyle).coerceAtLeast(0),
+                onSelectedIndexChange = { idx -> carouselModes.getOrNull(idx)?.let { style -> scope.launch { prefs.setCarouselStyle(style) } } }
+            )
             Spacer(Modifier.height(8.dp))
             val lyricsModes = LyricsAutoSearchMode.entries
             MiuixSpinnerRow(
@@ -721,6 +742,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
 
         dev.shephard.player.ui.components.SubmenuTopBar(
             title = strings.aboutSectionTitle,
+            compact = true,
             onBack = onBack,
             state = topBarState,
             collapseFraction = scrollProgress,
@@ -788,19 +810,6 @@ private fun SettingsPageScaffold(
                     .padding(top = innerPadding.calculateTopPadding() + 8.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = title,
-                    style = MiuixAppTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = cs.onBackground,
-                    modifier = Modifier
-                        .padding(top = 4.dp)
-                        .graphicsLayer {
-                            alpha = 1f - scrollProgress
-                            scaleX = 1f - scrollProgress * 0.05f
-                            scaleY = 1f - scrollProgress * 0.05f
-                        }
-                )
                 content()
                 Spacer(Modifier.height(24.dp))
             }

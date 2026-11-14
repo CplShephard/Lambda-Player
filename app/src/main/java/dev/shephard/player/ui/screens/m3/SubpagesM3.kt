@@ -21,6 +21,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import dev.shephard.player.ui.components.comradeEasterEggTrigger
+import dev.shephard.player.ui.components.m3.rememberExpressiveTopBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import dev.shephard.player.ui.components.m3.M3SmallTopBar
 import dev.shephard.player.ui.components.m3.DropDownMenuWidget
 import dev.shephard.player.player.LyricsAutoSearchMode
@@ -105,11 +107,13 @@ fun SettingsScreenM3(
     val strings = LocalStrings.current
     val totalMs by playerViewModel.totalListeningMsLive.collectAsState()
 
+    val m3TopBarState = rememberExpressiveTopBarState()
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().nestedScroll(m3TopBarState.connection),
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             M3SmallTopBar(
+                state = m3TopBarState,
                 title = { Text(strings.settings) },
                 colors = m3TopBarColors(),
             )
@@ -195,12 +199,15 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
     val playWith by prefs.playWithOthers.collectAsState(initial = false)
     val lyricsAutoSearch by prefs.lyricsAutoSearchMode.collectAsState(initial = LyricsAutoSearchMode.OFF)
     val volumeNormalization by prefs.volumeNormalization.collectAsState(initial = VolumeNormalization.NONE)
+    val carouselStyle by prefs.carouselStyle.collectAsState(initial = dev.shephard.player.player.CarouselStyle.NO_PEEK)
 
+            val m3TopBarState = rememberExpressiveTopBarState()
             Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().nestedScroll(m3TopBarState.connection),
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             M3SmallTopBar(
+                state = m3TopBarState,
                 title = { Text(strings.playbackSettings) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) }
@@ -229,6 +236,15 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
                             title = strings.gapless,
                             checked = gapless,
                             onCheckedChange = { scope.launch { prefs.setGaplessEnabled(it) } }
+                        )
+                    }
+                    item {
+                        val modes = dev.shephard.player.player.CarouselStyle.visibleOptions
+                        DropDownMenuWidget(
+                            icon = Icons.Filled.MusicNote, title = strings.carouselTitle, description = strings.carouselDescription,
+                            choice = modes.indexOf(carouselStyle).coerceAtLeast(0),
+                            data = listOf(strings.carouselNoPeek, strings.carouselOnePeek),
+                            onChoiceChange = { idx -> modes.getOrNull(idx)?.let { style -> scope.launch { prefs.setCarouselStyle(style) } } }
                         )
                     }
                     item {
@@ -295,11 +311,13 @@ fun AboutSettingsScreenM3(onBack: () -> Unit) {
         }
     }
 
+            val m3TopBarState = rememberExpressiveTopBarState()
             Scaffold(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().nestedScroll(m3TopBarState.connection),
             containerColor = MaterialTheme.colorScheme.surface,
             topBar = {
                 M3SmallTopBar(
+                    state = m3TopBarState,
                     title = { Text(strings.aboutSectionTitle) },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
                     colors = m3TopBarColors(),
@@ -393,11 +411,13 @@ fun StatsScreenM3(
         ListenStatsCalculator.buildSnapshot(periodEvents)
     }
 
+            val m3TopBarState = rememberExpressiveTopBarState()
             Scaffold(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().nestedScroll(m3TopBarState.connection),
             containerColor = MaterialTheme.colorScheme.surface,
             topBar = {
                 M3SmallTopBar(
+                    state = m3TopBarState,
                     title = { Text(strings.statsTitle) },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
                     colors = m3TopBarColors(),

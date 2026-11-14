@@ -539,6 +539,27 @@ fun <T> FloatingBottomBar(
                         .width(tabWidthDp),
                 )
             } else {
+                // Only the solid floating dock gets the subtle elastic indicator. Keep the
+                // active icons/labels in a separate unscaled layer so their design stays intact.
+                if (mode == FloatingBottomBarMode.None) {
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp)
+                            .graphicsLayer {
+                                val progressOffset = dampedDragAnimation.value * tabWidthPx
+                                translationX = if (isLtr) progressOffset + panelOffset else -progressOffset + panelOffset
+                                val stretchX = (dampedDragAnimation.scaleX - 1f) * 0.17f
+                                val squeezeY = (dampedDragAnimation.scaleY - 1f) * 0.15f
+                                val movement = (abs(dampedDragAnimation.velocity) * 0.015f).coerceIn(0f, 0.06f) *
+                                    dampedDragAnimation.pressProgress.coerceIn(0f, 1f)
+                                scaleX = 1f + stretchX + movement
+                                scaleY = 1f - squeezeY - movement * 0.5f
+                            }
+                            .background(colors.indicatorColor.copy(alpha = 0.15f), pillShape)
+                            .height(56.dp)
+                            .width(tabWidthDp),
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .padding(horizontal = 4.dp)
@@ -547,7 +568,10 @@ fun <T> FloatingBottomBar(
                             translationX = if (isLtr) progressOffset + panelOffset else -progressOffset + panelOffset
                         }
                         .clip(pillShape)
-                        .background(colors.indicatorColor.copy(alpha = 0.15f), pillShape)
+                        .then(
+                            if (mode == FloatingBottomBarMode.None) Modifier
+                            else Modifier.background(colors.indicatorColor.copy(alpha = 0.15f), pillShape)
+                        )
                         .height(56.dp)
                         .width(tabWidthDp),
                     // Force start alignment for the Box container to prevent centering

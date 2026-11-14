@@ -62,6 +62,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -69,8 +70,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.zIndex
-import dev.shephard.player.ui.components.LocalDetailMiniPlayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -81,22 +80,30 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
+import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.shephard.player.data.AudioTrack
+import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.PlaylistCoverArt
 import dev.shephard.player.ui.components.m3.BaseWidget
 import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
+import dev.shephard.player.ui.components.m3.rememberExpressiveTopBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import dev.shephard.player.ui.components.m3.M3SmallTopBar
 import dev.shephard.player.ui.components.m3.SegmentedColumn
 import dev.shephard.player.ui.components.m3.m3ItemCardColors
 import dev.shephard.player.ui.components.m3.m3TopBarColors
 import dev.shephard.player.ui.components.M3BottomSheetWrapper
+import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.i18n.Strings
 import dev.shephard.player.ui.screens.LocalPlaylist
 import dev.shephard.player.ui.screens.encodePlaylists
+import dev.shephard.player.ui.screens.ensureLikedSongsPlaylist
 import dev.shephard.player.ui.screens.parsePlaylists
+import dev.shephard.player.ui.screens.resolvePlaylistTracks
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -112,6 +119,7 @@ internal fun M3PlaylistDetail(
     onPlayAll: () -> Unit,
     onPlayRemix: () -> Unit,
     onRemoveTrack: (Long) -> Unit,
+    onTrackOptions: (AudioTrack) -> Unit,
     onReorder: (List<AudioTrack>) -> Unit = {},
     onChangeSort: (String) -> Unit = {},
     isHomeSimplified: Boolean = false,
@@ -128,7 +136,6 @@ internal fun M3PlaylistDetail(
     var renameDialog by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf(playlist.name) }
     var deleteConfirm by remember { mutableStateOf(false) }
-    var trackMenuTrack by remember { mutableStateOf<AudioTrack?>(null) }
 
     fun updateRaw(transform: (MutableList<LocalPlaylist>) -> Unit) {
         scope.launch {
@@ -160,7 +167,7 @@ internal fun M3PlaylistDetail(
             try {
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             } catch (_: SecurityException) { }
-            if (context.contentResolver.getType(uri) == "image/gif") {
+            if (dev.shephard.player.player.ImagePersistence.isAnimatedCover(context, uri)) {
                 scope.launch {
                     val persisted = dev.shephard.player.player.ImagePersistence.persistCover(context, uri)
                     if (persisted != null) {
@@ -333,22 +340,28 @@ internal fun M3PlaylistDetail(
             confirmButton = {
                 TextButton(onClick = {
                     deleteConfirm = false
-                    updateRaw { all -> all.removeAll { it.name == playlist.name && it.createdAt == playlist.createdAt } }
-                    onBack()
+                    scope.launch {
+                        val all = parsePlaylists(prefs.playlistsJson.first()).toMutableList()
+                        all.removeAll { it.name == playlist.name && it.createdAt == playlist.createdAt }
+                        prefs.setPlaylistsJson(encodePlaylists(all))
+                        onBack()
+                    }
                 }) { Text(strings.delete) }
             },
             dismissButton = { TextButton(onClick = { deleteConfirm = false }) { Text(strings.cancel) } },
         )
     }
 
+    // Top-level submenu (like the settings submenus): the pager, dock and mini player stay
+    // underneath by z-order, so no detail mini player is needed here.
     Box(modifier = Modifier.fillMaxSize()) {
-    // Detail mini player sits above the content (zIndex) and is only composed while the detail is open.
-    LocalDetailMiniPlayer.current(Modifier.align(Alignment.BottomCenter).zIndex(1f))
+    val m3TopBarState = rememberExpressiveTopBarState()
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().nestedScroll(m3TopBarState.connection),
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             M3SmallTopBar(
+                state = m3TopBarState,
                 title = { Text(text = playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -361,7 +374,7 @@ internal fun M3PlaylistDetail(
                             IconButton(onClick = { showMenu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = null) }
                             DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                                 DropdownMenuItem(text = { Text(strings.editPlaylist) }, leadingIcon = { Icon(Icons.Filled.Edit, null) }, onClick = { showMenu = false; renameText = playlist.name; renameDialog = true })
-                                DropdownMenuItem(text = { Text(strings.cover) }, leadingIcon = { Icon(Icons.Filled.QueueMusic, null) }, onClick = { showMenu = false; coverPicker.launch(arrayOf("image/*")) })
+                                DropdownMenuItem(text = { Text(strings.cover) }, leadingIcon = { Icon(Icons.Filled.QueueMusic, null) }, onClick = { showMenu = false; coverPicker.launch(arrayOf("image/*", "video/mp4")) })
                                 DropdownMenuItem(text = { Text(strings.delete) }, leadingIcon = { Icon(Icons.Filled.Delete, null) }, onClick = { showMenu = false; deleteConfirm = true })
                             }
                         }
@@ -376,7 +389,7 @@ internal fun M3PlaylistDetail(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 top = padding.calculateTopPadding() + 8.dp,
-                bottom = 220.dp,
+                bottom = 110.dp,
             ),
         ) {
             item(key = "header") {
@@ -388,11 +401,12 @@ internal fun M3PlaylistDetail(
                             .aspectRatio(1f)
                             .clip(RoundedCornerShape(16.dp))
                             .background(MaterialTheme.colorScheme.secondaryContainer)
-                            .then(if (canEdit) Modifier.clickable { coverPicker.launch(arrayOf("image/*")) } else Modifier),
+                            .then(if (canEdit) Modifier.clickable { coverPicker.launch(arrayOf("image/*", "video/mp4")) } else Modifier),
                     ) {
                         PlaylistCoverArt(
                             coverUri = playlist.coverUri,
                             tracks = plTracks,
+                            animateVideo = true,
                             placeholderColor = MaterialTheme.colorScheme.secondaryContainer,
                             placeholderIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
                             fallback = {
@@ -507,7 +521,7 @@ internal fun M3PlaylistDetail(
                                 track = t,
                                 isDragged = isDragging,
                                 onClick = { onTrackClick(reorderItems.toList(), i) },
-                                onMore = { trackMenuTrack = t },
+                                onMore = { onTrackOptions(t) },
                                 dragHandleModifier = Modifier.draggableHandle(),
                             )
                         }
@@ -525,7 +539,7 @@ internal fun M3PlaylistDetail(
                         M3PlaylistTrackRow(
                             track = t,
                             onClick = { onTrackClick(displayTracks, i) },
-                            onMore = { trackMenuTrack = t },
+                            onMore = { onTrackOptions(t) },
                         )
                     }
                 }
@@ -534,34 +548,7 @@ internal fun M3PlaylistDetail(
     }
     }
 
-    trackMenuTrack?.let { menuTrack ->
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        M3BottomSheetWrapper(
-            onDismissRequest = { trackMenuTrack = null },
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-                LineageListItemWithThumbnail(
-                    headline = menuTrack.title,
-                    supporting = menuTrack.artist,
-                    thumbnailModel = menuTrack.albumArtUri,
-                    placeholderIcon = Icons.Filled.MusicNote
-                )
-                Spacer(Modifier.height(8.dp))
-                SegmentedColumn {
-                    item {
-                        BaseWidget(
-                            icon = Icons.Filled.Delete,
-                            title = strings.removeFromPlaylist,
-                            onClick = { trackMenuTrack = null; onRemoveTrack(menuTrack.id) }
-                        )
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-            }
-        }
-    }
+
 }
 
 /**
@@ -603,7 +590,7 @@ private fun M3PlaylistTrackRow(
             ) {
                 if (track.albumArtUri != null) {
                     AsyncImage(
-                        model = track.albumArtUri,
+                        model = dev.shephard.player.ui.components.rememberStaticArtwork(track.albumArtUri),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -644,4 +631,107 @@ private fun M3PlaylistTrackRow(
             }
         }
     }
+}
+
+/**
+ * Playlist detail as a top-level submenu, exactly like the settings submenus: it is pushed as
+ * [dev.shephard.player.ui.navigation.PlaylistDetailRoute] in NavGraph, so the pager, dock and
+ * mini player stay underneath by z-order. Self-contained (loads its own playlists/tracks) like
+ * the Miuix detail screen.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PlaylistDetailScreenM3(
+    index: Int,
+    onBack: () -> Unit,
+    onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
+    onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> },
+    libraryViewModel: LibraryViewModel = viewModel(),
+    playerViewModel: dev.shephard.player.player.PlayerViewModel = viewModel(),
+) {
+    val context = LocalContext.current
+    val prefs = remember { PreferencesManager(context) }
+    val scope = rememberCoroutineScope()
+    val strings = LocalStrings.current
+
+    val tracks by libraryViewModel.tracks.collectAsState()
+    LaunchedEffect(Unit) {
+        if (tracks.isEmpty()) libraryViewModel.loadTracks()
+    }
+    val json by prefs.playlistsJson.collectAsState(initial = null as String?)
+    val likedSongIdsJson by prefs.likedSongIds.collectAsState(initial = "[]")
+    val likedIds = remember(likedSongIdsJson) {
+        try {
+            JSONArray(likedSongIdsJson).let { arr -> (0 until arr.length()).map { arr.getLong(it) } }
+        } catch (_: Exception) { emptyList() }
+    }
+    val loadedJson = json ?: return
+    val rawPlaylists = remember(loadedJson) { parsePlaylists(loadedJson) }
+    val playlists = remember(rawPlaylists, strings) { ensureLikedSongsPlaylist(rawPlaylists, strings) }
+
+    fun writePlaylists(all: List<LocalPlaylist>) {
+        scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
+    }
+
+    var trackOptions by remember { mutableStateOf<AudioTrack?>(null) }
+    var trackToEditInPlaylist by remember { mutableStateOf<AudioTrack?>(null) }
+    val pl = playlists.getOrNull(index)
+    if (pl == null) {
+        // Playlist was deleted while the detail was open; close it like other submenus do.
+        LaunchedEffect(Unit) { onBack() }
+        return
+    }
+    val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+    fun sameRawPlaylist(p: LocalPlaylist) = p.name == pl.name && p.createdAt == pl.createdAt
+
+    M3PlaylistDetail(
+        playlist = pl,
+        allTracks = tracks,
+        plTracks = plTracks,
+        strings = strings,
+        onBack = onBack,
+        onTrackClick = { list, i -> onTrackClick(list, i, if (pl.isSystem) strings.likedSongs else pl.name) },
+        onPlayAll = { if (plTracks.isNotEmpty()) onTrackClick(plTracks, 0, if (pl.isSystem) strings.likedSongs else pl.name) },
+        onPlayRemix = {
+            if (plTracks.isNotEmpty()) {
+                if (pl.isSystem) onPlaylistRemixClick(plTracks.shuffled(), strings.likedSongs)
+                else onPlaylistRemixClick(plTracks.shuffled(), pl.name)
+            }
+        },
+        onRemoveTrack = { trackId ->
+            val newTrackIds = pl.trackIds - trackId
+            val all = rawPlaylists.toMutableList()
+            val rawIdx = all.indexOfFirst { it.name == pl.name && it.createdAt == pl.createdAt }
+            if (rawIdx >= 0) {
+                all[rawIdx] = all[rawIdx].copy(trackIds = newTrackIds)
+                writePlaylists(all)
+            }
+        },
+        onTrackOptions = { trackOptions = it },
+        onReorder = { newOrder ->
+            writePlaylists(rawPlaylists.map { p ->
+                if (sameRawPlaylist(p)) p.copy(trackIds = newOrder.map { it.id }, sortMode = "custom") else p
+            })
+        },
+        onChangeSort = { mode ->
+            writePlaylists(rawPlaylists.map { p -> if (sameRawPlaylist(p)) p.copy(sortMode = mode) else p })
+        },
+    )
+    trackOptions?.let { track ->
+        dev.shephard.player.ui.screens.SongOptionsSheet(track, false, playerViewModel,
+            onDismiss = { trackOptions = null }, onEdit = { trackOptions = null; trackToEditInPlaylist = track }, onDelete = null,
+            onRemoveFromPlaylist = {
+                trackOptions = null
+                scope.launch {
+                    if (pl.isSystem) prefs.updateLikedTrackId(track.id, "remove")
+                    else prefs.updatePlaylistsJson { json ->
+                        dev.shephard.player.ui.screens.updatePlaylistMembership(json, pl.name, pl.createdAt, listOf(track.id), "remove")
+                    }
+                }
+            })
+    }
+    trackToEditInPlaylist?.let { track ->
+        M3EditTrackDialogLineage(track, libraryViewModel, playerViewModel) { trackToEditInPlaylist = null }
+    }
+
 }
