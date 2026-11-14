@@ -1917,10 +1917,36 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /** Update matching queue snapshots after a MediaStore rescan, without changing order or playback. */
+    fun syncLibraryTracks(tracks: List<AudioTrack>) {
+        if (tracks.isEmpty() || queueTracks.isEmpty()) return
+        val byId = tracks.associateBy { it.id }
+        fun refreshed(old: AudioTrack): AudioTrack {
+            val fresh = byId[old.id] ?: return old
+            if (old.uri != fresh.uri) return old
+            if (old.sourcePath != null && fresh.sourcePath != null && old.sourcePath != fresh.sourcePath) return old
+            if (old.dateAdded > 0L && fresh.dateAdded > 0L && old.dateAdded != fresh.dateAdded) return old
+            return fresh
+        }
+        val updatedQueue = queueTracks.map(::refreshed)
+        val updatedOriginal = originalQueue.map(::refreshed)
+        if (updatedQueue == queueTracks && updatedOriginal == originalQueue) return
+        val current = _uiState.value
+        val currentIndex = current.currentQueueIndex
+        val updatedCurrent = updatedQueue.getOrNull(currentIndex)?.takeIf { it.id == current.currentTrack?.id }
+            ?: current.currentTrack?.let(::refreshed)
+        val previousCurrent = current.currentTrack
+        queueTracks = updatedQueue
+        originalQueue = updatedOriginal
+        _uiState.value = current.copy(queue = updatedQueue, currentTrack = updatedCurrent)
+        if (updatedCurrent != null && updatedCurrent.albumArtUri != previousCurrent?.albumArtUri) extractGlowColor(updatedCurrent)
+    }
+
     fun notifyTrackUpdated(updatedTrack: AudioTrack) {
         val current = _uiState.value
         val updatedQueue = current.queue.map { if (it.id == updatedTrack.id) updatedTrack else it }
         queueTracks = queueTracks.map { if (it.id == updatedTrack.id) updatedTrack else it }
+        originalQueue = originalQueue.map { if (it.id == updatedTrack.id) updatedTrack else it }
         val updatedCurrent = if (current.currentTrack?.id == updatedTrack.id) updatedTrack else current.currentTrack
         _uiState.value = current.copy(queue = updatedQueue, currentTrack = updatedCurrent)
         if (updatedCurrent?.id == updatedTrack.id) {

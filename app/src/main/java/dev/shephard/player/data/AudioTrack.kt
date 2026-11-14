@@ -14,7 +14,9 @@ data class AudioTrack(
     val artistId: Long? = null,
     val genre: String? = null,
     val folder: String? = null,
-    val dateAdded: Long = 0L
+    val dateAdded: Long = 0L,
+    // Optional file identity, used to avoid applying a new override to a recycled MediaStore ID.
+    val sourcePath: String? = null
 )
 
 fun AudioTrack.formattedDuration(): String {

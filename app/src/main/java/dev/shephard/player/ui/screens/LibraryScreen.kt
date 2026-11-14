@@ -72,11 +72,15 @@ fun LibraryScreen(
     val playlistLayout by prefs.playlistsLayout.collectAsState(initial = dev.shephard.player.player.LayoutMode.LIST)
     val albumLayout by prefs.albumsLayout.collectAsState(initial = dev.shephard.player.player.LayoutMode.LIST)
     val refreshing by libraryViewModel.isLoading.collectAsState()
+    var manualRefreshIndicator by remember { mutableStateOf(false) }
     val songSort by prefs.librarySongSort.collectAsState(initial = 0)
     val sortDescending by prefs.librarySortDescending.collectAsState(initial = false)
     val folderFilter by prefs.libraryFolderFilter.collectAsState(initial = "")
     val tracks by libraryViewModel.tracks.collectAsState()
     val state by playerViewModel.uiState.collectAsState()
+    // Also reconcile a queue restored after the first library emission.
+    val queueIdentity = state.queue.map { it.id to it.uri }
+    LaunchedEffect(tracks, queueIdentity) { playerViewModel.syncLibraryTracks(tracks) }
     val permission = rememberAudioPermissionState(onGranted = { libraryViewModel.loadTracks() })
     var pendingDelete by remember { mutableStateOf<android.net.Uri?>(null) }
     var deleteTrack by remember { mutableStateOf<AudioTrack?>(null) }
@@ -165,12 +169,33 @@ fun LibraryScreen(
                 onSelected = { index ->
                     selectTab(index)
                 },
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                animateSelection = true,
             )
         } else {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 labels.forEach { (index, label) ->
-                    FilterChip(selected = selectedTab == index, onClick = { selectTab(index) }, label = { Text(label, maxLines = 1) })
+                    val selected = selectedTab == index
+                    val chipBackground by androidx.compose.animation.animateColorAsState(
+                        if (selected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent,
+                        animationSpec = androidx.compose.animation.core.tween(220), label = "libraryChipBackground",
+                    )
+                    val chipText by androidx.compose.animation.animateColorAsState(
+                        if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                        animationSpec = androidx.compose.animation.core.tween(220), label = "libraryChipText",
+                    )
+                    val chipBorder by androidx.compose.animation.animateColorAsState(
+                        if (selected) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
+                        animationSpec = androidx.compose.animation.core.tween(220), label = "libraryChipBorder",
+                    )
+                    FilterChip(
+                        selected = selected, onClick = { selectTab(index) }, label = { Text(label, maxLines = 1) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = chipBackground, selectedContainerColor = chipBackground,
+                            labelColor = chipText, selectedLabelColor = chipText,
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, chipBorder),
+                    )
                 }
             }
         }
@@ -278,11 +303,19 @@ if (group == null && displayLayout == dev.shephard.player.player.LayoutMode.GRID
             }
         }
         val refreshLibrary: () -> Unit = {
-            if (permission.hasPermission) libraryViewModel.loadTracks() else permission.requestPermission()
+            if (!permission.hasPermission) permission.requestPermission()
+            else if (!manualRefreshIndicator && !refreshing) {
+                manualRefreshIndicator = true
+                libraryViewModel.refreshTracks() // Publish scan results immediately; delay only the indicator.
+                scope.launch {
+                    kotlinx.coroutines.delay(1400L)
+                    manualRefreshIndicator = false
+                }
+            }
         }
         if (useMiuix) {
             top.yukonga.miuix.kmp.basic.PullToRefresh(
-                isRefreshing = refreshing, onRefresh = refreshLibrary,
+                isRefreshing = refreshing || manualRefreshIndicator, onRefresh = refreshLibrary,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 color = MiuixAppTheme.colorScheme.onSurfaceVariant,
                 refreshTexts = listOf(strings.pullToRefresh, strings.releaseToRefresh, strings.refreshing, strings.refreshComplete),
@@ -290,7 +323,7 @@ if (group == null && displayLayout == dev.shephard.player.player.LayoutMode.GRID
             )
         } else {
             androidx.compose.material3.pulltorefresh.PullToRefreshBox(
-                isRefreshing = refreshing, onRefresh = refreshLibrary,
+                isRefreshing = refreshing || manualRefreshIndicator, onRefresh = refreshLibrary,
                 modifier = Modifier.weight(1f).fillMaxWidth(), content = { pagerContent() },
             )
         }

@@ -6,7 +6,7 @@ import android.provider.MediaStore
 
 object MediaStoreScanner {
 
-    fun queryAudioTracks(context: Context): List<AudioTrack> {
+    fun queryAudioTracks(context: Context, artworkRevision: Long = 0L): List<AudioTrack> {
         val tracks = mutableListOf<AudioTrack>()
 
         val collection = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
@@ -29,11 +29,13 @@ object MediaStoreScanner {
         val metadataProjection = projection + arrayOf(
             MediaStore.Audio.Media.ARTIST_ID,
             MediaStore.Audio.Media.DATE_ADDED,
+            MediaStore.Audio.Media.DATE_MODIFIED,
+            MediaStore.Audio.Media.SIZE,
             MediaStore.Audio.Media.DATA
         )
         val extendedProjection = metadataProjection +
             (if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) arrayOf(MediaStore.Audio.Media.RELATIVE_PATH) else emptyArray()) +
-            (if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) arrayOf(MediaStore.Audio.Media.GENRE) else emptyArray())
+            (if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) arrayOf(MediaStore.Audio.Media.GENRE, MediaStore.Audio.Media.GENERATION_MODIFIED) else emptyArray())
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.DURATION} > 0"
         val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
 
@@ -54,6 +56,10 @@ object MediaStoreScanner {
             val artistIdCol = it.getColumnIndex(MediaStore.Audio.Media.ARTIST_ID)
             val dateAddedCol = it.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED)
             val dataCol = it.getColumnIndex(MediaStore.Audio.Media.DATA)
+            val dateModifiedCol = it.getColumnIndex(MediaStore.Audio.Media.DATE_MODIFIED)
+            val sizeCol = it.getColumnIndex(MediaStore.Audio.Media.SIZE)
+            val generationCol = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R)
+                it.getColumnIndex(MediaStore.Audio.Media.GENERATION_MODIFIED) else -1
             val genreCol = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R)
                 it.getColumnIndex(MediaStore.Audio.Media.GENRE) else -1
             val relativePathCol = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
@@ -68,10 +74,13 @@ object MediaStoreScanner {
                 val duration = it.getLong(durationCol)
 
                 val contentUri = ContentUris.withAppendedId(collection, id)
-                val albumArtUri = ContentUris.withAppendedId(
-                    android.net.Uri.parse("content://media/external/audio/albumart"),
-                    albumId
-                )
+                val sourcePath = if (dataCol >= 0) it.getString(dataCol)?.takeIf(String::isNotBlank) else null
+                val dateAdded = if (dateAddedCol >= 0 && !it.isNull(dateAddedCol)) it.getLong(dateAddedCol) else 0L
+                val dateModified = if (dateModifiedCol >= 0 && !it.isNull(dateModifiedCol)) it.getLong(dateModifiedCol) else 0L
+                val size = if (sizeCol >= 0 && !it.isNull(sizeCol)) it.getLong(sizeCol) else 0L
+                val generation = if (generationCol >= 0 && !it.isNull(generationCol)) it.getLong(generationCol) else 0L
+                // Unlike album-level artwork, this cannot borrow another track's cover.
+                val albumArtUri = SongArtworkProvider.uri(context, id, dateAdded, dateModified, size, generation, sourcePath, artworkRevision)
 
                 tracks.add(
                     AudioTrack(
@@ -87,7 +96,8 @@ object MediaStoreScanner {
                         genre = if (genreCol >= 0) it.getString(genreCol)?.takeIf(String::isNotBlank) else null,
                         folder = (if (dataCol >= 0) it.getString(dataCol)?.substringBeforeLast('/', "")?.takeIf(String::isNotBlank) else null)
                             ?: (if (relativePathCol >= 0) it.getString(relativePathCol)?.trimEnd('/')?.takeIf(String::isNotBlank) else null),
-                        dateAdded = if (dateAddedCol >= 0 && !it.isNull(dateAddedCol)) it.getLong(dateAddedCol) else 0L
+                        dateAdded = dateAdded,
+                        sourcePath = sourcePath
                     )
                 )
             }

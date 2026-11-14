@@ -570,7 +570,7 @@ internal fun EditMusicDrawer(
                         title = titleText.ifBlank { track.title },
                         artist = artistText.ifBlank { track.artist },
                         album = albumText.ifBlank { track.album },
-                        albumArtUri = coverUri ?: track.albumArtUri
+                        albumArtUri = coverUri ?: libraryViewModel.getDefaultTrackArtwork(track.id) ?: track.albumArtUri
                     )
                     playerViewModel.notifyTrackUpdated(updatedTrack)
                     dismissDrawer()

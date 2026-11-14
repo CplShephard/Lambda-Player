@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package dev.shephard.player.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -25,7 +29,8 @@ internal fun <T> MiuixSwitcherPills(
     options: List<Pair<T, String>>,
     selected: T,
     onSelected: (T) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    animateSelection: Boolean = false,
 ) {
     val rowScrollState = rememberScrollState()
     Row(
@@ -35,16 +40,24 @@ internal fun <T> MiuixSwitcherPills(
         options.forEach { (value, label) ->
             val isSelected = value == selected
             val cs = MiuixAppTheme.colorScheme
+            val background by animateColorAsState(
+                targetValue = if (isSelected) cs.primary else cs.surfaceVariant.copy(alpha = 0.6f),
+                animationSpec = if (animateSelection) tween(220) else snap(), label = "switcherBackground",
+            )
+            val textColor by animateColorAsState(
+                targetValue = if (isSelected) cs.onPrimary else cs.onSurfaceVariant,
+                animationSpec = if (animateSelection) tween(220) else snap(), label = "switcherText",
+            )
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .background(if (isSelected) cs.primary else cs.surfaceVariant.copy(alpha = 0.6f))
+                    .background(background)
                     .clickable { onSelected(value) }
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Text(
                     text = label,
-                    color = if (isSelected) cs.onPrimary else cs.onSurfaceVariant,
+                    color = textColor,
                     style = MiuixAppTheme.typography.bodyMedium,
                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                 )

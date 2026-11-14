@@ -76,6 +76,12 @@
         </service>
 
         <provider
+            android:name=".data.SongArtworkProvider"
+            android:authorities="${applicationId}.songart"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
+        <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"

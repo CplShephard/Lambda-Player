@@ -19,11 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.Text
@@ -191,36 +187,24 @@ fun MiniPlayer(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.FastRewind,
+                        painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_rewind),
                         contentDescription = LocalStrings.current.previous,
                         tint = MiuixAppTheme.colorScheme.onBackground,
                         modifier = Modifier.size(iconSize)
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .size(buttonSize)
-                        .clip(RoundedCornerShape(8.dp))
-                        .bounceClick(pressScale = 0.92f) { onPlayPauseClick() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    AnimatedContent(
-                        targetState = state.isPlaying,
-                        transitionSpec = {
-                            (fadeIn(animationSpec = tween(150)))
-                                .togetherWith(fadeOut(animationSpec = tween(100)))
-                        },
-                        label = "miniPlayPauseIcon"
-                    ) { isPlaying ->
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = if (isPlaying) LocalStrings.current.pause else LocalStrings.current.play,
-                            tint = MiuixAppTheme.colorScheme.onBackground,
-                            modifier = Modifier.size(iconSize)
-                        )
-                    }
-                }
+                MiuixPlayPauseButton(
+                    isPlaying = state.isPlaying,
+                    onClick = onPlayPauseClick,
+                    playDescription = LocalStrings.current.play,
+                    pauseDescription = LocalStrings.current.pause,
+                    tint = MiuixAppTheme.colorScheme.onBackground,
+                    modifier = Modifier.clip(RoundedCornerShape(8.dp)),
+                    buttonSize = buttonSize,
+                    iconSize = iconSize,
+                    pressScale = 0.92f,
+                )
 
                 Box(
                     modifier = Modifier
@@ -230,7 +214,7 @@ fun MiniPlayer(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.FastForward,
+                        painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_fforward),
                         contentDescription = LocalStrings.current.next,
                         tint = MiuixAppTheme.colorScheme.onBackground,
                         modifier = Modifier.size(iconSize)

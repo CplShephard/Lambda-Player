@@ -37,6 +37,7 @@ object PrefsKeys {
     val ALBUMS_LAYOUT = intPreferencesKey("albums_layout")
     val LIKED_SONG_IDS = stringPreferencesKey("liked_song_ids")
     val TRACK_OVERRIDES_JSON = stringPreferencesKey("track-overrides_json")
+    val SONG_ARTWORK_REVISION = longPreferencesKey("song_artwork_revision")
     val LYRICS_JSON = stringPreferencesKey("lyrics_json")
     // The old key stores blur; retain it so existing preferences migrate without surprises.
     val LIQUID_GLASS_ENABLED = booleanPreferencesKey("liquid_glass_enabled")
@@ -283,6 +284,14 @@ class PreferencesManager(private val context: Context) {
 
     val likedSongIds: Flow<String> = context.dataStore.data.map {
         it[PrefsKeys.LIKED_SONG_IDS] ?: "[]"
+    }
+
+    val songArtworkRevision: Flow<Long> = context.dataStore.data.map { it[PrefsKeys.SONG_ARTWORK_REVISION] ?: 0L }
+
+    suspend fun refreshSongArtworkRevision() {
+        context.dataStore.edit { preferences ->
+            preferences[PrefsKeys.SONG_ARTWORK_REVISION] = (preferences[PrefsKeys.SONG_ARTWORK_REVISION] ?: 0L) + 1L
+        }
     }
 
     val trackOverridesJson: Flow<String> = context.dataStore.data.map {
@@ -572,6 +581,9 @@ class PreferencesManager(private val context: Context) {
             putOrRemove("artist", overrideData.artist)
             putOrRemove("album", overrideData.album)
             putOrRemove("coverUri", overrideData.coverUri)
+            putOrRemove("sourcePath", overrideData.sourcePath)
+            if (overrideData.sourceDateAdded == null) entry.remove("sourceDateAdded")
+            else entry.put("sourceDateAdded", overrideData.sourceDateAdded)
             all.put(trackId.toString(), entry)
             preferences[PrefsKeys.TRACK_OVERRIDES_JSON] = all.toString()
         }

@@ -12,8 +12,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
@@ -25,7 +23,7 @@ import androidx.compose.material3.IconButtonDefaults
 import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.components.BouncyIconButton
 import dev.shephard.player.ui.components.MinimalSeekBar
-import dev.shephard.player.ui.components.bounceClick
+import dev.shephard.player.ui.components.MiuixPlayPauseButton
 import dev.shephard.player.ui.components.m3.M3WavySlider
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,7 +42,6 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -104,7 +101,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -117,8 +113,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.SolidColor
@@ -191,38 +185,17 @@ fun FullScreenLyricsExperience(
     val searchListState = rememberLazyListState()
 
     val track = state.currentTrack
-    val themePrimary = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
-    // The lyrics backdrop is intentionally dark even in a light app theme.
-    val primary = if (themePrimary.luminance() < .28f) lerp(themePrimary, Color.White, .55f) else themePrimary
+    val primary = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
     val textStyle = if (useMiuix) MiuixAppTheme.typography.bodyMedium else MaterialTheme.typography.bodyMedium
     val titleStyle = if (useMiuix) MiuixAppTheme.typography.titleLarge else MaterialTheme.typography.titleLarge
-    // A software-compatible Compose gradient is used on every supported Android version.
-    // Cover extraction is asynchronous; a stable per-track fallback avoids inheriting the
-    // previous track's colour while its artwork is being analysed.
-    val fallbackTint = remember(track?.id) {
-        val seed = (track?.id ?: 0L).toInt()
-        Color.hsv(((seed.toLong() and 0xffffffffL) % 360L).toFloat(), 0.45f, 0.48f)
-    }
-    val coverTint = if (state.coverColorAvailable) Color(state.glowColorArgb) else fallbackTint
-    val lyricsBackground = lerp(Color(0xFF0C1018), coverTint, 0.26f)
-    val lyricsForeground = Color.White
-    var previousTrackId by remember { mutableStateOf(track?.id) }
-    var previousQueueIndex by remember { mutableIntStateOf(state.currentQueueIndex) }
-    var gradientDirection by remember { mutableIntStateOf(1) }
-    var oldGradient by remember { mutableStateOf(lyricsBackground) }
-    var newGradient by remember { mutableStateOf(lyricsBackground) }
-    val gradientProgress = remember { Animatable(1f) }
-    LaunchedEffect(track?.id, lyricsBackground) {
-        if (track?.id != previousTrackId) {
-            gradientDirection = if (state.currentQueueIndex < previousQueueIndex) -1 else 1
-            previousTrackId = track?.id
-            previousQueueIndex = state.currentQueueIndex
-        }
-        oldGradient = lerp(oldGradient, newGradient, gradientProgress.value)
-        newGradient = lyricsBackground
-        gradientProgress.snapTo(0f)
-        gradientProgress.animateTo(1f, tween(750))
-    }
+    val coverTint = Color(state.glowColorArgb)
+    val m3LyricsBackground by animateColorAsState(
+        targetValue = lerp(MaterialTheme.colorScheme.surface, coverTint, 0.34f),
+        animationSpec = tween(520),
+        label = "m3LyricsCoverTint",
+    )
+    val lyricsBackground = if (useMiuix) Color(0xFF111318) else m3LyricsBackground
+    val lyricsForeground = if (useMiuix || lyricsBackground.luminance() < 0.52f) Color.White else Color(0xFF17131A)
     var blurStrength by remember { mutableFloatStateOf(36f) }
     LaunchedEffect(savedBlurStrength) { blurStrength = savedBlurStrength.coerceIn(0f, 64f) }
 
@@ -408,11 +381,37 @@ fun FullScreenLyricsExperience(
             decorFitsSystemWindows = false,
         ),
     ) {
-        // Let the Compose scale/slide transition own the opening and closing, rather than
-        // layering the platform Dialog fade over it.
+        // The dialog has its own window. Match the display bounds, including the short-edge
+        // cutout area, rather than leaving a thin strip outside the lyrics content.
         val dialogView = androidx.compose.ui.platform.LocalView.current
-        androidx.compose.runtime.SideEffect {
-            (dialogView.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window?.setWindowAnimations(0)
+        androidx.compose.runtime.DisposableEffect(dialogView) {
+            val window = (dialogView.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
+            window?.apply {
+                setWindowAnimations(0)
+                clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+                addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+                @Suppress("DEPRECATION")
+                statusBarColor = android.graphics.Color.TRANSPARENT
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    isStatusBarContrastEnforced = false
+                }
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                    attributes = attributes.apply {
+                        layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    }
+                }
+                setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+            }
+            onDispose { /* This window belongs only to this dialog and is destroyed with it. */ }
+        }
+        // Keep status icons legible over the lyrics backdrop without hiding the system bar.
+        val darkStatusIcons = lyricsForeground.luminance() < 0.5f
+        LaunchedEffect(dialogView, darkStatusIcons) {
+            val window = (dialogView.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
+            if (window != null) {
+                val controller = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+                if (controller.isAppearanceLightStatusBars != darkStatusIcons) controller.isAppearanceLightStatusBars = darkStatusIcons
+            }
         }
         WindowNavigationEventBridge()
         val navigationBack = rememberNavigationEventState(currentInfo = NavigationEventInfo.None)
@@ -457,18 +456,38 @@ fun FullScreenLyricsExperience(
                         clip = p > 0.001f || entrance < 0.999f
                     }
             ) {
-                LyricsGradientBackdrop(oldGradient, newGradient, gradientProgress.value, gradientDirection)
-                // Keep the user's artwork/blur preference as a restrained texture, not a
-                // replacement for the gradient; gradient remains available on older Android.
-                if (track?.albumArtUri != null) {
-                    AsyncImage(
-                        model = track.albumArtUri,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize()
-                            .then(if (blurEnabled && blurStrength > 0f) Modifier.blur(blurStrength.dp) else Modifier)
-                            .graphicsLayer { alpha = 0.10f },
-                        contentScale = ContentScale.Crop,
-                    )
+                if (useMiuix) {
+                    Crossfade(
+                        targetState = track?.albumArtUri,
+                        animationSpec = tween(durationMillis = 650),
+                        label = "lyricsBackdropCrossfade",
+                        modifier = Modifier.fillMaxSize(),
+                    ) { artUri ->
+                        if (artUri != null && blurEnabled && blurStrength > 0f) {
+                            AsyncImage(
+                                model = artUri,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer { scaleX = 1.12f; scaleY = 1.12f }
+                                    .blur(blurStrength.dp),
+                                contentScale = ContentScale.Crop,
+                                colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.2f) }),
+                            )
+                        } else if (artUri != null) {
+                            AsyncImage(
+                                model = artUri,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                            )
+                        } else {
+                            Box(Modifier.fillMaxSize().background(Color(0xFF111318)))
+                        }
+                    }
+                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.70f)))
+                } else {
+                    Box(Modifier.fillMaxSize().background(lyricsBackground))
                 }
 
         Column(
@@ -692,6 +711,8 @@ fun FullScreenLyricsExperience(
                                     // Word-synced: the unsung part stays dim, sung words are painted over it.
                                     karaoke -> foreground.copy(alpha = 0.45f)
                                     isActive -> foreground
+                                    // Recently completed word-synced lines retain a brighter finish.
+                                    index < activeIndex && line.words.isNotEmpty() && distance <= 2 -> foreground.copy(alpha = 0.90f)
                                     distance > 3 -> foreground.copy(alpha = 0.40f)
                                     else -> foreground.copy(alpha = 0.72f)
                                 }
@@ -878,13 +899,14 @@ private fun LyricsOptionsDrawer(
 ) {
     val fg = if (useMiuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
     val accent = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
+    val cardColor = if (useMiuix) dev.shephard.player.ui.components.miuixDrawerCardColor() else MaterialTheme.colorScheme.surfaceContainerHigh
     val content: @Composable () -> Unit = {
         val closeThen = dev.shephard.player.ui.components.rememberCloseDrawerThen()
         CompositionLocalProvider(LocalLyricsForeground provides fg) {
             Column(Modifier.fillMaxWidth().heightIn(max = 620.dp).verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 12.dp)) {
                 BasicText(strings.lyricsOptions, style = MaterialTheme.typography.titleLarge.copy(color = fg, fontWeight = FontWeight.Bold), modifier = Modifier.padding(bottom = 12.dp))
                 @Composable fun Action(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean = true, action: () -> Unit) {
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(if (useMiuix) MiuixAppTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceContainerHigh)
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(cardColor)
                         .clickable(enabled = enabled, onClick = action).padding(horizontal = 14.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(icon, null, tint = if (enabled) accent else fg.copy(alpha = .3f))
                         Spacer(Modifier.width(14.dp))
@@ -1019,6 +1041,7 @@ private fun MiuixLyricsSettingsPanel(
     strings: dev.shephard.player.ui.i18n.Strings,
 ) {
     val foreground = LocalLyricsForeground.current
+    val cardColor = dev.shephard.player.ui.components.miuixDrawerCardColor()
     val labelStyle = textStyle.copy(color = foreground.copy(alpha = 0.9f), fontSize = 15.sp, fontWeight = FontWeight.Medium)
     val switchColors = top.yukonga.miuix.kmp.basic.SwitchDefaults.switchColors(
         checkedTrackColor = primary,
@@ -1037,7 +1060,7 @@ private fun MiuixLyricsSettingsPanel(
             .fillMaxWidth()
             .padding(bottom = 8.dp)
             .clip(RoundedCornerShape(20.dp))
-            .background(foreground.copy(alpha = 0.10f))
+            .background(cardColor)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -1265,6 +1288,7 @@ private fun LyricsPlaybackControls(
                 },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                 trackHeight = 6.dp,
+                expandOnPress = true,
                 activeColor = Color.White,
                 inactiveColor = Color.White.copy(alpha = 0.3f),
             )
@@ -1342,8 +1366,6 @@ private fun LyricsMiuixTransport(
     onRepeat: () -> Unit,
     strings: dev.shephard.player.ui.i18n.Strings,
 ) {
-    val playScale = remember { Animatable(1f) }
-    val playScope = rememberCoroutineScope()
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 12.dp, start = 12.dp, end = 12.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -1358,46 +1380,21 @@ private fun LyricsMiuixTransport(
         )
         BouncyIconButton(
             onClick = onPrevious,
-            icon = Icons.Filled.FastRewind,
+            painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_rewind),
             contentDescription = strings.previous,
             tint = Color.White,
             iconSize = 36.dp,
         )
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .bounceClick {
-                    playScope.launch {
-                        playScale.animateTo(0.85f, tween(80))
-                        playScale.animateTo(1.1f, spring(dampingRatio = 0.45f, stiffness = 600f))
-                        playScale.animateTo(1f, spring(dampingRatio = 0.7f, stiffness = 600f))
-                    }
-                    onPlayPause()
-                }
-                .graphicsLayer {
-                    scaleX = playScale.value
-                    scaleY = playScale.value
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            AnimatedContent(
-                targetState = isPlaying,
-                transitionSpec = {
-                    fadeIn(animationSpec = tween(150)).togetherWith(fadeOut(animationSpec = tween(100)))
-                },
-                label = "lyricsMiuixPlayPause",
-            ) { playing ->
-                Icon(
-                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (playing) strings.pause else strings.play,
-                    tint = Color.White,
-                    modifier = Modifier.size(40.dp),
-                )
-            }
-        }
+        MiuixPlayPauseButton(
+            isPlaying = isPlaying,
+            onClick = onPlayPause,
+            playDescription = strings.play,
+            pauseDescription = strings.pause,
+            tint = Color.White,
+        )
         BouncyIconButton(
             onClick = onNext,
-            icon = Icons.Filled.FastForward,
+            painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_fforward),
             contentDescription = strings.next,
             tint = Color.White,
             iconSize = 36.dp,
@@ -1572,37 +1569,6 @@ private fun rememberSmoothLyricsPosition(positionMs: Long, isPlaying: Boolean, e
     return smooth
 }
 
-/** Horizontal feathered wave, revealed from the selected queue direction. */
-@Composable
-private fun LyricsGradientBackdrop(old: Color, new: Color, progress: Float, direction: Int) {
-    Canvas(Modifier.fillMaxSize()) {
-        fun palette(c: Color) = listOf(lerp(c, Color(0xFF15111F), .24f), c, lerp(c, Color(0xFF070B15), .52f))
-        drawRect(brush = Brush.verticalGradient(palette(old)))
-        val p = progress.coerceIn(0f, 1f)
-        if (p >= 0.999f) {
-            drawRect(brush = Brush.verticalGradient(palette(new)))
-        } else if (p > 0f) {
-            // Horizontal slices form a soft low-amplitude travelling wave without runtime shaders.
-            val bands = 32
-            val h = size.height / bands
-            val feather = size.width * .12f
-            val newPalette = palette(new)
-            for (i in 0 until bands) {
-                val y = (i + .5f) / bands
-                val wave = kotlin.math.sin(y * 6.283185f + p * 3.14159f) * size.width * .035f * kotlin.math.sin(p * 3.14159f)
-                val edge = if (direction >= 0) size.width * (1f - p) + wave else size.width * p + wave
-                // Construct each band's colour ramp directly so it works on pre-Android 13 too.
-                val base = if (y < .5f) lerp(newPalette[0], newPalette[1], y * 2f)
-                    else lerp(newPalette[1], newPalette[2], (y - .5f) * 2f)
-                val clear = base.copy(alpha = 0f)
-                val ramp = if (direction >= 0) listOf(clear, base) else listOf(base, clear)
-                drawRect(brush = Brush.horizontalGradient(ramp, startX = edge - feather, endX = edge + feather),
-                    topLeft = Offset(0f, i * h), size = Size(size.width, h + 1f))
-            }
-        }
-    }
-}
-
 /**
  * QQ-Music-style karaoke: paints the already-sung part of [line] in [color] over the dim base
  * text, sweeping through the current word/character in proportion to its sung time.
@@ -1646,14 +1612,16 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawKaraokeHighligh
         }
         // Paint a short alpha ramp through the glyphs rather than clipping at a hard edge.
         // Shadow is deliberately subtle and uses the same text layout to preserve shaping.
-        val feather = 5.dp.toPx()
+        val feather = 2.dp.toPx()
         val full = sungChars >= lineEnd || lineEnd <= lineStart
-        val brush = if (full) SolidColor(color) else Brush.horizontalGradient(
-            colors = if (rtl) listOf(Color.Transparent, color) else listOf(color, Color.Transparent),
-            startX = edge - feather, endX = edge + feather,
+        val brush = if (full) SolidColor(color.copy(alpha = 1f)) else Brush.horizontalGradient(
+            colors = if (rtl) listOf(Color.Transparent, color.copy(alpha = 1f)) else listOf(color.copy(alpha = 1f), Color.Transparent),
+            startX = if (rtl) edge else edge - feather,
+            endX = if (rtl) edge + feather else edge,
         )
         clipRect(left = 0f, top = top, right = size.width, bottom = bottom) {
-            drawText(layout, brush = brush, shadow = Shadow(color.copy(alpha = .22f), blurRadius = 3.dp.toPx()))
+            // Override the dim base text alpha explicitly for the filled glyphs.
+            drawText(layout, brush = brush, alpha = 1f, shadow = Shadow(color.copy(alpha = .22f), blurRadius = 3.dp.toPx()))
         }
     }
 }

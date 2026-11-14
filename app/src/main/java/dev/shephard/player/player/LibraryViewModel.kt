@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -27,7 +28,9 @@ data class TrackOverride(
     val title: String? = null,
     val artist: String? = null,
     val album: String? = null,
-    val coverUri: String? = null
+    val coverUri: String? = null,
+    val sourcePath: String? = null,
+    val sourceDateAdded: Long? = null,
 )
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
@@ -97,6 +100,20 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         if (!_hasScanned.value && scanJob?.isActive != true) loadTracks()
     }
 
+    /** Refresh the persisted cache revision in its own job; observer-triggered scans cannot cancel it. */
+    fun refreshTracks() {
+        viewModelScope.launch {
+            try {
+                prefs.refreshSongArtworkRevision()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("LibraryViewModel", "Could not refresh artwork revision", e)
+            }
+            loadTracks()
+        }
+    }
+
     fun loadTracks() {
         val generation = ++scanGeneration
         scanJob?.cancel()
@@ -105,8 +122,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             try {
                 // Never publish raw MediaStore metadata before persisted edits are loaded.
                 overridesReady.await()
+                val artworkRevision = prefs.songArtworkRevision.first()
                 val result = withContext(Dispatchers.IO) {
-                    MediaStoreScanner.queryAudioTracks(getApplication())
+                    MediaStoreScanner.queryAudioTracks(getApplication(), artworkRevision)
                 }
                 rawTracks = result
                 _tracks.value = applyOverridesToList(result, _overrides.value)
@@ -131,7 +149,12 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     fun saveTrackOverride(trackId: Long, title: String, artist: String, album: String, coverUri: String?) {
         viewModelScope.launch {
             try {
-                prefs.updateTrackOverride(trackId, TrackOverride(title, artist, album, coverUri))
+                val source = rawTracks.firstOrNull { it.id == trackId }
+                prefs.updateTrackOverride(trackId, TrackOverride(
+                    title, artist, album, coverUri,
+                    sourcePath = source?.sourcePath,
+                    sourceDateAdded = source?.dateAdded?.takeIf { it > 0L },
+                ))
                 // DataStore's flow updates all active library screens with the merged result.
             } catch (e: CancellationException) {
                 throw e
@@ -141,7 +164,20 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun getOverride(trackId: Long): TrackOverride? = _overrides.value[trackId.toString()]
+    fun getOverride(trackId: Long): TrackOverride? {
+        val source = rawTracks.firstOrNull { it.id == trackId } ?: return null
+        return _overrides.value[trackId.toString()]?.takeIf { it.matchesSource(source) }
+    }
+
+    /** Original MediaStore-derived artwork, used when a custom cover is removed. */
+    fun getDefaultTrackArtwork(trackId: Long): Uri? = rawTracks.firstOrNull { it.id == trackId }?.albumArtUri
+
+    private fun TrackOverride.matchesSource(track: AudioTrack): Boolean {
+        if (sourcePath != null && track.sourcePath != null && sourcePath != track.sourcePath) return false
+        if (sourceDateAdded != null && track.dateAdded > 0L && sourceDateAdded != track.dateAdded) return false
+        // Legacy overrides have no identity metadata; keep them instead of deleting user edits.
+        return true
+    }
 
     private fun applyOverridesToList(tracks: List<AudioTrack>, overrides: Map<String, TrackOverride>): List<AudioTrack> {
         val collator = Collator.getInstance(Locale.getDefault()).apply {
@@ -149,7 +185,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
 
         return tracks.map { track ->
-            val ov = overrides[track.id.toString()] ?: return@map track
+            val ov = overrides[track.id.toString()]?.takeIf { it.matchesSource(track) } ?: return@map track
             track.copy(
                 title = ov.title?.takeIf { it.isNotBlank() } ?: track.title,
                 artist = ov.artist?.takeIf { it.isNotBlank() } ?: track.artist,
@@ -202,7 +238,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                         title = v.optString("title").takeIf { it.isNotEmpty() },
                         artist = v.optString("artist").takeIf { it.isNotEmpty() },
                         album = v.optString("album").takeIf { it.isNotEmpty() },
-                        coverUri = v.optString("coverUri").takeIf { it.isNotEmpty() }
+                        coverUri = v.optString("coverUri").takeIf { it.isNotEmpty() },
+                        sourcePath = v.optString("sourcePath").takeIf { it.isNotEmpty() },
+                        sourceDateAdded = v.optLong("sourceDateAdded", 0L).takeIf { it > 0L }
                     )
                 }
                 map
@@ -217,6 +255,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 ov.artist?.let { v.put("artist", it) }
                 ov.album?.let { v.put("album", it) }
                 ov.coverUri?.let { v.put("coverUri", it) }
+                ov.sourcePath?.let { v.put("sourcePath", it) }
+                ov.sourceDateAdded?.let { v.put("sourceDateAdded", it) }
                 obj.put(key, v)
             }
             return obj.toString()

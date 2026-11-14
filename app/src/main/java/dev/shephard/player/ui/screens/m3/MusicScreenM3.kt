@@ -386,7 +386,7 @@ internal fun M3EditTrackDialogLineage(
             TextButton(
                 onClick = {
                     libraryViewModel.saveTrackOverride(trackId = track.id, title = titleText, artist = artistText, album = albumText, coverUri = coverUri?.toString())
-                    val updatedTrack = track.copy(title = titleText.ifBlank { track.title }, artist = artistText.ifBlank { track.artist }, album = albumText.ifBlank { track.album }, albumArtUri = coverUri ?: track.albumArtUri)
+                    val updatedTrack = track.copy(title = titleText.ifBlank { track.title }, artist = artistText.ifBlank { track.artist }, album = albumText.ifBlank { track.album }, albumArtUri = coverUri ?: libraryViewModel.getDefaultTrackArtwork(track.id) ?: track.albumArtUri)
                     playerViewModel.notifyTrackUpdated(updatedTrack)
                     onDismiss()
                 },

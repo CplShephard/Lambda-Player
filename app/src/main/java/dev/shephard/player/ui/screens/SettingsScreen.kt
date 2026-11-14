@@ -185,7 +185,8 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
 
     val useMiuix by prefs.useMiuix.collectAsState(initial = true)
     val themeMode by prefs.themeMode.collectAsState(initial = ThemeModePreference.LIGHT)
-    val liquidGlassEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
+    val liquidGlassEnabledLoaded by prefs.liquidGlassEnabled.collectAsState(initial = null as Boolean?)
+    val liquidGlassEnabled = liquidGlassEnabledLoaded == true
     val glassEffect by prefs.liquidGlassEffect.collectAsState(initial = false)
     val dynamicByCover by prefs.dynamicColorByCover.collectAsState(initial = false)
     val appleFloatingBar by prefs.useAppleFloatingBar.collectAsState(initial = false)
@@ -253,10 +254,23 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 MiuixSwitchRow(label = strings.blurEffect, checked = liquidGlassEnabled, description = strings.blurEffectDescription) { enabled ->
                     scope.launch { prefs.setLiquidGlassEnabled(enabled) }
                 }
-                if (liquidGlassEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    Spacer(Modifier.height(8.dp))
-                    MiuixSwitchRow(label = strings.liquidGlass, checked = glassEffect, description = strings.liquidGlassDescription) { enabled ->
-                        scope.launch { prefs.setLiquidGlassEffect(enabled) }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && liquidGlassEnabledLoaded != null) {
+                    // Match the accent grid: start at the persisted value, animate only changes.
+                    val glassRowState = remember { MutableTransitionState(liquidGlassEnabled) }
+                    LaunchedEffect(liquidGlassEnabled) { glassRowState.targetState = liquidGlassEnabled }
+                    AnimatedVisibility(
+                        visibleState = glassRowState,
+                        enter = fadeIn(animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)) +
+                            expandVertically(animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing)),
+                        exit = fadeOut(animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing)) +
+                            shrinkVertically(animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)),
+                    ) {
+                        Column {
+                            Spacer(Modifier.height(8.dp))
+                            MiuixSwitchRow(label = strings.liquidGlass, checked = glassEffect, description = strings.liquidGlassDescription) { enabled ->
+                                scope.launch { prefs.setLiquidGlassEffect(enabled) }
+                            }
+                        }
                     }
                 }
             }

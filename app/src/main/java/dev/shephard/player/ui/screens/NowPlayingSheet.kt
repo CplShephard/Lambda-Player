@@ -108,6 +108,7 @@ import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.components.BouncyIconButton
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.components.MinimalSeekBar
+import dev.shephard.player.ui.components.MiuixPlayPauseButton
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -202,8 +203,6 @@ fun NowPlayingSheet(
         }
     }
 
-val playButtonScale = remember { androidx.compose.animation.core.Animatable(1f) }
-    val playButtonScope = rememberCoroutineScope()
 
 var isInteractingWithSheet by remember { mutableStateOf(false) }
     val isFullyExpanded by remember {
@@ -382,41 +381,13 @@ SeekBarRow(playerViewModel = playerViewModel)
                     iconSize = 36.dp
                 )
 
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .bounceClick {
-                            playButtonScope.launch {
-                                playButtonScale.animateTo(0.85f, androidx.compose.animation.core.tween(80))
-                                playButtonScale.animateTo(1.1f, androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 600f))
-                                playButtonScale.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 600f))
-                            }
-                            playerViewModel.togglePlayPause()
-                        }
-                        .graphicsLayer {
-                            scaleX = playButtonScale.value
-                            scaleY = playButtonScale.value
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    androidx.compose.animation.AnimatedContent(
-                        targetState = state.isPlaying,
-                        transitionSpec = {
-                            androidx.compose.animation.ContentTransform(
-                                targetContentEnter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(150)) + androidx.compose.animation.scaleIn(initialScale = 0.5f),
-                                initialContentExit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(100)) + androidx.compose.animation.scaleOut(targetScale = 1.5f)
-                            )
-                        },
-                        label = "playPauseIcon"
-                    ) { isPlaying ->
-                        Icon(
-                            painter = androidx.compose.ui.res.painterResource(if (isPlaying) dev.shephard.player.R.drawable.ic_nowplaying_pause else dev.shephard.player.R.drawable.ic_nowplaying_play),
-                            contentDescription = if (isPlaying) strings.pause else strings.play,
-                            tint = Color.White,
-                            modifier = Modifier.size(40.dp)
-                        )
-                    }
-                }
+                MiuixPlayPauseButton(
+                    isPlaying = state.isPlaying,
+                    onClick = playerViewModel::togglePlayPause,
+                    playDescription = strings.play,
+                    pauseDescription = strings.pause,
+                    tint = Color.White,
+                )
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToNext() },
                     painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_fforward),
