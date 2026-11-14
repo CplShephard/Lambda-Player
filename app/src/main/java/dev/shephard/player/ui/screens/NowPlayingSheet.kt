@@ -2,8 +2,6 @@
 
 package dev.shephard.player.ui.screens
 
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionOnScreen
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
@@ -97,6 +95,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import sh.calvin.reorderable.ReorderableItem
@@ -136,7 +135,6 @@ fun NowPlayingSheet(
     var showQueue by remember { mutableStateOf(false) }
     var showPlaylists by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
-    var lyricsButtonBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
 
     val density = LocalDensity.current
     val dismissThresholdPx = with(density) { 140.dp.toPx() }
@@ -464,10 +462,6 @@ SeekBarRow(playerViewModel = playerViewModel)
                     )
                     BouncyIconButton(
                         onClick = { showLyrics = true },
-                        modifier = Modifier.onGloballyPositioned { coordinates ->
-                            val pos = coordinates.positionOnScreen()
-                            if (pos.x.isFinite() && pos.y.isFinite()) lyricsButtonBounds = androidx.compose.ui.geometry.Rect(pos.x, pos.y, pos.x + coordinates.size.width, pos.y + coordinates.size.height)
-                        },
                         icon = Icons.Filled.Lyrics,
                         contentDescription = strings.lyrics,
                         tint = Color.White,
@@ -523,7 +517,6 @@ SeekBarRow(playerViewModel = playerViewModel)
                 FullScreenLyricsExperience(
                     playerViewModel = playerViewModel,
                     useMiuix = true,
-                    sourceBoundsOnScreen = lyricsButtonBounds,
                     onDismiss = { showLyrics = false },
                 )
             }
@@ -641,7 +634,7 @@ private fun SeekBarRow(playerViewModel: PlayerViewModel) {
 }
 
 @Composable
-private fun AddToPlaylistDrawer(
+internal fun AddToPlaylistDrawer(
     trackId: Long,
     track: AudioTrack?,
     playerViewModel: PlayerViewModel,
@@ -649,7 +642,6 @@ private fun AddToPlaylistDrawer(
     strings: dev.shephard.player.ui.i18n.Strings
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val prefs = remember { PreferencesManager(context) }
     val json by prefs.playlistsJson.collectAsState(initial = "[]")
     val playlists = remember(json) { parsePlaylists(json) }
@@ -659,13 +651,26 @@ private fun AddToPlaylistDrawer(
         catch (_: Exception) { emptyList() }
     }
     val isLiked = likedIds.contains(trackId)
-    val addToPlaylistLiquidGlassOn = LocalBlurEnabled.current
+    val visiblePlaylists = remember(playlists) { playlists.filterNot { it.isSystem } }
+    val togglePlaylist: (LocalPlaylist) -> Unit = { playlist ->
+        playerViewModel.viewModelScope.launch {
+            try {
+                prefs.updatePlaylistsJson { json ->
+                    updatePlaylistMembership(json, playlist.name, playlist.createdAt, listOf(trackId), "toggle")
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                android.widget.Toast.makeText(context, strings.actionFailed, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
-MiuixDrawer(
+    MiuixDrawer(
         onDismissRequest = onDismiss,
     ) {
-
-Column(
+        val card = dev.shephard.player.ui.components.miuixDrawerCardColor()
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
@@ -676,21 +681,17 @@ Column(
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
-                    .overScrollVertical()
+                    .overScrollVertical(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
 
-item {
+                item {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable {
-                                scope.launch {
-                                    val newIds = if (isLiked) likedIds - trackId else likedIds + trackId
-                                    val arr = org.json.JSONArray().apply { newIds.forEach { put(it) } }
-                                    prefs.setLikedSongIds(arr.toString())
-                                }
-                            }
+                            .background(card)
+                            .clickable { playerViewModel.toggleLike(trackId) }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -708,7 +709,7 @@ item {
                         }
                         Box(
                             modifier = Modifier.size(32.dp).clip(CircleShape)
-                                .background(if (isLiked) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f) else MiuixAppTheme.colorScheme.surfaceVariant),
+                                .background(if (isLiked) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f) else MiuixAppTheme.colorScheme.surfaceContainer),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -721,23 +722,14 @@ item {
                     }
                 }
 
-itemsIndexed(playlists) { idx, pl ->
-                    if (pl.isSystem) return@itemsIndexed
+                itemsIndexed(visiblePlaylists) { _, pl ->
                     val containsTrack = pl.trackIds.contains(trackId)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable {
-                                val updated = if (containsTrack)
-                                    pl.copy(trackIds = pl.trackIds - trackId)
-                                else
-                                    pl.copy(trackIds = pl.trackIds + trackId)
-                                val all = playlists.toMutableList()
-                                all[idx] = updated
-                                scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
-
-                            }
+                            .background(card)
+                            .clickable { togglePlaylist(pl) }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -747,7 +739,7 @@ itemsIndexed(playlists) { idx, pl ->
                         }
                         Box(
                             modifier = Modifier.size(32.dp).clip(CircleShape)
-                                .background(if (containsTrack) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f) else MiuixAppTheme.colorScheme.surfaceVariant),
+                                .background(if (containsTrack) MiuixAppTheme.colorScheme.primary.copy(alpha = 0.18f) else MiuixAppTheme.colorScheme.surfaceContainer),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(

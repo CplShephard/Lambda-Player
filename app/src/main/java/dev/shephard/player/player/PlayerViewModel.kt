@@ -1251,7 +1251,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val candidates = coroutineScope {
                 val lrclib = async(Dispatchers.IO) { runCatching { searchLrclib(query) }.getOrDefault(emptyList()) }
                 val qqMusic = async { runCatching { searchQqLyrics(query) }.getOrDefault(emptyList()) }
-                lrclib.await() + qqMusic.await()
+                val liriqo = async(Dispatchers.IO) { runCatching { LiriqoLyrics.search(query) }.getOrDefault(emptyList()) }
+                lrclib.await() + qqMusic.await() + liriqo.await()
             }
             pickBestLyricsCandidate(candidates, track)?.let { return it }
             if (_uiState.value.currentTrack?.id != track.id) return null
@@ -1502,7 +1503,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _lyricsSearchState.value = LyricsSearchUiState(query = cleanedQuery, isLoading = true)
         lyricsSearchJob = viewModelScope.launch {
             try {
-                val (lrclibAttempt, qqAttempt) = coroutineScope {
+                val (lrclibAttempt, qqAttempt, liriqoAttempt) = coroutineScope {
                     val lrclib = async(Dispatchers.IO) { runCatching { searchLrclib(cleanedQuery) } }
                     val qqMusic = async {
                         try {
@@ -1513,20 +1514,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             Result.failure(error)
                         }
                     }
-                    lrclib.await() to qqMusic.await()
+                    val liriqo = async(Dispatchers.IO) { runCatching { LiriqoLyrics.search(cleanedQuery) } }
+                    Triple(lrclib.await(), qqMusic.await(), liriqo.await())
                 }
                 if (trackId != _uiState.value.currentTrack?.id) return@launch
-                val results = (lrclibAttempt.getOrDefault(emptyList()) + qqAttempt.getOrDefault(emptyList()))
+                val results = (liriqoAttempt.getOrDefault(emptyList()) + lrclibAttempt.getOrDefault(emptyList()) + qqAttempt.getOrDefault(emptyList()))
                     .distinctBy { "${it.source}|${it.sourceId ?: it.id ?: (it.title.trim().lowercase() + "|" + it.artist.trim().lowercase())}" }
                     .take(30)
-                val networkFailed = results.isEmpty() && lrclibAttempt.isFailure && qqAttempt.isFailure
+                val networkFailed = results.isEmpty() && lrclibAttempt.isFailure && qqAttempt.isFailure && liriqoAttempt.isFailure
                 val applicable = results.filter { it.rawLyrics.isNotBlank() }
                 if (autoApply && applicable.isNotEmpty()) {
                     val track = _uiState.value.currentTrack
-                    val chosen = track?.let { pickBestLyricsCandidate(applicable, it) } ?: applicable.first()
-                    setManualLyricsText(chosen.rawLyrics)
-                    _lyricsSearchState.value = LyricsSearchUiState(query = cleanedQuery, autoApplied = true)
-                    return@launch
+                    val chosen = if (track != null) pickBestLyricsCandidate(applicable, track) else null
+                    if (chosen != null) {
+                        setManualLyricsText(chosen.rawLyrics)
+                        _lyricsSearchState.value = LyricsSearchUiState(query = cleanedQuery, autoApplied = true)
+                        return@launch
+                    } // No safe automatic match: leave the results for an explicit user choice.
                 }
                 _lyricsSearchState.value = LyricsSearchUiState(
                     query = cleanedQuery,

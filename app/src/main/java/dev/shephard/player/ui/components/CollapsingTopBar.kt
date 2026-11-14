@@ -101,10 +101,12 @@ fun Modifier.miuixHeaderSafeTop(): Modifier {
 private fun BoxScope.TopBarBlurBackground(
     state: CollapsingTopBarState,
     collapseFraction: Float,
+    includeStatusBar: Boolean = false,
 ) {
     val surface = MiuixAppTheme.colorScheme.background
+    val statusHeight = if (includeStatusBar) WindowInsets.safeDrawing.only(WindowInsetsSides.Top).asPaddingValues().calculateTopPadding() else 0.dp
     Box(
-        modifier = Modifier.fillMaxWidth().height(64.dp).align(Alignment.TopCenter)
+        modifier = Modifier.fillMaxWidth().height(statusHeight + 64.dp).align(Alignment.TopCenter)
             .graphicsLayer {
                 alpha = collapseFraction.coerceIn(0f, 1f)
                 compositingStrategy = CompositingStrategy.Offscreen
@@ -124,8 +126,9 @@ private fun BoxScope.TopBarBlurBackground(
 private fun BoxScope.MiuixStatusBarBackground() {
     val top = WindowInsets.safeDrawing.only(WindowInsetsSides.Top).asPaddingValues().calculateTopPadding()
     val surface = MiuixAppTheme.colorScheme.background
-    Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(top)
-        .background(Brush.verticalGradient(listOf(surface, surface.copy(alpha = .88f)))))
+    // Extend the same opaque page/top-bar surface behind the status icons. The
+    // scroll-dependent bar/blur overlay above this spans this inset as well.
+    Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(top).background(surface))
 }
 
 /** Single title moves from the large left title to the centered small title. */
@@ -160,8 +163,10 @@ fun CollapsingTopBar(
     modifier: Modifier = Modifier,
 ) {
     val scrollProgress = state.collapseFraction
-    Box(modifier = modifier.fillMaxWidth().miuixHeaderSafeTop()) {
-        TopBarBlurBackground(state, scrollProgress)
+    Box(modifier = modifier.fillMaxWidth()) {
+        MiuixStatusBarBackground()
+        TopBarBlurBackground(state, scrollProgress, includeStatusBar = true)
+        Box(Modifier.fillMaxWidth().miuixHeaderSafeTop()) {
         SmallTopAppBar(
             title = title,
             color = if (state.pageBackdrop != null)
@@ -172,6 +177,7 @@ fun CollapsingTopBar(
             scrollBehavior = state.scrollBehavior,
             defaultWindowInsetsPadding = false,
         )
+        }
     }
 }
 
@@ -202,6 +208,7 @@ fun MiuixTopBar(
     val fraction = state.collapseFraction
     Box(modifier = modifier.fillMaxWidth()) {
         MiuixStatusBarBackground()
+        TopBarBlurBackground(state, fraction, includeStatusBar = true)
         Box(Modifier.fillMaxWidth().miuixHeaderSafeTop()) {
         TopAppBar(
             title = title,
@@ -213,7 +220,6 @@ fun MiuixTopBar(
             scrollBehavior = state.scrollBehavior,
             defaultWindowInsetsPadding = false,
         )
-        TopBarBlurBackground(state, fraction)
         MovingMiuixTitle(title, fraction)
         }
     }
@@ -262,6 +268,7 @@ fun SubmenuTopBar(
     collapseFraction: Float,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    showStatusBarBackground: Boolean = true,
 ) {
     val cs = MiuixAppTheme.colorScheme
     val fraction = if (compact) collapseFraction.coerceIn(0f, 1f) else state.collapseFraction
@@ -276,12 +283,12 @@ fun SubmenuTopBar(
         }
     }
     Box(modifier = modifier.fillMaxWidth()) {
-        MiuixStatusBarBackground()
+        if (showStatusBarBackground) MiuixStatusBarBackground()
+        TopBarBlurBackground(state, fraction, includeStatusBar = true)
         Box(Modifier.fillMaxWidth().miuixHeaderSafeTop()) {
         if (compact) {
             SmallTopAppBar(title = title, color = Color.Transparent, titleColor = Color.Transparent,
                 scrollBehavior = state.scrollBehavior, defaultWindowInsetsPadding = false)
-            TopBarBlurBackground(state, fraction)
             Box(Modifier.align(Alignment.TopStart).height(56.dp), contentAlignment = Alignment.CenterStart) { backIcon() }
             Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(56.dp).graphicsLayer { alpha = fraction },
                 contentAlignment = Alignment.Center) {
@@ -292,7 +299,6 @@ fun SubmenuTopBar(
             TopAppBar(title = title, largeTitle = title, titleColor = Color.Transparent,
                 largeTitleColor = Color.Transparent, color = Color.Transparent,
                 scrollBehavior = state.scrollBehavior, defaultWindowInsetsPadding = false)
-            TopBarBlurBackground(state, fraction)
             MovingMiuixTitle(title, fraction)
             Box(Modifier.align(Alignment.TopStart).height(56.dp), contentAlignment = Alignment.CenterStart) { backIcon() }
         }

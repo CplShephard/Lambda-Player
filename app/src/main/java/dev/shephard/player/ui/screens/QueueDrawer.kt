@@ -48,7 +48,7 @@ fun QueueDrawer(playerViewModel: PlayerViewModel, useMiuix: Boolean, onDismiss: 
     val strings = LocalStrings.current
     val accent = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
     val text = if (useMiuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
-    val card = if (useMiuix) MiuixAppTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceContainerHigh
+    val card = if (useMiuix) dev.shephard.player.ui.components.miuixDrawerCardColor() else MaterialTheme.colorScheme.surfaceContainerHigh
     val dock = if (useMiuix) MiuixAppTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainerHighest
     val current = state.currentQueueIndex.coerceIn(0, (state.queue.size - 1).coerceAtLeast(0))
     val entries = remember { mutableStateListOf<QueueEntry>() }
@@ -93,7 +93,7 @@ fun QueueDrawer(playerViewModel: PlayerViewModel, useMiuix: Boolean, onDismiss: 
                                 .clickable { playerViewModel.playQueueItemAbsolute(actualIndex) }
                                 .padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 AsyncImage(model = rememberStaticArtwork(entry.track.albumArtUri), contentDescription = null,
-                                    modifier = Modifier.size(46.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                                    modifier = Modifier.size(46.dp).aspectRatio(1f).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
                                 Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
                                     LibraryText(entry.track.title, useMiuix, color = if (active) accent else text, bold = true)
                                     LibraryText(entry.track.artist, useMiuix, color = text.copy(alpha = .65f))

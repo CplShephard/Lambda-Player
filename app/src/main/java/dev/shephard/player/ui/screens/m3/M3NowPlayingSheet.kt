@@ -3,8 +3,6 @@
 // LineageOS Twelve 1:1 - Now Playing Screen
 package dev.shephard.player.ui.screens.m3
 
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionOnScreen
 
 
 import androidx.activity.compose.PredictiveBackHandler
@@ -98,6 +96,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
 import dev.shephard.player.player.PlayerUiState
 import dev.shephard.player.player.PlayerViewModel
@@ -180,7 +179,6 @@ private fun M3NowPlayingSheetContent(
 
     var showQueue by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
-    var lyricsButtonBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     var showAddToPlaylist by remember { mutableStateOf(false) }
 
     val density = LocalDensity.current
@@ -385,10 +383,7 @@ private fun M3NowPlayingSheetContent(
                     IconButton(onClick = { showQueue = true }, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.AutoMirrored.Filled.QueueMusic, strings.queue, tint = MaterialTheme.colorScheme.onSecondaryContainer)
                     }
-                    IconButton(onClick = { showLyrics = true }, modifier = Modifier.size(48.dp).onGloballyPositioned { coordinates ->
-                        val pos = coordinates.positionOnScreen()
-                        if (pos.x.isFinite() && pos.y.isFinite()) lyricsButtonBounds = androidx.compose.ui.geometry.Rect(pos.x, pos.y, pos.x + coordinates.size.width, pos.y + coordinates.size.height)
-                    }) {
+                    IconButton(onClick = { showLyrics = true }, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Filled.Lyrics, strings.lyrics, tint = MaterialTheme.colorScheme.onSecondaryContainer)
                     }
                     val trackId = track?.id ?: -1L
@@ -434,7 +429,6 @@ private fun M3NowPlayingSheetContent(
         dev.shephard.player.ui.screens.FullScreenLyricsExperience(
             playerViewModel = playerViewModel,
             useMiuix = false,
-            sourceBoundsOnScreen = lyricsButtonBounds,
             onDismiss = { showLyrics = false },
         )
     }
@@ -520,7 +514,7 @@ private fun m3FormatMillisLineage(ms: Long): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun M3AddToPlaylistDrawer(
+internal fun M3AddToPlaylistDrawer(
     trackId: Long,
     track: dev.shephard.player.data.AudioTrack?,
     playerViewModel: PlayerViewModel,
@@ -528,7 +522,6 @@ private fun M3AddToPlaylistDrawer(
     strings: dev.shephard.player.ui.i18n.Strings
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val prefs = remember { dev.shephard.player.player.PreferencesManager(context) }
     val json by prefs.playlistsJson.collectAsState(initial = "[]")
     val playlists = remember(json) { dev.shephard.player.ui.screens.parsePlaylists(json) }
@@ -538,6 +531,20 @@ private fun M3AddToPlaylistDrawer(
         catch (_: Exception) { emptyList() }
     }
     val isLiked = likedIds.contains(trackId)
+    val visiblePlaylists = remember(playlists) { playlists.filterNot { it.isSystem } }
+    val togglePlaylist: (dev.shephard.player.ui.screens.LocalPlaylist) -> Unit = { playlist ->
+        playerViewModel.viewModelScope.launch {
+            try {
+                prefs.updatePlaylistsJson { json ->
+                    dev.shephard.player.ui.screens.updatePlaylistMembership(json, playlist.name, playlist.createdAt, listOf(trackId), "toggle")
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                android.widget.Toast.makeText(context, strings.actionFailed, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     M3BottomSheetWrapper(
             onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surfaceContainer) {
@@ -564,18 +571,12 @@ private fun M3AddToPlaylistDrawer(
                             )
                         },
                         modifier = Modifier.clip(RoundedCornerShape(16.dp)).clickable {
-                            scope.launch {
-                                val newIds = if (isLiked) likedIds - trackId else likedIds + trackId
-                                val arr = org.json.JSONArray().apply { newIds.forEach { put(it) } }
-                                prefs.setLikedSongIds(arr.toString())
-                            }
+                            playerViewModel.toggleLike(trackId)
                         }
                     )
                 }
-                items(playlists.filterNot { it.isSystem }.size) { idxFiltered ->
-                    val filtered = playlists.filterNot { it.isSystem }
-                    val pl = filtered[idxFiltered]
-                    val originalIdx = playlists.indexOf(pl)
+                items(visiblePlaylists.size) { idxFiltered ->
+                    val pl = visiblePlaylists[idxFiltered]
                     val contains = trackId in pl.trackIds
                     androidx.compose.material3.ListItem(
                         headlineContent = { Text(pl.name) },
@@ -589,15 +590,7 @@ private fun M3AddToPlaylistDrawer(
                             )
                         },
                         modifier = Modifier.clip(RoundedCornerShape(16.dp)).clickable {
-                            scope.launch {
-                                val all = playlists.toMutableList()
-                                if (originalIdx >= 0) {
-                                    val current = all[originalIdx]
-                                    val newIds = if (contains) current.trackIds - trackId else current.trackIds + trackId
-                                    all[originalIdx] = current.copy(trackIds = newIds)
-                                    prefs.setPlaylistsJson(dev.shephard.player.ui.screens.encodePlaylists(all))
-                                }
-                            }
+                            togglePlaylist(pl)
                         }
                     )
                 }

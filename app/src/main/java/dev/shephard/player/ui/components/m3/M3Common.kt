@@ -13,7 +13,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -96,7 +99,9 @@ fun M3SmallTopBar(
     Box(
         modifier = modifier.fillMaxWidth().background(Brush.verticalGradient(
             0f to colors.containerColor, .9f to colors.containerColor, 1f to colors.containerColor.copy(alpha = 0f)))
-            .statusBarsPadding().height(height)
+            // Paint before applying the inset: the same bar surface continues
+            // underneath status-bar icons and display cutouts.
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)).height(height)
     ) {
         Box(
             modifier = Modifier.fillMaxSize()

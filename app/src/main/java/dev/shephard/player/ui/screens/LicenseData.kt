@@ -19,10 +19,13 @@ val AppLicenses: List<LicenseEntry> = listOf(
     LicenseEntry("KernelSU", "tiann (weishu) and contributors", "GPL-3.0", "https://github.com/tiann/KernelSU"),
     LicenseEntry("LineageOS Twelve", "The LineageOS Project", "Apache-2.0", "https://github.com/LineageOS/android_packages_apps_Twelve"),
     LicenseEntry("AndroidLiquidGlass", "Kyant0", "Apache-2.0", "https://github.com/Kyant0/AndroidLiquidGlass"),
-    LicenseEntry("PixelPlayer", "theovilardo", "MIT (code before 2026-05-12)", "https://github.com/theovilardo/PixelPlayer"),
+    LicenseEntry("PixelPlayer (adapted code)", "PixelPlayer contributors", "GPL-3.0 (provided source snapshot)", "https://github.com/PixelPlayerHQ/PixelPlayer"),
     LicenseEntry("Miuix example app (OS3 background effect, liquid glass bottom bar, glass effects)", "compose-miuix-ui contributors", "Apache-2.0", "https://github.com/compose-miuix-ui/miuix"),
-    // Online lyrics sources queried by the app
+    LicenseEntry("QQMusicDecoder (QRC reference)", "WXRIW", "MIT", "https://github.com/WXRIW/QQMusicDecoder/blob/master/LICENSE"),
+    LicenseEntry("crypto-algorithms (DES reference)", "Brad Conte", "Public domain", "https://github.com/B-Con/crypto-algorithms"),
+    // Online lyrics sources queried by the app; service entries are not content licences.
     LicenseEntry("LRCLIB", "lrclib.net", "Online lyrics service", "https://lrclib.net"),
+    LicenseEntry("LiriQo", "LiriQo community", "Unofficial multi-provider lyrics service; upstream terms apply", "https://github.com/aguswar123/LiriQo"),
     LicenseEntry("QQ Music lyrics API", "Tencent", "Online lyrics service", "https://y.qq.com"),
     LicenseEntry("lyrics.ovh", "lyrics.ovh", "Online lyrics service", "https://lyrics.ovh"),
     // Libraries
@@ -32,10 +35,10 @@ val AppLicenses: List<LicenseEntry> = listOf(
     LicenseEntry("MaterialKolor", "jordond", "MIT", "https://github.com/jordond/MaterialKolor"),
     LicenseEntry("AppIconLoader", "zhanghai", "Apache-2.0", "https://github.com/zhanghai/AppIconLoader"),
     LicenseEntry("Reorderable", "Calvin-LL", "Apache-2.0", "https://github.com/Calvin-LL/Reorderable"),
-    LicenseEntry("Coil (Compose, GIF)", "coil-kt", "Apache-2.0", "https://github.com/coil-kt/coil"),
+    LicenseEntry("Coil (Compose, GIF, Video)", "coil-kt", "Apache-2.0", "https://github.com/coil-kt/coil"),
     LicenseEntry("kotlinx.coroutines", "JetBrains", "Apache-2.0", "https://github.com/Kotlin/kotlinx.coroutines"),
     LicenseEntry("Guava", "Google", "Apache-2.0", "https://github.com/google/guava"),
-    LicenseEntry("JAudiotagger", "ijabz", "LGPL-2.1", "https://github.com/ijabz/JAudiotagger"),
+    LicenseEntry("JAudiotagger", "ijabz", "LGPL (see upstream for version)", "https://bitbucket.org/ijabz/jaudiotagger"),
     LicenseEntry("Kotlin Standard Library", "JetBrains", "Apache-2.0", "https://github.com/JetBrains/kotlin"),
     // Pulled in transitively by the libraries above
     LicenseEntry("Compose Multiplatform (via Miuix)", "JetBrains", "Apache-2.0", "https://github.com/JetBrains/compose-multiplatform"),

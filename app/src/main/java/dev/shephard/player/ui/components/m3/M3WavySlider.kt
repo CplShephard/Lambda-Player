@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: Apache-2.0
-// Ported from PixelPlayer (com.theveloper.pixelplay.presentation.components.WavySliderExpressive)
+// SPDX-License-Identifier: GPL-3.0-only
+// Adapted from PixelPlayer WavySliderExpressive in the supplied GPL-3.0 source snapshot.
 // with the same Material 3 expressive "wavy" progress slider design.
 @file:kotlin.OptIn(
     androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,

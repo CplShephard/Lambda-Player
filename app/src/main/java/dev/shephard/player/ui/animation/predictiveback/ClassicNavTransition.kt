@@ -44,7 +44,8 @@ private val ClassicScalePop: NavTransition = object : NavTransition {
                 scaleY = scaleX
                 translationX = snapTranslationToPixelEdge(0f, scaleX, widthPx)
                 translationY = snapTranslationToPixelEdge(0f, scaleY, heightPx)
-                alpha = progress
+                // Keep the revealed page opaque during the classic scale gesture.
+                alpha = 1f
             } else {
                 translationX = snapTranslationToPixelEdge(
                     translation = -coverProgress(depth) * widthPx,

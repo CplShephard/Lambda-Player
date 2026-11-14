@@ -33,7 +33,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -61,6 +63,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -554,11 +557,14 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
         dev.shephard.player.ui.components.ComradeEasterEggDialog(useMiuix = true, onDismiss = { showComradeEasterEgg = false })
     }
     val density = LocalDensity.current
-    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val statusBarPadding = WindowInsets.safeDrawing.only(WindowInsetsSides.Top).asPaddingValues().calculateTopPadding()
     val appBarHeight = 56.dp
     val headerTopPadding = statusBarPadding + appBarHeight + 40.dp
 
     val lazyListState = rememberLazyListState()
+    // Same short scroll threshold as the other compact headers; the logo's
+    // longer fade continues to use its own progress below.
+    val aboutBarProgress by dev.shephard.player.ui.components.rememberScrollFraction(lazyListState)
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
     var logoHeightPx by remember { mutableIntStateOf(0) }
     var headerHeightDp by remember { mutableStateOf(190.dp) }
@@ -690,7 +696,7 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
                 Column(modifier = Modifier.fillParentMaxHeight()) {
                     // Title and the three link cards sit 120dp lower than before.
                     Spacer(Modifier.height(120.dp))
-                    SmallTitle(strings.aboutSectionTitle)
+                    SmallTitle(strings.aboutSectionTitle, modifier = Modifier.graphicsLayer { alpha = aboutBarProgress })
                     MiuixNativeCard(
                         modifier = Modifier
                             .padding(horizontal = 12.dp)
@@ -720,33 +726,30 @@ fun AboutSettingsScreen(onBack: () -> Unit) {
         dev.shephard.player.ui.components.SubmenuTopBar(
             title = strings.aboutSectionTitle,
             compact = true,
+            showStatusBarBackground = false,
             onBack = onBack,
             state = topBarState,
-            collapseFraction = scrollProgress,
+            collapseFraction = aboutBarProgress,
             modifier = Modifier.align(Alignment.TopCenter)
         )
     }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            BgEffectBackground(
-                isDarkTheme = isDarkTheme,
-                modifier = Modifier.fillMaxSize(),
-                isFullSize = true,
-                surface = Color.Black,
-                alpha = { 1f - scrollProgress * 0.85f }
-            ) {
-                aboutContent()
-            }
-        } else {
-            // Solid fallback on <13: gradient fails, use black/white per dark mode
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(if (isDarkTheme) Color.Black else Color.White)
-            ) {
-                aboutContent()
-            }
-        }
+    // BgEffectBackground supplies a normal Compose gradient when runtime shaders
+    // are unavailable, including Android versions below 13.
+    val gradientBase = if (isDarkTheme)
+        listOf(Color(0xFF092C27), Color(0xFF102C37), Color(0xFF10151B))
+    else listOf(Color(0xFFC8F2D8), Color(0xFFCEEAF4), Color(0xFFE6F6DF))
+    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(gradientBase))) {
+        BgEffectBackground(
+            isDarkTheme = isDarkTheme,
+            modifier = Modifier.fillMaxSize(),
+            isFullSize = true,
+            // Keep the gradient behind the shader all the way into the status bar.
+            surface = Color.Transparent,
+            alpha = { 1f - scrollProgress * 0.85f },
+        ) { aboutContent() }
+    }
+
 }
 
 @Composable

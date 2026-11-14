@@ -351,7 +351,11 @@ fun NavGraph(
             }
             entry<PlaylistDetailRoute>(swipeDismiss = swipeBackDirection) { route ->
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
+                    // Record this submenu only; the mini player itself stays outside the
+                    // recording to avoid sampling the underlying main pager or itself.
+                    val detailBackdrop = dev.shephard.player.ui.glass.rememberAppBlurBackdrop(LocalBlurEnabled.current)
                     Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxSize().then(if (detailBackdrop != null) Modifier.layerBackdrop(detailBackdrop) else Modifier)) {
                     if (useMiuix) {
                         PlaylistDetailScreen(
                             playerViewModel = playerViewModel,
@@ -369,9 +373,12 @@ fun NavGraph(
                             onPlaylistRemixClick = onPlaylistRemixClick,
                         )
                     }
+                    }
                     Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-                        MiniPlayerHost(playerViewModel = playerViewModel, useMiuix = useMiuix,
-                            onOpenNowPlaying = onOpenNowPlaying, onBoundsChanged = onMiniPlayerBoundsChanged)
+                        CompositionLocalProvider(LocalContentBackdrop provides detailBackdrop) {
+                            MiniPlayerHost(playerViewModel = playerViewModel, useMiuix = useMiuix,
+                                onOpenNowPlaying = onOpenNowPlaying, onBoundsChanged = onMiniPlayerBoundsChanged)
+                        }
                     }
                     }
                 }

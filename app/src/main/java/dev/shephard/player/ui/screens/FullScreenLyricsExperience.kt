@@ -4,8 +4,6 @@
 
 package dev.shephard.player.ui.screens
 
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionOnScreen
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -29,8 +27,6 @@ import dev.shephard.player.ui.components.BouncyIconButton
 import dev.shephard.player.ui.components.MinimalSeekBar
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.m3.M3WavySlider
-import androidx.activity.BackEventCompat
-import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
@@ -48,6 +44,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -64,7 +61,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -117,6 +116,9 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.SolidColor
@@ -139,14 +141,21 @@ import dev.shephard.player.player.LyricsSearchResult
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.SyncedLyricLine
-import dev.shephard.player.theme.PredictiveBackAnimation
 import dev.shephard.player.ui.util.rememberDeviceCornerRadius
+import dev.shephard.player.ui.util.TrackOverlayForBack
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.NavigationEventTransitionState
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
+import androidx.compose.runtime.snapshotFlow
+import top.yukonga.miuix.kmp.nav.gesture.WindowNavigationEventBridge
+import top.yukonga.miuix.kmp.anim.folmeSpring
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.min
@@ -160,7 +169,6 @@ private val LocalLyricsForeground = staticCompositionLocalOf { Color.White }
 fun FullScreenLyricsExperience(
     playerViewModel: PlayerViewModel,
     useMiuix: Boolean,
-    sourceBoundsOnScreen: androidx.compose.ui.geometry.Rect? = null,
     onDismiss: () -> Unit,
 ) {
     val strings = LocalStrings.current
@@ -171,8 +179,6 @@ fun FullScreenLyricsExperience(
     val isRemixed by playerViewModel.isRemixed.collectAsState()
     val context = LocalContext.current
     val preferences = remember(context) { PreferencesManager(context) }
-    val predictiveBack by preferences.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
-    val useClassicPredictiveBack = predictiveBack == PredictiveBackAnimation.CLASSIC
     val blurEnabled by preferences.lyricsBackgroundBlurEnabled.collectAsState(initial = true)
     val savedBlurStrength by preferences.lyricsBackgroundBlurStrength.collectAsState(initial = 36f)
     val autoScroll by preferences.lyricsAutoScrollEnabled.collectAsState(initial = true)
@@ -185,26 +191,51 @@ fun FullScreenLyricsExperience(
     val searchListState = rememberLazyListState()
 
     val track = state.currentTrack
-    val primary = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
+    val themePrimary = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
+    // The lyrics backdrop is intentionally dark even in a light app theme.
+    val primary = if (themePrimary.luminance() < .28f) lerp(themePrimary, Color.White, .55f) else themePrimary
     val textStyle = if (useMiuix) MiuixAppTheme.typography.bodyMedium else MaterialTheme.typography.bodyMedium
     val titleStyle = if (useMiuix) MiuixAppTheme.typography.titleLarge else MaterialTheme.typography.titleLarge
-    val coverTint = Color(state.glowColorArgb)
-    val m3LyricsBackground by animateColorAsState(
-        targetValue = lerp(MaterialTheme.colorScheme.surface, coverTint, 0.34f),
-        animationSpec = tween(520),
-        label = "m3LyricsCoverTint",
-    )
-    val lyricsBackground = if (useMiuix) Color(0xFF111318) else m3LyricsBackground
-    val lyricsForeground = if (useMiuix || lyricsBackground.luminance() < 0.52f) Color.White else Color(0xFF17131A)
+    // A software-compatible Compose gradient is used on every supported Android version.
+    // Cover extraction is asynchronous; a stable per-track fallback avoids inheriting the
+    // previous track's colour while its artwork is being analysed.
+    val fallbackTint = remember(track?.id) {
+        val seed = (track?.id ?: 0L).toInt()
+        Color.hsv(((seed.toLong() and 0xffffffffL) % 360L).toFloat(), 0.45f, 0.48f)
+    }
+    val coverTint = if (state.coverColorAvailable) Color(state.glowColorArgb) else fallbackTint
+    val lyricsBackground = lerp(Color(0xFF0C1018), coverTint, 0.26f)
+    val lyricsForeground = Color.White
+    var previousTrackId by remember { mutableStateOf(track?.id) }
+    var previousQueueIndex by remember { mutableIntStateOf(state.currentQueueIndex) }
+    var gradientDirection by remember { mutableIntStateOf(1) }
+    var oldGradient by remember { mutableStateOf(lyricsBackground) }
+    var newGradient by remember { mutableStateOf(lyricsBackground) }
+    val gradientProgress = remember { Animatable(1f) }
+    LaunchedEffect(track?.id, lyricsBackground) {
+        if (track?.id != previousTrackId) {
+            gradientDirection = if (state.currentQueueIndex < previousQueueIndex) -1 else 1
+            previousTrackId = track?.id
+            previousQueueIndex = state.currentQueueIndex
+        }
+        oldGradient = lerp(oldGradient, newGradient, gradientProgress.value)
+        newGradient = lyricsBackground
+        gradientProgress.snapTo(0f)
+        gradientProgress.animateTo(1f, tween(750))
+    }
     var blurStrength by remember { mutableFloatStateOf(36f) }
     LaunchedEffect(savedBlurStrength) { blurStrength = savedBlurStrength.coerceIn(0f, 64f) }
 
     var showSearch by remember { mutableStateOf(false) }
+    // Preserve the visible results while the search panel fades out after selection.
+    var lastSearchForExit by remember { mutableStateOf(searchState) }
+    androidx.compose.runtime.SideEffect {
+        if (showSearch && !searchState.autoApplied) lastSearchForExit = searchState
+    }
     var showFetchLyrics by remember { mutableStateOf(false) }
     val promptedTracks = remember { mutableSetOf<Long>() }
     var showSettings by remember { mutableStateOf(false) }
     var lyricsOnly by remember { mutableStateOf(false) }
-    androidx.activity.compose.BackHandler(enabled = lyricsOnly) { lyricsOnly = false }
     var showOptions by remember { mutableStateOf(false) }
     var isEditing by remember { mutableStateOf(false) }
     var editText by remember { mutableStateOf("") }
@@ -221,10 +252,18 @@ fun FullScreenLyricsExperience(
         positionMs = progress.positionMs,
         isPlaying = state.isPlaying,
         enabled = synced.isNotEmpty(),
+        frameAccurate = remember(synced) { synced.any { it.words.isNotEmpty() } },
     )
     val activeIndex by remember(synced, syncOffsetMs) {
         derivedStateOf {
-            if (synced.isNotEmpty()) synced.indexOfLast { it.timeMs + syncOffsetMs <= smoothPositionMs.longValue } else -1
+            var low = 0
+            var high = synced.lastIndex
+            val position = smoothPositionMs.longValue - syncOffsetMs
+            while (low <= high) {
+                val middle = (low + high).ushr(1)
+                if (synced[middle].timeMs <= position) low = middle + 1 else high = middle - 1
+            }
+            high
         }
     }
     val durationMs = progress.durationMs.coerceAtLeast(0L)
@@ -327,11 +366,7 @@ fun FullScreenLyricsExperience(
     }
 
     // Exported as enhanced LRC when the lyrics are word-synced, so karaoke timings survive.
-    val exportText = remember(state.lyrics, synced) {
-        if (synced.isNotEmpty()) {
-            synced.joinToString("\n") { line -> line.toLrcLine() }
-        } else state.lyrics.joinToString("\n")
-    }
+    val exportText = editSource // Editing and exporting use the same serialized lyrics.
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if (uri != null && exportText.isNotBlank()) {
             scope.launch(Dispatchers.IO) {
@@ -344,40 +379,28 @@ fun FullScreenLyricsExperience(
         }
     }
 
+    TrackOverlayForBack()
     val backProgress = remember { Animatable(0f) }
     val openProgress = remember { Animatable(0f) }
     var closing by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { openProgress.animateTo(1f, spring(dampingRatio = 0.78f, stiffness = 300f)) }
+    // Match the theme's actual sheet motion specs, while retaining a full-screen Dialog.
+    val openSpec = if (useMiuix) folmeSpring<Float>(damping = 0.9f, response = 0.38f)
+        else MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    val closeSpec = if (useMiuix) folmeSpring<Float>(damping = 0.9f, response = 0.38f)
+        else MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    LaunchedEffect(Unit) { openProgress.animateTo(1f, openSpec) }
     val closeAnimated: () -> Unit = {
         if (!closing) {
             closing = true
             scope.launch {
-                openProgress.animateTo(0f, tween(220, easing = FastOutSlowInEasing))
+                openProgress.animateTo(0f, closeSpec)
                 onDismiss()
-            }
-        }
-    }
-    var backEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
-    if (useClassicPredictiveBack) {
-        PredictiveBackHandler(enabled = !lyricsOnly && !showOptions && !showFetchLyrics && !closing) { events ->
-            try {
-                events.collect { event ->
-                    backEdge = event.swipeEdge
-                    backProgress.snapTo(event.progress.coerceIn(0f, 1f))
-                }
-                if (backProgress.value < 1f) backProgress.animateTo(1f, tween(150))
-                closeAnimated()
-            } catch (cancelled: CancellationException) {
-                backProgress.animateTo(0f, spring(dampingRatio = 0.82f, stiffness = 380f))
-                throw cancelled
             }
         }
     }
     val deviceCornerRadius = rememberDeviceCornerRadius()
 
-    // decorFitsSystemWindows = false lets the lyrics background draw behind the status bar.
-    // The content already applies statusBarsPadding()/navigationBarsPadding(), so the header
-    // is laid out in the status bar's inset area instead of starting below it.
+    // This remains a full-screen Dialog, not a bottom sheet; only its motion follows the sheet.
     Dialog(
         onDismissRequest = { if (lyricsOnly) lyricsOnly = false else closeAnimated() },
         properties = DialogProperties(
@@ -391,83 +414,73 @@ fun FullScreenLyricsExperience(
         androidx.compose.runtime.SideEffect {
             (dialogView.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window?.setWindowAnimations(0)
         }
-        var dialogOrigin by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+        WindowNavigationEventBridge()
+        val navigationBack = rememberNavigationEventState(currentInfo = NavigationEventInfo.None)
+        NavigationBackHandler(
+            state = navigationBack,
+            isBackEnabled = !showOptions && !showFetchLyrics && !closing,
+            onBackCancelled = { scope.launch { backProgress.animateTo(0f, spring(dampingRatio = 0.82f, stiffness = 380f)) } },
+            onBackCompleted = {
+                if (lyricsOnly) { lyricsOnly = false; scope.launch { backProgress.snapTo(0f) } }
+                else closeAnimated()
+            },
+        )
+        LaunchedEffect(navigationBack, lyricsOnly) {
+            snapshotFlow { navigationBack.transitionState }.collect { transition ->
+                if (!lyricsOnly && transition is NavigationEventTransitionState.InProgress &&
+                    transition.direction == NavigationEventTransitionState.TRANSITIONING_BACK) {
+                    backProgress.snapTo(transition.latestEvent.progress.coerceIn(0f, 1f))
+                }
+            }
+        }
+        val insetTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val contentTop by animateDpAsState(if (lyricsOnly) 0.dp else insetTop, tween(220), label = "lyricsFullscreenInset")
         CompositionLocalProvider(LocalLyricsForeground provides lyricsForeground) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .onGloballyPositioned { coordinates ->
-                        val origin = coordinates.positionOnScreen()
-                        if (origin.x.isFinite() && origin.y.isFinite()) dialogOrigin = origin
-                    }
                     .zIndex(20f)
                     .graphicsLayer {
                         val p = backProgress.value.coerceIn(0f, 1f)
-                        val direction = if (backEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
                         val entrance = openProgress.value.coerceIn(0f, 1f)
-                        val source = sourceBoundsOnScreen?.takeIf { it.width > 0f && it.height > 0f }
-                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
-                        val startX = source?.let { it.left - dialogOrigin.x } ?: 0f
-                        val startY = source?.let { it.top - dialogOrigin.y } ?: size.height * .12f
-                        val startWidth = source?.let { (it.width / size.width.coerceAtLeast(1f)).coerceIn(.01f, 1f) } ?: .96f
-                        val startHeight = source?.let { (it.height / size.height.coerceAtLeast(1f)).coerceIn(.01f, 1f) } ?: .96f
-                        translationX = startX * (1f - entrance) + size.width * 0.12f * p * direction
-                        translationY = startY * (1f - entrance)
-                        scaleX = (startWidth + (1f - startWidth) * entrance) * (1f - .035f * p)
-                        scaleY = (startHeight + (1f - startHeight) * entrance) * (1f - .035f * p)
-                        alpha = (0.35f + .65f * entrance) * (1f - 0.12f * p)
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
+                        if (useMiuix) {
+                            // Miuix drawer follows predictive back down the screen.
+                            translationY = size.height * ((1f - entrance) + entrance * p)
+                        } else {
+                            // M3 drawer scales towards its bottom edge while back progresses.
+                            translationY = size.height * (1f - entrance)
+                            scaleX = 1f - min(48.dp.toPx(), size.width) / size.width.coerceAtLeast(1f) * p
+                            scaleY = 1f - min(24.dp.toPx(), size.height) / size.height.coerceAtLeast(1f) * p
+                        }
                         shape = RoundedCornerShape(deviceCornerRadius * maxOf(p, 1f - entrance))
                         clip = p > 0.001f || entrance < 0.999f
                     }
             ) {
-                if (useMiuix) {
-                    Crossfade(
-                        targetState = track?.albumArtUri,
-                        animationSpec = tween(durationMillis = 650),
-                        label = "lyricsBackdropCrossfade",
-                        modifier = Modifier.fillMaxSize(),
-                    ) { artUri ->
-                        if (artUri != null && blurEnabled && blurStrength > 0f) {
-                            AsyncImage(
-                                model = artUri,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .graphicsLayer { scaleX = 1.12f; scaleY = 1.12f }
-                                    .blur(blurStrength.dp),
-                                contentScale = ContentScale.Crop,
-                                colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.2f) }),
-                            )
-                        } else if (artUri != null) {
-                            AsyncImage(
-                                model = artUri,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
-                            )
-                        } else {
-                            Box(Modifier.fillMaxSize().background(Color(0xFF111318)))
-                        }
-                    }
-                    Box(
-                        Modifier.fillMaxSize().background(
-                            Brush.verticalGradient(
-                                listOf(Color.Black.copy(alpha = 0.72f), Color.Black.copy(alpha = 0.58f), Color.Black.copy(alpha = 0.82f))
-                            )
-                        )
+                LyricsGradientBackdrop(oldGradient, newGradient, gradientProgress.value, gradientDirection)
+                // Keep the user's artwork/blur preference as a restrained texture, not a
+                // replacement for the gradient; gradient remains available on older Android.
+                if (track?.albumArtUri != null) {
+                    AsyncImage(
+                        model = track.albumArtUri,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize()
+                            .then(if (blurEnabled && blurStrength > 0f) Modifier.blur(blurStrength.dp) else Modifier)
+                            .graphicsLayer { alpha = 0.10f },
+                        contentScale = ContentScale.Crop,
                     )
-                } else {
-                    Box(Modifier.fillMaxSize().background(lyricsBackground))
                 }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
+                .padding(top = contentTop)
                 .navigationBarsPadding()
                 .padding(horizontal = 16.dp)
         ) {
-            if (!lyricsOnly) LyricsHeader(
+            androidx.compose.animation.AnimatedVisibility(visible = !lyricsOnly,
+                enter = fadeIn(tween(220)), exit = fadeOut(tween(220))) {
+                LyricsHeader(
                 title = strings.lyrics,
                 subtitle = track?.let { "${it.title} · ${it.artist}" }.orEmpty(),
                 titleStyle = titleStyle,
@@ -480,7 +493,8 @@ fun FullScreenLyricsExperience(
                     isEditing = false
                 }) else null,
                 strings = strings,
-            )
+                )
+            }
 
             if (showOptions) {
                 LyricsOptionsDrawer(
@@ -557,27 +571,42 @@ fun FullScreenLyricsExperience(
                 )
             }
 
-            when {
-                showSearch -> {
+            val lyricsPage = when {
+                showSearch -> "search"
+                isEditing -> "edit"
+                state.lyrics.isEmpty() -> "empty"
+                else -> "lyrics"
+            }
+            AnimatedContent(
+                targetState = lyricsPage,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                transitionSpec = { fadeIn(tween(240)) togetherWith fadeOut(tween(180)) },
+                label = "lyricsPageFade",
+            ) { page ->
+              Column(Modifier.fillMaxSize()) {
+              when (page) {
+                "search" -> {
+                    val displayedSearch = if (showSearch) searchState else lastSearchForExit
                     LyricsSearchPanel(
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                         query = searchQuery,
                         onQueryChange = { searchQuery = it },
-                        isLoading = searchState.isLoading,
-                        results = searchState.results,
-                        error = searchState.error,
+                        isLoading = displayedSearch.isLoading,
+                        results = displayedSearch.results,
+                        error = displayedSearch.error,
                         primary = primary,
                         textStyle = textStyle,
                         listState = searchListState,
                         onSearch = { playerViewModel.searchLyrics(searchQuery) },
                         onSelect = { result ->
+                            lastSearchForExit = searchState
                             playerViewModel.selectLyricsSearchResult(result)
                             showSearch = false
                         },
                         strings = strings,
                     )
                 }
-                isEditing -> {
+                "edit" -> {
                     Column(
                         modifier = Modifier
                             .weight(1f)
@@ -607,7 +636,7 @@ fun FullScreenLyricsExperience(
                         )
                     }
                 }
-                state.lyrics.isEmpty() -> {
+                "empty" -> {
                     Column(
                         modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -728,7 +757,12 @@ fun FullScreenLyricsExperience(
                 }
             }
 
-            if (!lyricsOnly) LyricsPlaybackControls(
+              }
+            }
+
+            androidx.compose.animation.AnimatedVisibility(visible = !lyricsOnly,
+                enter = fadeIn(tween(220)), exit = fadeOut(tween(220))) {
+                LyricsPlaybackControls(
                 track = track,
                 isPlaying = state.isPlaying,
                 progressMs = progress.positionMs,
@@ -754,7 +788,8 @@ fun FullScreenLyricsExperience(
                 onPlayPause = playerViewModel::togglePlayPause,
                 onNext = playerViewModel::skipToNext,
                 strings = strings,
-            )
+                )
+            }
         }
             }
         }
@@ -814,7 +849,10 @@ private fun LyricsHeader(
             BasicText(subtitle, style = bodyStyle.copy(color = LocalLyricsForeground.current.copy(alpha = .7f), fontSize = 11.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (onSaveEdit != null) LyricsIconButton(Icons.Filled.Check, strings.lyricsSave, onSaveEdit)
-        if (onFullScreen != null) LyricsIconButton(Icons.Filled.Fullscreen, strings.lyrics, onFullScreen)
+        if (onFullScreen != null) {
+            LyricsIconButton(Icons.Filled.Fullscreen, strings.lyrics, onFullScreen)
+            Spacer(Modifier.width(10.dp))
+        }
         LyricsIconButton(Icons.Filled.MoreVert, strings.lyricsOptions, onOptions)
     }
 }
@@ -1115,26 +1153,43 @@ private fun LyricsSearchPanel(
             LyricsIconButton(Icons.Filled.Search, strings.search, onSearch, selected = true, primary = primary)
         }
 
-        if (isLoading) {
-            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = primary, modifier = Modifier.size(32.dp), strokeWidth = 2.dp)
-            }
-        } else if (results.isEmpty()) {
-            Box(Modifier.fillMaxWidth().weight(1f).padding(20.dp), contentAlignment = Alignment.Center) {
-                BasicText(
-                    text = if (error == "network") strings.lyricsSearchFailed else strings.noSearchResults,
-                    style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.76f), textAlign = TextAlign.Center),
-                )
-            }
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp),
-                contentPadding = PaddingValues(bottom = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(results, key = { result -> result.sourceId ?: "${result.source}_${result.id ?: (result.title + result.artist).hashCode()}" }) { result ->
-                    LyricsSearchResultCard(result = result, primary = primary, textStyle = textStyle, onClick = { onSelect(result) })
+        var lastResults by remember { mutableStateOf(results) }
+        androidx.compose.runtime.SideEffect { if (results.isNotEmpty()) lastResults = results }
+        val resultPage = when {
+            isLoading -> "loading"
+            results.isEmpty() -> "empty"
+            else -> "results"
+        }
+        AnimatedContent(
+            targetState = resultPage,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            transitionSpec = { fadeIn(tween(240)) togetherWith fadeOut(tween(160)) },
+            label = "lyricsSearchResultsFade",
+        ) { page ->
+            when (page) {
+                "loading" -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = primary, modifier = Modifier.size(32.dp), strokeWidth = 2.dp)
+                }
+                "empty" -> Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
+                    BasicText(
+                        text = if (error == "network") strings.lyricsSearchFailed else strings.noSearchResults,
+                        style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.76f), textAlign = TextAlign.Center),
+                    )
+                }
+                else -> {
+                    val visibleResults = if (results.isNotEmpty()) results else lastResults
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize().padding(top = 8.dp),
+                        contentPadding = PaddingValues(bottom = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(visibleResults, key = { result ->
+                            "${result.source}|${result.sourceId ?: result.id ?: (result.title + result.artist).hashCode()}"
+                        }) { result ->
+                            LyricsSearchResultCard(result = result, primary = primary, textStyle = textStyle, onClick = { onSelect(result) })
+                        }
+                    }
                 }
             }
         }
@@ -1490,22 +1545,62 @@ private fun lyricLineLayoutStyle(base: TextStyle): TextStyle = base.copy(
  * never jumps back; real seeks (bigger differences) are followed immediately.
  */
 @Composable
-private fun rememberSmoothLyricsPosition(positionMs: Long, isPlaying: Boolean, enabled: Boolean): MutableLongState {
+private fun rememberSmoothLyricsPosition(positionMs: Long, isPlaying: Boolean, enabled: Boolean, frameAccurate: Boolean): MutableLongState {
     val smooth = remember { mutableLongStateOf(positionMs) }
-    LaunchedEffect(positionMs, isPlaying, enabled) {
+    LaunchedEffect(positionMs, isPlaying, enabled, frameAccurate) {
         val current = smooth.longValue
         val base = if (isPlaying && positionMs <= current && current - positionMs < 400L) current else positionMs
         smooth.longValue = base
         if (!isPlaying || !enabled) return@LaunchedEffect
-        var startNanos = -1L
-        while (true) {
-            withFrameNanos { now ->
-                if (startNanos < 0L) startNanos = now
-                smooth.longValue = base + (now - startNanos) / 1_000_000L
+        if (frameAccurate) {
+            var startNanos = -1L
+            while (true) {
+                withFrameNanos { now ->
+                    if (startNanos < 0L) startNanos = now
+                    smooth.longValue = base + (now - startNanos) / 1_000_000L
+                }
+            }
+        } else {
+            // Line-synced lyrics need no frame-by-frame karaoke redraw.
+            val start = android.os.SystemClock.elapsedRealtime()
+            while (true) {
+                delay(40L)
+                smooth.longValue = base + (android.os.SystemClock.elapsedRealtime() - start)
             }
         }
     }
     return smooth
+}
+
+/** Horizontal feathered wave, revealed from the selected queue direction. */
+@Composable
+private fun LyricsGradientBackdrop(old: Color, new: Color, progress: Float, direction: Int) {
+    Canvas(Modifier.fillMaxSize()) {
+        fun palette(c: Color) = listOf(lerp(c, Color(0xFF15111F), .24f), c, lerp(c, Color(0xFF070B15), .52f))
+        drawRect(brush = Brush.verticalGradient(palette(old)))
+        val p = progress.coerceIn(0f, 1f)
+        if (p >= 0.999f) {
+            drawRect(brush = Brush.verticalGradient(palette(new)))
+        } else if (p > 0f) {
+            // Horizontal slices form a soft low-amplitude travelling wave without runtime shaders.
+            val bands = 32
+            val h = size.height / bands
+            val feather = size.width * .12f
+            val newPalette = palette(new)
+            for (i in 0 until bands) {
+                val y = (i + .5f) / bands
+                val wave = kotlin.math.sin(y * 6.283185f + p * 3.14159f) * size.width * .035f * kotlin.math.sin(p * 3.14159f)
+                val edge = if (direction >= 0) size.width * (1f - p) + wave else size.width * p + wave
+                // Construct each band's colour ramp directly so it works on pre-Android 13 too.
+                val base = if (y < .5f) lerp(newPalette[0], newPalette[1], y * 2f)
+                    else lerp(newPalette[1], newPalette[2], (y - .5f) * 2f)
+                val clear = base.copy(alpha = 0f)
+                val ramp = if (direction >= 0) listOf(clear, base) else listOf(base, clear)
+                drawRect(brush = Brush.horizontalGradient(ramp, startX = edge - feather, endX = edge + feather),
+                    topLeft = Offset(0f, i * h), size = Size(size.width, h + 1f))
+            }
+        }
+    }
 }
 
 /**
@@ -1549,13 +1644,16 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawKaraokeHighligh
             val within = sungChars - charIndex
             if (rtl) box.right - box.width * within else box.left + box.width * within
         }
-        clipRect(
-            left = if (rtl) edge else 0f,
-            top = top,
-            right = if (rtl) size.width else edge,
-            bottom = bottom,
-        ) {
-            drawText(layout, color = color)
+        // Paint a short alpha ramp through the glyphs rather than clipping at a hard edge.
+        // Shadow is deliberately subtle and uses the same text layout to preserve shaping.
+        val feather = 5.dp.toPx()
+        val full = sungChars >= lineEnd || lineEnd <= lineStart
+        val brush = if (full) SolidColor(color) else Brush.horizontalGradient(
+            colors = if (rtl) listOf(Color.Transparent, color) else listOf(color, Color.Transparent),
+            startX = edge - feather, endX = edge + feather,
+        )
+        clipRect(left = 0f, top = top, right = size.width, bottom = bottom) {
+            drawText(layout, brush = brush, shadow = Shadow(color.copy(alpha = .22f), blurRadius = 3.dp.toPx()))
         }
     }
 }

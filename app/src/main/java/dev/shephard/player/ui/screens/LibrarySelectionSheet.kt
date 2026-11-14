@@ -44,7 +44,7 @@ internal fun LibrarySelectionSheet(tracks: List<AudioTrack>, useMiuix: Boolean, 
     fun onError() = android.widget.Toast.makeText(context, strings.actionFailed, android.widget.Toast.LENGTH_SHORT).show()
     val content: @Composable () -> Unit = {
         val closeThen = dev.shephard.player.ui.components.rememberCloseDrawerThen()
-        val actionCard = if (useMiuix) MiuixAppTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceContainerHigh
+        val actionCard = if (useMiuix) dev.shephard.player.ui.components.miuixDrawerCardColor() else MaterialTheme.colorScheme.surfaceContainerHigh
         Column(Modifier.fillMaxWidth().heightIn(max = 700.dp).padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(if (playlistMode) strings.addToPlaylist else "${strings.selectSongs} (${selectedTracks.size})", color = foreground,
@@ -64,7 +64,7 @@ internal fun LibrarySelectionSheet(tracks: List<AudioTrack>, useMiuix: Boolean, 
                             selected = if (track.id in selected) selected - track.id else selected + track.id
                         }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(checked = track.id in selected, onCheckedChange = null)
-                            AsyncImage(dev.shephard.player.ui.components.rememberStaticArtwork(track.albumArtUri), null, Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)))
+                            AsyncImage(dev.shephard.player.ui.components.rememberStaticArtwork(track.albumArtUri), null, Modifier.size(40.dp).aspectRatio(1f).clip(RoundedCornerShape(8.dp)), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
                             Column(Modifier.weight(1f).padding(start = 10.dp)) {
                                 Text(track.title, color = foreground, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(track.artist, color = foreground.copy(alpha = .7f), maxLines = 1, overflow = TextOverflow.Ellipsis)

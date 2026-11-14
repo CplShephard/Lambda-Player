@@ -3,6 +3,13 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package dev.shephard.player.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.SideEffect
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -90,13 +97,32 @@ fun FetchLyricsDialog(
         ) {
             Column(modifier = Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp.dp - 96.dp).coerceAtLeast(240.dp))
                 .verticalScroll(rememberScrollState()).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                when {
-                    uiState.isLoading -> LoadingContent()
-                    uiState.results.isNotEmpty() -> PickResultContent(uiState.results, onPickResult, onDismiss)
-                    uiState.error == "network" -> ErrorContent(strings.lyricsSearchFailed, onDismiss)
-                    uiState.error != null -> NotFoundContent(currentSong?.title.orEmpty(), currentSong?.artist, strings.noLyricsFound, onManualSearch, onDismiss)
-                    else -> IdleContent(currentSong, forcePickResults, { forcePickResults = it }, dontShowAgain, onDontShowAgainChange,
-                        { onConfirm(forcePickResults) }, onImport, onDismiss)
+                var lastResults by remember { mutableStateOf(uiState.results) }
+                SideEffect { if (uiState.results.isNotEmpty()) lastResults = uiState.results }
+                val page = when {
+                    uiState.isLoading -> "loading"
+                    uiState.results.isNotEmpty() -> "results"
+                    uiState.error == "network" -> "network"
+                    uiState.error != null -> "notFound"
+                    else -> "idle"
+                }
+                AnimatedContent(
+                    targetState = page,
+                    transitionSpec = { fadeIn(tween(240)) togetherWith fadeOut(tween(160)) },
+                    label = "fetchLyricsFade",
+                ) { screen ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        when (screen) {
+                            "loading" -> LoadingContent()
+                            "results" -> PickResultContent(
+                                uiState.results.ifEmpty { lastResults }, onPickResult, onDismiss,
+                            )
+                            "network" -> ErrorContent(strings.lyricsSearchFailed, onDismiss)
+                            "notFound" -> NotFoundContent(currentSong?.title.orEmpty(), currentSong?.artist, strings.noLyricsFound, onManualSearch, onDismiss)
+                            else -> IdleContent(currentSong, forcePickResults, { forcePickResults = it }, dontShowAgain, onDontShowAgainChange,
+                                { onConfirm(forcePickResults) }, onImport, onDismiss)
+                        }
+                    }
                 }
             }
         }

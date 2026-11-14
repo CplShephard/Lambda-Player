@@ -56,6 +56,18 @@ internal fun scoreLyricsCandidate(candidate: LyricsSearchResult, track: AudioTra
     if (candidate.instrumental) return null
     if (candidate.rawLyrics.isBlank()) return null
 
+    // A resolver search may return a plausible but unrelated result. Do not auto-apply
+    // an aggregator match without BOTH a comparable title and artist.
+    if (candidate.source.startsWith("LiriQo")) {
+        fun matches(a: String, b: String): Boolean {
+            val x = normalizeForLyricsMatch(a); val y = normalizeForLyricsMatch(b)
+            return x.length >= 2 && y.length >= 2 && (x == y || x.contains(y) || y.contains(x))
+        }
+        if (!matches(stripTitleDecorations(track.title), stripTitleDecorations(candidate.title)) ||
+            !matches(track.artist, candidate.artist)) return null
+        if (candidate.durationSeconds != null && track.durationMs > 0 &&
+            abs(candidate.durationSeconds - track.durationMs / 1000.0) > 15.0) return null
+    }
     var score = 0.0
 
     if (track.durationMs > 0L) {
@@ -71,7 +83,11 @@ internal fun scoreLyricsCandidate(candidate: LyricsSearchResult, track: AudioTra
         }
     }
 
-    if (!candidate.syncedLyrics.isNullOrBlank()) score += 2.0
+    if (!candidate.syncedLyrics.isNullOrBlank()) {
+        score += 2.0
+        // Prefer actual word-tagged timing when otherwise similarly matched.
+        if (Regex("<\\d{1,3}:\\d{2}[.:]\\d{1,3}>").containsMatchIn(candidate.syncedLyrics)) score += 1.5
+    }
 
     val trackArtist = normalizeForLyricsMatch(track.artist)
     val candidateArtist = normalizeForLyricsMatch(candidate.artist)

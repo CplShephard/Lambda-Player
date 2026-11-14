@@ -39,7 +39,7 @@ internal fun PlaylistDetailMenu(miuix: Boolean, playlist: LocalPlaylist, onDismi
     onPlay: () -> Unit, onRemix: () -> Unit, onEdit: () -> Unit, onAdd: () -> Unit, onDelete: () -> Unit) {
     val s = LocalStrings.current
     val fg = if (miuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
-    val card = if (miuix) MiuixAppTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceContainerHigh
+    val card = if (miuix) dev.shephard.player.ui.components.miuixDrawerCardColor() else MaterialTheme.colorScheme.surfaceContainerHigh
     val body: @Composable () -> Unit = {
         val closeThen = dev.shephard.player.ui.components.rememberCloseDrawerThen()
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

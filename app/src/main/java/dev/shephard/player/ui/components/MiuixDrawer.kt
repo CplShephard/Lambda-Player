@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -161,6 +162,16 @@ private fun MiuixDrawerCircleAction(
             modifier = Modifier.size(22.dp),
         )
     }
+}
+
+/** Same card surface for the queue and other action drawers, with a contrast fallback. */
+@Composable
+fun miuixDrawerCardColor(): Color {
+    val drawer = MiuixTheme.colorScheme.surfaceContainer
+    val card = MiuixTheme.colorScheme.surfaceVariant
+    return if (kotlin.math.abs(card.luminance() - drawer.luminance()) < 0.035f)
+        androidx.compose.ui.graphics.lerp(drawer, MiuixTheme.colorScheme.onBackground, 0.10f)
+    else card
 }
 
 object MiuixDrawerDefaults {

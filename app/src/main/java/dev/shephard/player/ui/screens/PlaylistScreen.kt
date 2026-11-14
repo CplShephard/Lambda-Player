@@ -541,6 +541,7 @@ val menuIdx = playlistMenuIndex
             onDismissRequest = { playlistMenuIndex = null },
         ) {
         val closeThen = dev.shephard.player.ui.components.rememberCloseDrawerThen()
+        val actionCard = dev.shephard.player.ui.components.miuixDrawerCardColor()
 Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -580,8 +581,9 @@ Column(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(bottom = 6.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                        .background(actionCard)
                         .bounceClick {
                             closeThen {
                                 editPlaylistIndex = menuIdx
@@ -598,8 +600,9 @@ Column(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(bottom = 6.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                        .background(actionCard)
                         .bounceClick {
                             closeThen {
                             val pinnedCount = playlists.count { it.pinned }
@@ -624,7 +627,7 @@ Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                            .background(actionCard)
                             .bounceClick {
                                 closeThen {
                                     playlistToDelete = pl
@@ -1807,6 +1810,7 @@ fun PlaylistDetailScreen(
             onDismissRequest = { showTrackPicker = false },
         ) {
             val dismissDrawer = rememberDrawerDismiss()
+            val pickerCard = dev.shephard.player.ui.components.miuixDrawerCardColor()
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1844,7 +1848,7 @@ fun PlaylistDetailScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                                .background(pickerCard)
                                 .then(if (checked) Modifier.background(MiuixAppTheme.colorScheme.primary.copy(alpha = 0.10f)) else Modifier)
                                 .clickable { pickerSelected = if (checked) pickerSelected - t.id else pickerSelected + t.id }
                                 .padding(vertical = 8.dp, horizontal = 8.dp),

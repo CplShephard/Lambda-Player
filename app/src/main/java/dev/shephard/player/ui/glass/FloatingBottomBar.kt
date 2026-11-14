@@ -305,6 +305,7 @@ fun <T> FloatingBottomBar(
         val scale = LocalFloatingBottomBarTabScale.current
         val contentColor = LocalFloatingBottomBarContentColor.current
         items.forEachIndexed { index, item ->
+            val tabColor = if (!isLiquidGlassMode && index == currentIndex) colors.activeContentColor else contentColor
             Column(
                 modifier = Modifier
                     .defaultMinSize(minWidth = 76.dp)
@@ -339,8 +340,8 @@ fun <T> FloatingBottomBar(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 CompositionLocalProvider(
-                    MiuixLocalContentColor provides contentColor,
-                    M3LocalContentColor provides contentColor,
+                    MiuixLocalContentColor provides tabColor,
+                    M3LocalContentColor provides tabColor,
                 ) {
                     iconContent(item, index)
                     labelContent(item, index)
@@ -559,36 +560,8 @@ fun <T> FloatingBottomBar(
                             .width(tabWidthDp),
                     )
                 }
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .graphicsLayer {
-                            val progressOffset = dampedDragAnimation.value * tabWidthPx
-                            translationX = if (isLtr) progressOffset + panelOffset else -progressOffset + panelOffset
-                        }
-                        .clip(pillShape)
-                        .height(56.dp)
-                        .width(tabWidthDp),
-                    // Force start alignment for the Box container to prevent centering
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    // Provide the active content color to the non-blur active layer
-                    CompositionLocalProvider(LocalFloatingBottomBarContentColor provides colors.activeContentColor) {
-                        Row(
-                            Modifier
-                                .clearAndSetSemantics {}
-                                .wrapContentWidth(align = Alignment.Start, unbounded = true)
-                                .requiredWidth(with(density) { (totalWidthPx - 8.dp.toPx()).toDp() })
-                                .height(56.dp)
-                                .graphicsLayer {
-                                    val progressOffset = dampedDragAnimation.value * tabWidthPx
-                                    translationX = if (isLtr) -progressOffset else progressOffset
-                                },
-                            verticalAlignment = Alignment.CenterVertically,
-                            content = tabsContent,
-                        )
-                    }
-                }
+                // The former clipped duplicate tab row intersected glyphs while the
+                // indicator settled, leaving a one-frame seam. Tabs are coloured once above.
             }
         }
     }

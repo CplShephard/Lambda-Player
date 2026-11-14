@@ -23,6 +23,10 @@ class Strings internal constructor(private val texts: Map<String, String>) {
     val libraryFolders: String get() = texts.getValue("libraryFolders")
     val libraryGenres: String get() = texts.getValue("libraryGenres")
     val libraryRefresh: String get() = texts.getValue("libraryRefresh")
+    val pullToRefresh: String get() = texts.getValue("pullToRefresh")
+    val releaseToRefresh: String get() = texts.getValue("releaseToRefresh")
+    val refreshing: String get() = texts.getValue("refreshing")
+    val refreshComplete: String get() = texts.getValue("refreshComplete")
     val libraryUnknown: String get() = texts.getValue("libraryUnknown")
     val addToQueue: String get() = texts.getValue("addToQueue")
     val libraryDetails: String get() = texts.getValue("libraryDetails")
@@ -315,7 +319,7 @@ private fun createEN(): Strings = Strings(mapOf(
     "lyricsMatches" to "Found %d match(es)",
     "lyricsManualHint" to "We couldn't find lyrics automatically. Edit the title or artist and search manually.",
     "lyricsArtistOptional" to "Artist (optional)",
-    "lyricsSources" to "Lyrics provided by LRCLIB and QQ Music",
+    "lyricsSources" to "Lyrics sources: LRCLIB, QQ Music and LiriQo (community API)",
     "notificationLike" to "Like",
     "notificationUnlike" to "Remove like",
     "notificationClose" to "Close player",
@@ -403,6 +407,10 @@ private fun createEN(): Strings = Strings(mapOf(
     "appearance" to "Appearance",
     "licensesTitle" to "Licenses",
     "licensesSummary" to "Open-source projects and libraries used in Lambda Player",
+    "pullToRefresh" to "Pull down to refresh",
+    "releaseToRefresh" to "Release to refresh",
+    "refreshing" to "Refreshing…",
+    "refreshComplete" to "Refresh complete",
     "code" to "en",
     "displayName" to "English (US)",
     "music" to "Musics",
@@ -530,6 +538,10 @@ private fun createEN(): Strings = Strings(mapOf(
 ))
 
 private fun createTR(base: Strings): Strings = base.withOverrides(mapOf(
+    "pullToRefresh" to "Yenilemek için aşağı çek",
+    "releaseToRefresh" to "Yenilemek için bırak",
+    "refreshing" to "Yenileniyor…",
+    "refreshComplete" to "Yenileme tamamlandı",
     "code" to "tr",
     "displayName" to "Türkçe",
     "yourMix" to "Senin Miksin",
@@ -578,7 +590,7 @@ private fun createTR(base: Strings): Strings = base.withOverrides(mapOf(
     "lyricsMatches" to "%d eşleşme bulundu",
     "lyricsManualHint" to "Şarkı sözleri bulunamadı. Şarkı veya sanatçı adını düzenleyip tekrar ara.",
     "lyricsArtistOptional" to "Sanatçı (isteğe bağlı)",
-    "lyricsSources" to "Şarkı sözleri: LRCLIB ve QQ Music",
+    "lyricsSources" to "Şarkı sözü kaynakları: LRCLIB, QQ Music ve LiriQo (topluluk API’si)",
     "notificationLike" to "Beğen",
     "notificationUnlike" to "Beğeniyi kaldır",
     "notificationClose" to "Oynatıcıyı kapat",
@@ -789,6 +801,10 @@ private fun createTR(base: Strings): Strings = base.withOverrides(mapOf(
 ))
 
 private fun createZH(base: Strings): Strings = base.withOverrides(mapOf(
+    "pullToRefresh" to "下拉刷新",
+    "releaseToRefresh" to "松开刷新",
+    "refreshing" to "正在刷新…",
+    "refreshComplete" to "刷新完成",
     "code" to "zh",
     "displayName" to "简体中文",
     "home" to "首页",
@@ -963,6 +979,10 @@ private fun createZH(base: Strings): Strings = base.withOverrides(mapOf(
 ))
 
 private fun createES(base: Strings): Strings = base.withOverrides(mapOf(
+    "pullToRefresh" to "Desliza hacia abajo para actualizar",
+    "releaseToRefresh" to "Suelta para actualizar",
+    "refreshing" to "Actualizando…",
+    "refreshComplete" to "Actualización completada",
     "code" to "es",
     "displayName" to "Español",
     "home" to "Inicio",
@@ -1137,6 +1157,10 @@ private fun createES(base: Strings): Strings = base.withOverrides(mapOf(
 ))
 
 private fun createRU(base: Strings): Strings = base.withOverrides(mapOf(
+    "pullToRefresh" to "Потяните вниз для обновления",
+    "releaseToRefresh" to "Отпустите для обновления",
+    "refreshing" to "Обновление…",
+    "refreshComplete" to "Обновление завершено",
     "code" to "ru",
     "displayName" to "Русский",
     "home" to "Главная",
@@ -1311,6 +1335,10 @@ private fun createRU(base: Strings): Strings = base.withOverrides(mapOf(
 ))
 
 private fun createKA(base: Strings): Strings = base.withOverrides(mapOf(
+    "pullToRefresh" to "განახლებისთვის ჩამოსწიეთ",
+    "releaseToRefresh" to "განახლებისთვის გაუშვით",
+    "refreshing" to "ახლდება…",
+    "refreshComplete" to "განახლება დასრულდა",
     "code" to "ka",
     "displayName" to "ქართული",
     "home" to "მთავარი",
@@ -1485,6 +1513,10 @@ private fun createKA(base: Strings): Strings = base.withOverrides(mapOf(
 ))
 
 private fun createAR(base: Strings): Strings = base.withOverrides(mapOf(
+    "pullToRefresh" to "اسحب للأسفل للتحديث",
+    "releaseToRefresh" to "اترك للتحديث",
+    "refreshing" to "جارٍ التحديث…",
+    "refreshComplete" to "اكتمل التحديث",
     "code" to "ar",
     "displayName" to "العربية",
     "home" to "الرئيسية",

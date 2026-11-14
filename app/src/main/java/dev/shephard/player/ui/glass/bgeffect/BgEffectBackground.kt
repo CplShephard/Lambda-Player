@@ -4,6 +4,8 @@ import android.os.Build
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,7 +32,9 @@ fun BgEffectBackground(
 ) {
     val shaderSupported = remember { isRuntimeShaderSupported() }
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || !shaderSupported) {
-        Box(modifier = modifier, content = content)
+        val colors = if (isDarkTheme) listOf(Color(0xFF092C27), Color(0xFF102C37), Color(0xFF10151B))
+            else listOf(Color(0xFFC8F2D8), Color(0xFFCEEAF4), Color(0xFFE6F6DF))
+        Box(modifier = modifier.background(Brush.verticalGradient(colors)), content = content)
         return
     }
 

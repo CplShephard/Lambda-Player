@@ -99,18 +99,34 @@ fun LibraryScreen(
         initialPage = labels.indexOfFirst { it.first == selectedTab }.coerceAtLeast(0),
         pageCount = { labels.size }
     )
+    var tabNavigationToken by remember { mutableIntStateOf(0) }
+    var tabNavigationInProgress by remember { mutableStateOf(false) }
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }.collect { page ->
+            if (!tabNavigationInProgress) labels.getOrNull(page)?.first?.let { selectedTab = it }
+        }
+    }
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.settledPage }.collect { page ->
-            val tab = labels.getOrNull(page)?.first ?: return@collect
-            if (selectedTab != tab) {
-                selectedTab = tab
-                prefs.setLibrarySelectedTab(tab)
-            }
+            labels.getOrNull(page)?.first?.let { prefs.setLibrarySelectedTab(it) }
         }
     }
     val selectTab: (Int) -> Unit = { tab ->
         val target = labels.indexOfFirst { it.first == tab }
-        if (target >= 0) scope.launch { pagerState.animateScrollToPage(target) }
+        if (target >= 0) {
+            selectedTab = tab // Highlight the tapped tab immediately, before pager animation.
+            tabNavigationInProgress = true
+            val token = ++tabNavigationToken
+            scope.launch {
+                try { pagerState.animateScrollToPage(target) }
+                finally {
+                    if (token == tabNavigationToken) {
+                        tabNavigationInProgress = false
+                        labels.getOrNull(pagerState.currentPage)?.first?.let { selectedTab = it }
+                    }
+                }
+            }
+        }
     }
     val foreground = if (useMiuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
     val accent = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
@@ -173,11 +189,7 @@ fun LibraryScreen(
                 if (sortDescending) sorted.reversed() else sorted
             }
         }
-        androidx.compose.material3.pulltorefresh.PullToRefreshBox(
-            isRefreshing = refreshing,
-            onRefresh = { if (permission.hasPermission) libraryViewModel.loadTracks() else permission.requestPermission() },
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-        ) {
+        val pagerContent: @Composable () -> Unit = {
             androidx.compose.foundation.pager.HorizontalPager(
                 state = pagerState, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 1
             ) { page ->
@@ -264,6 +276,23 @@ if (group == null && displayLayout == dev.shephard.player.player.LayoutMode.GRID
                 }
             }
             }
+        }
+        val refreshLibrary: () -> Unit = {
+            if (permission.hasPermission) libraryViewModel.loadTracks() else permission.requestPermission()
+        }
+        if (useMiuix) {
+            top.yukonga.miuix.kmp.basic.PullToRefresh(
+                isRefreshing = refreshing, onRefresh = refreshLibrary,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                refreshTexts = listOf(strings.pullToRefresh, strings.releaseToRefresh, strings.refreshing, strings.refreshComplete),
+                content = pagerContent,
+            )
+        } else {
+            androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                isRefreshing = refreshing, onRefresh = refreshLibrary,
+                modifier = Modifier.weight(1f).fillMaxWidth(), content = { pagerContent() },
+            )
         }
     }
     if (showSelection) LibrarySelectionSheet(tracks, useMiuix, playerViewModel) { showSelection = false }
