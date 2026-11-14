@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -163,7 +164,7 @@ fun MiuixTopBar(
     subtitle: String = "",
 ) {
     val fraction = state.collapseFraction
-    Box(modifier = modifier.fillMaxWidth()) {
+    Box(modifier = modifier.fillMaxWidth().statusBarsPadding()) {
         TopAppBar(
             title = title,
             largeTitle = title,
@@ -235,7 +236,7 @@ fun SubmenuTopBar(
                 contentDescription = LocalStrings.current.backContentDescription, tint = cs.onBackground)
         }
     }
-    Box(modifier = modifier.fillMaxWidth()) {
+    Box(modifier = modifier.fillMaxWidth().statusBarsPadding()) {
         if (compact) {
             SmallTopAppBar(title = title, color = Color.Transparent, titleColor = Color.Transparent,
                 scrollBehavior = state.scrollBehavior, defaultWindowInsetsPadding = false)

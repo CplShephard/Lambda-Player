@@ -34,6 +34,7 @@ object PrefsKeys {
     val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
     val PLAYLISTS_LAYOUT = intPreferencesKey("playlists_layout")
     val MUSICS_LAYOUT = intPreferencesKey("musics_layout")
+    val ALBUMS_LAYOUT = intPreferencesKey("albums_layout")
     val LIKED_SONG_IDS = stringPreferencesKey("liked_song_ids")
     val TRACK_OVERRIDES_JSON = stringPreferencesKey("track-overrides_json")
     val LYRICS_JSON = stringPreferencesKey("lyrics_json")
@@ -241,6 +242,8 @@ class PreferencesManager(private val context: Context) {
     val musicsLayout: Flow<Int> = context.dataStore.data.map {
         it[PrefsKeys.MUSICS_LAYOUT] ?: LayoutMode.LIST
     }
+
+    val albumsLayout: Flow<Int> = context.dataStore.data.map { it[PrefsKeys.ALBUMS_LAYOUT] ?: LayoutMode.LIST }
 
     val m3NavBarCornerRadius: Flow<Int> = context.dataStore.data.map {
         (it[PrefsKeys.M3_NAV_BAR_CORNER_RADIUS] ?: 24).coerceIn(0, 64)
@@ -477,7 +480,10 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun setUseMiuixMonet(use: Boolean) {
-        context.dataStore.edit { it[PrefsKeys.USE_MIUIX_MONET] = use }
+        context.dataStore.edit {
+            it[PrefsKeys.USE_MIUIX_MONET] = use
+            if (!use && (it[PrefsKeys.USE_MIUIX] ?: true)) it[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = false
+        }
     }
 
     suspend fun setUseAppleFloatingBar(use: Boolean) {
@@ -498,6 +504,10 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setMusicsLayout(mode: Int) {
         context.dataStore.edit { it[PrefsKeys.MUSICS_LAYOUT] = mode }
+    }
+
+    suspend fun setAlbumsLayout(mode: Int) {
+        context.dataStore.edit { it[PrefsKeys.ALBUMS_LAYOUT] = mode }
     }
 
     suspend fun setM3NavBarCornerRadius(radius: Int) {

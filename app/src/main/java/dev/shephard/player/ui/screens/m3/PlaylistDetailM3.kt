@@ -313,26 +313,27 @@ internal fun M3PlaylistDetail(
         )
     }
 
-    if (renameDialog) {
-        AlertDialog(
-            onDismissRequest = { renameDialog = false },
-            title = { Text(strings.editPlaylist) },
-            text = { OutlinedTextField(value = renameText, onValueChange = { renameText = it }, singleLine = true, label = { Text(strings.playlistName) }) },
-            confirmButton = {
-                TextButton(onClick = {
-                    renameDialog = false
-                    val newName = renameText.trim()
-                    if (newName.isNotEmpty() && newName != playlist.name) {
-                        updateRaw { all ->
-                            val idx = all.indexOfFirst { it.name == playlist.name && it.createdAt == playlist.createdAt }
-                            if (idx >= 0) all[idx] = all[idx].copy(name = newName)
-                        }
-                    }
-                }) { Text(strings.save) }
-            },
-            dismissButton = { TextButton(onClick = { renameDialog = false }) { Text(strings.cancel) } },
-        )
-    }
+    if (showMenu) dev.shephard.player.ui.screens.PlaylistDetailMenu(false, playlist,
+        onDismiss = { showMenu = false },
+        onPlay = { showMenu = false; onPlayAll() },
+        onRemix = { showMenu = false; onPlayRemix() },
+        onEdit = { showMenu = false; renameText = playlist.name; renameDialog = true },
+        onAdd = { showMenu = false; showAddTracks = true },
+        onDelete = { showMenu = false; deleteConfirm = true })
+    if (renameDialog) dev.shephard.player.ui.screens.PlaylistDetailEditor(false, playlist, plTracks,
+        onDismiss = { renameDialog = false },
+        onSave = { newName ->
+            renameDialog = false
+            if (newName.isNotBlank() && newName != playlist.name) updateRaw { all ->
+                val idx = all.indexOfFirst { it.name == playlist.name && it.createdAt == playlist.createdAt }
+                if (idx >= 0) all[idx] = all[idx].copy(name = newName)
+            }
+        },
+        onPickCover = { coverPicker.launch(arrayOf("image/*", "video/mp4")) },
+        onRemoveCover = { updateRaw { all ->
+            val idx = all.indexOfFirst { it.name == playlist.name && it.createdAt == playlist.createdAt }
+            if (idx >= 0) all[idx] = all[idx].copy(coverUri = null)
+        } })
 
     if (deleteConfirm) {
         AlertDialog(
@@ -371,16 +372,7 @@ internal fun M3PlaylistDetail(
                     }
                 },
                 actions = {
-                    if (canEdit) {
-                        Box {
-                            IconButton(onClick = { showMenu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = null) }
-                            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                                DropdownMenuItem(text = { Text(strings.editPlaylist) }, leadingIcon = { Icon(Icons.Filled.Edit, null) }, onClick = { showMenu = false; renameText = playlist.name; renameDialog = true })
-                                DropdownMenuItem(text = { Text(strings.cover) }, leadingIcon = { Icon(Icons.Filled.QueueMusic, null) }, onClick = { showMenu = false; coverPicker.launch(arrayOf("image/*", "video/mp4")) })
-                                DropdownMenuItem(text = { Text(strings.delete) }, leadingIcon = { Icon(Icons.Filled.Delete, null) }, onClick = { showMenu = false; deleteConfirm = true })
-                            }
-                        }
-                    }
+                    IconButton(onClick = { showMenu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = strings.libraryOptions) }
                 },
                 colors = m3TopBarColors(),
             )
@@ -430,15 +422,6 @@ internal fun M3PlaylistDetail(
                         }
                     }
                     Spacer(Modifier.height(16.dp))
-                    Text(
-                        text = playlist.name,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(Modifier.height(4.dp))
                     Text(
                         text = "${plTracks.size} ${strings.trackCount}",
                         style = MaterialTheme.typography.labelLarge,

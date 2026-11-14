@@ -148,8 +148,6 @@ fun SettingsScreen(
                     .padding(top = innerPadding.calculateTopPadding() + 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                TotalListeningTimeCard(playerViewModel = playerViewModel, onClick = onOpenStats)
-
                 SettingsNavigationCard(
                     icon = Icons.Filled.ColorLens,
                     title = strings.themeSettings,
@@ -223,10 +221,6 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 }
             )
 
-            Spacer(Modifier.height(8.dp))
-            MiuixSwitchRow(label = strings.appleFloatingBar, checked = appleFloatingBar, description = strings.appleFloatingBarDescription) { enabled ->
-                scope.launch { prefs.setUseAppleFloatingBar(enabled) }
-            }
         }
 
         // ── Group 2: Miuix UI + Miuix Custom Colors (InstallerX layout) ──────
@@ -283,7 +277,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
 
             // Fixed re-animation: snap to target on first load to avoid enter animation on re-enter
             if (useMiuixMonetNullable != null) {
-                val monetMenuState = remember(useMiuixMonetNullable) { MutableTransitionState(useMiuixMonet) }
+                val monetMenuState = remember { MutableTransitionState(useMiuixMonet) }
                 LaunchedEffect(useMiuixMonet) {
                     monetMenuState.targetState = useMiuixMonet
                 }
@@ -345,39 +339,12 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // ── Grid/list layout preferences (kept in Theme Settings for Miuix) ──
-        SmallTitle(
-            text = strings.layout,
-            insideMargin = PaddingValues(16.dp, 8.dp),
-        )
-        SectionCard(contentPadding = PaddingValues(0.dp)) {
-            val layoutModes = listOf(LayoutMode.LIST, LayoutMode.GRID)
-            val layoutLabels = listOf(strings.list, strings.grid)
-            MiuixSpinnerRow(
-                title = strings.musicsLayout,
-                items = layoutLabels,
-                selectedIndex = layoutModes.indexOf(musicsLayout).coerceAtLeast(0),
-                onSelectedIndexChange = { index ->
-                    scope.launch { prefs.setMusicsLayout(layoutModes[index]) }
-                }
-            )
-            Spacer(Modifier.height(8.dp))
-            MiuixSpinnerRow(
-                title = strings.playlistsLayout,
-                items = layoutLabels,
-                selectedIndex = layoutModes.indexOf(playlistsLayout).coerceAtLeast(0),
-                onSelectedIndexChange = { index ->
-                    scope.launch { prefs.setPlaylistsLayout(layoutModes[index]) }
-                }
-            )
-        }
-
         // Fixed: avoid re-animation on enter/exit, only show when data loaded, snap on first load
         val accentGridTarget = useMiuixMonet &&
             paletteStyle != PaletteStyle.Monochrome &&
             (!dynamicColor || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) && !dynamicByCover
         val accentGridVisible = useMiuixMonetNullable != null && dynamicColorNullable != null && accentGridTarget
-        val accentGridState = remember(useMiuixMonetNullable, dynamicColorNullable) { MutableTransitionState(accentGridVisible) }
+        val accentGridState = remember { MutableTransitionState(accentGridVisible) }
         LaunchedEffect(accentGridVisible) {
             accentGridState.targetState = accentGridVisible
         }
@@ -448,6 +415,16 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                         }
                     }
                 }
+            }
+        }
+
+        // Layout is placed after accent colors and before predictive back. Grid/list selection
+        // lives in Library; the dock style is the remaining page-layout preference.
+        SmallTitle(text = strings.layout, insideMargin = PaddingValues(16.dp, 8.dp))
+        SectionCard(contentPadding = PaddingValues(0.dp)) {
+            MiuixSwitchRow(label = strings.appleFloatingBar, checked = appleFloatingBar,
+                description = strings.appleFloatingBarDescription) { enabled ->
+                scope.launch { prefs.setUseAppleFloatingBar(enabled) }
             }
         }
 

@@ -81,27 +81,18 @@ fun rememberHomeMix(tracks: List<AudioTrack>, likedIds: List<Long>, history: Lis
 fun HomeYourMix(
     tracks: List<AudioTrack>,
     useMiuix: Boolean,
+    onRemix: (List<AudioTrack>) -> Unit,
     onPlay: (List<AudioTrack>, Int) -> Unit,
 ) {
     val strings = LocalStrings.current
-    val context = LocalContext.current
-    val prefs = remember(context) { PreferencesManager(context) }
-    val scope = rememberCoroutineScope()
-    val storedPattern by prefs.mixCollagePattern.collectAsState(initial = CollagePattern.COSMIC_SWIRL.name)
-    val autoRotate by prefs.mixCollageAutoRotate.collectAsState(initial = false)
-    var showStyles by remember { mutableStateOf(false) }
-    val basePattern = remember(storedPattern) { CollagePattern.entries.firstOrNull { it.name == storedPattern } ?: CollagePattern.COSMIC_SWIRL }
     val day = Calendar.getInstance().let { it.get(Calendar.YEAR) * 366 + it.get(Calendar.DAY_OF_YEAR) }
-    val pattern = if (autoRotate) CollagePattern.entries[day % CollagePattern.entries.size] else basePattern
+    val pattern = CollagePattern.entries[day % CollagePattern.entries.size]
     val surface = if (useMiuix) MiuixAppTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.secondaryContainer
     val ink = if (useMiuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
     val accent = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
     Column(Modifier.fillMaxWidth()) {
         // Pixel's hero: a two-line title with a prominent shuffle button.
         Box(Modifier.fillMaxWidth().height(256.dp).padding(16.dp)) {
-            IconButton(onClick = { showStyles = true }, modifier = Modifier.align(Alignment.TopEnd)) {
-                Icon(Icons.Filled.Palette, contentDescription = strings.collageStyle, tint = ink)
-            }
             Column(Modifier.align(Alignment.TopStart).padding(top = 48.dp, start = 12.dp)) {
                 Text(strings.yourMixTitle, fontWeight = FontWeight.Black, fontSize = 64.sp, lineHeight = 62.sp, color = ink)
                 Text(strings.yourMixSubtitle, color = ink.copy(alpha = .7f),
@@ -112,8 +103,7 @@ fun HomeYourMix(
                     .clip(RoundedCornerShape(28.dp))
                     .background(if (tracks.isNotEmpty()) accent else surface)
                     .clickable(enabled = tracks.isNotEmpty()) {
-                        val shuffled = tracks.shuffled()
-                        onPlay(shuffled, 0)
+                        onRemix(tracks)
                     },
                 contentAlignment = Alignment.Center,
             ) {
@@ -131,29 +121,7 @@ fun HomeYourMix(
             PixelMixCollage(tracks = tracks, surface = surface, accent = accent, pattern = pattern, useMiuix = useMiuix, onPlay = onPlay)
         }
     }
-    if (showStyles) {
-        AlertDialog(
-            onDismissRequest = { showStyles = false },
-            title = { Text(strings.collageStyle) },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    Row(Modifier.fillMaxWidth().clickable { scope.launch { prefs.setMixCollageAutoRotate(!autoRotate) } }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(strings.collageAutoRotate, Modifier.weight(1f))
-                        Switch(checked = autoRotate, onCheckedChange = { value -> scope.launch { prefs.setMixCollageAutoRotate(value) } })
-                    }
-                    CollagePattern.entries.forEach { item ->
-                        Row(Modifier.fillMaxWidth().clickable {
-                            scope.launch { prefs.setMixCollagePattern(item.name); prefs.setMixCollageAutoRotate(false) }
-                        }, verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = !autoRotate && item == basePattern, onClick = null)
-                            Text(item.label, modifier = Modifier.padding(start = 8.dp))
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showStyles = false }) { Text(strings.save) } }
-        )
-    }
+
 }
 
 /** PixelPlayerOSS collage positions, using Lambda's artwork. */
@@ -170,7 +138,7 @@ private fun PixelMixCollage(
     @Composable
     fun Tile(index: Int, width: Dp, height: Dp, modifier: Modifier, shape: Shape, rotation: Float) {
         val track = tracks.getOrNull(index) ?: return
-        Box(modifier.size(width, height).graphicsLayer { rotationZ = rotation }.clip(shape)
+        Box(modifier.size(minOf(width, height)).graphicsLayer { rotationZ = rotation }.clip(shape)
             .background(surface).then(
                 if (useMiuix) Modifier.clickable { onPlay(tracks, index) }
                 else Modifier.m3CardPress(shape = shape, overlayColor = Color.White) { onPlay(tracks, index) }

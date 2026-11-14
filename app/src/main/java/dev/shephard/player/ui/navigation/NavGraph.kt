@@ -352,6 +352,7 @@ fun NavGraph(
             }
             entry<PlaylistDetailRoute>(swipeDismiss = swipeBackDirection) { route ->
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
+                    Box(Modifier.fillMaxSize()) {
                     if (useMiuix) {
                         PlaylistDetailScreen(
                             playerViewModel = playerViewModel,
@@ -368,6 +369,11 @@ fun NavGraph(
                             onTrackClick = onTrackClick,
                             onPlaylistRemixClick = onPlaylistRemixClick,
                         )
+                    }
+                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+                        MiniPlayerHost(playerViewModel = playerViewModel, useMiuix = useMiuix,
+                            onOpenNowPlaying = onOpenNowPlaying, onBoundsChanged = onMiniPlayerBoundsChanged)
+                    }
                     }
                 }
             }

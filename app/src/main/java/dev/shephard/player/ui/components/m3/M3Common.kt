@@ -91,7 +91,7 @@ fun M3SmallTopBar(
 ) {
     val fraction = state.fraction
     val titleStart = androidx.compose.ui.unit.lerp(20.dp, if (navigationIcon != null) 80.dp else 20.dp, fraction)
-    val height = androidx.compose.ui.unit.lerp(152.dp, 64.dp, fraction)
+    val height = androidx.compose.ui.unit.lerp(140.dp, 64.dp, fraction)
     Box(
         modifier = modifier.fillMaxWidth().background(colors.containerColor)
             .statusBarsPadding().height(height)
@@ -104,7 +104,7 @@ fun M3SmallTopBar(
             Box(modifier = Modifier.height(64.dp), contentAlignment = Alignment.CenterStart) {
                 androidx.compose.material3.ProvideTextStyle(
                     MaterialTheme.typography.titleLarge.copy(
-                        fontSize = androidx.compose.ui.unit.lerp(30.sp, 22.sp, fraction),
+                        fontSize = androidx.compose.ui.unit.lerp(32.sp, 23.sp, fraction),
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                     )
                 ) { title() }

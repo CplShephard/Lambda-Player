@@ -3,6 +3,9 @@
 // LineageOS Twelve 1:1 - Now Playing Screen
 package dev.shephard.player.ui.screens.m3
 
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionOnScreen
+
 
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
@@ -167,6 +170,7 @@ private fun M3NowPlayingSheetContent(
     onDismiss: () -> Unit,
 ) {
     val track = state.currentTrack
+    val isRemixed by playerViewModel.isRemixed.collectAsState()
     val pendingCarouselIndex by playerViewModel.pendingCarouselIndex.collectAsState()
     val carouselContext = androidx.compose.ui.platform.LocalContext.current
     val carouselPrefs = remember(carouselContext) { dev.shephard.player.player.PreferencesManager(carouselContext) }
@@ -176,6 +180,7 @@ private fun M3NowPlayingSheetContent(
 
     var showQueue by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
+    var lyricsButtonBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     var showAddToPlaylist by remember { mutableStateOf(false) }
 
     val density = LocalDensity.current
@@ -235,17 +240,8 @@ private fun M3NowPlayingSheetContent(
             .onSizeChanged { measuredHeightPx = it.height.toFloat() }
             .graphicsLayer {
                 val p = (dragOffset.value / screenHeightPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
-                val bounds = collapsedBounds?.takeIf { it.width > 0f && it.height > 0f }
-                if (bounds != null && size.width > 0f && size.height > 0f) {
-                    transformOrigin = TransformOrigin(0f, 0f)
-                    scaleX = 1f - (1f - bounds.width / size.width) * p
-                    scaleY = 1f - (1f - bounds.height / size.height) * p
-                    translationX = bounds.left * p
-                    translationY = bounds.top * p
-                } else {
-                    translationY = dragOffset.value.coerceAtLeast(0f)
-                }
-                alpha = if (bounds != null) ((1f - p) * 4f).coerceIn(0f, 1f) else 1f
+                translationY = dragOffset.value.coerceAtLeast(0f)
+                alpha = (1f - p * .22f).coerceIn(0f, 1f)
                 shape = RoundedCornerShape(sheetCornerRadius)
                 clip = true
             }
@@ -307,8 +303,10 @@ private fun M3NowPlayingSheetContent(
                         placeholderContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                     )
                 } else {
-                    Box(Modifier.fillMaxWidth().height(artHeight).clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(64.dp))
+                    Box(Modifier.fillMaxWidth().height(artHeight), contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(artHeight).clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(64.dp))
+                        }
                     }
                 }
             }
@@ -356,11 +354,11 @@ private fun M3NowPlayingSheetContent(
                 onNext = playerViewModel::skipToNext,
                 height = 80.dp,
                 pressAnimationSpec = androidx.compose.animation.core.tween(240, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-                releaseDelay = 220L,
+                releaseDelay = 0L,
             )
             Row(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                IconButton(onClick = playerViewModel::toggleShuffle) {
-                    Icon(Icons.Filled.Shuffle, strings.shuffle, tint = if (state.shuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                IconButton(onClick = playerViewModel::remixQueue) {
+                    Icon(Icons.Filled.Shuffle, strings.remix, tint = if (isRemixed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                 }
                 IconButton(onClick = playerViewModel::cycleRepeatMode) {
                     Icon(if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat, strings.repeat, tint = if (state.repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
@@ -384,7 +382,10 @@ private fun M3NowPlayingSheetContent(
                     IconButton(onClick = { showQueue = true }, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.AutoMirrored.Filled.QueueMusic, strings.queue, tint = MaterialTheme.colorScheme.onSecondaryContainer)
                     }
-                    IconButton(onClick = { showLyrics = true }, modifier = Modifier.size(48.dp)) {
+                    IconButton(onClick = { showLyrics = true }, modifier = Modifier.size(48.dp).onGloballyPositioned { coordinates ->
+                        val pos = coordinates.positionOnScreen()
+                        if (pos.x.isFinite() && pos.y.isFinite()) lyricsButtonBounds = androidx.compose.ui.geometry.Rect(pos.x, pos.y, pos.x + coordinates.size.width, pos.y + coordinates.size.height)
+                    }) {
                         Icon(Icons.Filled.Lyrics, strings.lyrics, tint = MaterialTheme.colorScheme.onSecondaryContainer)
                     }
                     val trackId = track?.id ?: -1L
@@ -430,6 +431,7 @@ private fun M3NowPlayingSheetContent(
         dev.shephard.player.ui.screens.FullScreenLyricsExperience(
             playerViewModel = playerViewModel,
             useMiuix = false,
+            sourceBoundsOnScreen = lyricsButtonBounds,
             onDismiss = { showLyrics = false },
         )
     }
@@ -592,9 +594,6 @@ private fun M3AddToPlaylistDrawer(
                                     all[originalIdx] = current.copy(trackIds = newIds)
                                     prefs.setPlaylistsJson(dev.shephard.player.ui.screens.encodePlaylists(all))
                                 }
-                            }
-                            if (!contains && track != null) {
-                                playerViewModel.addTrackToQueue(track)
                             }
                         }
                     )

@@ -539,9 +539,8 @@ fun <T> FloatingBottomBar(
                         .width(tabWidthDp),
                 )
             } else {
-                // Only the solid floating dock gets the subtle elastic indicator. Keep the
-                // active icons/labels in a separate unscaled layer so their design stays intact.
-                if (mode == FloatingBottomBarMode.None) {
+                // Keep the same elastic indicator in solid and blurred modes.
+                run {
                     Box(
                         modifier = Modifier
                             .padding(horizontal = 4.dp)
@@ -568,10 +567,6 @@ fun <T> FloatingBottomBar(
                             translationX = if (isLtr) progressOffset + panelOffset else -progressOffset + panelOffset
                         }
                         .clip(pillShape)
-                        .then(
-                            if (mode == FloatingBottomBarMode.None) Modifier
-                            else Modifier.background(colors.indicatorColor.copy(alpha = 0.15f), pillShape)
-                        )
                         .height(56.dp)
                         .width(tabWidthDp),
                     // Force start alignment for the Box container to prevent centering

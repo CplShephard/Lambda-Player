@@ -168,18 +168,8 @@ fun HomeScreen(
                                 ),
                             verticalArrangement = Arrangement.spacedBy(24.dp)
                         ) {
-                            HomeYourMix(yourMix, useMiuix = true) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
+                            HomeYourMix(yourMix, useMiuix = true, onRemix = { playerViewModel.setQueueAndPlayRemixed(it, strings.yourMix) }) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
                             HomeListeningTime(totalListeningMs, useMiuix = true, onClick = onOpenStats)
-                            if (featuredTracks.isNotEmpty()) {
-                                FeaturedSongsSection(
-                                    title = strings.featuredSongs,
-                                    tracks = featuredTracks,
-                                    onTrackClick = { featuredIdx ->
-                                        onTrackClick(featuredTracks, featuredIdx, strings.featuredSongs)
-                                    }
-                                )
-                            }
-
                             if (featuredPlaylists.isNotEmpty()) {
                                 FeaturedPlaylistsSection(
                                     title = strings.featuredPlaylists,

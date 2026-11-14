@@ -203,8 +203,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 carouselConfirmationJob?.cancel()
                 _pendingCarouselIndex.value = null
             }
-            val track = controller?.currentMediaItemIndex?.let(queueTracks::getOrNull)
-                ?: queueTracks.find { it.id.toString() == mediaItem?.mediaId }
+            // Media3 can dispatch a transition while a batch of move commands is still
+            // being applied. Never trust a stale index over the media item's identity.
+            val indexedTrack = controller?.currentMediaItemIndex?.let(queueTracks::getOrNull)
+            val track = indexedTrack?.takeIf { it.id.toString() == mediaItem.mediaId }
+                ?: queueTracks.find { it.id.toString() == mediaItem.mediaId }
             finalizeStatsSession()
             statsSessionTrackId = track?.id
             _uiState.value = _uiState.value.copy(
@@ -835,7 +838,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun remixQueue() {
         val c = controller ?: return
         val current = _uiState.value.queue
-        if (current.size <= 1 || c.currentMediaItemIndex !in current.indices) return
+        if (c.currentMediaItemIndex !in current.indices || (!remixActive && current.size <= 1)) return
         if (remixActive) {
             // Restore the original order while preserving multiplicity and later queue edits.
             val remaining = current.toMutableList()
@@ -845,14 +848,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (index >= 0) restored += remaining.removeAt(index)
             }
             restored += remaining
-            reorderPlayerPlaylist(c, current, restored)
+            val restoredCurrent = reorderPlayerPlaylist(c, current, restored)
             queueTracks = restored
-            _uiState.value = _uiState.value.copy(queue = restored, currentQueueIndex = c.currentMediaItemIndex.coerceAtLeast(0))
+            _uiState.value = _uiState.value.copy(queue = restored, currentQueueIndex = restoredCurrent)
             remixActive = false
             _isRemixed.value = false
             originalQueue = emptyList()
             return
         }
+        clearCarouselPrediction()
+        if (c.shuffleModeEnabled) c.shuffleModeEnabled = false
         originalQueue = current.toList()
         val currentIndex = c.currentMediaItemIndex
         val order = listOf(currentIndex) + current.indices.filter { it != currentIndex }.shuffled()
@@ -866,7 +871,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
         val newOrder = order.map { current[it] }
         queueTracks = newOrder
-        _uiState.value = _uiState.value.copy(queue = newOrder, currentQueueIndex = c.currentMediaItemIndex.coerceAtLeast(0))
+        _uiState.value = _uiState.value.copy(queue = newOrder, currentQueueIndex = 0, shuffleEnabled = false)
         remixActive = true
         _isRemixed.value = true
     }
@@ -876,6 +881,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val c = controller ?: return
         if (tracks.isEmpty()) return
 
+        if (c.shuffleModeEnabled) c.shuffleModeEnabled = false
         val startIndex = tracks.indices.random()
         val startTrack = tracks[startIndex]
         val newOrder = listOf(startTrack) + tracks.filterIndexed { i, _ -> i != startIndex }.shuffled()
@@ -904,7 +910,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.value = _uiState.value.copy(
             queue = newOrder,
             currentTrack = startTrack,
-            shuffleEnabled = true,
+            currentQueueIndex = 0,
+            shuffleEnabled = false,
             currentPlaylistName = playlistName
         )
         _progress.value = PlaybackProgress(
@@ -916,15 +923,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         c: Player,
         fromOrder: List<AudioTrack>,
         toOrder: List<AudioTrack>
-    ) {
+    ): Int {
         val working = fromOrder.toMutableList()
+        var currentIndex = c.currentMediaItemIndex.coerceIn(0, (working.size - 1).coerceAtLeast(0))
         for (target in toOrder.indices) {
             val desiredId = toOrder[target].id
             val currentPos = (target until working.size).firstOrNull { working[it].id == desiredId } ?: -1
             if (currentPos < 0 || currentPos == target) continue
             runCatching { c.moveMediaItem(currentPos, target) }
             working.add(target, working.removeAt(currentPos))
+            currentIndex = when {
+                currentIndex == currentPos -> target
+                currentPos > target && currentIndex in target until currentPos -> currentIndex + 1
+                currentPos < target && currentIndex in (currentPos + 1)..target -> currentIndex - 1
+                else -> currentIndex
+            }
         }
+        return currentIndex
     }
 
     fun cycleRepeatMode() {

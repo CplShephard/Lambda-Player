@@ -2,6 +2,9 @@
 
 package dev.shephard.player.ui.screens
 
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionOnScreen
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.slideInHorizontally
@@ -133,6 +136,7 @@ fun NowPlayingSheet(
     var showQueue by remember { mutableStateOf(false) }
     var showPlaylists by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
+    var lyricsButtonBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
 
     val density = LocalDensity.current
     val dismissThresholdPx = with(density) { 140.dp.toPx() }
@@ -223,19 +227,8 @@ Box(
             .onSizeChanged { measuredHeightPx = it.height.toFloat() }
             .graphicsLayer {
                 val p = (dragOffset.value / screenHeightPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
-                val bounds = collapsedBounds?.takeIf { it.width > 0f && it.height > 0f }
-                if (bounds != null && size.width > 0f && size.height > 0f) {
-                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
-                    scaleX = 1f - (1f - bounds.width / size.width) * p
-                    scaleY = 1f - (1f - bounds.height / size.height) * p
-                    translationX = bounds.left * p
-                    translationY = bounds.top * p
-                } else {
-                    translationY = dragOffset.value.coerceAtLeast(0f)
-                }
-                // At the collapsed end the real mini-player remains visible underneath;
-                // fade the full content in as the surface grows instead of flashing tiny text.
-                alpha = if (bounds != null) ((1f - p) * 4f).coerceIn(0f, 1f) else 1f
+                translationY = dragOffset.value.coerceAtLeast(0f)
+                alpha = (1f - p * .22f).coerceIn(0f, 1f)
                 shape = sheetShape
                 clip = true
             }
@@ -322,7 +315,7 @@ Column(modifier = Modifier.padding(horizontal = 24.dp)) {
             dev.shephard.player.player.CarouselStyle.TWO_PEEK -> .6f
             else -> .8f
         }
-        val artHeight = minOf(maxWidth * pageFraction, configuration.screenHeightDp.dp * .38f)
+        val artHeight = minOf(maxWidth * pageFraction, configuration.screenHeightDp.dp * .42f)
         if (state.queue.isNotEmpty()) {
             dev.shephard.player.ui.components.AlbumCarousel(
                 queue = state.queue, currentIndex = state.currentQueueIndex,
@@ -334,8 +327,10 @@ Column(modifier = Modifier.padding(horizontal = 24.dp)) {
                 placeholderContentColor = MiuixAppTheme.colorScheme.primary,
             )
         } else {
-            Box(Modifier.fillMaxWidth().height(artHeight).clip(RoundedCornerShape(24.dp)).background(MiuixAppTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
+            Box(Modifier.fillMaxWidth().height(artHeight), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(artHeight).clip(RoundedCornerShape(24.dp)).background(MiuixAppTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
+                }
             }
         }
     }
@@ -383,7 +378,7 @@ SeekBarRow(playerViewModel = playerViewModel)
                 )
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToPrevious() },
-                    icon = Icons.Filled.FastRewind,
+                    painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_rewind),
                     contentDescription = strings.previous,
                     tint = Color.White,
                     iconSize = 36.dp
@@ -417,7 +412,7 @@ SeekBarRow(playerViewModel = playerViewModel)
                         label = "playPauseIcon"
                     ) { isPlaying ->
                         Icon(
-                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            painter = androidx.compose.ui.res.painterResource(if (isPlaying) dev.shephard.player.R.drawable.ic_nowplaying_pause else dev.shephard.player.R.drawable.ic_nowplaying_play),
                             contentDescription = if (isPlaying) strings.pause else strings.play,
                             tint = Color.White,
                             modifier = Modifier.size(40.dp)
@@ -426,7 +421,7 @@ SeekBarRow(playerViewModel = playerViewModel)
                 }
                 BouncyIconButton(
                     onClick = { playerViewModel.skipToNext() },
-                    icon = Icons.Filled.FastForward,
+                    painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_fforward),
                     contentDescription = strings.next,
                     tint = Color.White,
                     iconSize = 36.dp
@@ -469,6 +464,10 @@ SeekBarRow(playerViewModel = playerViewModel)
                     )
                     BouncyIconButton(
                         onClick = { showLyrics = true },
+                        modifier = Modifier.onGloballyPositioned { coordinates ->
+                            val pos = coordinates.positionOnScreen()
+                            if (pos.x.isFinite() && pos.y.isFinite()) lyricsButtonBounds = androidx.compose.ui.geometry.Rect(pos.x, pos.y, pos.x + coordinates.size.width, pos.y + coordinates.size.height)
+                        },
                         icon = Icons.Filled.Lyrics,
                         contentDescription = strings.lyrics,
                         tint = Color.White,
@@ -524,6 +523,7 @@ SeekBarRow(playerViewModel = playerViewModel)
                 FullScreenLyricsExperience(
                     playerViewModel = playerViewModel,
                     useMiuix = true,
+                    sourceBoundsOnScreen = lyricsButtonBounds,
                     onDismiss = { showLyrics = false },
                 )
             }
@@ -737,9 +737,6 @@ itemsIndexed(playlists) { idx, pl ->
                                 all[idx] = updated
                                 scope.launch { prefs.setPlaylistsJson(encodePlaylists(all)) }
 
-if (!containsTrack && track != null) {
-                                    playerViewModel.addTrackToQueue(track)
-                                }
                             }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically

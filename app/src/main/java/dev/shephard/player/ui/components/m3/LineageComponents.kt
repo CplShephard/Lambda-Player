@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -129,7 +130,7 @@ fun LineageListItemWithThumbnail(
                     AsyncImage(
                         model = dev.shephard.player.ui.components.rememberStaticArtwork(thumbnailModel),
                         contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
                 } else if (placeholderIcon != null) {
@@ -202,7 +203,6 @@ fun LineageHorizontalMediaItem(
         Card(
             modifier = Modifier
                 .size(thumbnailSize)
-                .padding(bottom = 8.dp)
                 .m3CardPressLayer(cardInteractions, RoundedCornerShape(8.dp), Color.White),
             shape = RoundedCornerShape(8.dp),
             colors = CardDefaults.cardColors(
@@ -222,7 +222,7 @@ fun LineageHorizontalMediaItem(
                     AsyncImage(
                         model = dev.shephard.player.ui.components.rememberStaticArtwork(thumbnailModel),
                         contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
                 } else if (placeholderIcon != null) {

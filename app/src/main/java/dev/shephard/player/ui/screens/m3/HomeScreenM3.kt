@@ -162,34 +162,11 @@ fun HomeScreenM3(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             item(key = "your_mix") {
-                                HomeYourMix(yourMix, useMiuix = false) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
+                                HomeYourMix(yourMix, useMiuix = false, onRemix = { playerViewModel.setQueueAndPlayRemixed(it, strings.yourMix) }) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
                             }
                             item(key = "listening_time") {
                                 HomeListeningTime(totalListeningMs, useMiuix = false, onClick = onOpenStats)
                             }
-                            if (featuredTracks.isNotEmpty()) {
-                                item {
-                                    LineageSectionHeader(title = strings.featuredSongs)
-                                    LazyRow(
-                                        contentPadding = PaddingValues(horizontal = 8.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        items(featuredTracks, key = { it.id }) { track ->
-                                            LineageHorizontalMediaItem(
-                                                headline = track.title,
-                                                subhead = track.artist,
-                                                thumbnailModel = track.albumArtUri,
-                                                placeholderIcon = Icons.Filled.MusicNote,
-                                                onClick = {
-                                                    val idx = featuredTracks.indexOf(track)
-                                                    if (idx >= 0) onTrackClick(featuredTracks, idx, strings.featuredSongs)
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
                             if (featuredPlaylists.isNotEmpty()) {
                                 item {
                                     LineageSectionHeader(title = strings.featuredPlaylists)

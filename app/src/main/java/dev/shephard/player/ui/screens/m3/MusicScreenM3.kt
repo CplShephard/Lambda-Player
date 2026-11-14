@@ -180,7 +180,7 @@ fun MusicScreenM3(
                 }
                 else -> {
                     Column(modifier = Modifier.fillMaxSize()) {
-                        Row(
+                        if (!embedded) Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
