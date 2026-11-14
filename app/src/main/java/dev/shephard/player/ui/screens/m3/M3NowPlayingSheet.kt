@@ -3,9 +3,6 @@
 // LineageOS Twelve 1:1 - Now Playing Screen
 package dev.shephard.player.ui.screens.m3
 
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionOnScreen
-
 
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
@@ -180,7 +177,6 @@ private fun M3NowPlayingSheetContent(
 
     var showQueue by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
-    var lyricsButtonBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     var showAddToPlaylist by remember { mutableStateOf(false) }
 
     val density = LocalDensity.current
@@ -303,10 +299,8 @@ private fun M3NowPlayingSheetContent(
                         placeholderContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                     )
                 } else {
-                    Box(Modifier.fillMaxWidth().height(artHeight), contentAlignment = Alignment.Center) {
-                        Box(Modifier.size(artHeight).clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(64.dp))
-                        }
+                    Box(Modifier.fillMaxWidth().height(artHeight).clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(64.dp))
                     }
                 }
             }
@@ -382,10 +376,7 @@ private fun M3NowPlayingSheetContent(
                     IconButton(onClick = { showQueue = true }, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.AutoMirrored.Filled.QueueMusic, strings.queue, tint = MaterialTheme.colorScheme.onSecondaryContainer)
                     }
-                    IconButton(onClick = { showLyrics = true }, modifier = Modifier.size(48.dp).onGloballyPositioned { coordinates ->
-                        val pos = coordinates.positionOnScreen()
-                        if (pos.x.isFinite() && pos.y.isFinite()) lyricsButtonBounds = androidx.compose.ui.geometry.Rect(pos.x, pos.y, pos.x + coordinates.size.width, pos.y + coordinates.size.height)
-                    }) {
+                    IconButton(onClick = { showLyrics = true }, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Filled.Lyrics, strings.lyrics, tint = MaterialTheme.colorScheme.onSecondaryContainer)
                     }
                     val trackId = track?.id ?: -1L
@@ -431,7 +422,6 @@ private fun M3NowPlayingSheetContent(
         dev.shephard.player.ui.screens.FullScreenLyricsExperience(
             playerViewModel = playerViewModel,
             useMiuix = false,
-            sourceBoundsOnScreen = lyricsButtonBounds,
             onDismiss = { showLyrics = false },
         )
     }
@@ -594,6 +584,9 @@ private fun M3AddToPlaylistDrawer(
                                     all[originalIdx] = current.copy(trackIds = newIds)
                                     prefs.setPlaylistsJson(dev.shephard.player.ui.screens.encodePlaylists(all))
                                 }
+                            }
+                            if (!contains && track != null) {
+                                playerViewModel.addTrackToQueue(track)
                             }
                         }
                     )

@@ -2,7 +2,6 @@
 package dev.shephard.player.ui.screens
 
 import android.content.Intent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -54,23 +53,21 @@ internal fun SongOptionsSheet(
     var query by remember { mutableStateOf("") }
     var newName by remember { mutableStateOf("") }
     val foreground = if (useMiuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
-    val card = if (useMiuix) MiuixAppTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceContainerHigh
     val content: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth().heightIn(max = 660.dp).padding(horizontal = 16.dp).padding(bottom = 18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
                 AsyncImage(dev.shephard.player.ui.components.rememberStaticArtwork(track.albumArtUri), null, Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    LibraryText(track.title, useMiuix, color = foreground, bold = true)
-                    LibraryText("${track.artist} • ${track.album}", useMiuix, color = foreground.copy(alpha = .7f), maxLines = 2)
+                    Text(track.title, color = foreground, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${track.artist} • ${track.album}", color = foreground.copy(alpha = .7f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
             when (page) {
                 0 -> Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                     @Composable fun Action(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, action: () -> Unit) {
-                        Row(Modifier.fillMaxWidth().padding(bottom = 4.dp).clip(RoundedCornerShape(15.dp)).background(card)
-                            .clickable(onClick = action).padding(vertical = 13.dp, horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            LibraryIcon(icon, null, useMiuix, foreground); Spacer(Modifier.width(16.dp)); LibraryText(label, useMiuix, color = foreground)
+                        Row(Modifier.fillMaxWidth().clickable(onClick = action).padding(vertical = 10.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(icon, null, tint = foreground); Spacer(Modifier.width(16.dp)); Text(label, color = foreground)
                         }
                     }
                     Action(strings.play, Icons.Default.PlayArrow) { player.setQueueAndPlay(listOf(track), 0); onDismiss() }
@@ -108,40 +105,36 @@ internal fun SongOptionsSheet(
                 }
                 1 -> {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        LibraryText("‹", useMiuix, Modifier.clickable { page = 0 }.padding(12.dp), color = foreground)
-                        LibraryText(strings.addToPlaylist, useMiuix, color = foreground, bold = true)
+                        TextButton(onClick = { page = 0 }) { Text("‹") }
+                        Text(strings.addToPlaylist, color = foreground, fontWeight = FontWeight.Bold)
                     }
-                    if (useMiuix) dev.shephard.player.ui.miuix.OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, placeholder = { dev.shephard.player.ui.miuix.Text(strings.search) })
-                    else OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text(strings.search) })
+                    OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text(strings.search) })
                     LazyColumn(Modifier.weight(1f, fill = false).heightIn(max = 280.dp)) {
                         items(playlists.filter { it.name.contains(query, ignoreCase = true) }) { playlist ->
                             val checked = track.id in playlist.trackIds
-                            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(14.dp)).background(card).clickable {
+                            Row(Modifier.fillMaxWidth().clickable {
                                 scope.launch {
                                     prefs.updatePlaylistsJson { json ->
                                         updatePlaylistMembership(json, playlist.name, playlist.createdAt, listOf(track.id), "toggle")
                                     }
                                 }
-                            }.padding(vertical = 6.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                if (useMiuix) dev.shephard.player.ui.miuix.Checkbox(checked = checked, onCheckedChange = null)
-                                else Checkbox(checked = checked, onCheckedChange = null)
-                                LibraryText(playlist.name, useMiuix, modifier = Modifier.padding(start = 8.dp), color = foreground)
+                            }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = checked, onCheckedChange = null)
+                                Text(playlist.name, color = foreground, modifier = Modifier.padding(start = 8.dp))
                             }
                         }
                     }
-                    if (useMiuix) dev.shephard.player.ui.miuix.OutlinedTextField(newName, { newName = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { dev.shephard.player.ui.miuix.Text(strings.playlistName) })
-                    else OutlinedTextField(newName, { newName = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(strings.playlistName) })
-                    LibraryText(strings.createPlaylist, useMiuix, Modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(14.dp)).background(card)
-                        .clickable(enabled = newName.isNotBlank()) {
-                            val name = newName.trim(); newName = ""
-                            scope.launch { prefs.updatePlaylistsJson { json -> appendPlaylist(json, name, listOf(track.id)) } }
-                        }.padding(14.dp), color = foreground)
+                    OutlinedTextField(newName, { newName = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text(strings.playlistName) })
+                    TextButton(enabled = newName.isNotBlank(), onClick = {
+                        val name = newName.trim(); newName = ""
+                        scope.launch { prefs.updatePlaylistsJson { json -> appendPlaylist(json, name, listOf(track.id)) } }
+                    }) { Text(strings.createPlaylist) }
                 }
                 else -> {
-                    LibraryText("‹  ${strings.libraryDetails}", useMiuix, Modifier.clickable { page = 0 }.padding(12.dp), color = foreground, bold = true)
+                    TextButton(onClick = { page = 0 }) { Text("‹  ${strings.libraryDetails}") }
                     listOf(track.title, track.artist, track.album, track.genre ?: strings.libraryUnknown,
                         track.formattedDuration(), track.folder ?: track.uri.toString()).forEach {
-                        LibraryText(it, useMiuix, Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(14.dp)).background(card).padding(12.dp), color = foreground, maxLines = 3)
+                        Text(it, color = foreground, modifier = Modifier.padding(vertical = 5.dp))
                     }
                 }
             }

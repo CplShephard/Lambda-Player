@@ -115,9 +115,6 @@ fun PlaylistScreenM3(
     onPlaylistRemixClick: (List<AudioTrack>, String?) -> Unit = { _, _ -> },
     onOpenPlaylistDetail: (Int) -> Unit = {},
     embedded: Boolean = false,
-    query: String = "",
-    sortMode: Int = 0,
-    descending: Boolean = false,
 ) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
@@ -291,20 +288,44 @@ fun PlaylistScreenM3(
     if (editPlaylistIndex != null) {
         val editingPl = playlists.getOrNull(editPlaylistIndex ?: -1)
         if (editingPl != null) {
-            val editTracks = remember(editingPl, tracks, likedIds) { resolvePlaylistTracks(editingPl, tracks, likedIds) }
-            dev.shephard.player.ui.screens.PlaylistDetailEditor(false, editingPl, editTracks,
-                onDismiss = { editPlaylistIndex = null },
-                onSave = { name ->
-                    editPlaylistIndex = null
-                    scope.launch { prefs.updatePlaylistsJson { json ->
-                        val all = parsePlaylists(json).toMutableList()
-                        val i = all.indexOfFirst { it.name == editingPl.name && it.createdAt == editingPl.createdAt }
-                        if (i >= 0) all[i] = all[i].copy(name = name)
-                        encodePlaylists(all)
-                    } }
+            AlertDialog(
+                onDismissRequest = { editPlaylistIndex = null },
+                title = { Text(strings.editPlaylist) },
+                text = {
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        M3CoverEditor(
+                            model = editingPl.coverUri?.let { Uri.parse(it) }
+                                ?: resolvePlaylistTracks(editingPl, tracks, likedIds).firstOrNull()?.albumArtUri,
+                            placeholderIcon = Icons.Filled.QueueMusic,
+                            hasCustomCover = editingPl.coverUri != null,
+                            onPick = { pickEditCover() },
+                            onRemove = { setPlaylistCover(editingPl, null) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedTextField(value = editPlaylistName, onValueChange = { editPlaylistName = it }, singleLine = true, label = { Text(strings.playlistName) }, modifier = Modifier.fillMaxWidth())
+                    }
                 },
-                onPickCover = pickEditCover,
-                onRemoveCover = { setPlaylistCover(editingPl, null) })
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val newNameTrim = editPlaylistName.trim()
+                            if (newNameTrim.isNotEmpty()) {
+                                val all = rawPlaylists.toMutableList()
+                                val idx = all.indexOfFirst { it.name == editingPl.name && it.createdAt == editingPl.createdAt }
+                                if (idx >= 0) all[idx] = all[idx].copy(name = newNameTrim)
+                                writePlaylists(all)
+                            }
+                            editPlaylistIndex = null
+                        },
+                    ) { Text(strings.save) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { editPlaylistIndex = null }) { Text(strings.cancel) }
+                },
+            )
+        } else {
+            editPlaylistIndex = null
         }
     }
 
@@ -378,7 +399,7 @@ fun PlaylistScreenM3(
                         }
                     } else {
                         Column(modifier = Modifier.fillMaxSize()) {
-                            if (!embedded) Row(
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -397,14 +418,8 @@ fun PlaylistScreenM3(
                                 )
                             }
 
-                            val sortedPlaylists = remember(playlists, query, sortMode, descending) {
-                                val filtered = playlists.filter { it.name.contains(query, ignoreCase = true) }
-                                val sorted = when (sortMode) {
-                                    3 -> filtered.sortedBy { it.createdAt }
-                                    4 -> filtered.sortedBy { it.trackIds.size }
-                                    else -> filtered.sortedBy { it.name.lowercase() }
-                                }.let { if (descending) it.reversed() else it }
-                                val (pinned, unpinned) = sorted.partition { it.pinned }
+                            val sortedPlaylists = remember(playlists) {
+                                val (pinned, unpinned) = playlists.partition { it.pinned }
                                 pinned + unpinned
                             }
 

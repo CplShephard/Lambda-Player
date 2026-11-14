@@ -173,12 +173,9 @@ fun MusicScreen(
                                     state = gridState,
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        // Embedded Library has its own header and pull-to-refresh.
-                                        // A hidden top bar must not consume the list's scroll deltas.
-                                        .then(if (embedded) Modifier else Modifier
-                                            .captureForTopBarBlur(topBarState)
-                                            .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                                            .overScrollVertical()),
+                                        .captureForTopBarBlur(topBarState)
+                                        .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                                        .overScrollVertical(),
                                     contentPadding = PaddingValues(
                                         start = 12.dp,
                                         end = 12.dp,
@@ -201,12 +198,9 @@ fun MusicScreen(
                                     state = listState,
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        // Embedded Library has its own header and pull-to-refresh.
-                                        // A hidden top bar must not consume the list's scroll deltas.
-                                        .then(if (embedded) Modifier else Modifier
-                                            .captureForTopBarBlur(topBarState)
-                                            .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                                            .overScrollVertical()),
+                                        .captureForTopBarBlur(topBarState)
+                                        .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                                        .overScrollVertical(),
                                     contentPadding = PaddingValues(
                                         start = 16.dp,
                                         end = 16.dp,

@@ -2,7 +2,6 @@ package dev.shephard.player.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -27,7 +26,8 @@ import dev.shephard.player.data.AudioTrack
  *
  * An explicit cover always wins. Without one, the album art of the first tracks is used:
  *  - 4 or more tracks: 2x2 collage of the first four,
- *  - 2 or 3 tracks: square tiles in a two-column collage,
+ *  - 3 tracks: one large tile on the left, two stacked on the right,
+ *  - 2 tracks: two tiles side by side,
  *  - 1 track: that track's art on its own (same as before),
  *  - no tracks: [fallback].
  */
@@ -63,14 +63,15 @@ fun PlaylistCoverArt(
                     placeholderColor = placeholderColor,
                     placeholderIconColor = placeholderIconColor
                 )
-                2, 3 -> Column(modifier = Modifier.fillMaxSize(), verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center) {
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        ArtTile(arts[0], Modifier.weight(1f).aspectRatio(1f), placeholderColor, placeholderIconColor)
-                        ArtTile(arts[1], Modifier.weight(1f).aspectRatio(1f), placeholderColor, placeholderIconColor)
-                    }
-                    if (arts.size == 3) Row(modifier = Modifier.fillMaxWidth()) {
-                        ArtTile(arts[2], Modifier.weight(1f).aspectRatio(1f), placeholderColor, placeholderIconColor)
-                        Box(Modifier.weight(1f).aspectRatio(1f).background(placeholderColor))
+                2 -> Row(modifier = Modifier.fillMaxSize()) {
+                    ArtTile(arts[0], Modifier.weight(1f).fillMaxHeight(), placeholderColor, placeholderIconColor)
+                    ArtTile(arts[1], Modifier.weight(1f).fillMaxHeight(), placeholderColor, placeholderIconColor)
+                }
+                3 -> Row(modifier = Modifier.fillMaxSize()) {
+                    ArtTile(arts[0], Modifier.weight(1f).fillMaxHeight(), placeholderColor, placeholderIconColor)
+                    Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        ArtTile(arts[1], Modifier.weight(1f).fillMaxWidth(), placeholderColor, placeholderIconColor)
+                        ArtTile(arts[2], Modifier.weight(1f).fillMaxWidth(), placeholderColor, placeholderIconColor)
                     }
                 }
                 else -> Column(modifier = Modifier.fillMaxSize()) {

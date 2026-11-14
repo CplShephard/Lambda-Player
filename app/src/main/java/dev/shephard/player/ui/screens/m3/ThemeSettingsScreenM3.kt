@@ -199,10 +199,8 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
             // Accent color grid - fixed #4: no closing animation when dynamic color on
             if (dynamicColorNullable != null) {
                 item {
-                    val accentVisibility = remember { androidx.compose.animation.core.MutableTransitionState(accentGridTarget) }
-                    androidx.compose.runtime.LaunchedEffect(accentGridTarget) { accentVisibility.targetState = accentGridTarget }
                     androidx.compose.animation.AnimatedVisibility(
-                        visibleState = accentVisibility,
+                        visible = accentGridTarget,
                         enter = androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(300)) + androidx.compose.animation.expandVertically(animationSpec = androidx.compose.animation.core.tween(400)),
                         exit = androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(250)) + androidx.compose.animation.shrinkVertically(animationSpec = androidx.compose.animation.core.tween(350))
                     ) {
