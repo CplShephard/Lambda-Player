@@ -43,6 +43,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -443,7 +445,7 @@ onDismiss: () -> Unit,
     }
 
     if (showQueue) {
-        dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { showQueue = false })
+        dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { onShowQueueChange(false) })
     }
 
     val isLandscapeOutside = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -621,11 +623,22 @@ private fun M3LandscapeContent(
         }
     }
     if (showQueue) {
-        dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { showQueue = false })
+        dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { onShowQueueChange(false) })
     }
     if (showAddToPlaylist) {
         M3AddToPlaylistDrawer(track?.id ?: -1L, track, playerViewModel, { showAddToPlaylist = false }, strings)
     }
+}
+
+
+@Composable
+internal fun M3NowPlayingProgressLineage(playerViewModel: PlayerViewModel, isPlaying: Boolean) {
+    val prog by playerViewModel.progress.collectAsState()
+    val fraction = if (prog.durationMs > 0) prog.positionMs.toFloat() / prog.durationMs else 0f
+    androidx.compose.material3.LinearWavyProgressIndicator(
+        progress = fraction,
+        modifier = androidx.compose.foundation.layout.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+    )
 }
 
 private fun m3FormatMillisLineage(ms: Long): String {
