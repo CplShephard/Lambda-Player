@@ -484,9 +484,9 @@ fun FullScreenLyricsExperience(
                         label = "lyricsBackdropCrossfade",
                         modifier = Modifier.fillMaxSize(),
                     ) { artUri ->
-                        if (artUri != null && !isAnimatedCover && blurEnabled && blurStrength > 0f) {
+                        if (artUri != null && blurEnabled && blurStrength > 0f) {
                             AsyncImage(
-                                model = artUri,
+                                model = if (isAnimatedCover) rememberStaticArtwork(artUri) else artUri,
                                 contentDescription = null,
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -494,14 +494,6 @@ fun FullScreenLyricsExperience(
                                     .blur(blurStrength.dp),
                                 contentScale = ContentScale.Crop,
                                 colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.2f) }),
-                            )
-                        } else if (artUri != null && isAnimatedCover) {
-                            // Frozen frame for animated covers
-                            AsyncImage(
-                                model = rememberStaticArtwork(artUri),
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
                             )
                         } else if (artUri != null) {
                             AsyncImage(
