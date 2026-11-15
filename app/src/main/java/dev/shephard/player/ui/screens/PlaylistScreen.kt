@@ -1225,9 +1225,16 @@ internal fun PlaylistDetailView(
                     dev.shephard.player.ui.components.SubmenuTopBar(
                         title = detailTitle, onBack = onBack, state = topBarState, collapseFraction = detailCollapse
                     )
+                    val cs = MiuixAppTheme.colorScheme
                     Box(Modifier.align(Alignment.TopEnd).miuixHeaderSafeTop().padding(end = 8.dp).height(56.dp),
                         contentAlignment = Alignment.Center) {
-                        LibraryPopupButton(true, Icons.Filled.MoreVert, strings.libraryOptions, MiuixAppTheme.colorScheme.onBackground, menuChoices)
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape)
+                                .background(cs.surfaceVariant.copy(alpha = 0.75f * detailCollapse)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            LibraryPopupButton(true, Icons.Filled.MoreVert, strings.libraryOptions, cs.onBackground, menuChoices)
+                        }
                     }
                 }
             }
@@ -1590,8 +1597,10 @@ fun PlaylistDetailScreen(
     LaunchedEffect(Unit) {
         if (tracks.isEmpty()) libraryViewModel.loadTracks()
     }
-    val json by prefs.playlistsJson.collectAsState(initial = null as String?)
-    val likedSongIdsJson by prefs.likedSongIds.collectAsState(initial = "[]")
+    val initialJson = remember { kotlinx.coroutines.runBlocking { kotlinx.coroutines.flow.first(prefs.playlistsJson) } }
+    val json by prefs.playlistsJson.collectAsState(initial = initialJson)
+    val initialLikedJson = remember { kotlinx.coroutines.runBlocking { kotlinx.coroutines.flow.first(prefs.likedSongIds) } }
+    val likedSongIdsJson by prefs.likedSongIds.collectAsState(initial = initialLikedJson)
     val likedIds = remember(likedSongIdsJson) {
         try {
             JSONArray(likedSongIdsJson).let { arr -> (0 until arr.length()).map { arr.getLong(it) } }
