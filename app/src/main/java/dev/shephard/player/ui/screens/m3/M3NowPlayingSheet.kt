@@ -114,61 +114,61 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun M3NowPlayingSheet(
-    playerViewModel: PlayerViewModel = viewModel(),
-    collapsedBounds: androidx.compose.ui.geometry.Rect? = null,
-    onAlbumClick: (dev.shephard.player.data.AudioTrack) -> Unit = {},
-    onDismiss: () -> Unit
+playerViewModel: PlayerViewModel = viewModel(),
+collapsedBounds: androidx.compose.ui.geometry.Rect? = null,
+onAlbumClick: (dev.shephard.player.data.AudioTrack) -> Unit = {},
+onDismiss: () -> Unit
 ) {
     val state by playerViewModel.uiState.collectAsState()
     val baseScheme = MaterialTheme.colorScheme
     val accent by androidx.compose.animation.animateColorAsState(
-        targetValue = Color(state.glowColorArgb),
-        animationSpec = tween(620),
-        label = "nowPlayingCoverAccent",
-    )
+    targetValue = Color(state.glowColorArgb),
+    animationSpec = tween(620),
+    label = "nowPlayingCoverAccent",
+)
     val tintedSurface = lerp(baseScheme.surface, accent, 0.25f)
     val tintedSurfaceVariant = lerp(baseScheme.surfaceVariant, accent, 0.30f)
     val tintedSecondaryContainer = lerp(baseScheme.secondaryContainer, accent, 0.48f)
     val tintedPrimaryContainer = lerp(baseScheme.primaryContainer, accent, 0.42f)
     val tintedScheme = baseScheme.copy(
-        primary = accent,
-        onPrimary = contrastColorFor(accent),
-        primaryContainer = tintedPrimaryContainer,
-        onPrimaryContainer = contrastColorFor(tintedPrimaryContainer),
-        secondary = accent,
-        onSecondary = contrastColorFor(accent),
-        secondaryContainer = tintedSecondaryContainer,
-        onSecondaryContainer = contrastColorFor(tintedSecondaryContainer),
-        surface = tintedSurface,
-        onSurface = contrastColorFor(tintedSurface),
-        surfaceVariant = tintedSurfaceVariant,
-        onSurfaceVariant = contrastColorFor(tintedSurfaceVariant),
-        surfaceContainerLowest = lerp(baseScheme.surfaceContainerLowest, accent, 0.10f),
-        surfaceContainerLow = lerp(baseScheme.surfaceContainerLow, accent, 0.18f),
-        surfaceContainer = lerp(baseScheme.surfaceContainer, accent, 0.28f),
-        surfaceContainerHigh = lerp(baseScheme.surfaceContainerHigh, accent, 0.36f),
-        surfaceContainerHighest = lerp(baseScheme.surfaceContainerHighest, accent, 0.42f),
-        outline = lerp(baseScheme.outline, accent, 0.28f),
-    )
+    primary = accent,
+    onPrimary = contrastColorFor(accent),
+    primaryContainer = tintedPrimaryContainer,
+    onPrimaryContainer = contrastColorFor(tintedPrimaryContainer),
+    secondary = accent,
+    onSecondary = contrastColorFor(accent),
+    secondaryContainer = tintedSecondaryContainer,
+    onSecondaryContainer = contrastColorFor(tintedSecondaryContainer),
+    surface = tintedSurface,
+    onSurface = contrastColorFor(tintedSurface),
+    surfaceVariant = tintedSurfaceVariant,
+    onSurfaceVariant = contrastColorFor(tintedSurfaceVariant),
+    surfaceContainerLowest = lerp(baseScheme.surfaceContainerLowest, accent, 0.10f),
+    surfaceContainerLow = lerp(baseScheme.surfaceContainerLow, accent, 0.18f),
+    surfaceContainer = lerp(baseScheme.surfaceContainer, accent, 0.28f),
+    surfaceContainerHigh = lerp(baseScheme.surfaceContainerHigh, accent, 0.36f),
+    surfaceContainerHighest = lerp(baseScheme.surfaceContainerHighest, accent, 0.42f),
+    outline = lerp(baseScheme.outline, accent, 0.28f),
+)
     MaterialTheme(colorScheme = tintedScheme) {
         M3NowPlayingSheetContent(
-            playerViewModel = playerViewModel,
-            state = state,
-            collapsedBounds = collapsedBounds,
-            onAlbumClick = onAlbumClick,
-            onDismiss = onDismiss,
-        )
+        playerViewModel = playerViewModel,
+        state = state,
+        collapsedBounds = collapsedBounds,
+        onAlbumClick = onAlbumClick,
+        onDismiss = onDismiss,
+    )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun M3NowPlayingSheetContent(
-    playerViewModel: PlayerViewModel,
-    state: PlayerUiState,
-    collapsedBounds: androidx.compose.ui.geometry.Rect?,
-    onAlbumClick: (dev.shephard.player.data.AudioTrack) -> Unit,
-    onDismiss: () -> Unit,
+playerViewModel: PlayerViewModel,
+state: PlayerUiState,
+collapsedBounds: androidx.compose.ui.geometry.Rect?,
+onAlbumClick: (dev.shephard.player.data.AudioTrack) -> Unit,
+onDismiss: () -> Unit,
 ) {
     val track = state.currentTrack
     val isRemixed by playerViewModel.isRemixed.collectAsState()
@@ -205,10 +205,10 @@ private fun M3NowPlayingSheetContent(
     var isInteractingWithSheet by remember { mutableStateOf(false) }
     val isFullyExpanded by remember { derivedStateOf { hasEnteredRest && !isInteractingWithSheet && dragOffset.value <= 0.5f } }
     val sheetCornerRadius by animateDpAsState(
-        targetValue = if (isFullyExpanded) 0.dp else 28.dp,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
-        label = "sheetCornerRadiusM3"
-    )
+    targetValue = if (isFullyExpanded) 0.dp else 28.dp,
+    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
+    label = "sheetCornerRadiusM3"
+)
 
     val dismissWithAnimation: () -> Unit = {
         dragScope.launch {
@@ -235,59 +235,59 @@ private fun M3NowPlayingSheetContent(
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .onSizeChanged { measuredHeightPx = it.height.toFloat() }
-            .graphicsLayer {
-                val p = (dragOffset.value / screenHeightPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
-                translationY = dragOffset.value.coerceAtLeast(0f)
-                alpha = (1f - p * .22f).coerceIn(0f, 1f)
-                shape = RoundedCornerShape(sheetCornerRadius)
-                clip = true
-            }
-            .background(nowPlayingBackground)
-            .draggable(
-                orientation = Orientation.Vertical,
-                state = rememberDraggableState { delta ->
-                    val next = (dragOffset.value + delta).coerceAtLeast(0f)
-                    dragScope.launch { dragOffset.snapTo(next) }
-                },
-                onDragStarted = { isInteractingWithSheet = true },
-                onDragStopped = { velocity ->
-                    isInteractingWithSheet = false
-                    if (dragOffset.value > dismissThresholdPx || velocity > 2000f) dismissWithAnimation()
-                    else dragScope.launch { dragOffset.animateTo(0f, animationSpec = enterSpring) }
-                }
-            )
+    modifier = Modifier
+    .fillMaxSize()
+    .onSizeChanged { measuredHeightPx = it.height.toFloat() }
+    .graphicsLayer {
+        val p = (dragOffset.value / screenHeightPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
+        translationY = dragOffset.value.coerceAtLeast(0f)
+        alpha = (1f - p * .22f).coerceIn(0f, 1f)
+        shape = RoundedCornerShape(sheetCornerRadius)
+        clip = true
+    }
+    .background(nowPlayingBackground)
+    .draggable(
+    orientation = Orientation.Vertical,
+    state = rememberDraggableState { delta ->
+        val next = (dragOffset.value + delta).coerceAtLeast(0f)
+        dragScope.launch { dragOffset.snapTo(next) }
+    },
+    onDragStarted = { isInteractingWithSheet = true },
+    onDragStopped = { velocity ->
+        isInteractingWithSheet = false
+        if (dragOffset.value > dismissThresholdPx || velocity > 2000f) dismissWithAnimation()
+        else dragScope.launch { dragOffset.animateTo(0f, animationSpec = enterSpring) }
+    }
+)
     ) {
-            val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            if (isLandscape) {
-                M3LandscapeContent(
-                    playerViewModel = playerViewModel,
-                    state = state,
-                    pendingCarouselIndex = pendingCarouselIndex,
-                    carouselStyle = carouselStyle,
-                    onAlbumClick = onAlbumClick,
-                    showQueue = showQueue,
-                    onShowQueueChange = { showQueue = it },
-                    showAddToPlaylist = showAddToPlaylist,
-                    onShowAddToPlaylistChange = { showAddToPlaylist = it },
-                    strings = strings,
-                )
-            } else {
-        Column(
+        val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        if (isLandscape) {
+            M3LandscapeContent(
+            playerViewModel = playerViewModel,
+            state = state,
+            pendingCarouselIndex = pendingCarouselIndex,
+            carouselStyle = carouselStyle,
+            onAlbumClick = onAlbumClick,
+            showQueue = showQueue,
+            onShowQueueChange = { showQueue = it },
+            showAddToPlaylist = showAddToPlaylist,
+            onShowAddToPlaylistChange = { showAddToPlaylist = it },
+            strings = strings,
+        )
+        } else {
+            Column(
             modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-        ) {
-            // Drag handle
-            Box(modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {
-                Box(modifier = Modifier.size(width = 36.dp, height = 4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
-            }
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            ) {
+                // Drag handle
+                Box(modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.size(width = 36.dp, height = 4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
+                }
 
-            // Minimal, transparent heading: let the cover-derived Now Playing palette show through.
-            Text(
+                // Minimal, transparent heading: let the cover-derived Now Playing palette show through.
+                Text(
                 text = strings.nowPlaying,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 10.dp),
                 style = MaterialTheme.typography.titleLarge,
@@ -297,8 +297,200 @@ private fun M3NowPlayingSheetContent(
                 overflow = TextOverflow.Ellipsis,
             )
 
-            androidx.compose.foundation.layout.BoxWithConstraints(
+                androidx.compose.foundation.layout.BoxWithConstraints(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+                ) {
+                    val pageFraction = when (carouselStyle) {
+                        dev.shephard.player.player.CarouselStyle.NO_PEEK -> 1f
+                        dev.shephard.player.player.CarouselStyle.TWO_PEEK -> .6f
+                        else -> .8f
+                    }
+                    val artHeight = minOf(maxWidth * pageFraction, configuration.screenHeightDp.dp * .38f)
+                    if (state.queue.isNotEmpty()) {
+                        dev.shephard.player.ui.components.AlbumCarousel(
+                        queue = state.queue, currentIndex = state.currentQueueIndex,
+                        requestedIndex = pendingCarouselIndex, isPlaying = state.isPlaying, carouselStyle = carouselStyle,
+                        onSongSelected = playerViewModel::playQueueItemAbsolute,
+                        onAlbumClick = onAlbumClick,
+                        modifier = Modifier.fillMaxWidth().height(artHeight),
+                        placeholderColor = MaterialTheme.colorScheme.secondaryContainer,
+                        placeholderContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                    } else {
+                        Box(Modifier.fillMaxWidth().height(artHeight), contentAlignment = Alignment.Center) {
+                            Box(Modifier.size(artHeight).clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(64.dp))
+                            }
+                        }
+                    }
+                }
+
+                // Labels - margin 40dp bottom 20dp like Twelve
+                Column(
+                modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 40.dp)
+                .padding(bottom = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                    text = track?.title ?: "",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                    Text(
+                    text = track?.artist ?: "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                    Text(
+                    text = track?.album ?: "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                }
+
+                // Progress slider
+                M3NowPlayingProgressLineage(playerViewModel = playerViewModel, isPlaying = state.isPlaying)
+
+                dev.shephard.player.ui.components.m3.AnimatedPlaybackControls(
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
+                isPlayingProvider = { state.isPlaying },
+                onPrevious = playerViewModel::skipToPrevious,
+                onPlayPause = playerViewModel::togglePlayPause,
+                onNext = playerViewModel::skipToNext,
+                height = 80.dp,
+                pressAnimationSpec = androidx.compose.animation.core.tween(240, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                releaseDelay = 0L,
+            )
+                Row(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    dev.shephard.player.ui.components.m3.M3PlaybackModeButton(
+                    icon = Icons.Filled.Shuffle, description = strings.remix,
+                    active = isRemixed, onClick = playerViewModel::remixQueue,
+                )
+                    dev.shephard.player.ui.components.m3.M3PlaybackModeButton(
+                    icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                    description = strings.repeat, active = state.repeatMode != RepeatMode.OFF,
+                    onClick = playerViewModel::cycleRepeatMode,
+                )
+                }
+
+                // Bottom bar card - fixed colors and removed non-working buttons #3
+                Card(
+                modifier = Modifier
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp)
+                .align(Alignment.CenterHorizontally),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { showQueue = true }, modifier = Modifier.size(48.dp)) {
+                            Icon(Icons.AutoMirrored.Filled.QueueMusic, strings.queue, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                        IconButton(onClick = { showLyrics = true }, modifier = Modifier.size(48.dp)) {
+                            Icon(Icons.Filled.Lyrics, strings.lyrics, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                        val trackId = track?.id ?: -1L
+                        val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
+                        Box(
+                        modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { if (trackId > 0) playerViewModel.toggleLike(trackId) }
+                        .combinedClickable(
+                        onClick = { if (trackId > 0) playerViewModel.toggleLike(trackId) },
+                        onLongClick = { showAddToPlaylist = true }
+                    ),
+                        contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                            if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            strings.likedSongs,
+                            tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        }
+                        if (showAddToPlaylist && track != null) {
+                            M3AddToPlaylistDrawer(
+                            trackId = trackId,
+                            track = track,
+                            playerViewModel = playerViewModel,
+                            onDismiss = { showAddToPlaylist = false },
+                            strings = strings
+                        )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+    }
+
+    if (showQueue) {
+        dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { showQueue = false })
+    }
+
+    if (showLyrics && !isLandscape) {
+        dev.shephard.player.ui.screens.FullScreenLyricsExperience(
+        playerViewModel = playerViewModel,
+        useMiuix = false,
+        onDismiss = { showLyrics = false },
+    )
+    }
+
+}
+
+
+@Composable
+private fun M3LandscapeContent(
+    playerViewModel: PlayerViewModel,
+    state: dev.shephard.player.player.PlayerUiState,
+    pendingCarouselIndex: Int?,
+    carouselStyle: String,
+    onAlbumClick: (dev.shephard.player.data.AudioTrack) -> Unit,
+    showQueue: Boolean,
+    onShowQueueChange: (Boolean) -> Unit,
+    showAddToPlaylist: Boolean,
+    onShowAddToPlaylistChange: (Boolean) -> Unit,
+    strings: dev.shephard.player.ui.i18n.Strings,
+) {
+    val configuration = LocalConfiguration.current
+    val track = state.currentTrack
+    Row(
+        modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()
+    ) {
+        Column(
+            modifier = Modifier.weight(0.5f).fillMaxHeight().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.size(width = 36.dp, height = 4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
+            }
+            Text(
+                text = strings.nowPlaying,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            androidx.compose.foundation.layout.BoxWithConstraints(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(vertical = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 val pageFraction = when (carouselStyle) {
@@ -306,7 +498,7 @@ private fun M3NowPlayingSheetContent(
                     dev.shephard.player.player.CarouselStyle.TWO_PEEK -> .6f
                     else -> .8f
                 }
-                val artHeight = minOf(maxWidth * pageFraction, configuration.screenHeightDp.dp * .38f)
+                val artHeight = minOf(maxWidth * pageFraction, configuration.screenHeightDp.dp * .60f)
                 if (state.queue.isNotEmpty()) {
                     dev.shephard.player.ui.components.AlbumCarousel(
                         queue = state.queue, currentIndex = state.currentQueueIndex,
@@ -320,377 +512,116 @@ private fun M3NowPlayingSheetContent(
                 } else {
                     Box(Modifier.fillMaxWidth().height(artHeight), contentAlignment = Alignment.Center) {
                         Box(Modifier.size(artHeight).clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(64.dp))
+                            Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(48.dp))
                         }
                     }
                 }
             }
-
-            // Labels - margin 40dp bottom 20dp like Twelve
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 40.dp)
-                    .padding(bottom = 20.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = track?.title ?: "",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = track?.artist ?: "",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = track?.album ?: "",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Text(track?.title ?: "", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(track?.artist ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-
-            // Progress slider
-            M3NowPlayingProgressLineage(playerViewModel = playerViewModel, isPlaying = state.isPlaying)
-
-            dev.shephard.player.ui.components.m3.AnimatedPlaybackControls(
-                modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
-                isPlayingProvider = { state.isPlaying },
-                onPrevious = playerViewModel::skipToPrevious,
-                onPlayPause = playerViewModel::togglePlayPause,
-                onNext = playerViewModel::skipToNext,
-                height = 80.dp,
-                pressAnimationSpec = androidx.compose.animation.core.tween(240, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-                releaseDelay = 0L,
-            )
-            Row(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                dev.shephard.player.ui.components.m3.M3PlaybackModeButton(
-                    icon = Icons.Filled.Shuffle, description = strings.remix,
-                    active = isRemixed, onClick = playerViewModel::remixQueue,
-                )
-                dev.shephard.player.ui.components.m3.M3PlaybackModeButton(
-                    icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-                    description = strings.repeat, active = state.repeatMode != RepeatMode.OFF,
-                    onClick = playerViewModel::cycleRepeatMode,
-                )
-            }
-
-            // Bottom bar card - fixed colors and removed non-working buttons #3
-            Card(
-                modifier = Modifier
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 24.dp)
-                    .align(Alignment.CenterHorizontally),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                M3NowPlayingProgressLineage(playerViewModel = playerViewModel, isPlaying = state.isPlaying)
+                // Controls
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { showQueue = true }, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.AutoMirrored.Filled.QueueMusic, strings.queue, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                    }
-                    IconButton(onClick = { showLyrics = true }, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Filled.Lyrics, strings.lyrics, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                    }
-                    val trackId = track?.id ?: -1L
-                    val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { if (trackId > 0) playerViewModel.toggleLike(trackId) }
-                            .combinedClickable(
-                                onClick = { if (trackId > 0) playerViewModel.toggleLike(trackId) },
-                                onLongClick = { showAddToPlaylist = true }
-                            ),
-                        contentAlignment = Alignment.Center
+                    val isRemixed by playerViewModel.isRemixed.collectAsState()
+                    BouncyIconButton(
+                        onClick = { playerViewModel.remixQueue() },
+                        icon = Icons.Filled.Shuffle,
+                        contentDescription = strings.remix,
+                        tint = if (isRemixed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        iconSize = 24.dp
+                    )
+                    BouncyIconButton(
+                        onClick = { playerViewModel.skipToPrevious() },
+                        painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_rewind),
+                        contentDescription = strings.previous,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        iconSize = 30.dp
+                    )
+                    MiuixPlayPauseButton(
+                        isPlaying = state.isPlaying,
+                        onClick = playerViewModel::togglePlayPause,
+                        playDescription = strings.play,
+                        pauseDescription = strings.pause,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                    BouncyIconButton(
+                        onClick = { playerViewModel.skipToNext() },
+                        painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_fforward),
+                        contentDescription = strings.next,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        iconSize = 30.dp
+                    )
+                    BouncyIconButton(
+                        onClick = { playerViewModel.cycleRepeatMode() },
+                        icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                        contentDescription = strings.repeat,
+                        tint = if (state.repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        iconSize = 24.dp
+                    )
+                }
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(top = 4.dp, bottom = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)).padding(horizontal = 10.dp, vertical = 3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                            strings.likedSongs,
-                            tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer
+                        BouncyIconButton(
+                            onClick = { onShowQueueChange(true) },
+                            icon = Icons.AutoMirrored.Filled.QueueMusic,
+                            contentDescription = strings.queue,
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            iconSize = 24.dp
                         )
-                    }
-                    if (showAddToPlaylist && track != null) {
-                        M3AddToPlaylistDrawer(
-                            trackId = trackId,
-                            track = track,
-                            playerViewModel = playerViewModel,
-                            onDismiss = { showAddToPlaylist = false },
-                            strings = strings
-                        )
+                        val trackId = track?.id ?: -1L
+                        val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
+                        Box(
+                            modifier = Modifier.size(40.dp).bounceClick {
+                                if (trackId > 0) {
+                                    if (isLiked) onShowAddToPlaylistChange(true) else playerViewModel.addToLiked(trackId)
+                                }
+                            },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isLiked) Icons.Filled.Check else Icons.Filled.Add,
+                                contentDescription = if (isLiked) "Added" else "Add",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
             }
-
-            Spacer(Modifier.height(16.dp))
         }
-            }
+        Box(
+            modifier = Modifier.weight(0.5f).fillMaxHeight().padding(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 8.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        ) {
+            MiuixEmbeddedLyrics(
+                playerViewModel = playerViewModel,
+                state = state,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
-
     if (showQueue) {
         dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { showQueue = false })
     }
-
-    if (showLyrics && !isLandscape) {
-        dev.shephard.player.ui.screens.FullScreenLyricsExperience(
-            playerViewModel = playerViewModel,
-            useMiuix = false,
-            onDismiss = { showLyrics = false },
-        )
+    if (showAddToPlaylist) {
+        M3AddToPlaylistDrawer(trackId = track?.id ?: -1L, track = track, playerViewModel = playerViewModel, onDismiss = { showAddToPlaylist = false }, strings = strings)
     }
-
-}
-
-
-@Composable
-private fun M3LandscapeContent(
-playerViewModel: PlayerViewModel,
-state: dev.shephard.player.player.PlayerUiState,
-pendingCarouselIndex: Int?,
-carouselStyle: String,
-onAlbumClick: (dev.shephard.player.data.AudioTrack) -> Unit,
-showQueue: Boolean,
-onShowQueueChange: (Boolean) -> Unit,
-showAddToPlaylist: Boolean,
-onShowAddToPlaylistChange: (Boolean) -> Unit,
-strings: dev.shephard.player.ui.i18n.Strings,
-) {
-val configuration = LocalConfiguration.current
-val track = state.currentTrack
-Row(
-modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()
-) {
-// LEFT - cover + reduced controls
-Column(
-modifier = Modifier.weight(0.5f).fillMaxHeight().padding(horizontal = 12.dp, vertical = 8.dp),
-verticalArrangement = Arrangement.SpaceBetween,
-horizontalAlignment = Alignment.CenterHorizontally
-) {
-Box(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
-Box(modifier = Modifier.size(width = 36.dp, height = 4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
-}
-Text(
-text = strings.nowPlaying,
-modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-style = MaterialTheme.typography.titleMedium,
-fontWeight = FontWeight.Bold,
-color = MaterialTheme.colorScheme.onSurface,
-maxLines = 1,
-overflow = TextOverflow.Ellipsis,
-)
-androidx.compose.foundation.layout.BoxWithConstraints(
-modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(vertical = 4.dp),
-contentAlignment = Alignment.Center,
-) {
-val pageFraction = when (carouselStyle) {
-dev.shephard.player.player.CarouselStyle.NO_PEEK -> 1f
-dev.shephard.player.player.CarouselStyle.TWO_PEEK -> .6f
-else -> .8f
-}
-val artHeight = minOf(maxWidth * pageFraction, configuration.screenHeightDp.dp * .60f)
-if (state.queue.isNotEmpty()) {
-dev.shephard.player.ui.components.AlbumCarousel(
-queue = state.queue, currentIndex = state.currentQueueIndex,
-requestedIndex = pendingCarouselIndex, isPlaying = state.isPlaying, carouselStyle = carouselStyle,
-onSongSelected = playerViewModel::playQueueItemAbsolute,
-onAlbumClick = onAlbumClick,
-modifier = Modifier.fillMaxWidth().height(artHeight),
-placeholderColor = MaterialTheme.colorScheme.secondaryContainer,
-placeholderContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-)
-} else {
-Box(Modifier.fillMaxWidth().height(artHeight), contentAlignment = Alignment.Center) {
-Box(Modifier.size(artHeight).clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
-Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(48.dp))
-}
-}
-}
-}
-Column(
-modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp),
-horizontalAlignment = Alignment.CenterHorizontally
-) {
-Text(track?.title ?: "", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-Text(track?.artist ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-}
-Column(modifier = Modifier.fillMaxWidth()) {
-M3NowPlayingProgressLineage(playerViewModel = playerViewModel, isPlaying = state.isPlaying)
-Column(modifier = Modifier.fillMaxWidth().graphicsLayer(scaleX = 0.82f, scaleY = 0.82f)) {
-dev.shephard.player.ui.components.m3.AnimatedPlaybackControls(
-modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-isPlayingProvider = { state.isPlaying },
-onPrevious = playerViewModel::skipToPrevious,
-onPlayPause = playerViewModel::togglePlayPause,
-onNext = playerViewModel::skipToNext,
-height = 64.dp,
-pressAnimationSpec = androidx.compose.animation.core.tween(240, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-releaseDelay = 0L,
-)
-Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-dev.shephard.player.ui.components.m3.M3PlaybackModeButton(icon = Icons.Filled.Shuffle, description = strings.remix, active = playerViewModel.isRemixed.collectAsState().value, onClick = playerViewModel::remixQueue)
-dev.shephard.player.ui.components.m3.M3PlaybackModeButton(icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat, description = strings.repeat, active = state.repeatMode != RepeatMode.OFF, onClick = playerViewModel::cycleRepeatMode)
-}
-Card(modifier = Modifier.padding(horizontal = 12.dp).padding(top = 4.dp, bottom = 4.dp).align(Alignment.CenterHorizontally), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-IconButton(onClick = { onShowQueueChange(true) }, modifier = Modifier.size(40.dp)) { Icon(Icons.AutoMirrored.Filled.QueueMusic, strings.queue, tint = MaterialTheme.colorScheme.onSecondaryContainer) }
-val trackId = track?.id ?: -1L
-val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
-Box(modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).clickable { if (trackId > 0) playerViewModel.toggleLike(trackId) }.combinedClickable(onClick = { if (trackId > 0) playerViewModel.toggleLike(trackId) }, onLongClick = { onShowAddToPlaylistChange(true) }), contentAlignment = Alignment.Center) {
-Icon(if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, strings.likedSongs, tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer)
-}
-if (showAddToPlaylist && track != null) {
-M3AddToPlaylistDrawer(trackId = trackId, track = track, playerViewModel = playerViewModel, onDismiss = { onShowAddToPlaylistChange(false) }, strings = strings)
-}
-}
-}
-}
-}
-}
-// RIGHT - lyrics fullscreen no buttons
-Box(modifier = Modifier.weight(0.5f).fillMaxHeight().padding(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 8.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow)) {
-M3EmbeddedLyrics(playerViewModel = playerViewModel, state = state, modifier = Modifier.fillMaxSize())
-}
-}
-if (showQueue) {
-dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { onShowQueueChange(false) })
-}
-}
-
-@Composable
-private fun M3EmbeddedLyrics(
-playerViewModel: PlayerViewModel,
-state: dev.shephard.player.player.PlayerUiState,
-modifier: Modifier = Modifier
-) {
-val progress by playerViewModel.progress.collectAsState()
-val syncOffsetMs by playerViewModel.lyricsSyncOffsetMs.collectAsState()
-val synced = state.syncedLyrics
-val plain = state.lyrics
-val listState = rememberLazyListState()
-val activeIndex by remember(synced, progress.positionMs, syncOffsetMs) {
-androidx.compose.runtime.derivedStateOf {
-if (synced.isEmpty()) -1 else {
-var low = 0; var high = synced.lastIndex; val pos = progress.positionMs - syncOffsetMs; while (low <= high) { val mid = (low + high).ushr(1); if (synced[mid].timeMs <= pos) low = mid + 1 else high = mid - 1 }; high
-}
-}
-}
-LaunchedEffect(activeIndex) {
-if (synced.isNotEmpty() && activeIndex >= 0) {
-try {
-val info = listState.layoutInfo; val h = info.viewportSize.height; if (h==0) listState.animateScrollToItem(activeIndex) else {
-val target = activeIndex.coerceIn(synced.indices); val visible = info.visibleItemsInfo.firstOrNull{ it.index==target}; val itemH = visible?.size ?: 60; val offset = h*0.4f - itemH/2f - info.beforeContentPadding; if (visible!=null) listState.animateScrollBy(visible.offset - offset, animationSpec = androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)) else listState.animateScrollToItem(target, -offset.toInt())
-}
-} catch (_: Exception) {}
-}
-}
-Column(modifier = modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-Text(text = dev.shephard.player.ui.i18n.LocalStrings.current.lyrics, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(bottom = 6.dp))
-if (synced.isNotEmpty()) {
-LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-itemsIndexed(synced, key = { i, l -> "${l.timeMs}_$i"}) { i, line ->
-val active = i==activeIndex; val col = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.60f)
-Column(Modifier.fillMaxWidth().graphicsLayer(scaleX = if(active)1f else 0.93f, scaleY = if(active)1f else 0.93f).clip(RoundedCornerShape(10.dp)).clickable{ playerViewModel.seekTo((line.timeMs+syncOffsetMs).coerceAtLeast(0)) }.padding(8.dp)) {
-Text(line.text, style = MaterialTheme.typography.bodyMedium.copy(color = col, fontWeight = if(active) FontWeight.Bold else FontWeight.Medium, fontSize = if(active) 15.sp else 13.sp), maxLines = 3, overflow = TextOverflow.Ellipsis)
-if (!line.translation.isNullOrBlank()) Text(line.translation, style = MaterialTheme.typography.bodySmall.copy(color = col.copy(alpha=0.78f)), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top=2.dp))
-}
-}
-}
-} else if (plain.isNotEmpty()) {
-LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-items(plain.size) { idx -> Text(plain[idx], style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.padding(8.dp)) }
-}
-} else {
-Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center){
-Column(horizontalAlignment = Alignment.CenterHorizontally){
-Icon(Icons.Filled.Lyrics, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=0.6f), modifier = Modifier.size(28.dp))
-Text(dev.shephard.player.ui.i18n.LocalStrings.current.noLyricsFound, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=0.55f), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top=8.dp))
-}
-}
-}
-}
-}
-
-
-@Composable
-private fun M3NowPlayingProgressLineage(
-    playerViewModel: PlayerViewModel,
-    isPlaying: Boolean,
-) {
-    val progress by playerViewModel.progress.collectAsState()
-    val durationMs = progress.durationMs
-    val baseFraction = rememberSmoothFractionLineage(positionMs = progress.positionMs, durationMs = durationMs, isPlaying = isPlaying)
-
-    var seekFraction by remember { mutableStateOf<Float?>(null) }
-    androidx.compose.runtime.LaunchedEffect(baseFraction, durationMs) {
-        val held = seekFraction ?: return@LaunchedEffect
-        if (kotlin.math.abs(held - baseFraction) < 0.03f || kotlin.math.abs(held - baseFraction) > 0.1f) {
-            seekFraction = null
-        }
-    }
-
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-        dev.shephard.player.ui.components.m3.M3WavySlider(
-            value = { seekFraction ?: baseFraction },
-            onValueChange = { fraction ->
-                seekFraction = fraction
-                if (durationMs > 0L) playerViewModel.onSeekPreview((fraction * durationMs).toLong())
-            },
-            onValueCommit = { fraction ->
-                seekFraction = fraction
-                if (durationMs > 0L) playerViewModel.onSeekCommit((fraction * durationMs).toLong())
-            },
-            modifier = Modifier.fillMaxWidth(),
-            isPlaying = isPlaying,
-            activeTrackColor = MaterialTheme.colorScheme.primary,
-            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-            thumbColor = MaterialTheme.colorScheme.primary,
-            semanticsLabel = dev.shephard.player.ui.i18n.LocalStrings.current.playbackPosition,
-        )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(
-                text = m3FormatMillisLineage(if (seekFraction != null) (seekFraction!! * durationMs).toLong() else progress.positionMs),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(text = m3FormatMillisLineage(durationMs), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-
-}
-
-@Composable
-private fun rememberSmoothFractionLineage(positionMs: Long, durationMs: Long, isPlaying: Boolean): Float {
-    var smooth by remember { mutableFloatStateOf(0f) }
-    var lastSamplePosMs by remember { mutableLongStateOf(0L) }
-    var lastSampleAtMs by remember { mutableLongStateOf(0L) }
-    val durMs = durationMs.coerceAtLeast(1L)
-
-    LaunchedEffect(positionMs, durationMs, isPlaying) {
-        val pos = positionMs.coerceAtLeast(0L)
-        val now = android.os.SystemClock.elapsedRealtime()
-        lastSamplePosMs = pos
-        lastSampleAtMs = now
-        smooth = (pos.toFloat() / durMs).coerceIn(0f, 1f)
-        while (true) {
-            withFrameNanos { }
-            val elapsed = (android.os.SystemClock.elapsedRealtime() - lastSampleAtMs).coerceAtLeast(0L)
-            val displayedPos = if (isPlaying) (lastSamplePosMs + elapsed).coerceAtMost(pos + 500L) else lastSamplePosMs
-            smooth = (displayedPos.toFloat() / durMs).coerceIn(0f, 1f)
-        }
-    }
-    return smooth
 }
 
 private fun m3FormatMillisLineage(ms: Long): String {
@@ -703,11 +634,11 @@ private fun m3FormatMillisLineage(ms: Long): String {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun M3AddToPlaylistDrawer(
-    trackId: Long,
-    track: dev.shephard.player.data.AudioTrack?,
-    playerViewModel: PlayerViewModel,
-    onDismiss: () -> Unit,
-    strings: dev.shephard.player.ui.i18n.Strings
+trackId: Long,
+track: dev.shephard.player.data.AudioTrack?,
+playerViewModel: PlayerViewModel,
+onDismiss: () -> Unit,
+strings: dev.shephard.player.ui.i18n.Strings
 ) {
     val context = LocalContext.current
     val prefs = remember { dev.shephard.player.player.PreferencesManager(context) }
@@ -735,52 +666,52 @@ internal fun M3AddToPlaylistDrawer(
     }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     M3BottomSheetWrapper(
-            onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+    onDismissRequest = onDismiss, sheetState = sheetState, containerColor = MaterialTheme.colorScheme.surfaceContainer) {
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
             Text(strings.addToPlaylist, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
             // Same insets as the queue sheet: cards keep 16dp from the screen edges and 6dp
             // between each other instead of touching the edges and their neighbours.
             androidx.compose.foundation.lazy.LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
             ) {
                 item {
                     androidx.compose.material3.ListItem(
-                        headlineContent = { Text(strings.likedSongs) },
-                        supportingContent = { Text("${likedIds.size} ${strings.trackCount}") },
-                        leadingContent = { Icon(Icons.Filled.Favorite, null, tint = MaterialTheme.colorScheme.primary) },
-                        trailingContent = {
-                            Icon(
-                                imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                contentDescription = null,
-                                tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        },
-                        modifier = Modifier.clip(RoundedCornerShape(16.dp)).clickable {
-                            playerViewModel.toggleLike(trackId)
-                        }
+                    headlineContent = { Text(strings.likedSongs) },
+                    supportingContent = { Text("${likedIds.size} ${strings.trackCount}") },
+                    leadingContent = { Icon(Icons.Filled.Favorite, null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = {
+                        Icon(
+                        imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        contentDescription = null,
+                        tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
+                    },
+                    modifier = Modifier.clip(RoundedCornerShape(16.dp)).clickable {
+                        playerViewModel.toggleLike(trackId)
+                    }
+                )
                 }
                 items(visiblePlaylists.size) { idxFiltered ->
                     val pl = visiblePlaylists[idxFiltered]
                     val contains = trackId in pl.trackIds
                     androidx.compose.material3.ListItem(
-                        headlineContent = { Text(pl.name) },
-                        supportingContent = { Text("${pl.trackIds.size} ${strings.trackCount}") },
-                        trailingContent = {
-                            Icon(
-                                imageVector = if (contains) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                contentDescription = null,
-                                tint = if (contains) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        },
-                        modifier = Modifier.clip(RoundedCornerShape(16.dp)).clickable {
-                            togglePlaylist(pl)
-                        }
+                    headlineContent = { Text(pl.name) },
+                    supportingContent = { Text("${pl.trackIds.size} ${strings.trackCount}") },
+                    trailingContent = {
+                        Icon(
+                        imageVector = if (contains) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        contentDescription = null,
+                        tint = if (contains) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
+                    },
+                    modifier = Modifier.clip(RoundedCornerShape(16.dp)).clickable {
+                        togglePlaylist(pl)
+                    }
+                )
                 }
             }
         }
@@ -788,7 +719,7 @@ internal fun M3AddToPlaylistDrawer(
 }
 
 private fun contrastColorFor(color: Color): Color =
-    if (color.luminance() >= 0.56f) Color(0xFF17131A) else Color.White
+if (color.luminance() >= 0.56f) Color(0xFF17131A) else Color.White
 
 /** Easing Material 3 applies to predictive back progress (PredictiveBack.transform). */
 private val M3PredictiveBackEasing = androidx.compose.animation.core.CubicBezierEasing(0.1f, 0.1f, 0f, 1f)

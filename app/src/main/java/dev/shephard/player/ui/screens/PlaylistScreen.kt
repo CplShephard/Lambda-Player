@@ -123,6 +123,7 @@ import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -1597,9 +1598,9 @@ fun PlaylistDetailScreen(
     LaunchedEffect(Unit) {
         if (tracks.isEmpty()) libraryViewModel.loadTracks()
     }
-    val initialJson = remember { kotlinx.coroutines.runBlocking { kotlinx.coroutines.flow.first(prefs.playlistsJson) } }
+    val initialJson = remember { kotlinx.coroutines.runBlocking { prefs.playlistsJson.first() } }
     val json by prefs.playlistsJson.collectAsState(initial = initialJson)
-    val initialLikedJson = remember { kotlinx.coroutines.runBlocking { kotlinx.coroutines.flow.first(prefs.likedSongIds) } }
+    val initialLikedJson = remember { kotlinx.coroutines.runBlocking { prefs.likedSongIds.first() } }
     val likedSongIdsJson by prefs.likedSongIds.collectAsState(initial = initialLikedJson)
     val likedIds = remember(likedSongIdsJson) {
         try {

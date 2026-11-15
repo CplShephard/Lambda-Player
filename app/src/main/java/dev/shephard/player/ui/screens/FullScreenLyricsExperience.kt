@@ -76,10 +76,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MusicNote
@@ -799,12 +799,12 @@ fun FullScreenLyricsExperience(
                                 val infinite = rememberInfiniteTransition(label = "lyricJiggle")
                                 val jiggleX by infinite.animateFloat(
                                     initialValue = -0.7f, targetValue = 0.7f,
-                                    animationSpec = infiniteRepeatable(tween(160, easing = LinearEasing), RepeatMode.Reverse),
+                                    animationSpec = infiniteRepeatable(tween(160, easing = LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse),
                                     label = "jiggleX"
                                 )
                                 val jiggleY by infinite.animateFloat(
                                     initialValue = -0.9f, targetValue = 0.9f,
-                                    animationSpec = infiniteRepeatable(tween(140, easing = LinearEasing), RepeatMode.Reverse),
+                                    animationSpec = infiniteRepeatable(tween(140, easing = LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse),
                                     label = "jiggleY"
                                 )
                                 Column(
@@ -1765,11 +1765,11 @@ private fun formatLrcTime(ms: Long): String {
 private fun QqMusicNoteAnimation(primary: Color, foreground: Color) {
     // Three floating notes that drift up and fade, like QQ Music instrumental sections
     val infinite = rememberInfiniteTransition(label = "qqNotes")
-    val offset1 by infinite.animateFloat(initialValue = 0f, targetValue = -18f, animationSpec = infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "n1Y")
-    val offset2 by infinite.animateFloat(initialValue = 0f, targetValue = -22f, animationSpec = infiniteRepeatable(tween(1100, delayMillis = 220, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "n2Y")
-    val offset3 by infinite.animateFloat(initialValue = 0f, targetValue = -16f, animationSpec = infiniteRepeatable(tween(1000, delayMillis = 440, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "n3Y")
-    val alpha1 by infinite.animateFloat(initialValue = 0.0f, targetValue = 0.85f, animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse), label = "n1A")
-    val alpha2 by infinite.animateFloat(initialValue = 0.0f, targetValue = 0.8f, animationSpec = infiniteRepeatable(tween(1100, delayMillis = 220, easing = LinearEasing), RepeatMode.Reverse), label = "n2A")
+    val offset1 by infinite.animateFloat(initialValue = 0f, targetValue = -18f, animationSpec = infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Restart), label = "n1Y")
+    val offset2 by infinite.animateFloat(initialValue = 0f, targetValue = -22f, animationSpec = infiniteRepeatable(tween(1100, delayMillis = 220, easing = FastOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Restart), label = "n2Y")
+    val offset3 by infinite.animateFloat(initialValue = 0f, targetValue = -16f, animationSpec = infiniteRepeatable(tween(1000, delayMillis = 440, easing = FastOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Restart), label = "n3Y")
+    val alpha1 by infinite.animateFloat(initialValue = 0.0f, targetValue = 0.85f, animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "n1A")
+    val alpha2 by infinite.animateFloat(initialValue = 0.0f, targetValue = 0.8f, animationSpec = infiniteRepeatable(tween(1100, delayMillis = 220, easing = LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "n2A")
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))

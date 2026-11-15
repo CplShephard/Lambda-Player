@@ -51,6 +51,7 @@ import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.miuixBlurSurface
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator as MiuixLinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults as MiuixProgressIndicatorDefaults
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -70,7 +71,7 @@ fun MiniPlayer(
     val track = state.currentTrack ?: return
     val context = LocalContext.current
     val prefs = remember(context) { dev.shephard.player.player.PreferencesManager(context) }
-    val initialAppleFloating = remember { kotlinx.coroutines.runBlocking { kotlinx.coroutines.flow.first(prefs.useAppleFloatingBar) } }
+    val initialAppleFloating = remember { kotlinx.coroutines.runBlocking { prefs.useAppleFloatingBar.first() } }
     val isAppleFloatingEnabled by prefs.useAppleFloatingBar.collectAsState(initial = initialAppleFloating)
 
     val liquidGlassOn = LocalBlurEnabled.current
