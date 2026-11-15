@@ -799,6 +799,11 @@ fun FullScreenLyricsExperience(
                                     animationSpec = infiniteRepeatable(tween(800, easing = LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse),
                                     label = "jiggleY"
                                 )
+                                val lineSlideOffset by androidx.compose.animation.core.animateDpAsState(
+                                    targetValue = if (isActive) 0.dp else if (distance == 1) 4.dp else 0.dp,
+                                    animationSpec = androidx.compose.animation.core.tween(380, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                                    label = "lineSlide"
+                                )
                                 Column(
                                     modifier = Modifier.fillMaxWidth()
                                         .clip(RoundedCornerShape(18.dp))
@@ -808,12 +813,6 @@ fun FullScreenLyricsExperience(
                                             scaleX = scale
                                             scaleY = scale
                                             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
-                                            // Only active line letters move slowly; transitioning lines drag slightly down then settle
-                                            val lineSlideOffset by androidx.compose.animation.core.animateDpAsState(
-                                                targetValue = if (isActive) 0.dp else if (distance == 1) 4.dp else 0.dp,
-                                                animationSpec = androidx.compose.animation.core.tween(380, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-                                                label = "lineSlide"
-                                            )
                                             translationY += lineSlideOffset.toPx() * (if (index < activeIndex) -1f else 1f)
                                             if (shouldJiggle) {
                                                 translationX = jiggleX * 0.6f
