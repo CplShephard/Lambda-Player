@@ -794,17 +794,17 @@ fun FullScreenLyricsExperience(
                                     animationSpec = tween(520, easing = FastOutSlowInEasing),
                                     label = "shakeProgress"
                                 )
-                                // Letter-level jiggle driven by infinite transition when line is near active
-                                val shouldJiggle = isActive || (distance == 1 && line.words.isNotEmpty())
+                                // Only active line letters move slowly; others have single transition animation
+                                val shouldJiggle = isActive
                                 val infinite = rememberInfiniteTransition(label = "lyricJiggle")
                                 val jiggleX by infinite.animateFloat(
-                                    initialValue = -0.7f, targetValue = 0.7f,
-                                    animationSpec = infiniteRepeatable(tween(160, easing = LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse),
+                                    initialValue = -0.3f, targetValue = 0.3f,
+                                    animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse),
                                     label = "jiggleX"
                                 )
                                 val jiggleY by infinite.animateFloat(
-                                    initialValue = -0.9f, targetValue = 0.9f,
-                                    animationSpec = infiniteRepeatable(tween(140, easing = LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse),
+                                    initialValue = -0.3f, targetValue = 0.3f,
+                                    animationSpec = infiniteRepeatable(tween(800, easing = LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse),
                                     label = "jiggleY"
                                 )
                                 Column(
@@ -816,12 +816,10 @@ fun FullScreenLyricsExperience(
                                             scaleX = scale
                                             scaleY = scale
                                             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
-                                            // Whole-line premium shake as it enters/exits (upward motion)
+                                            // Only active line letters move slowly
                                             if (shouldJiggle) {
-                                                // Subtle rotation + tiny shift mimics QQ Music letter tremble
-                                                translationX = jiggleX * 1.2f
-                                                translationY = jiggleY * 1.1f
-                                                rotationZ = jiggleX * 0.35f
+                                                translationX = jiggleX * 0.6f
+                                                translationY = jiggleY * 0.5f
                                             }
                                         }
                                         .blur(animatedBlur)
