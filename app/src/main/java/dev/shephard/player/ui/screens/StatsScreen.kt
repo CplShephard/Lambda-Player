@@ -75,6 +75,10 @@ fun StatsScreen(
     val allEvents by playerViewModel.statsEventsFlow.collectAsState()
     val tracks by libraryViewModel.tracks.collectAsState()
     var selectedPeriod by remember { mutableStateOf(StatsPeriod.Today) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember(context) { dev.shephard.player.player.PreferencesManager(context) }
+    val topCount by prefs.statsTopCount.collectAsState(initial = 10)
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     val snapshot = remember(allEvents, selectedPeriod) {
         val periodEvents = ListenStatsCalculator.filterEventsForPeriod(allEvents, selectedPeriod)
@@ -90,7 +94,20 @@ fun StatsScreen(
                     title = strings.statsTitle,
                     state = topBarState,
                     collapseFraction = scrollProgress,
-                    onBack = onBack
+                    onBack = onBack,
+                    trailingContent = {
+                        LibraryPopupButton(
+                            miuix = true,
+                            icon = androidx.compose.material.icons.Icons.Filled.MoreVert,
+                            description = "Top count",
+                            color = cs.onBackground,
+                            choices = listOf(10, 20, 30, 40, 50).map { count ->
+                                Triple("Top $count", topCount == count, {
+                                    scope.launch { prefs.setStatsTopCount(count) }
+                                })
+                            }
+                        )
+                    }
                 )
             }
         ) { innerPadding ->
@@ -126,8 +143,17 @@ fun StatsScreen(
             if (snapshot.trackEntries.isEmpty()) {
                 StatsEmptyState()
             } else {
-                StatsSectionHeader(strings.statsTopTracks)
-                StatsTrackList(snapshot.trackEntries.take(10), tracks)
+                StatsSectionHeader(strings.statsTopTracks + " • Top $topCount")
+                // Same animated transition as This Month/This Week filter: crossfade + slide with spring
+                androidx.compose.animation.AnimatedContent(
+                    targetState = topCount to selectedPeriod,
+                    transitionSpec = {
+                        androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(260)) togetherWith androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(200))
+                    },
+                    label = "topTracksAnim"
+                ) { (count, _) ->
+                    StatsTrackList(snapshot.trackEntries.take(count), tracks)
+                }
             }
 
             Spacer(Modifier.height(90.dp))

@@ -143,10 +143,11 @@ fun rememberSmoothProgressFraction(positionMs: Long, durationMs: Long, isPlaying
         lastSamplePosMs = pos
         lastSampleAtMs = now
         smooth = (pos.toFloat() / durMs).coerceIn(0f, 1f)
-        while (true) {
+        if (!isPlaying) return@LaunchedEffect
+        while (isPlaying) {
             withFrameNanos { }
             val elapsed = (android.os.SystemClock.elapsedRealtime() - lastSampleAtMs).coerceAtLeast(0L)
-            val displayedPos = if (isPlaying) (lastSamplePosMs + elapsed).coerceAtMost(pos + 500L) else lastSamplePosMs
+            val displayedPos = (lastSamplePosMs + elapsed).coerceAtMost(pos + 500L)
             smooth = (displayedPos.toFloat() / durMs).coerceIn(0f, 1f)
         }
     }

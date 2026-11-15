@@ -76,13 +76,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
@@ -132,9 +139,11 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.LyricsSearchResult
+import dev.shephard.player.player.ImagePersistence
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.SyncedLyricLine
+import dev.shephard.player.ui.components.rememberStaticArtwork
 import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import dev.shephard.player.ui.util.TrackOverlayForBack
 import androidx.navigationevent.NavigationEventInfo
@@ -177,6 +186,7 @@ fun FullScreenLyricsExperience(
     val savedBlurStrength by preferences.lyricsBackgroundBlurStrength.collectAsState(initial = 36f)
     val autoScroll by preferences.lyricsAutoScrollEnabled.collectAsState(initial = true)
     val showTranslation by preferences.lyricsTranslationVisible.collectAsState(initial = true)
+    val transLang by preferences.lyricsTranslationLanguage.collectAsState(initial = "off")
     val skipLyricsPrompt by preferences.lyricsSkipSearchPrompt.collectAsState(initial = null)
     val scope = rememberCoroutineScope()
     val lyricsListState = rememberLazyListState()
@@ -185,6 +195,10 @@ fun FullScreenLyricsExperience(
     val searchListState = rememberLazyListState()
 
     val track = state.currentTrack
+    // Detect animated cover to freeze animation in lyrics (avoid jank)
+    val isAnimatedCover = remember(track?.albumArtUri) {
+        track?.albumArtUri?.let { uri -> ImagePersistence.isAnimatedCover(context, uri) } ?: false
+    }
     val primary = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
     val textStyle = if (useMiuix) MiuixAppTheme.typography.bodyMedium else MaterialTheme.typography.bodyMedium
     val titleStyle = if (useMiuix) MiuixAppTheme.typography.titleLarge else MaterialTheme.typography.titleLarge
@@ -218,6 +232,12 @@ fun FullScreenLyricsExperience(
     var seekFraction by remember { mutableStateOf<Float?>(null) }
 
     val synced = state.syncedLyrics
+    LaunchedEffect(transLang, synced) {
+        if (transLang != "off" && synced.isNotEmpty() && synced.any { !it.translation.isNullOrBlank() || transLang != "original" }) {
+            playerViewModel.ensureLyricsTranslation(transLang)
+        }
+    }
+
     // The player reports its position every 500 ms. Lines (and the karaoke sweep) follow a
     // frame-accurate position extrapolated between those reports instead, so a line lights up
     // on time and word colouring moves smoothly.
@@ -457,13 +477,14 @@ fun FullScreenLyricsExperience(
                     }
             ) {
                 if (useMiuix) {
+                    // Freeze animated gif/mp4 covers in lyrics to avoid jank
                     Crossfade(
                         targetState = track?.albumArtUri,
                         animationSpec = tween(durationMillis = 650),
                         label = "lyricsBackdropCrossfade",
                         modifier = Modifier.fillMaxSize(),
                     ) { artUri ->
-                        if (artUri != null && blurEnabled && blurStrength > 0f) {
+                        if (artUri != null && !isAnimatedCover && blurEnabled && blurStrength > 0f) {
                             AsyncImage(
                                 model = artUri,
                                 contentDescription = null,
@@ -473,6 +494,14 @@ fun FullScreenLyricsExperience(
                                     .blur(blurStrength.dp),
                                 contentScale = ContentScale.Crop,
                                 colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.2f) }),
+                            )
+                        } else if (artUri != null && isAnimatedCover) {
+                            // Frozen frame for animated covers
+                            AsyncImage(
+                                model = rememberStaticArtwork(artUri),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
                             )
                         } else if (artUri != null) {
                             AsyncImage(
@@ -523,7 +552,17 @@ fun FullScreenLyricsExperience(
                     showSettings = showSettings,
                     onDismiss = { showOptions = false },
                     onSearch = { showOptions = false; showSettings = false; showSearch = true },
-                    onImport = { showOptions = false; importLauncher.launch(arrayOf("text/*", "application/octet-stream", "application/x-lrc", "application/ttml+xml", "application/xml")) },
+                    onImport = { showOptions = false; importLauncher.launch(arrayOf("*/*", "text/*", "text/plain", "application/octet-stream", "application/x-lrc", "text/lrc", "text/x-lrc", "application/ttml+xml", "application/xml")) },
+                    onScanStorage = {
+                        showOptions = false
+                        scope.launch(Dispatchers.IO) {
+                            val found = playerViewModel.scanStorageLyricsAndApply()
+                            withContext(Dispatchers.Main) {
+                                val msg = if (found) "Lyrics found and applied" else "No .lrc file found in storage"
+                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
                     onEdit = {
                         showOptions = false; showSearch = false
                         if (isEditing) { if (editText != editSource) playerViewModel.setManualLyricsText(editText); isEditing = false }
@@ -680,9 +719,34 @@ fun FullScreenLyricsExperience(
                     }
                 }
                 else -> {
-                    LazyColumn(
+                    // QQ Music style floating notes during instrumental gaps (word-by-word only)
+                    val hasWordSync = remember(synced) { synced.any { it.words.isNotEmpty() } }
+                    val showNoteAnim by remember(synced, smoothPositionMs.longValue, activeIndex, syncOffsetMs) {
+                        derivedStateOf {
+                            if (!hasWordSync) false else {
+                                val pos = smoothPositionMs.longValue - syncOffsetMs
+                                // Check if currently inside any word
+                                val curr = synced.getOrNull(activeIndex)
+                                val inWord = curr?.words?.any { w -> pos in w.startMs..w.endMs } == true
+                                if (inWord) false else {
+                                    if (activeIndex < 0) {
+                                        val first = synced.firstOrNull()?.timeMs ?: 0L
+                                        pos < first - 250
+                                    } else {
+                                        val next = synced.getOrNull(activeIndex + 1)
+                                        val lastEnd = curr?.words?.lastOrNull()?.endMs ?: curr?.timeMs ?: pos
+                                        val gapFromEnd = pos - lastEnd
+                                        val gapToNext = if (next != null) next.timeMs - pos else 0L
+                                        gapFromEnd > 700 || gapToNext > 800
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        LazyColumn(
                         state = lyricsListState,
-                        modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         contentPadding = PaddingValues(top = 28.dp, bottom = 26.dp),
                         verticalArrangement = Arrangement.spacedBy(if (synced.isNotEmpty()) 0.dp else 6.dp),
                     ) {
@@ -722,6 +786,27 @@ fun FullScreenLyricsExperience(
                                     label = "lyricLineColor",
                                 )
                                 var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
+                                // Premium shake: jiggle intensity spikes when line becomes active/inactive (QQ Music feel)
+                                var shakeTrigger by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                                androidx.compose.runtime.LaunchedEffect(isActive) { shakeTrigger++ }
+                                val shakeProgress by animateFloatAsState(
+                                    targetValue = if (shakeTrigger > 0) 1f else 0f,
+                                    animationSpec = tween(520, easing = FastOutSlowInEasing),
+                                    label = "shakeProgress"
+                                )
+                                // Letter-level jiggle driven by infinite transition when line is near active
+                                val shouldJiggle = isActive || (distance == 1 && line.words.isNotEmpty())
+                                val infinite = rememberInfiniteTransition(label = "lyricJiggle")
+                                val jiggleX by infinite.animateFloat(
+                                    initialValue = -0.7f, targetValue = 0.7f,
+                                    animationSpec = infiniteRepeatable(tween(160, easing = LinearEasing), RepeatMode.Reverse),
+                                    label = "jiggleX"
+                                )
+                                val jiggleY by infinite.animateFloat(
+                                    initialValue = -0.9f, targetValue = 0.9f,
+                                    animationSpec = infiniteRepeatable(tween(140, easing = LinearEasing), RepeatMode.Reverse),
+                                    label = "jiggleY"
+                                )
                                 Column(
                                     modifier = Modifier.fillMaxWidth()
                                         .clip(RoundedCornerShape(18.dp))
@@ -731,25 +816,35 @@ fun FullScreenLyricsExperience(
                                             scaleX = scale
                                             scaleY = scale
                                             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
+                                            // Whole-line premium shake as it enters/exits (upward motion)
+                                            if (shouldJiggle) {
+                                                // Subtle rotation + tiny shift mimics QQ Music letter tremble
+                                                translationX = jiggleX * 1.2f
+                                                translationY = jiggleY * 1.1f
+                                                rotationZ = jiggleX * 0.35f
+                                            }
                                         }
                                         .blur(animatedBlur)
                                         .padding(horizontal = LyricLineHorizontalPadding, vertical = LyricLineVerticalPadding),
                                 ) {
-                                    BasicText(
-                                        text = line.text,
-                                        onTextLayout = { textLayout = it },
-                                        modifier = Modifier.fillMaxWidth().drawWithContent {
-                                            drawContent()
-                                            if (karaoke) textLayout?.let { layout ->
-                                                drawKaraokeHighlight(
-                                                    layout = layout, line = line,
-                                                    positionMs = smoothPositionMs.longValue - syncOffsetMs,
-                                                    color = foreground,
-                                                )
-                                            }
-                                        },
-                                        style = lyricLineLayoutStyle(textStyle).copy(color = animatedColor),
-                                    )
+                                    // Word-by-word karaoke with per-word letter wobble overlay
+                                    Box(modifier = Modifier.fillMaxWidth()) {
+                                        BasicText(
+                                            text = line.text,
+                                            onTextLayout = { textLayout = it },
+                                            modifier = Modifier.fillMaxWidth().drawWithContent {
+                                                drawContent()
+                                                if (karaoke) textLayout?.let { layout ->
+                                                    drawKaraokeHighlight(
+                                                        layout = layout, line = line,
+                                                        positionMs = smoothPositionMs.longValue - syncOffsetMs,
+                                                        color = foreground,
+                                                    )
+                                                }
+                                            },
+                                            style = lyricLineLayoutStyle(textStyle).copy(color = animatedColor),
+                                        )
+                                    }
                                     if (showTranslation && !line.translation.isNullOrBlank()) {
                                         BasicText(
                                             text = line.translation,
@@ -773,6 +868,16 @@ fun FullScreenLyricsExperience(
                                     ),
                                 )
                             }
+                        }
+                    }
+                        // Floating music notes overlay during gaps (centered, like QQ Music)
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = showNoteAnim,
+                            enter = fadeIn(tween(220)) ,
+                            exit = fadeOut(tween(180)),
+                            modifier = Modifier.align(androidx.compose.ui.Alignment.Center)
+                        ) {
+                            QqMusicNoteAnimation(primary = primary, foreground = LocalLyricsForeground.current)
                         }
                     }
                 }
@@ -827,7 +932,7 @@ fun FullScreenLyricsExperience(
             val importLyrics = {
                 showFetchLyrics = false
                 playerViewModel.clearLyricsSearch()
-                importLauncher.launch(arrayOf("text/*", "application/octet-stream", "application/x-lrc", "application/ttml+xml", "application/xml"))
+                importLauncher.launch(arrayOf("*/*", "text/*", "text/plain", "application/octet-stream", "application/x-lrc", "text/lrc", "text/x-lrc", "application/ttml+xml", "application/xml"))
             }
             if (useMiuix) {
                 dev.shephard.player.ui.components.MiuixFetchLyricsDialog(
@@ -891,6 +996,7 @@ private fun LyricsOptionsDrawer(
     onDismiss: () -> Unit,
     onSearch: () -> Unit,
     onImport: () -> Unit,
+    onScanStorage: () -> Unit = {},
     onEdit: () -> Unit,
     onCopy: () -> Unit,
     onExport: () -> Unit,
@@ -916,6 +1022,7 @@ private fun LyricsOptionsDrawer(
                 }
                 Action(Icons.Filled.Search, strings.search, action = { closeThen(onSearch) })
                 Action(Icons.Filled.FolderOpen, strings.lyricsImport, action = { closeThen(onImport) })
+                Action(Icons.Filled.Storage, strings.lyricsScanStorage, action = { closeThen(onScanStorage) })
                 Action(if (isEditing) Icons.Filled.Check else Icons.Filled.Edit, if (isEditing) strings.lyricsSave else strings.lyricsEdit, action = { closeThen(onEdit) })
                 if (hasTranslation) Action(Icons.Filled.Translate, if (showTranslation) strings.lyricsHideTranslation else strings.lyricsShowTranslation, action = onToggleTranslation)
                 Action(Icons.Filled.ContentCopy, strings.lyricsCopy, hasLyrics, { closeThen(onCopy) })
@@ -1249,6 +1356,7 @@ private fun LyricsSearchResultCard(
             )
             LyricsPill(result.source, primary, selected = result.source == "QQ Music", onClick = onClick)
             if (result.syncedLyrics != null) LyricsPill("Synced", primary, selected = true, onClick = onClick)
+            if (result.syncedLyrics?.let { isWordByWordLyrics(it) } == true) LyricsPill("word-by-word", primary, selected = true, onClick = onClick)
             if (result.instrumental) LyricsPill("Instrumental", primary, selected = false, onClick = onClick)
         }
     }
@@ -1652,6 +1760,34 @@ private fun formatLrcTime(ms: Long): String {
     val centiseconds = (safe % 1_000L) / 10L
     return "%02d:%02d.%02d".format(minutes, seconds, centiseconds)
 }
+
+@Composable
+private fun QqMusicNoteAnimation(primary: Color, foreground: Color) {
+    // Three floating notes that drift up and fade, like QQ Music instrumental sections
+    val infinite = rememberInfiniteTransition(label = "qqNotes")
+    val offset1 by infinite.animateFloat(initialValue = 0f, targetValue = -18f, animationSpec = infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "n1Y")
+    val offset2 by infinite.animateFloat(initialValue = 0f, targetValue = -22f, animationSpec = infiniteRepeatable(tween(1100, delayMillis = 220, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "n2Y")
+    val offset3 by infinite.animateFloat(initialValue = 0f, targetValue = -16f, animationSpec = infiniteRepeatable(tween(1000, delayMillis = 440, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "n3Y")
+    val alpha1 by infinite.animateFloat(initialValue = 0.0f, targetValue = 0.85f, animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse), label = "n1A")
+    val alpha2 by infinite.animateFloat(initialValue = 0.0f, targetValue = 0.8f, animationSpec = infiniteRepeatable(tween(1100, delayMillis = 220, easing = LinearEasing), RepeatMode.Reverse), label = "n2A")
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(foreground.copy(alpha = 0.08f))
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(Icons.Filled.MusicNote, null, tint = primary.copy(alpha = (0.5f + alpha1 * 0.5f)), modifier = Modifier.size(20.dp).graphicsLayer { translationY = offset1; scaleX = 1f + alpha1 * 0.12f; scaleY = 1f + alpha1 * 0.12f })
+        Icon(Icons.Filled.GraphicEq, null, tint = foreground.copy(alpha = 0.55f + alpha2 * 0.3f), modifier = Modifier.size(18.dp).graphicsLayer { translationY = offset2; rotationZ = offset2 * 0.6f })
+        Icon(Icons.Filled.MusicNote, null, tint = primary.copy(alpha = 0.45f + alpha1 * 0.4f), modifier = Modifier.size(16.dp).graphicsLayer { translationY = offset3; scaleX = 1f + alpha2 * 0.08f })
+        BasicText("♪", style = androidx.compose.ui.text.TextStyle(color = foreground.copy(alpha = 0.6f), fontSize = 13.sp))
+    }
+}
+
+private fun isWordByWordLyrics(synced: String): Boolean =
+    // Enhanced LRC word tag like <00:12.000> indicates word-by-word (like original QQ QRC)
+    Regex("<\\d{1,3}:\\d{2}[.:]\\d{1,3}>").containsMatchIn(synced)
 
 private fun formatLyricsDuration(ms: Long): String {
     val totalSeconds = (ms.coerceAtLeast(0L) / 1_000L)

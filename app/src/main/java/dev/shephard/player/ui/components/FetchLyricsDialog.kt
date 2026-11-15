@@ -415,6 +415,21 @@ private fun ResultItemCard(
                             )
                         }
                     }
+                    val isWordByWordFetch = hasSyncedLyrics && result.syncedLyrics?.let { Regex("<\\d{1,3}:\\d{2}[.:]\\d{1,3}>").containsMatchIn(it) } == true
+                    if (isWordByWordFetch) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.tertiary,
+                            contentColor = MaterialTheme.colorScheme.onTertiary
+                        ) {
+                            Text(
+                                text = "word-by-word",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
                 Text(
                     text = listOf(result.artist, result.album, result.source).filter { it.isNotBlank() }.joinToString(" · "),

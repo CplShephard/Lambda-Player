@@ -15,9 +15,12 @@ fun AlbumDetailScreen(albumId: Long, albumName: String, artist: String, useMiuix
     val all by library.tracks.collectAsState()
     val strings = LocalStrings.current
     LaunchedEffect(library) { library.ensureTracksLoaded() }
-    val songs = remember(all, albumId, albumName, artist) {
-        if (albumId > 0L) all.filter { it.albumId == albumId }
-        else all.filter { it.album.equals(albumName, ignoreCase = true) && it.artist.equals(artist, ignoreCase = true) }
+    // Filter on Default dispatcher to avoid jank when library is large (like playlists).
+    val songs by produceState(initialValue = emptyList<AudioTrack>(), all, albumId, albumName, artist) {
+        value = with(kotlinx.coroutines.Dispatchers.Default) {
+            if (albumId > 0L) all.filter { it.albumId == albumId }
+            else all.filter { it.album.equals(albumName, ignoreCase = true) && it.artist.equals(artist, ignoreCase = true) }
+        }
     }
     val album = remember(albumName, songs) {
         LocalPlaylist(name = albumName, trackIds = songs.map { it.id },

@@ -49,6 +49,7 @@ import dev.shephard.player.player.PlayerUiState
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.miuixBlurSurface
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.flow.StateFlow
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator as MiuixLinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults as MiuixProgressIndicatorDefaults
@@ -67,6 +68,10 @@ fun MiniPlayer(
     modifier: Modifier = Modifier
 ) {
     val track = state.currentTrack ?: return
+    val context = LocalContext.current
+    val prefs = remember(context) { dev.shephard.player.player.PreferencesManager(context) }
+    val initialAppleFloating = remember { kotlinx.coroutines.runBlocking { kotlinx.coroutines.flow.first(prefs.useAppleFloatingBar) } }
+    val isAppleFloatingEnabled by prefs.useAppleFloatingBar.collectAsState(initial = initialAppleFloating)
 
     val liquidGlassOn = LocalBlurEnabled.current
     val contentBackdrop = LocalContentBackdrop.current
@@ -85,21 +90,24 @@ fun MiniPlayer(
             // 15dp (was 16dp) on each side: the pop-up is 2dp wider overall; large variant is wider still.
             .padding(horizontal = if (large) 8.dp else 15.dp, vertical = if (large) 10.dp else 6.dp)
     ) {
+        val isFloatingBarOn = isAppleFloatingEnabled
+        val blurActive = liquidGlassOn && contentBackdrop != null
+        val solidColor = if (isFloatingBarOn) MiuixAppTheme.colorScheme.surfaceVariant else MiuixAppTheme.colorScheme.surface
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(miniPlayerShape)
                 .then(
-                    if (liquidGlassOn && contentBackdrop != null) {
+                    if (blurActive) {
                         Modifier.miuixBlurSurface(
                             backdrop = contentBackdrop,
                             shape = miniPlayerShape,
-                            blurRadius = 28f,
-                            tintAlpha = 0.58f,
-                            fallbackColor = MiuixAppTheme.colorScheme.surfaceVariant
+                            blurRadius = if (isFloatingBarOn) 28f else 25f,
+                            tintAlpha = if (isFloatingBarOn) 0.58f else 0.8f,
+                            fallbackColor = solidColor
                         )
                     } else {
-                        Modifier.background(MiuixAppTheme.colorScheme.surfaceVariant)
+                        Modifier.background(solidColor)
                     }
                 )
                 .bounceClick(pressScale = 0.97f) { onClick() }

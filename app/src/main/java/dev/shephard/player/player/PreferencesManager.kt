@@ -19,8 +19,6 @@ private val Context.dataStore by preferencesDataStore(name = "lambda_player_pref
 
 object PrefsKeys {
     val CROSSFADE_ENABLED = booleanPreferencesKey("crossfade_enabled")
-    val ONLINE_MODE_ENABLED = booleanPreferencesKey("online_mode_enabled")
-    val EXTENSION_REGISTRY_URL = stringPreferencesKey("extension_registry_url")
     val GAPLESS_ENABLED = booleanPreferencesKey("gapless_enabled")
     val LYRICS_AUTO_SEARCH_MODE = stringPreferencesKey("lyrics_auto_search_mode")
     val LYRICS_ONLINE_OPENED_TRACK_IDS = stringPreferencesKey("lyrics_online_opened_track_ids")
@@ -64,13 +62,16 @@ object PrefsKeys {
     val PREDICTIVE_BACK_ANIMATION = stringPreferencesKey("predictive_back_animation")
     val PREDICTIVE_BACK_EXIT_DIRECTION = stringPreferencesKey("predictive_back_exit_direction")
     val M3_BLUR_BACKUP = intPreferencesKey("m3_blur_backup")
+    val DYNAMIC_COLOR_BY_COVER_BACKUP = intPreferencesKey("dynamic_color_by_cover_backup")
     val M3_NAV_BAR_CORNER_RADIUS = intPreferencesKey("m3_nav_bar_corner_radius")
     val LYRICS_BACKGROUND_BLUR_ENABLED = booleanPreferencesKey("lyrics_background_blur_enabled")
     val LYRICS_BACKGROUND_BLUR_STRENGTH = floatPreferencesKey("lyrics_background_blur_strength")
     val LYRICS_AUTO_SCROLL_ENABLED = booleanPreferencesKey("lyrics_auto_scroll_enabled")
     val LYRICS_SKIP_SEARCH_PROMPT = booleanPreferencesKey("lyrics_skip_search_prompt")
     val LYRICS_TRANSLATION_VISIBLE = booleanPreferencesKey("lyrics_translation_visible")
+    val LYRICS_TRANSLATION_LANGUAGE = stringPreferencesKey("lyrics_translation_language")
     val CAROUSEL_STYLE = stringPreferencesKey("carousel_style")
+    val STATS_TOP_COUNT = intPreferencesKey("stats_top_count")
     val LYRICS_SYNC_OFFSETS_JSON = stringPreferencesKey("lyrics_sync_offsets_json")
 }
 
@@ -280,8 +281,16 @@ class PreferencesManager(private val context: Context) {
         it[PrefsKeys.LYRICS_TRANSLATION_VISIBLE] ?: true
     }
 
+    val lyricsTranslationLanguage: Flow<String> = context.dataStore.data.map {
+        it[PrefsKeys.LYRICS_TRANSLATION_LANGUAGE] ?: "off"
+    }
+
     val lyricsSyncOffsetsJson: Flow<String> = context.dataStore.data.map {
         it[PrefsKeys.LYRICS_SYNC_OFFSETS_JSON] ?: "{}"
+    }
+
+    val statsTopCount: Flow<Int> = context.dataStore.data.map {
+        (it[PrefsKeys.STATS_TOP_COUNT] ?: 10).coerceIn(10, 50)
     }
 
     val likedSongIds: Flow<String> = context.dataStore.data.map {
@@ -452,13 +461,30 @@ class PreferencesManager(private val context: Context) {
                     prefs[PrefsKeys.M3_BLUR_BACKUP] = 0
                 }
                 prefs[PrefsKeys.LIQUID_GLASS_ENABLED] = false
+                // Restore dynamic-color-by-cover if it was backed up when leaving Miuix with custom colors off.
+                val coverBackup = prefs[PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP]
+                if (coverBackup != null) {
+                    prefs[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = coverBackup == 1
+                    prefs.remove(PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP)
+                }
             } else {
                 // A cover-based palette is incompatible with Miuix while custom colors are off.
                 // Make the transition atomic so the switch and the rendered theme agree.
+                // Backup like blur so we can restore when custom colors are re-enabled or user returns to Material.
                 if (!(prefs[PrefsKeys.USE_MIUIX_MONET] ?: false)) {
+                    val currentCover = prefs[PrefsKeys.DYNAMIC_COLOR_BY_COVER] ?: false
+                    if (currentCover) {
+                        prefs[PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP] = 1
+                    }
                     prefs[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = false
+                } else {
+                    val coverBackup = prefs[PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP]
+                    if (coverBackup != null) {
+                        prefs[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = coverBackup == 1
+                        prefs.remove(PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP)
+                    }
                 }
-                // Switching back to Miuix: restore the backup if one exists,
+                // Switching back to Miuix: restore the blur backup if one exists,
                 // then forget it.
                 val backup = prefs[PrefsKeys.M3_BLUR_BACKUP]
                 if (backup != null) {
@@ -498,7 +524,19 @@ class PreferencesManager(private val context: Context) {
     suspend fun setUseMiuixMonet(use: Boolean) {
         context.dataStore.edit {
             it[PrefsKeys.USE_MIUIX_MONET] = use
-            if (!use && (it[PrefsKeys.USE_MIUIX] ?: true)) it[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = false
+            if (!use && (it[PrefsKeys.USE_MIUIX] ?: true)) {
+                val currentCover = it[PrefsKeys.DYNAMIC_COLOR_BY_COVER] ?: false
+                if (currentCover) {
+                    it[PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP] = 1
+                }
+                it[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = false
+            } else if (use) {
+                val backup = it[PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP]
+                if (backup != null) {
+                    it[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = backup == 1
+                    it.remove(PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP)
+                }
+            }
         }
     }
 
@@ -558,8 +596,16 @@ class PreferencesManager(private val context: Context) {
         context.dataStore.edit { it[PrefsKeys.LYRICS_TRANSLATION_VISIBLE] = visible }
     }
 
+    suspend fun setLyricsTranslationLanguage(language: String) {
+        context.dataStore.edit { it[PrefsKeys.LYRICS_TRANSLATION_LANGUAGE] = language }
+    }
+
     suspend fun setLyricsSyncOffsetsJson(json: String) {
         context.dataStore.edit { it[PrefsKeys.LYRICS_SYNC_OFFSETS_JSON] = json }
+    }
+
+    suspend fun setStatsTopCount(count: Int) {
+        context.dataStore.edit { it[PrefsKeys.STATS_TOP_COUNT] = count.coerceIn(10, 50) }
     }
 
     suspend fun setLikedSongIds(json: String) {
@@ -607,24 +653,4 @@ class PreferencesManager(private val context: Context) {
         context.dataStore.edit { it[PrefsKeys.LISTEN_STATS_EVENTS_JSON] = json }
     }
 
-    val onlineModeEnabled: Flow<Boolean> = context.dataStore.data.map {
-        it[PrefsKeys.ONLINE_MODE_ENABLED] ?: false
-    }
-
-    suspend fun setOnlineModeEnabled(enabled: Boolean) {
-        context.getSharedPreferences("lambda_online_gate", Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean("online_mode_enabled", enabled)
-            .apply()
-        context.dataStore.edit { it[PrefsKeys.ONLINE_MODE_ENABLED] = enabled }
-    }
-
-    val extensionRegistryUrl: Flow<String> = context.dataStore.data.map {
-        it[PrefsKeys.EXTENSION_REGISTRY_URL]
-            ?: dev.shephard.player.extension.ExtensionManager.DEFAULT_REGISTRY_URL
-    }
-
-    suspend fun setExtensionRegistryUrl(url: String) {
-        context.dataStore.edit { it[PrefsKeys.EXTENSION_REGISTRY_URL] = url }
-    }
 }

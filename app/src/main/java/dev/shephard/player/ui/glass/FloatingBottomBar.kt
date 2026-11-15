@@ -540,7 +540,7 @@ fun <T> FloatingBottomBar(
                         .width(tabWidthDp),
                 )
             } else {
-                // Keep the same elastic indicator in solid and blurred modes.
+                // Keep the same elastic indicator in solid and blurred modes — now shrinks on press both axes.
                 run {
                     Box(
                         modifier = Modifier
@@ -548,12 +548,14 @@ fun <T> FloatingBottomBar(
                             .graphicsLayer {
                                 val progressOffset = dampedDragAnimation.value * tabWidthPx
                                 translationX = if (isLtr) progressOffset + panelOffset else -progressOffset + panelOffset
+                                val press = dampedDragAnimation.pressProgress.coerceIn(0f, 1f)
+                                val horizontalShrink = lerp(1f, 0.97f, press)
+                                val verticalShrink = lerp(1f, 0.95f, press)
                                 val stretchX = (dampedDragAnimation.scaleX - 1f) * 0.17f
                                 val squeezeY = (dampedDragAnimation.scaleY - 1f) * 0.15f
-                                val movement = (abs(dampedDragAnimation.velocity) * 0.015f).coerceIn(0f, 0.06f) *
-                                    dampedDragAnimation.pressProgress.coerceIn(0f, 1f)
-                                scaleX = 1f + stretchX + movement
-                                scaleY = 1f - squeezeY - movement * 0.5f
+                                val movement = (abs(dampedDragAnimation.velocity) * 0.015f).coerceIn(0f, 0.06f) * press
+                                scaleX = horizontalShrink - stretchX * 0.5f + movement * 0.15f
+                                scaleY = verticalShrink - squeezeY * 0.5f - movement * 0.25f
                             }
                             .background(colors.indicatorColor.copy(alpha = 0.15f), pillShape)
                             .height(56.dp)

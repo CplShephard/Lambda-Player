@@ -19,6 +19,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -38,6 +39,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -94,6 +96,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
@@ -101,6 +104,7 @@ import coil.compose.AsyncImagePainter
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import dev.shephard.player.data.AudioTrack
+import dev.shephard.player.player.ImagePersistence
 import dev.shephard.player.data.formattedDuration
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
@@ -126,10 +130,16 @@ fun NowPlayingSheet(
     val state by playerViewModel.uiState.collectAsState()
     val navigationDirection by playerViewModel.navigationDirection.collectAsState()
     val pendingCarouselIndex by playerViewModel.pendingCarouselIndex.collectAsState()
+    val context = LocalContext.current
     val track = state.currentTrack
     val strings = LocalStrings.current
     val nowPlayingLiquidGlassOn = LocalBlurEnabled.current
-    val context = LocalContext.current
+    // Detect gif/mp4 cover (override coverUri or track uri) for miuix handling
+    val isAnimatedCover = remember(track?.albumArtUri) {
+        track?.albumArtUri?.let { uri ->
+            ImagePersistence.isAnimatedCover(context, uri)
+        } ?: false
+    }
     val carouselPrefs = remember(context) { PreferencesManager(context) }
     val carouselStyle by carouselPrefs.carouselStyle.collectAsState(initial = dev.shephard.player.player.CarouselStyle.NO_PEEK)
 
@@ -157,11 +167,11 @@ fun NowPlayingSheet(
     }
 
     val artSlideSpec = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(
-        durationMillis = 320,
+        durationMillis = 260,
         easing = androidx.compose.animation.core.FastOutSlowInEasing
     )
     val artFadeSpec = androidx.compose.animation.core.tween<Float>(
-        durationMillis = 220,
+        durationMillis = 180,
         easing = androidx.compose.animation.core.LinearOutSlowInEasing
     )
 
@@ -270,8 +280,25 @@ onDismiss()
             )
     ) {
 
-AmbientGlowBackground(track = track, isPlaying = state.isPlaying)
+AmbientGlowBackground(track = track, isPlaying = state.isPlaying, isAnimated = isAnimatedCover)
 
+val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+if (isLandscape) {
+MiuixLandscapeContent(
+playerViewModel = playerViewModel,
+state = state,
+track = track,
+navigationDirection = navigationDirection,
+pendingCarouselIndex = pendingCarouselIndex,
+carouselStyle = carouselStyle,
+onAlbumClick = onAlbumClick,
+strings = strings,
+showQueue = showQueue,
+onShowQueueChange = { showQueue = it },
+showPlaylists = showPlaylists,
+onShowPlaylistsChange = { showPlaylists = it },
+)
+} else {
 Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -413,7 +440,7 @@ SeekBarRow(playerViewModel = playerViewModel)
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
-                    .padding(top = 8.dp, bottom = 32.dp),
+                    .padding(top = 8.dp, bottom = 42.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Row(
@@ -480,11 +507,13 @@ SeekBarRow(playerViewModel = playerViewModel)
                 }
             }
 
+        }
+        }
             if (showQueue) {
                 QueueDrawer(playerViewModel = playerViewModel, useMiuix = true, onDismiss = { showQueue = false })
             }
 
-            if (showLyrics) {
+            if (showLyrics && !isLandscape) {
                 FullScreenLyricsExperience(
                     playerViewModel = playerViewModel,
                     useMiuix = true,
@@ -501,14 +530,379 @@ SeekBarRow(playerViewModel = playerViewModel)
                     strings = strings
                 )
             }
-        }
     }
 }
+
+
+@Composable
+private fun MiuixLandscapeContent(
+playerViewModel: PlayerViewModel,
+state: dev.shephard.player.player.PlayerUiState,
+track: AudioTrack?,
+navigationDirection: Int,
+pendingCarouselIndex: Int?,
+carouselStyle: String,
+onAlbumClick: (AudioTrack) -> Unit,
+strings: dev.shephard.player.ui.i18n.Strings,
+showQueue: Boolean,
+onShowQueueChange: (Boolean) -> Unit,
+showPlaylists: Boolean,
+onShowPlaylistsChange: (Boolean) -> Unit,
+) {
+val configuration = LocalConfiguration.current
+Row(
+modifier = Modifier
+.fillMaxSize()
+.statusBarsPadding()
+.navigationBarsPadding()
+) {
+// LEFT PANE: cover + reduced controls
+Column(
+modifier = Modifier
+.weight(0.5f)
+.fillMaxHeight()
+.padding(horizontal = 12.dp, vertical = 8.dp),
+verticalArrangement = Arrangement.SpaceBetween,
+horizontalAlignment = Alignment.CenterHorizontally
+) {
+// Header condensed
+Row(
+modifier = Modifier
+.fillMaxWidth()
+.padding(top = 4.dp, start = 8.dp, end = 8.dp),
+horizontalArrangement = Arrangement.SpaceBetween,
+verticalAlignment = Alignment.CenterVertically
+) {
+Box(modifier = Modifier.size(32.dp))
+Column(horizontalAlignment = Alignment.CenterHorizontally) {
+Text(
+text = strings.nowPlaying,
+style = MiuixAppTheme.typography.labelLarge,
+color = Color.White.copy(alpha = 0.9f)
+)
+if (state.currentPlaylistName != null) {
+Text(
+text = state.currentPlaylistName!!,
+style = MiuixAppTheme.typography.labelSmall,
+color = Color.White.copy(alpha = 0.7f)
+)
+}
+}
+Box(modifier = Modifier.size(32.dp))
+}
+Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+val pageFraction = when (carouselStyle) {
+dev.shephard.player.player.CarouselStyle.NO_PEEK -> 1f
+dev.shephard.player.player.CarouselStyle.TWO_PEEK -> .6f
+else -> .8f
+}
+val artHeight = minOf(maxWidth * pageFraction, configuration.screenHeightDp.dp * .62f)
+if (state.queue.isNotEmpty()) {
+dev.shephard.player.ui.components.AlbumCarousel(
+queue = state.queue, currentIndex = state.currentQueueIndex,
+requestedIndex = pendingCarouselIndex, isPlaying = state.isPlaying, carouselStyle = carouselStyle,
+onSongSelected = playerViewModel::playQueueItemAbsolute,
+onAlbumClick = onAlbumClick,
+modifier = Modifier.fillMaxWidth().height(artHeight),
+placeholderColor = MiuixAppTheme.colorScheme.surfaceVariant,
+placeholderContentColor = MiuixAppTheme.colorScheme.primary,
+)
+} else {
+Box(Modifier.fillMaxWidth().height(artHeight), contentAlignment = Alignment.Center) {
+Box(Modifier.size(artHeight).clip(RoundedCornerShape(24.dp)).background(MiuixAppTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+Icon(Icons.Filled.MusicNote, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+}
+}
+}
+}
+androidx.compose.animation.AnimatedContent(
+targetState = track,
+transitionSpec = {
+val forward = navigationDirection >= 0
+val slideSpec = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(durationMillis = 320, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+val fadeSpec = androidx.compose.animation.core.tween<Float>(durationMillis = 220, easing = androidx.compose.animation.core.LinearOutSlowInEasing)
+(slideInHorizontally(slideSpec) { if (forward) it else -it } + fadeIn(fadeSpec)) togetherWith
+(slideOutHorizontally(slideSpec) { if (forward) -it else it } + fadeOut(fadeSpec))
+},
+label = "nowPlayingMetadataLand",
+) { current ->
+Column(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+if (current != null) {
+Text(current.title, style = MiuixAppTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp))
+Text(current.artist, style = MiuixAppTheme.typography.bodySmall, color = Color.White.copy(alpha = .7f),
+maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp))
+}
+}
+}
+}
+}
+Column(modifier = Modifier.fillMaxWidth()) {
+SeekBarRow(playerViewModel = playerViewModel)
+// Reduced controls - 18% smaller via scale
+Column(modifier = Modifier.fillMaxWidth().graphicsLayer(scaleX = 0.82f, scaleY = 0.82f)) {
+Row(
+modifier = Modifier
+.fillMaxWidth()
+.padding(top = 8.dp, start = 8.dp, end = 8.dp),
+horizontalArrangement = Arrangement.SpaceEvenly,
+verticalAlignment = Alignment.CenterVertically
+) {
+val isRemixed by playerViewModel.isRemixed.collectAsState()
+BouncyIconButton(
+onClick = { playerViewModel.remixQueue() },
+icon = Icons.Filled.Shuffle,
+contentDescription = strings.remix,
+tint = if (isRemixed) MiuixAppTheme.colorScheme.primary else Color.White,
+iconSize = 24.dp
+)
+BouncyIconButton(
+onClick = { playerViewModel.skipToPrevious() },
+painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_rewind),
+contentDescription = strings.previous,
+tint = Color.White,
+iconSize = 30.dp
+)
+MiuixPlayPauseButton(
+isPlaying = state.isPlaying,
+onClick = playerViewModel::togglePlayPause,
+playDescription = strings.play,
+pauseDescription = strings.pause,
+tint = Color.White,
+)
+BouncyIconButton(
+onClick = { playerViewModel.skipToNext() },
+painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_fforward),
+contentDescription = strings.next,
+tint = Color.White,
+iconSize = 30.dp
+)
+BouncyIconButton(
+onClick = { playerViewModel.cycleRepeatMode() },
+icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+contentDescription = strings.repeat,
+tint = if (state.repeatMode != RepeatMode.OFF) MiuixAppTheme.colorScheme.primary else Color.White,
+iconSize = 24.dp
+)
+}
+Box(
+modifier = Modifier
+.fillMaxWidth()
+.padding(horizontal = 12.dp)
+.padding(top = 4.dp, bottom = 6.dp),
+contentAlignment = Alignment.Center
+) {
+Row(
+modifier = Modifier
+.clip(RoundedCornerShape(12.dp))
+.background(Color.White.copy(alpha = 0.12f))
+.padding(horizontal = 10.dp, vertical = 3.dp),
+horizontalArrangement = Arrangement.spacedBy(6.dp),
+verticalAlignment = Alignment.CenterVertically
+) {
+BouncyIconButton(
+onClick = { onShowQueueChange(true) },
+icon = Icons.AutoMirrored.Filled.QueueMusic,
+contentDescription = strings.queue,
+tint = Color.White,
+iconSize = 24.dp
+)
+val trackId = track?.id ?: -1L
+val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
+Box(
+modifier = Modifier
+.size(40.dp)
+.bounceClick {
+if (trackId > 0) {
+if (isLiked) {
+onShowPlaylistsChange(true)
+} else {
+playerViewModel.addToLiked(trackId)
+}
+}
+},
+contentAlignment = Alignment.Center
+) {
+androidx.compose.animation.AnimatedContent(
+targetState = isLiked,
+transitionSpec = {
+(androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)) +
+androidx.compose.animation.scaleIn(initialScale = 0.45f, animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 400f))).togetherWith(
+androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150)) +
+androidx.compose.animation.scaleOut(targetScale = 1.35f)
+)
+},
+label = "likeMorphLand"
+) { liked ->
+Icon(
+imageVector = if (liked) Icons.Filled.Check else Icons.Filled.Add,
+contentDescription = if (liked) "Added" else "Add",
+tint = Color.White,
+modifier = Modifier.size(24.dp)
+)
+}
+}
+}
+}
+}
+}
+}
+}
+// RIGHT PANE: fullscreen lyrics without controls
+Box(
+modifier = Modifier
+.weight(0.5f)
+.fillMaxHeight()
+.padding(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
+.clip(RoundedCornerShape(16.dp))
+.background(Color.Black.copy(alpha = 0.18f))
+) {
+MiuixEmbeddedLyrics(
+playerViewModel = playerViewModel,
+state = state,
+modifier = Modifier.fillMaxSize()
+)
+}
+}
+if (showQueue) {
+QueueDrawer(playerViewModel = playerViewModel, useMiuix = true, onDismiss = { onShowQueueChange(false) })
+}
+if (showPlaylists) {
+AddToPlaylistDrawer(
+trackId = track?.id ?: -1L,
+track = track,
+playerViewModel = playerViewModel,
+onDismiss = { onShowPlaylistsChange(false) },
+strings = strings
+)
+}
+}
+
+@Composable
+private fun MiuixEmbeddedLyrics(
+playerViewModel: PlayerViewModel,
+state: dev.shephard.player.player.PlayerUiState,
+modifier: Modifier = Modifier
+) {
+val progress by playerViewModel.progress.collectAsState()
+val syncOffsetMs by playerViewModel.lyricsSyncOffsetMs.collectAsState()
+val synced = state.syncedLyrics
+val plain = state.lyrics
+val lyricsListState = rememberLazyListState()
+val textStyle = MiuixAppTheme.typography.bodyMedium
+val activeIndex by remember(synced, progress.positionMs, syncOffsetMs) {
+androidx.compose.runtime.derivedStateOf {
+if (synced.isEmpty()) -1 else {
+var low = 0
+var high = synced.lastIndex
+val pos = progress.positionMs - syncOffsetMs
+while (low <= high) {
+val mid = (low + high).ushr(1)
+if (synced[mid].timeMs <= pos) low = mid + 1 else high = mid - 1
+}
+high
+}
+}
+}
+LaunchedEffect(activeIndex) {
+if (synced.isNotEmpty() && activeIndex >= 0) {
+try {
+val layoutInfo = lyricsListState.layoutInfo
+val viewportHeight = layoutInfo.viewportSize.height
+if (viewportHeight == 0) {
+lyricsListState.animateScrollToItem(activeIndex)
+} else {
+val target = activeIndex.coerceIn(synced.indices)
+val visible = layoutInfo.visibleItemsInfo.firstOrNull { it.index == target }
+val itemHeight = visible?.size ?: 60
+val desiredOffset = viewportHeight * 0.4f - itemHeight / 2f - layoutInfo.beforeContentPadding
+if (visible != null) {
+lyricsListState.animateScrollBy(visible.offset - desiredOffset, animationSpec = androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+} else {
+lyricsListState.animateScrollToItem(index = target, scrollOffset = -desiredOffset.toInt())
+}
+}
+} catch (_: Exception) {}
+}
+}
+Column(modifier = modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+Text(
+text = dev.shephard.player.ui.i18n.LocalStrings.current.lyrics,
+style = MiuixAppTheme.typography.titleMedium,
+fontWeight = FontWeight.Bold,
+color = Color.White,
+modifier = Modifier.padding(bottom = 6.dp)
+)
+if (synced.isNotEmpty()) {
+LazyColumn(
+state = lyricsListState,
+modifier = Modifier.fillMaxSize(),
+contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp),
+verticalArrangement = Arrangement.spacedBy(4.dp)
+) {
+itemsIndexed(synced, key = { idx, line -> "${line.timeMs}_$idx" }) { idx, line ->
+val isActive = idx == activeIndex
+val color = if (isActive) Color.White else Color.White.copy(alpha = 0.55f)
+val scale = if (isActive) 1f else 0.92f
+Column(
+modifier = Modifier
+.fillMaxWidth()
+.graphicsLayer(scaleX = scale, scaleY = scale)
+.clip(RoundedCornerShape(10.dp))
+.clickable { playerViewModel.seekTo((line.timeMs + syncOffsetMs).coerceAtLeast(0)) }
+.padding(horizontal = 8.dp, vertical = 6.dp)
+) {
+Text(
+text = line.text,
+style = textStyle.copy(color = color, fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium, fontSize = if (isActive) 15.sp else 13.sp),
+maxLines = 3,
+overflow = TextOverflow.Ellipsis
+)
+if (!line.translation.isNullOrBlank()) {
+Text(
+text = line.translation,
+style = textStyle.copy(color = color.copy(alpha = 0.78f), fontSize = 12.sp),
+maxLines = 2,
+overflow = TextOverflow.Ellipsis,
+modifier = Modifier.padding(top = 2.dp)
+)
+}
+}
+}
+}
+} else if (plain.isNotEmpty()) {
+LazyColumn(
+state = lyricsListState,
+modifier = Modifier.fillMaxSize(),
+contentPadding = PaddingValues(vertical = 8.dp),
+verticalArrangement = Arrangement.spacedBy(6.dp)
+) {
+items(plain.size) { idx ->
+Text(
+text = plain[idx],
+style = textStyle.copy(color = Color.White.copy(alpha = 0.82f), fontSize = 13.sp),
+modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+)
+}
+}
+} else {
+Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+Column(horizontalAlignment = Alignment.CenterHorizontally) {
+Icon(Icons.Filled.Lyrics, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(28.dp))
+Text(dev.shephard.player.ui.i18n.LocalStrings.current.noLyricsFound, color = Color.White.copy(alpha = 0.55f), style = textStyle, modifier = Modifier.padding(top = 8.dp))
+}
+}
+}
+}
+}
+
 
 @Composable
 private fun AmbientGlowBackground(
     track: AudioTrack?,
-    isPlaying: Boolean
+    isPlaying: Boolean,
+    isAnimated: Boolean = false
 ) {
     val darkOverlayAlpha by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (isPlaying) 0.35f else 0.68f,
@@ -516,33 +910,42 @@ private fun AmbientGlowBackground(
         label = "darkOverlayAlpha"
     )
     Box(modifier = Modifier.fillMaxSize()) {
-        androidx.compose.animation.Crossfade(
-            targetState = track?.albumArtUri,
-            animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 720,
-                easing = androidx.compose.animation.core.FastOutSlowInEasing
-            ),
-            label = "ambientAlbumArtFade"
-        ) { artUri ->
-            if (artUri != null) {
-                AsyncImage(
-                    model = artUri,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { scaleX = 1.15f; scaleY = 1.15f }
-                        .blur(radius = 60.dp),
-                    colorFilter = ColorFilter.colorMatrix(
-                        ColorMatrix().apply { setToSaturation(1.35f) }
+        // For animated gif/mp4 covers, show only cover animation with no blurred background
+        if (isAnimated) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MiuixAppTheme.colorScheme.background)
+            )
+        } else {
+            androidx.compose.animation.Crossfade(
+                targetState = track?.albumArtUri,
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 420,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                ),
+                label = "ambientAlbumArtFade"
+            ) { artUri ->
+                if (artUri != null) {
+                    AsyncImage(
+                        model = artUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { scaleX = 1.08f; scaleY = 1.08f }
+                            .blur(radius = 32.dp),
+                        colorFilter = ColorFilter.colorMatrix(
+                            ColorMatrix().apply { setToSaturation(1.25f) }
+                        )
                     )
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MiuixAppTheme.colorScheme.surfaceVariant)
-                )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                    )
+                }
             }
         }
         Box(

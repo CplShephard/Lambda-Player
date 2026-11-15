@@ -539,7 +539,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                                 timestampMs = System.currentTimeMillis(),
                                 listenedMs = listenedMs,
                                 countsAsPlay = dayStart == statsSessionQualifyDayStartMs && statsSessionQualified,
-                                albumArtUri = track.albumArtUri?.toString()
+                                albumArtUri = track.albumArtUri?.toString(),
+                                stableKey = dev.shephard.player.data.TrackFingerprint.stableKey(track)
                             )
                         }
                     if (newEvents.isNotEmpty()) {
@@ -567,7 +568,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             timestampMs = now,
             listenedMs = 0L,
             countsAsPlay = false,
-            albumArtUri = track.albumArtUri?.toString()
+            albumArtUri = track.albumArtUri?.toString(),
+            stableKey = dev.shephard.player.data.TrackFingerprint.stableKey(track)
         )
         statsEvents = statsEvents + event
         _statsEventsFlow.value = statsEvents
@@ -590,6 +592,118 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         statsEvents = emptyList()
         _statsEventsFlow.value = emptyList()
         persistStatsEvents()
+    }
+
+    /**
+     * Scan DataStore for orphaned (GEREKSIZ) entries whose files are no longer on device.
+     * Reports progress 0..100 via [onProgress] and only deletes truly orphaned items:
+     *  - listening events whose stableKey not in [availableStableKeys]
+     *  - lyrics / overrides / offsets / liked ids whose trackId not in [availableTrackIds]
+     * Shows progress bar that fills to 100% as requested for delete dialog + playback settings button.
+     */
+    suspend fun scanAndCleanOrphanedData(
+        availableTrackIds: Set<String>,
+        availableStableKeys: Set<String>,
+        onProgress: (Int) -> Unit = {}
+    ): OrphanCleanupReport = withContext(Dispatchers.IO) {
+        var removedListening = 0
+        var removedLyrics = 0
+        var removedOverrides = 0
+        var removedOffsets = 0
+        var removedLiked = 0
+
+        // Step 1: listening events (stableKey based)
+        onProgress(5)
+        val currentEvents = statsEvents.ifEmpty { ListenStatsCalculator.decodeEvents(prefs.listenStatsEventsJson.first()) }
+        kotlinx.coroutines.delay(120) // simulate scan
+        onProgress(25)
+        val filteredEvents = currentEvents.filter { ev ->
+            val key = ev.stableKey ?: dev.shephard.player.data.TrackFingerprint.stableKey(ev.title, ev.artist, ev.album, 0L)
+            key in availableStableKeys
+        }
+        removedListening = currentEvents.size - filteredEvents.size
+        if (removedListening > 0) {
+            statsEvents = filteredEvents
+            _statsEventsFlow.value = filteredEvents
+            val json = ListenStatsCalculator.encodeEvents(filteredEvents)
+            prefs.setListenStatsEventsJson(json)
+        }
+        onProgress(45)
+
+        // Step 2: lyrics_json (trackId keyed)
+        val lyricsRaw = prefs.lyricsJson.first()
+        val lyricsObj = runCatching { org.json.JSONObject(lyricsRaw) }.getOrNull() ?: org.json.JSONObject()
+        val lyricsKeys = lyricsObj.keys().asSequence().toList()
+        var lyricsChanged = false
+        for (k in lyricsKeys) {
+            if (k !in availableTrackIds) {
+                // Keep if any event with same metadata exists? For GEREKSIZ we only remove if truly orphaned
+                // i.e., no listening event references this track's stable metadata.
+                lyricsObj.remove(k); removedLyrics++; lyricsChanged = true
+            }
+        }
+        if (lyricsChanged) prefs.setLyricsJson(lyricsObj.toString())
+        onProgress(65)
+        kotlinx.coroutines.delay(80)
+
+        // Step 3: track overrides
+        val overridesRaw = prefs.trackOverridesJson.first()
+        val overridesObj = runCatching { org.json.JSONObject(overridesRaw) }.getOrNull() ?: org.json.JSONObject()
+        val overrideKeys = overridesObj.keys().asSequence().toList()
+        var overridesChanged = false
+        for (k in overrideKeys) {
+            if (k !in availableTrackIds) { overridesObj.remove(k); removedOverrides++; overridesChanged = true }
+        }
+        if (overridesChanged) prefs.setTrackOverridesJson(overridesObj.toString())
+        onProgress(80)
+        kotlinx.coroutines.delay(80)
+
+        // Step 4: sync offsets
+        val offsetsRaw = prefs.lyricsSyncOffsetsJson.first()
+        val offsetsObj = runCatching { org.json.JSONObject(offsetsRaw) }.getOrNull() ?: org.json.JSONObject()
+        val offsetKeys = offsetsObj.keys().asSequence().toList()
+        var offsetsChanged = false
+        for (k in offsetKeys) {
+            if (k !in availableTrackIds) { offsetsObj.remove(k); removedOffsets++; offsetsChanged = true }
+        }
+        if (offsetsChanged) prefs.setLyricsSyncOffsetsJson(offsetsObj.toString())
+        onProgress(90)
+        kotlinx.coroutines.delay(80)
+
+        // Step 5: liked ids
+        val likedRaw = prefs.likedSongIds.first()
+        val likedArr = runCatching { org.json.JSONArray(likedRaw) }.getOrNull() ?: org.json.JSONArray()
+        val keptLiked = org.json.JSONArray()
+        for (i in 0 until likedArr.length()) {
+            val id = likedArr.optLong(i).toString()
+            if (id in availableTrackIds) keptLiked.put(likedArr.optLong(i)) else removedLiked++
+        }
+        if (removedLiked > 0) prefs.setLikedSongIds(keptLiked.toString())
+        onProgress(100)
+
+        OrphanCleanupReport(removedListening, removedLyrics, removedOverrides, removedOffsets, removedLiked)
+    }
+
+    data class OrphanCleanupReport(
+        val removedListening: Int,
+        val removedLyrics: Int,
+        val removedOverrides: Int,
+        val removedOffsets: Int,
+        val removedLiked: Int
+    ) {
+        val totalRemoved get() = removedListening + removedLyrics + removedOverrides + removedOffsets + removedLiked
+        fun summary(): String = buildString {
+            if (totalRemoved == 0) append("No orphaned data found")
+            else {
+                append("Cleaned ${'$'}totalRemoved items: ")
+                if (removedListening>0) append("listening ${'$'}removedListening, ")
+                if (removedLyrics>0) append("lyrics ${'$'}removedLyrics, ")
+                if (removedOverrides>0) append("overrides ${'$'}removedOverrides, ")
+                if (removedOffsets>0) append("offsets ${'$'}removedOffsets, ")
+                if (removedLiked>0) append("liked ${'$'}removedLiked, ")
+                trimEnd(); if (endsWith(",")) deleteAt(length-1)
+            }
+        }
     }
 
     private fun accrueListeningTime() {
@@ -975,9 +1089,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun playQueueItemAbsolute(index: Int) {
-        clearCarouselPrediction()
         val c = controller ?: return
-        if (index in queueTracks.indices) { c.seekTo(index, 0L); c.play() }
+        if (index in queueTracks.indices) {
+            _navigationDirection.value = index.compareTo(c.currentMediaItemIndex).let { if (it < 0) -1 else 1 }
+            clearCarouselPrediction()
+            c.seekTo(index, 0L); c.play()
+        }
     }
 
     fun removeQueueItemAbsolute(index: Int) {
@@ -1133,7 +1250,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
                     }
                     if (bitmap == null) null else try {
-                        val palette = Palette.from(bitmap).generate()
+                        val palette = Palette.from(bitmap).maximumColorCount(16).generate()
                         (palette.vibrantSwatch ?: palette.dominantSwatch)?.rgb
                     } finally { bitmap.recycle() }
                 }.getOrNull()
@@ -1179,19 +1296,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 val embedded = withContext(Dispatchers.IO) { loadEmbeddedLyricsDocument(track) }
                 val hasEmbedded = embedded != null && embedded.lines.isNotEmpty()
+                // If lyrics already exist (saved handled above, embedded/.lrc here) do not run automatic online search.
+                // This avoids wasteful network calls for tracks where the user already picked/imported lyrics or
+                // where embedded/.lrc lyrics are available - requested via ayarlar automatic search fix.
                 when (mode) {
                     LyricsAutoSearchMode.OFF,
                     LyricsAutoSearchMode.ONLINE_FIRST -> applyLyricsDocument(track, embedded)
 
-                    LyricsAutoSearchMode.EMBEDDED_FIRST -> {
+                    LyricsAutoSearchMode.EMBEDDED_FIRST,
+                    LyricsAutoSearchMode.BEST_MATCH -> {
                         if (hasEmbedded) {
                             applyLyricsDocument(track, embedded)
                         } else {
                             autoSearchLyricsAndApply(track, fallback = null)
                         }
                     }
-
-                    LyricsAutoSearchMode.BEST_MATCH -> autoSearchLyricsAndApply(track, fallback = embedded)
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
@@ -1318,33 +1437,73 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val context = getApplication<Application>()
         val resolver = context.contentResolver
         val projection = arrayOf(MediaStore.Files.FileColumns._ID, MediaStore.Files.FileColumns.DISPLAY_NAME)
+        // Match both .lrc and .lrc.txt (case-insensitive) - %.lrc% covers both
         val cursor = resolver.query(
             MediaStore.Files.getContentUri("external"),
             projection,
             "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ?",
-            arrayOf("%.lrc"),
+            arrayOf("%.lrc%"),
             null
-        )
-        cursor?.use { c ->
+        ) ?: return null
+        cursor.use { c ->
             val idCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
             val nameCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
             val baseName = track.title.replace(" ", "_")
+            val audioFileName = runCatching {
+                resolver.query(track.uri, arrayOf(MediaStore.Audio.Media.DISPLAY_NAME), null, null, null)?.use { ac ->
+                    if (ac.moveToFirst()) ac.getString(0) else null
+                }
+            }.getOrNull()
+            val audioBase = audioFileName?.substringBeforeLast(".")?.takeIf { it.isNotBlank() }
+            val candidates = mutableListOf<Triple<Long, String, Int>>()
             while (c.moveToNext()) {
                 val id = c.getLong(idCol)
                 val name = c.getString(nameCol) ?: continue
-                if (name.contains(baseName, ignoreCase = true) ||
-                    track.uri.lastPathSegment?.let { name.contains(it.substringBeforeLast("."), ignoreCase = true) } == true
-                ) {
-                    val lrcUri = android.content.ContentUris.withAppendedId(
-                        MediaStore.Files.getContentUri("external"), id
-                    )
-                    resolver.openInputStream(lrcUri)?.use { stream ->
-                        return stream.bufferedReader().readText()
-                    }
-                }
+                val lower = name.lowercase()
+                // Accept .lrc, .lrc.txt, .txt containing lrc, etc.
+                if (!lower.contains(".lrc")) continue
+                var score = 0
+                if (audioBase != null && lower.contains(audioBase.lowercase())) score = 10
+                else if (lower.contains(baseName.lowercase())) score = 8
+                else if (lower.contains(track.title.lowercase())) score = 6
+                else if (lower.contains(track.artist.lowercase()) && track.artist.isNotBlank() && !track.artist.equals("<unknown>", true)) score = 4
+                else if (track.uri.lastPathSegment?.substringBeforeLast(".")?.let { lower.contains(it.lowercase()) } == true) score = 5
+                // Even low-score files are candidates but ranked
+                candidates.add(Triple(id, name, score))
+            }
+            val sorted = candidates.sortedByDescending { it.third }
+            // Try best matches first
+            for ((id, _, score) in sorted) {
+                if (score == 0 && sorted.any { it.third > 0 }) continue // skip unrelated if we have better
+                val lrcUri = android.content.ContentUris.withAppendedId(
+                    MediaStore.Files.getContentUri("external"), id
+                )
+                val text = runCatching { resolver.openInputStream(lrcUri)?.bufferedReader()?.readText() }.getOrNull()
+                if (text.isNullOrBlank()) continue
+                // Validate looks like lyrics
+                if (text.length < 2) continue
+                return text
+            }
+            // Fallback: if no scored candidate, try any .lrc file that might be generic
+            if (sorted.isEmpty()) return null
+            for ((id, _, _) in sorted.take(5)) {
+                val lrcUri = android.content.ContentUris.withAppendedId(
+                    MediaStore.Files.getContentUri("external"), id
+                )
+                val text = runCatching { resolver.openInputStream(lrcUri)?.bufferedReader()?.readText() }.getOrNull()
+                if (!text.isNullOrBlank()) return text
             }
         }
         return null
+    }
+
+    /** Scan storage for .lrc/.lrc.txt matching current track and apply if found (for UI button) */
+    suspend fun scanStorageLyricsAndApply(): Boolean = withContext(Dispatchers.IO) {
+        val track = _uiState.value.currentTrack ?: return@withContext false
+        val raw = loadLyricsFromLrcFile(track) ?: return@withContext false
+        if (raw.isBlank()) return@withContext false
+        withContext(Dispatchers.Main) { setManualLyricsText(raw) }
+        true
     }
 
     private fun parseLyricsDocument(content: String): LyricsDocument {
@@ -1484,12 +1643,41 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             put("lines", org.json.JSONArray(document.lines))
             put("syncedLyrics", org.json.JSONArray().apply {
                 document.syncedLines.forEach { line ->
-                    put(org.json.JSONObject().put("timeMs", line.timeMs).put("text", line.text))
+                    val o = org.json.JSONObject().put("timeMs", line.timeMs).put("text", line.text)
+                    line.translation?.takeIf { it.isNotBlank() }?.let { o.put("translation", it) }
+                    if (line.words.isNotEmpty()) {
+                        o.put("words", org.json.JSONArray().apply {
+                            line.words.forEach { w -> put(org.json.JSONObject().put("startMs", w.startMs).put("endMs", w.endMs).put("startChar", w.startChar).put("endChar", w.endChar)) }
+                        })
+                    }
+                    put(o)
                 }
             })
         }
         obj.put(trackId.toString(), payload)
         prefs.setLyricsJson(obj.toString())
+    }
+
+    /** Translate current synced lyrics to target language if needed (QQ Music style) */
+    fun ensureLyricsTranslation(targetLang: String) {
+        if (targetLang == "off") return
+        val current = _uiState.value
+        if (current.syncedLyrics.isEmpty()) return
+        viewModelScope.launch {
+            val updated = current.syncedLyrics.map { line ->
+                if (targetLang == "original") line
+                else {
+                    val translated = try {
+                        LyricsTranslator.translateIfNeeded(line.text, targetLang, line.translation)
+                    } catch (_: Exception) { line.translation }
+                    if (translated != null && translated != line.translation) line.copy(translation = translated) else line
+                }
+            }
+            // Only update if changed
+            if (updated != current.syncedLyrics) {
+                _uiState.value = _uiState.value.copy(syncedLyrics = updated)
+            }
+        }
     }
 
     fun searchLyrics(query: String, autoApply: Boolean = false) {

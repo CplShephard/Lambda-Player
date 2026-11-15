@@ -65,6 +65,7 @@ import dev.shephard.player.ui.components.m3.SwitchWidget
 import dev.shephard.player.ui.i18n.AllLanguages
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.theme.material.PresetColors
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,18 +76,29 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val strings = LocalStrings.current
 
-    val themeMode by prefs.themeModeEnum.collectAsState(initial = ThemeMode.SYSTEM)
-    val useMiuix by prefs.useMiuix.collectAsState(initial = true)
-    val paletteStyle by prefs.paletteStyle.collectAsState(initial = PaletteStyle.TonalSpot)
-    val colorSpec by prefs.colorSpec.collectAsState(initial = ThemeColorSpec.SPEC_2025)
-    val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
-    val dynamicByCover by prefs.dynamicColorByCover.collectAsState(initial = false)
-    val seedColor by prefs.seedColor.collectAsState(initial = PresetColors.first().color.toArgb())
-    val blurEnabled by prefs.liquidGlassEnabled.collectAsState(initial = false)
-    val predictiveBack by prefs.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
+    val initialThemeMode = remember { kotlinx.coroutines.runBlocking { prefs.themeModeEnum.first() } }
+    val themeMode by prefs.themeModeEnum.collectAsState(initial = initialThemeMode)
+    val initialUseMiuixM3 = remember { kotlinx.coroutines.runBlocking { prefs.useMiuix.first() } }
+    val useMiuix by prefs.useMiuix.collectAsState(initial = initialUseMiuixM3)
+    val initialPaletteStyleM3 = remember { kotlinx.coroutines.runBlocking { prefs.paletteStyle.first() } }
+    val paletteStyle by prefs.paletteStyle.collectAsState(initial = initialPaletteStyleM3)
+    val initialColorSpecM3 = remember { kotlinx.coroutines.runBlocking { prefs.colorSpec.first() } }
+    val colorSpec by prefs.colorSpec.collectAsState(initial = initialColorSpecM3)
+    val initialDynamicColorM3 = remember { kotlinx.coroutines.runBlocking { prefs.dynamicColor.first() } }
+    val dynamicColor by prefs.dynamicColor.collectAsState(initial = initialDynamicColorM3)
+    val initialDynamicByCoverM3 = remember { kotlinx.coroutines.runBlocking { prefs.dynamicColorByCover.first() } }
+    val dynamicByCover by prefs.dynamicColorByCover.collectAsState(initial = initialDynamicByCoverM3)
+    val initialSeedColorM3 = remember { kotlinx.coroutines.runBlocking { prefs.seedColor.first() } }
+    val seedColor by prefs.seedColor.collectAsState(initial = initialSeedColorM3)
+    val initialBlurEnabledM3 = remember { kotlinx.coroutines.runBlocking { prefs.liquidGlassEnabled.first() } }
+    val blurEnabled by prefs.liquidGlassEnabled.collectAsState(initial = initialBlurEnabledM3)
+    val initialPredictiveBackM3 = remember { kotlinx.coroutines.runBlocking { prefs.predictiveBackAnimation.first() } }
+    val predictiveBack by prefs.predictiveBackAnimation.collectAsState(initial = initialPredictiveBackM3)
 
-    val navBarCornerRadius by prefs.m3NavBarCornerRadius.collectAsState(initial = 24)
-    val language by prefs.language.collectAsState(initial = "en")
+    val initialNavBarCornerRadius = remember { kotlinx.coroutines.runBlocking { prefs.m3NavBarCornerRadius.first() } }
+    val navBarCornerRadius by prefs.m3NavBarCornerRadius.collectAsState(initial = initialNavBarCornerRadius)
+    val initialLanguageM3 = remember { kotlinx.coroutines.runBlocking { prefs.language.first() } }
+    val language by prefs.language.collectAsState(initial = initialLanguageM3)
 
     var navBarCornerRadiusValue by remember { mutableFloatStateOf(navBarCornerRadius.toFloat()) }
     LaunchedEffect(navBarCornerRadius) { navBarCornerRadiusValue = navBarCornerRadius.toFloat() }
@@ -306,7 +318,6 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
 }
 
 private fun predictiveBackDisplayName(animation: PredictiveBackAnimation, strings: dev.shephard.player.ui.i18n.Strings): String = when (animation) {
-    PredictiveBackAnimation.NONE -> strings.predictiveBackNone
     PredictiveBackAnimation.AOSP -> strings.predictiveBackAosp
     PredictiveBackAnimation.MIUIX -> strings.predictiveBackMiuix
     PredictiveBackAnimation.CLASSIC -> strings.predictiveBackClassic

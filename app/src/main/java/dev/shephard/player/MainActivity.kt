@@ -91,6 +91,13 @@ class MainActivity : ComponentActivity() {
             val glassEnabled by prefs.liquidGlassEffect.collectAsState(initial = initialGlassEnabled)
             val initialAppleFloatingBar = remember { runBlocking { prefs.useAppleFloatingBar.first() } }
             val appleFloatingBar by prefs.useAppleFloatingBar.collectAsState(initial = initialAppleFloatingBar)
+            // Preload remaining theme prefs at startup to prevent any theme pop
+            val initialM3NavBarCornerRadius = remember { runBlocking { prefs.m3NavBarCornerRadius.first() } }
+            val m3NavBarCornerRadius by prefs.m3NavBarCornerRadius.collectAsState(initial = initialM3NavBarCornerRadius)
+            val initialPredictiveBackAnimation = remember { runBlocking { prefs.predictiveBackAnimation.first() } }
+            val predictiveBackAnimation by prefs.predictiveBackAnimation.collectAsState(initial = initialPredictiveBackAnimation)
+            // Ensure DataStore is warmed for all theme keys on first frame
+            // (paletteStyle, colorSpec, dynamicColor, etc. already preloaded above)
             val initialLanguageCode = remember { runBlocking { prefs.language.first() } }
             val languageCode by prefs.language.collectAsState(initial = initialLanguageCode)
             val strings = remember(languageCode) { stringsFor(languageCode) }

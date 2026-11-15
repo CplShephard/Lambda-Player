@@ -11,8 +11,19 @@ data class ListenEvent(
     val timestampMs: Long,
     val listenedMs: Long,
     val countsAsPlay: Boolean,
-    val albumArtUri: String? = null
+    val albumArtUri: String? = null,
+    val stableKey: String? = null
 )
+
+object TrackFingerprint {
+    fun stableKey(title: String, artist: String, album: String, durationMs: Long = 0L): String {
+        fun norm(s: String) = s.trim().lowercase().filter { it.isLetterOrDigit() }
+        val durBucket = if (durationMs > 0L) durationMs / 2000L else 0L // tolerate small duration differences
+        return "${'$'}{norm(title)}|${'$'}{norm(artist)}|${'$'}{norm(album)}|${'$'}durBucket"
+    }
+    fun stableKey(track: dev.shephard.player.data.AudioTrack): String =
+        stableKey(track.title, track.artist, track.album, track.durationMs)
+}
 
 enum class StatsPeriod {
     Today, ThisWeek, ThisMonth, ThisYear, AllTime
@@ -126,12 +137,13 @@ object ListenStatsCalculator {
             }
             .sortedByDescending { it.listenedMs }
 
-        val eventsByTrack = periodEvents.groupBy { it.trackId }
+        val eventsByTrack = periodEvents.groupBy { it.stableKey?.takeIf { s -> s.isNotBlank() } ?: it.trackId.toString() }
         val trackEntries = eventsByTrack.entries
-            .map { (trackId, events) ->
+            .map { (key, events) ->
                 val first = events.first()
+                // Preserve original trackId for UI when file still exists, but grouping is stable
                 StatsTrackEntry(
-                    trackId = trackId,
+                    trackId = first.trackId,
                     title = first.title,
                     artistName = first.artist,
                     albumName = first.album,
@@ -157,7 +169,8 @@ object ListenStatsCalculator {
             sb.append("\"timestampMs\":").append(e.timestampMs).append(',')
             sb.append("\"listenedMs\":").append(e.listenedMs).append(',')
             sb.append("\"countsAsPlay\":").append(e.countsAsPlay).append(',')
-            sb.append("\"albumArtUri\":\"").append(jsonEscape(e.albumArtUri ?: "")).append("\"")
+            sb.append("\"albumArtUri\":\"").append(jsonEscape(e.albumArtUri ?: "")).append("\",")
+            sb.append("\"stableKey\":\"").append(jsonEscape(e.stableKey ?: "")).append("\"")
             sb.append('}')
         }
         sb.append(']')
@@ -209,16 +222,22 @@ object ListenStatsCalculator {
             fields[key] = value
             idx = body.indexOf(',', idx).let { if (it == -1) body.length else it + 1 }
         }
+        val title = fields["title"] ?: ""
+        val artist = fields["artist"] ?: ""
+        val album = fields["album"] ?: ""
+        val stableKey = fields["stableKey"]?.takeIf { it.isNotBlank() }
+            ?: TrackFingerprint.stableKey(title, artist, album, 0L)
         return ListenEvent(
             trackId = fields["trackId"]?.toLongOrNull() ?: 0L,
-            title = fields["title"] ?: "",
-            artist = fields["artist"] ?: "",
-            album = fields["album"] ?: "",
+            title = title,
+            artist = artist,
+            album = album,
             dayStartMs = fields["dayStartMs"]?.toLongOrNull() ?: 0L,
             timestampMs = fields["timestampMs"]?.toLongOrNull() ?: 0L,
             listenedMs = fields["listenedMs"]?.toLongOrNull() ?: 0L,
             countsAsPlay = fields["countsAsPlay"] == "true",
-            albumArtUri = fields["albumArtUri"]?.takeIf { it.isNotEmpty() }
+            albumArtUri = fields["albumArtUri"]?.takeIf { it.isNotEmpty() },
+            stableKey = stableKey
         )
     }
 

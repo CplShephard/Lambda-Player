@@ -101,13 +101,7 @@ fun HomeScreenM3(
     val hasScanned by libraryViewModel.hasScanned.collectAsState()
     val recentEvents by playerViewModel.statsEventsFlow.collectAsState()
 
-    var showMinLoading by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        libraryViewModel.ensureTracksLoaded()
-        kotlinx.coroutines.delay(1000)
-        showMinLoading = false
-    }
-    val showLoadingOverlay = showMinLoading || !hasScanned
+    androidx.compose.runtime.LaunchedEffect(Unit) { libraryViewModel.ensureTracksLoaded() }
     val totalListeningMs by playerViewModel.totalListeningMsLive.collectAsState()
 
     val featuredTracks = dev.shephard.player.ui.components.rememberFeaturedTracks(tracks, 10)
@@ -155,7 +149,7 @@ fun HomeScreenM3(
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(
-                                top = padding.calculateTopPadding() + 8.dp,
+                                top = padding.calculateTopPadding() + 4.dp,
                                 bottom = 220.dp
                             ),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -217,13 +211,6 @@ fun HomeScreenM3(
                             }
                         }
                 }
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = showLoadingOverlay,
-                        enter = androidx.compose.animation.fadeIn(),
-                        exit = androidx.compose.animation.fadeOut()
-                    ) {
-                        dev.shephard.player.ui.components.M3LibraryLoadingOverlay()
-                    }
                 }
 }
 

@@ -33,8 +33,11 @@ import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.rememberAudioPermissionState
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import dev.shephard.player.ui.components.miuixHeaderSafeTop
 import dev.shephard.player.ui.components.MiuixSwitcherPills
+import dev.shephard.player.ui.components.LibraryTabsFixedShade
+import dev.shephard.player.ui.components.rememberLibraryTabsBackdrop
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.screens.m3.MusicScreenM3
@@ -77,12 +80,6 @@ fun LibraryScreen(
     val sortDescending by prefs.librarySortDescending.collectAsState(initial = false)
     val folderFilter by prefs.libraryFolderFilter.collectAsState(initial = "")
     val tracks by libraryViewModel.tracks.collectAsState()
-    val hasScanned by libraryViewModel.hasScanned.collectAsState()
-    var showMinLoading by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(1000)
-        showMinLoading = false
-    }
     val state by playerViewModel.uiState.collectAsState()
     // Also reconcile a queue restored after the first library emission.
     val queueIdentity = state.queue.map { it.id to it.uri }
@@ -90,6 +87,9 @@ fun LibraryScreen(
     val permission = rememberAudioPermissionState(onGranted = { libraryViewModel.loadTracks() })
     var pendingDelete by remember { mutableStateOf<android.net.Uri?>(null) }
     var deleteTrack by remember { mutableStateOf<AudioTrack?>(null) }
+    var deleteProgress by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var showDeleteProgress by remember { mutableStateOf(false) }
+    var lastCleanupReport by remember { mutableStateOf<dev.shephard.player.player.PlayerViewModel.OrphanCleanupReport?>(null) }
     val deleteLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         val uri = pendingDelete
         pendingDelete = null
@@ -169,16 +169,23 @@ fun LibraryScreen(
             if (useMiuix) dev.shephard.player.ui.miuix.OutlinedTextField(songSearch, { songSearch = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp), singleLine = true, placeholder = { dev.shephard.player.ui.miuix.Text(strings.search) })
             else OutlinedTextField(songSearch, { songSearch = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp), singleLine = true, label = { Text(strings.search) })
         }
+        // Fixed shade under Library tabs reusing miuix topBar dim (Library has no collapsing bar)
+        val libraryTabsBackdrop = if (useMiuix) rememberLibraryTabsBackdrop() else null
         if (useMiuix) {
-            MiuixSwitcherPills(
-                options = labels,
-                selected = selectedTab,
-                onSelected = { index ->
-                    selectTab(index)
-                },
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                animateSelection = true,
-            )
+            LibraryTabsFixedShade(
+                backdrop = libraryTabsBackdrop,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                MiuixSwitcherPills(
+                    options = labels,
+                    selected = selectedTab,
+                    onSelected = { index ->
+                        selectTab(index)
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    animateSelection = true,
+                )
+            }
         } else {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 labels.forEach { (index, label) ->
@@ -223,7 +230,7 @@ fun LibraryScreen(
         }
         val pagerContent: @Composable () -> Unit = {
             androidx.compose.foundation.pager.HorizontalPager(
-                state = pagerState, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 1
+                state = pagerState, modifier = Modifier.fillMaxSize().then(if (libraryTabsBackdrop != null) Modifier.layerBackdrop(libraryTabsBackdrop) else Modifier), beyondViewportPageCount = 1
             ) { page ->
             when (labels[page].first) {
                 0 -> if (useMiuix) MusicScreen(libraryViewModel, playerViewModel, { list, index -> onTrackClick(list, index, null) }, hasMiniPlayer, filteredSongs, embedded = true)
@@ -335,15 +342,6 @@ if (group == null && displayLayout == dev.shephard.player.player.LayoutMode.GRID
             )
         }
     }
-        // 1s loading overlay — covers the library pager until first scan completes
-        androidx.compose.animation.AnimatedVisibility(
-            visible = showMinLoading || !hasScanned,
-            enter = androidx.compose.animation.fadeIn(),
-            exit = androidx.compose.animation.fadeOut()
-        ) {
-            if (useMiuix) dev.shephard.player.ui.components.MiuixLibraryLoadingOverlay()
-            else dev.shephard.player.ui.components.M3LibraryLoadingOverlay()
-        }
     }
     if (showSelection) LibrarySelectionSheet(tracks, useMiuix, playerViewModel) { showSelection = false }
     deleteTrack?.let { track ->
@@ -375,13 +373,56 @@ if (group == null && displayLayout == dev.shephard.player.player.LayoutMode.GRID
                     }
                 }
         }
+        // Wrapped confirm that first scans DataStore with progress bar to 100% then deletes only GEREKSIZ orphan data
+        val confirmWithScan: () -> Unit = {
+            val trackToDelete = deleteTrack
+            showDeleteProgress = true; deleteProgress = 0
+            scope.launch(Dispatchers.IO) {
+                // progress bar scans DataStore directory while deleting file
+                val ids = tracks.map { it.id.toString() }.toSet().let { if (trackToDelete != null) it - trackToDelete.id.toString() else it }
+                val stableKeys = tracks.filter { it.id != trackToDelete?.id }.map { dev.shephard.player.data.TrackFingerprint.stableKey(it) }.toSet()
+                // show scanningprogress to 100% before actual orphan deletion (as requested: popup with progress bar)
+                for (p in 0..100 step 12) { withContext(Dispatchers.Main) { deleteProgress = p }; kotlinx.coroutines.delay(45) }
+                val report = playerViewModel.scanAndCleanOrphanedData(ids, stableKeys) { p -> scope.launch(Dispatchers.Main) { deleteProgress = p } }
+                withContext(Dispatchers.Main) { lastCleanupReport = report; deleteProgress = 100; showDeleteProgress = false }
+                // now actually delete the music file
+                withContext(Dispatchers.Main) { confirmDelete() }
+            }
+        }
+        if (showDeleteProgress) {
+            if (useMiuix) dev.shephard.player.ui.miuix.MiuixDialog(
+                onDismissRequest = { showDeleteProgress = false },
+                title = "DataStore orphan scan… ${deleteProgress}%",
+                text = {
+                    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                            Box(modifier = Modifier.fillMaxWidth(fraction = deleteProgress/100f).height(10.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.primary))
+                        }
+                        Text(text = "${deleteProgress}% — scanning for GEREKSIZ leftover metadata (listening stats, lyrics…)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+                        if (lastCleanupReport != null) Text(text = lastCleanupReport!!.summary(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 6.dp))
+                        Text(text = "Only orphaned DataStore entries will be removed, music file deletion follows.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=0.7f), modifier = Modifier.padding(top=6.dp))
+                    }
+                },
+                buttons = { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { top.yukonga.miuix.kmp.basic.TextButton(onClick = { showDeleteProgress = false }, text = strings.cancel) } }
+            ) else AlertDialog(
+                onDismissRequest = { showDeleteProgress = false },
+                title = { Text("Scanning… ${deleteProgress}%") },
+                text = {
+                    Column {
+                        LinearProgressIndicator(progress = { deleteProgress/100f }, modifier = Modifier.fillMaxWidth())
+                        Text("${deleteProgress}% — scanning DataStore for orphaned leftover metadata")
+                    }
+                },
+                confirmButton = {}, dismissButton = { TextButton(onClick = { showDeleteProgress = false }) { Text(strings.cancel) } }
+            )
+        }
         if (useMiuix) dev.shephard.player.ui.miuix.MiuixDeleteConfirmationDialog(
             show = true, title = strings.delete, message = strings.deleteTrackConfirm,
             confirmText = strings.delete, cancelText = strings.cancel,
-            onDismiss = { deleteTrack = null }, onConfirm = confirmDelete)
+            onDismiss = { deleteTrack = null }, onConfirm = confirmWithScan)
         else AlertDialog(onDismissRequest = { deleteTrack = null }, title = { Text(strings.delete) },
             text = { Text(strings.deleteTrackConfirm) },
             dismissButton = { TextButton(onClick = { deleteTrack = null }) { Text(strings.cancel) } },
-            confirmButton = { TextButton(onClick = confirmDelete) { Text(strings.delete) } })
+            confirmButton = { TextButton(onClick = confirmWithScan) { Text(strings.delete) } })
     }
 }

@@ -96,6 +96,35 @@ fun Modifier.miuixHeaderSafeTop(): Modifier {
     return this.padding(top = padding).consumeWindowInsets(safeTop)
 }
 
+/**
+ * Fixed shade under Library Songs/Playlists/Albums tabs reusing the miuix topBar dim.
+ * Library has no collapsing top bar, so this provides the same blur/dim as a fixed bar.
+ */
+@Composable
+fun LibraryTabsFixedShade(
+    backdrop: LayerBackdrop?,
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val surface = MiuixAppTheme.colorScheme.background
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (backdrop != null) Modifier.miuixTopBarBlur(backdrop, tintAlpha = 0.48f, tintColor = surface)
+                else Modifier.background(surface)
+            )
+    ) {
+        content()
+    }
+}
+
+@Composable
+fun rememberLibraryTabsBackdrop(): LayerBackdrop? {
+    val blurOn = LocalBlurEnabled.current
+    return rememberMiuixPageBackdrop(blurOn)
+}
+
 /** Translucent dark scrim; when available the captured page is blurred underneath. */
 @Composable
 private fun BoxScope.TopBarBlurBackground(
@@ -269,6 +298,7 @@ fun SubmenuTopBar(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     showStatusBarBackground: Boolean = true,
+    trailingContent: (@Composable () -> Unit)? = null,
 ) {
     val cs = MiuixAppTheme.colorScheme
     val fraction = if (compact) collapseFraction.coerceIn(0f, 1f) else state.collapseFraction
@@ -282,6 +312,15 @@ fun SubmenuTopBar(
                 contentDescription = LocalStrings.current.backContentDescription, tint = cs.onBackground)
         }
     }
+    val trailingIcon: @Composable () -> Unit = {
+        if (trailingContent != null) {
+            Box(
+                modifier = Modifier.padding(end = 12.dp).size(40.dp).clip(CircleShape)
+                    .background(cs.surfaceVariant.copy(alpha = 0.75f * fraction)),
+                contentAlignment = Alignment.Center,
+            ) { trailingContent() }
+        }
+    }
     Box(modifier = modifier.fillMaxWidth()) {
         if (showStatusBarBackground) MiuixStatusBarBackground()
         TopBarBlurBackground(state, fraction, includeStatusBar = true)
@@ -290,6 +329,7 @@ fun SubmenuTopBar(
             SmallTopAppBar(title = title, color = Color.Transparent, titleColor = Color.Transparent,
                 scrollBehavior = state.scrollBehavior, defaultWindowInsetsPadding = false)
             Box(Modifier.align(Alignment.TopStart).height(56.dp), contentAlignment = Alignment.CenterStart) { backIcon() }
+            Box(Modifier.align(Alignment.TopEnd).height(56.dp), contentAlignment = Alignment.CenterEnd) { trailingIcon() }
             Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(56.dp).graphicsLayer { alpha = fraction },
                 contentAlignment = Alignment.Center) {
                 Text(title, color = cs.onBackground, style = MiuixAppTheme.typography.titleMedium,
@@ -301,6 +341,7 @@ fun SubmenuTopBar(
                 scrollBehavior = state.scrollBehavior, defaultWindowInsetsPadding = false)
             MovingMiuixTitle(title, fraction)
             Box(Modifier.align(Alignment.TopStart).height(56.dp), contentAlignment = Alignment.CenterStart) { backIcon() }
+            Box(Modifier.align(Alignment.TopEnd).height(56.dp), contentAlignment = Alignment.CenterEnd) { trailingIcon() }
         }
         }
     }

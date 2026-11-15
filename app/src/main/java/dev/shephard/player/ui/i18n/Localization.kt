@@ -77,10 +77,15 @@ class Strings internal constructor(private val texts: Map<String, String>) {
     val carouselTwoPeek: String get() = texts.getValue("carouselTwoPeek")
     val lyricsShowTranslation: String get() = texts.getValue("lyricsShowTranslation")
     val lyricsHideTranslation: String get() = texts.getValue("lyricsHideTranslation")
+    val lyricsTranslationLanguage: String get() = texts.getValue("lyricsTranslationLanguage")
+    val lyricsTranslationLanguageDescription: String get() = texts.getValue("lyricsTranslationLanguageDescription")
+    val lyricsTranslationOff: String get() = texts.getValue("lyricsTranslationOff")
+    val lyricsTranslationOriginal: String get() = texts.getValue("lyricsTranslationOriginal")
     val lyricsOptions: String get() = texts.getValue("lyricsOptions")
     val lyricsEdit: String get() = texts.getValue("lyricsEdit")
     val lyricsSave: String get() = texts.getValue("lyricsSave")
     val lyricsImport: String get() = texts.getValue("lyricsImport")
+    val lyricsScanStorage: String get() = texts.getValue("lyricsScanStorage")
     val lyricsExport: String get() = texts.getValue("lyricsExport")
     val lyricsCopy: String get() = texts.getValue("lyricsCopy")
     val lyricsSettingsTitle: String get() = texts.getValue("lyricsSettingsTitle")
@@ -251,7 +256,6 @@ class Strings internal constructor(private val texts: Map<String, String>) {
     val dynamicColorDescription: String get() = texts.getValue("dynamicColorDescription")
     val predictiveBackTitle: String get() = texts.getValue("predictiveBackTitle")
     val predictiveBackDescription: String get() = texts.getValue("predictiveBackDescription")
-    val predictiveBackNone: String get() = texts.getValue("predictiveBackNone")
     val predictiveBackAosp: String get() = texts.getValue("predictiveBackAosp")
     val predictiveBackMiuix: String get() = texts.getValue("predictiveBackMiuix")
     val predictiveBackScale: String get() = texts.getValue("predictiveBackScale")
@@ -334,10 +338,19 @@ private fun createEN(): Strings = Strings(mapOf(
     "carouselTwoPeek" to "Both neighboring covers",
     "lyricsShowTranslation" to "Show translation",
     "lyricsHideTranslation" to "Hide translation",
+    "lyricsTranslationLanguage" to "Lyrics translation language",
+    "lyricsTranslationLanguageDescription" to "Show translation under each line in the chosen language (QQ Music style)",
+    "lyricsTranslationOff" to "Off",
+    "lyricsTranslationOriginal" to "Original (from source)",
+    "lyricsShakeEffect" to "Premium shake effect",
+    "lyricsShakeEffectDescription" to "Letters jiggle lightly as lines enter and exit",
+    "lyricsNoteAnimation" to "Music note animation",
+    "lyricsNoteAnimationDescription" to "Show animated notes during instrumental gaps (QQ Music style)",
     "lyricsOptions" to "Lyrics options",
     "lyricsEdit" to "Edit lyrics",
     "lyricsSave" to "Save lyrics",
     "lyricsImport" to "Import lyrics",
+    "lyricsScanStorage" to "Scan storage for .lrc",
     "lyricsExport" to "Export lyrics",
     "lyricsCopy" to "Copy lyrics",
     "lyricsSettingsTitle" to "Lyrics settings",
@@ -386,7 +399,6 @@ private fun createEN(): Strings = Strings(mapOf(
     "dynamicColorDescription" to "Use the system wallpaper colors (Android 12+).",
     "predictiveBackTitle" to "Predictive Back",
     "predictiveBackDescription" to "Choose the back gesture animation.",
-    "predictiveBackNone" to "None",
     "predictiveBackAosp" to "AOSP",
     "predictiveBackMiuix" to "MIUIX",
     "predictiveBackScale" to "Scale",
@@ -609,6 +621,7 @@ private fun createTR(base: Strings): Strings = base.withOverrides(mapOf(
     "lyricsEdit" to "Şarkı sözlerini düzenle",
     "lyricsSave" to "Şarkı sözlerini kaydet",
     "lyricsImport" to "Şarkı sözü içe aktar",
+    "lyricsScanStorage" to "Depolamayı tara (.lrc)",
     "lyricsExport" to "Şarkı sözlerini dışa aktar",
     "lyricsCopy" to "Şarkı sözlerini kopyala",
     "lyricsSettingsTitle" to "Şarkı sözü ayarları",
@@ -779,13 +792,20 @@ private fun createTR(base: Strings): Strings = base.withOverrides(mapOf(
     "dynamicColorDescription" to "Sistem duvar kağıdı renklerini kullan (Android 12+).",
     "removeCoverConfirm" to "Kapak fotoğrafını kaldırmak istediğine emin misin?",
     "removePlaylistConfirm" to "Bu çalma listesini silmek istediğine emin misin?",
-    "predictiveBackNone" to "Yok",
     "lyricsAutoSearchTitle" to "Otomatik lyrics araması",
     "lyricsAutoSearchDescription" to "Bir şarkı başladığında lyrics'in nasıl seçileceğini belirle.",
     "lyricsAutoSearchOff" to "Kapalı",
     "lyricsAutoSearchEmbedded" to "Gömülü öncelikli",
     "lyricsAutoSearchBestMatch" to "En uygun",
     "lyricsAutoSearchOnline" to "Online öncelikli",
+    "lyricsTranslationLanguage" to "Şarkı sözü çeviri dili",
+    "lyricsTranslationLanguageDescription" to "Her satırın altında seçilen dilde çeviriyi göster (QQ Music tarzı)",
+    "lyricsTranslationOff" to "Kapalı",
+    "lyricsTranslationOriginal" to "Orijinal (kaynak)",
+    "lyricsShakeEffect" to "Premium sallanma efekti",
+    "lyricsShakeEffectDescription" to "Satırlar girerken ve çıkarken harfler hafifçe sallansın",
+    "lyricsNoteAnimation" to "Nota animasyonu",
+    "lyricsNoteAnimationDescription" to "Şarkı söylenmeyen kısımlarda nota animasyonu göster (QQ Music tarzı)",
     "volumeNormalizationTitle" to "Ses seviyesi normalizasyonu",
     "volumeNormalizationDescription" to "Şarkılar arasındaki ses seviyesi farkını dengeler.",
     "volumeNormalizationNone" to "Kapalı",
@@ -969,7 +989,6 @@ private fun createZH(base: Strings): Strings = base.withOverrides(mapOf(
     "dynamicColorDescription" to "使用系统壁纸颜色（Android 12 及以上）。",
     "removeCoverConfirm" to "确定要移除封面图片吗？",
     "removePlaylistConfirm" to "确定要删除此播放列表吗？",
-    "predictiveBackNone" to "无",
     "predictiveBackAosp" to "AOSP",
     "predictiveBackMiuix" to "MIUIX",
     "predictiveBackScale" to "缩放",
@@ -1147,7 +1166,6 @@ private fun createES(base: Strings): Strings = base.withOverrides(mapOf(
     "dynamicColorDescription" to "Usar los colores del fondo de pantalla del sistema (Android 12+).",
     "removeCoverConfirm" to "¿Seguro que quieres quitar la foto de portada?",
     "removePlaylistConfirm" to "¿Seguro que quieres eliminar esta lista de reproducción?",
-    "predictiveBackNone" to "Ninguno",
     "predictiveBackAosp" to "AOSP",
     "predictiveBackMiuix" to "MIUIX",
     "predictiveBackScale" to "Escala",
@@ -1325,7 +1343,6 @@ private fun createRU(base: Strings): Strings = base.withOverrides(mapOf(
     "dynamicColorDescription" to "Использовать цвета системных обоев (Android 12+).",
     "removeCoverConfirm" to "Удалить фото обложки?",
     "removePlaylistConfirm" to "Удалить этот плейлист?",
-    "predictiveBackNone" to "Нет",
     "predictiveBackAosp" to "AOSP",
     "predictiveBackMiuix" to "MIUIX",
     "predictiveBackScale" to "Масштаб",
@@ -1503,7 +1520,6 @@ private fun createKA(base: Strings): Strings = base.withOverrides(mapOf(
     "dynamicColorDescription" to "გამოიყენე სისტემის ფონური ფერები (Android 12+).",
     "removeCoverConfirm" to "ნამდვილად გსურს გარეკანის ფოტოს წაშლა?",
     "removePlaylistConfirm" to "ნამდვილად გსურს ამ დასაკრავი სიის წაშლა?",
-    "predictiveBackNone" to "არცერთი",
     "predictiveBackAosp" to "AOSP",
     "predictiveBackMiuix" to "MIUIX",
     "predictiveBackScale" to "მასშტაბი",
@@ -1681,7 +1697,6 @@ private fun createAR(base: Strings): Strings = base.withOverrides(mapOf(
     "dynamicColorDescription" to "استخدم ألوان خلفية النظام (أندرويد 12 وما فوق).",
     "removeCoverConfirm" to "هل أنت متأكد من إزالة صورة الغلاف؟",
     "removePlaylistConfirm" to "هل أنت متأكد من حذف قائمة التشغيل هذه؟",
-    "predictiveBackNone" to "لا شيء",
     "predictiveBackAosp" to "AOSP",
     "predictiveBackMiuix" to "MIUIX",
     "predictiveBackScale" to "تكبير",
