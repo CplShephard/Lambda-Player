@@ -33,8 +33,11 @@ import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.rememberAudioPermissionState
+import top.yukonga.miuix.kmp.blur.layerBackdrop
 import dev.shephard.player.ui.components.miuixHeaderSafeTop
 import dev.shephard.player.ui.components.MiuixSwitcherPills
+import dev.shephard.player.ui.components.LibraryTabsFixedShade
+import dev.shephard.player.ui.components.rememberLibraryTabsBackdrop
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.screens.m3.MusicScreenM3
@@ -77,12 +80,6 @@ fun LibraryScreen(
     val sortDescending by prefs.librarySortDescending.collectAsState(initial = false)
     val folderFilter by prefs.libraryFolderFilter.collectAsState(initial = "")
     val tracks by libraryViewModel.tracks.collectAsState()
-    val hasScanned by libraryViewModel.hasScanned.collectAsState()
-    var showMinLoading by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(1000)
-        showMinLoading = false
-    }
     val state by playerViewModel.uiState.collectAsState()
     // Also reconcile a queue restored after the first library emission.
     val queueIdentity = state.queue.map { it.id to it.uri }
@@ -169,16 +166,23 @@ fun LibraryScreen(
             if (useMiuix) dev.shephard.player.ui.miuix.OutlinedTextField(songSearch, { songSearch = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp), singleLine = true, placeholder = { dev.shephard.player.ui.miuix.Text(strings.search) })
             else OutlinedTextField(songSearch, { songSearch = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp), singleLine = true, label = { Text(strings.search) })
         }
+        // Fixed shade under Library tabs reusing miuix topBar dim (Library has no collapsing bar)
+        val libraryTabsBackdrop = if (useMiuix) rememberLibraryTabsBackdrop() else null
         if (useMiuix) {
-            MiuixSwitcherPills(
-                options = labels,
-                selected = selectedTab,
-                onSelected = { index ->
-                    selectTab(index)
-                },
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                animateSelection = true,
-            )
+            LibraryTabsFixedShade(
+                backdrop = libraryTabsBackdrop,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                MiuixSwitcherPills(
+                    options = labels,
+                    selected = selectedTab,
+                    onSelected = { index ->
+                        selectTab(index)
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    animateSelection = true,
+                )
+            }
         } else {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 labels.forEach { (index, label) ->
@@ -223,7 +227,7 @@ fun LibraryScreen(
         }
         val pagerContent: @Composable () -> Unit = {
             androidx.compose.foundation.pager.HorizontalPager(
-                state = pagerState, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 1
+                state = pagerState, modifier = Modifier.fillMaxSize().then(if (libraryTabsBackdrop != null) Modifier.layerBackdrop(libraryTabsBackdrop) else Modifier), beyondViewportPageCount = 1
             ) { page ->
             when (labels[page].first) {
                 0 -> if (useMiuix) MusicScreen(libraryViewModel, playerViewModel, { list, index -> onTrackClick(list, index, null) }, hasMiniPlayer, filteredSongs, embedded = true)
@@ -335,15 +339,6 @@ if (group == null && displayLayout == dev.shephard.player.player.LayoutMode.GRID
             )
         }
     }
-        // 1s loading overlay — covers the library pager until first scan completes
-        androidx.compose.animation.AnimatedVisibility(
-            visible = showMinLoading || !hasScanned,
-            enter = androidx.compose.animation.fadeIn(),
-            exit = androidx.compose.animation.fadeOut()
-        ) {
-            if (useMiuix) dev.shephard.player.ui.components.MiuixLibraryLoadingOverlay()
-            else dev.shephard.player.ui.components.M3LibraryLoadingOverlay()
-        }
     }
     if (showSelection) LibrarySelectionSheet(tracks, useMiuix, playerViewModel) { showSelection = false }
     deleteTrack?.let { track ->

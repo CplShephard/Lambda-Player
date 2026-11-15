@@ -19,8 +19,6 @@ private val Context.dataStore by preferencesDataStore(name = "lambda_player_pref
 
 object PrefsKeys {
     val CROSSFADE_ENABLED = booleanPreferencesKey("crossfade_enabled")
-    val ONLINE_MODE_ENABLED = booleanPreferencesKey("online_mode_enabled")
-    val EXTENSION_REGISTRY_URL = stringPreferencesKey("extension_registry_url")
     val GAPLESS_ENABLED = booleanPreferencesKey("gapless_enabled")
     val LYRICS_AUTO_SEARCH_MODE = stringPreferencesKey("lyrics_auto_search_mode")
     val LYRICS_ONLINE_OPENED_TRACK_IDS = stringPreferencesKey("lyrics_online_opened_track_ids")
@@ -607,24 +605,4 @@ class PreferencesManager(private val context: Context) {
         context.dataStore.edit { it[PrefsKeys.LISTEN_STATS_EVENTS_JSON] = json }
     }
 
-    val onlineModeEnabled: Flow<Boolean> = context.dataStore.data.map {
-        it[PrefsKeys.ONLINE_MODE_ENABLED] ?: false
-    }
-
-    suspend fun setOnlineModeEnabled(enabled: Boolean) {
-        context.getSharedPreferences("lambda_online_gate", Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean("online_mode_enabled", enabled)
-            .apply()
-        context.dataStore.edit { it[PrefsKeys.ONLINE_MODE_ENABLED] = enabled }
-    }
-
-    val extensionRegistryUrl: Flow<String> = context.dataStore.data.map {
-        it[PrefsKeys.EXTENSION_REGISTRY_URL]
-            ?: dev.shephard.player.extension.ExtensionManager.DEFAULT_REGISTRY_URL
-    }
-
-    suspend fun setExtensionRegistryUrl(url: String) {
-        context.dataStore.edit { it[PrefsKeys.EXTENSION_REGISTRY_URL] = url }
-    }
 }

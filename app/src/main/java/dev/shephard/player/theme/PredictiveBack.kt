@@ -7,7 +7,6 @@ package dev.shephard.player.theme
  * `PredictiveBackAnimation` model so both UI engines can share the setting.
  */
 enum class PredictiveBackAnimation(val value: String, val displayName: String) {
-    NONE("none", "None"),
     AOSP("aosp", "AOSP"),
     MIUIX("miuix", "MIUIX"),
     CLASSIC("ksu_classic", "Classic"),

@@ -8,7 +8,6 @@ import top.yukonga.miuix.kmp.nav.transition.NavTransition
 import top.yukonga.miuix.kmp.nav.transition.NavTransitions
 
 fun installerNavTransition(animation: PredictiveBackAnimation, exitDirection: PredictiveBackExitDirection): NavTransition = when (animation) {
-    PredictiveBackAnimation.NONE -> NoPredictiveBackTransition
     PredictiveBackAnimation.MIUIX -> NavTransitions.MiuixDefault
     PredictiveBackAnimation.AOSP -> AospNavTransition
     PredictiveBackAnimation.SCALE -> scaleNavTransition(exitDirection)

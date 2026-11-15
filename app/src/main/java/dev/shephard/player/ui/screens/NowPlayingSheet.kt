@@ -101,6 +101,7 @@ import coil.compose.AsyncImagePainter
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import dev.shephard.player.data.AudioTrack
+import dev.shephard.player.player.ImagePersistence
 import dev.shephard.player.data.formattedDuration
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
@@ -126,10 +127,16 @@ fun NowPlayingSheet(
     val state by playerViewModel.uiState.collectAsState()
     val navigationDirection by playerViewModel.navigationDirection.collectAsState()
     val pendingCarouselIndex by playerViewModel.pendingCarouselIndex.collectAsState()
+    val context = LocalContext.current
     val track = state.currentTrack
     val strings = LocalStrings.current
     val nowPlayingLiquidGlassOn = LocalBlurEnabled.current
-    val context = LocalContext.current
+    // Detect gif/mp4 cover (override coverUri or track uri) for miuix handling
+    val isAnimatedCover = remember(track?.albumArtUri) {
+        track?.albumArtUri?.let { uri ->
+            ImagePersistence.isAnimatedCover(context, uri)
+        } ?: false
+    }
     val carouselPrefs = remember(context) { PreferencesManager(context) }
     val carouselStyle by carouselPrefs.carouselStyle.collectAsState(initial = dev.shephard.player.player.CarouselStyle.NO_PEEK)
 
@@ -270,7 +277,7 @@ onDismiss()
             )
     ) {
 
-AmbientGlowBackground(track = track, isPlaying = state.isPlaying)
+AmbientGlowBackground(track = track, isPlaying = state.isPlaying, isAnimated = isAnimatedCover)
 
 Column(
             modifier = Modifier
@@ -508,7 +515,8 @@ SeekBarRow(playerViewModel = playerViewModel)
 @Composable
 private fun AmbientGlowBackground(
     track: AudioTrack?,
-    isPlaying: Boolean
+    isPlaying: Boolean,
+    isAnimated: Boolean = false
 ) {
     val darkOverlayAlpha by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (isPlaying) 0.35f else 0.68f,
@@ -516,33 +524,42 @@ private fun AmbientGlowBackground(
         label = "darkOverlayAlpha"
     )
     Box(modifier = Modifier.fillMaxSize()) {
-        androidx.compose.animation.Crossfade(
-            targetState = track?.albumArtUri,
-            animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 720,
-                easing = androidx.compose.animation.core.FastOutSlowInEasing
-            ),
-            label = "ambientAlbumArtFade"
-        ) { artUri ->
-            if (artUri != null) {
-                AsyncImage(
-                    model = artUri,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { scaleX = 1.15f; scaleY = 1.15f }
-                        .blur(radius = 60.dp),
-                    colorFilter = ColorFilter.colorMatrix(
-                        ColorMatrix().apply { setToSaturation(1.35f) }
+        // For animated gif/mp4 covers, show only cover animation with no blurred background
+        if (isAnimated) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MiuixAppTheme.colorScheme.background)
+            )
+        } else {
+            androidx.compose.animation.Crossfade(
+                targetState = track?.albumArtUri,
+                animationSpec = androidx.compose.animation.core.tween(
+                    durationMillis = 720,
+                    easing = androidx.compose.animation.core.FastOutSlowInEasing
+                ),
+                label = "ambientAlbumArtFade"
+            ) { artUri ->
+                if (artUri != null) {
+                    AsyncImage(
+                        model = artUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { scaleX = 1.15f; scaleY = 1.15f }
+                            .blur(radius = 60.dp),
+                        colorFilter = ColorFilter.colorMatrix(
+                            ColorMatrix().apply { setToSaturation(1.35f) }
+                        )
                     )
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MiuixAppTheme.colorScheme.surfaceVariant)
-                )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                    )
+                }
             }
         }
         Box(

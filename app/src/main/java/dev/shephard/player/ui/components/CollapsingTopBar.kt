@@ -96,6 +96,35 @@ fun Modifier.miuixHeaderSafeTop(): Modifier {
     return this.padding(top = padding).consumeWindowInsets(safeTop)
 }
 
+/**
+ * Fixed shade under Library Songs/Playlists/Albums tabs reusing the miuix topBar dim.
+ * Library has no collapsing top bar, so this provides the same blur/dim as a fixed bar.
+ */
+@Composable
+fun LibraryTabsFixedShade(
+    backdrop: LayerBackdrop?,
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val surface = MiuixAppTheme.colorScheme.background
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (backdrop != null) Modifier.miuixTopBarBlur(backdrop, tintAlpha = 0.48f, tintColor = surface)
+                else Modifier.background(surface)
+            )
+    ) {
+        content()
+    }
+}
+
+@Composable
+fun rememberLibraryTabsBackdrop(): LayerBackdrop? {
+    val blurOn = LocalBlurEnabled.current
+    return rememberMiuixPageBackdrop(blurOn)
+}
+
 /** Translucent dark scrim; when available the captured page is blurred underneath. */
 @Composable
 private fun BoxScope.TopBarBlurBackground(

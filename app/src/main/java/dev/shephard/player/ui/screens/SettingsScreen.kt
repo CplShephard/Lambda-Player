@@ -44,7 +44,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
@@ -120,7 +119,6 @@ fun SettingsScreen(
     playerViewModel: PlayerViewModel = viewModel(),
     onOpenThemeSettings: () -> Unit = {},
     onOpenPlayerSettings: () -> Unit = {},
-    onOpenOnlineMode: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     onOpenStats: () -> Unit = {}
 ) {
@@ -164,12 +162,6 @@ fun SettingsScreen(
                     title = strings.playbackSettings,
                     summary = strings.playbackSettingsSummary,
                     onClick = onOpenPlayerSettings
-                )
-                SettingsNavigationCard(
-                    icon = Icons.Filled.Explore,
-                    title = "Online Mod",
-                    summary = "Extensionlar ve Discover sekmesi",
-                    onClick = onOpenOnlineMode
                 )
                 SettingsNavigationCard(
                     icon = Icons.Filled.Info,
@@ -461,7 +453,6 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             )
             SectionCard(contentPadding = PaddingValues(0.dp)) {
                 val predictiveBackOptions = listOf(
-                    PredictiveBackAnimation.NONE to strings.predictiveBackNone,
                     PredictiveBackAnimation.AOSP to strings.predictiveBackAosp,
                     PredictiveBackAnimation.MIUIX to strings.predictiveBackMiuix,
                     PredictiveBackAnimation.CLASSIC to strings.predictiveBackClassic,

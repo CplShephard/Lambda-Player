@@ -132,9 +132,11 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.LyricsSearchResult
+import dev.shephard.player.player.ImagePersistence
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.SyncedLyricLine
+import dev.shephard.player.ui.components.rememberStaticArtwork
 import dev.shephard.player.ui.util.rememberDeviceCornerRadius
 import dev.shephard.player.ui.util.TrackOverlayForBack
 import androidx.navigationevent.NavigationEventInfo
@@ -185,6 +187,10 @@ fun FullScreenLyricsExperience(
     val searchListState = rememberLazyListState()
 
     val track = state.currentTrack
+    // Detect animated cover to freeze animation in lyrics (avoid jank)
+    val isAnimatedCover = remember(track?.albumArtUri) {
+        track?.albumArtUri?.let { uri -> ImagePersistence.isAnimatedCover(context, uri) } ?: false
+    }
     val primary = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
     val textStyle = if (useMiuix) MiuixAppTheme.typography.bodyMedium else MaterialTheme.typography.bodyMedium
     val titleStyle = if (useMiuix) MiuixAppTheme.typography.titleLarge else MaterialTheme.typography.titleLarge
@@ -457,13 +463,14 @@ fun FullScreenLyricsExperience(
                     }
             ) {
                 if (useMiuix) {
+                    // Freeze animated gif/mp4 covers in lyrics to avoid jank
                     Crossfade(
                         targetState = track?.albumArtUri,
                         animationSpec = tween(durationMillis = 650),
                         label = "lyricsBackdropCrossfade",
                         modifier = Modifier.fillMaxSize(),
                     ) { artUri ->
-                        if (artUri != null && blurEnabled && blurStrength > 0f) {
+                        if (artUri != null && !isAnimatedCover && blurEnabled && blurStrength > 0f) {
                             AsyncImage(
                                 model = artUri,
                                 contentDescription = null,
@@ -473,6 +480,14 @@ fun FullScreenLyricsExperience(
                                     .blur(blurStrength.dp),
                                 contentScale = ContentScale.Crop,
                                 colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.2f) }),
+                            )
+                        } else if (artUri != null && isAnimatedCover) {
+                            // Frozen frame for animated covers
+                            AsyncImage(
+                                model = rememberStaticArtwork(artUri),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
                             )
                         } else if (artUri != null) {
                             AsyncImage(

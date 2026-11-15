@@ -134,10 +134,6 @@ dependencies {
 
     implementation("net.jthink:jaudiotagger:3.0.1")
 
-    // Extension engine (QuickJS) & HTTP client for Mornye-compatible .sflx extensions
-    implementation("io.github.dokar3:quickjs-kt:1.0.0-alpha13")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

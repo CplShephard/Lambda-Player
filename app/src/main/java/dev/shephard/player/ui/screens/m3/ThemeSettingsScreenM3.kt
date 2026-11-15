@@ -306,7 +306,6 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
 }
 
 private fun predictiveBackDisplayName(animation: PredictiveBackAnimation, strings: dev.shephard.player.ui.i18n.Strings): String = when (animation) {
-    PredictiveBackAnimation.NONE -> strings.predictiveBackNone
     PredictiveBackAnimation.AOSP -> strings.predictiveBackAosp
     PredictiveBackAnimation.MIUIX -> strings.predictiveBackMiuix
     PredictiveBackAnimation.CLASSIC -> strings.predictiveBackClassic

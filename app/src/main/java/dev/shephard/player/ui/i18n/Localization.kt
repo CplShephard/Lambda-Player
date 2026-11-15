@@ -251,7 +251,6 @@ class Strings internal constructor(private val texts: Map<String, String>) {
     val dynamicColorDescription: String get() = texts.getValue("dynamicColorDescription")
     val predictiveBackTitle: String get() = texts.getValue("predictiveBackTitle")
     val predictiveBackDescription: String get() = texts.getValue("predictiveBackDescription")
-    val predictiveBackNone: String get() = texts.getValue("predictiveBackNone")
     val predictiveBackAosp: String get() = texts.getValue("predictiveBackAosp")
     val predictiveBackMiuix: String get() = texts.getValue("predictiveBackMiuix")
     val predictiveBackScale: String get() = texts.getValue("predictiveBackScale")
@@ -386,7 +385,6 @@ private fun createEN(): Strings = Strings(mapOf(
     "dynamicColorDescription" to "Use the system wallpaper colors (Android 12+).",
     "predictiveBackTitle" to "Predictive Back",
     "predictiveBackDescription" to "Choose the back gesture animation.",
-    "predictiveBackNone" to "None",
     "predictiveBackAosp" to "AOSP",
     "predictiveBackMiuix" to "MIUIX",
     "predictiveBackScale" to "Scale",
@@ -779,7 +777,6 @@ private fun createTR(base: Strings): Strings = base.withOverrides(mapOf(
     "dynamicColorDescription" to "Sistem duvar kağıdı renklerini kullan (Android 12+).",
     "removeCoverConfirm" to "Kapak fotoğrafını kaldırmak istediğine emin misin?",
     "removePlaylistConfirm" to "Bu çalma listesini silmek istediğine emin misin?",
-    "predictiveBackNone" to "Yok",
     "lyricsAutoSearchTitle" to "Otomatik lyrics araması",
     "lyricsAutoSearchDescription" to "Bir şarkı başladığında lyrics'in nasıl seçileceğini belirle.",
     "lyricsAutoSearchOff" to "Kapalı",
@@ -969,7 +966,6 @@ private fun createZH(base: Strings): Strings = base.withOverrides(mapOf(
     "dynamicColorDescription" to "使用系统壁纸颜色（Android 12 及以上）。",
     "removeCoverConfirm" to "确定要移除封面图片吗？",
     "removePlaylistConfirm" to "确定要删除此播放列表吗？",
-    "predictiveBackNone" to "无",
     "predictiveBackAosp" to "AOSP",
     "predictiveBackMiuix" to "MIUIX",
     "predictiveBackScale" to "缩放",
@@ -1147,7 +1143,6 @@ private fun createES(base: Strings): Strings = base.withOverrides(mapOf(
     "dynamicColorDescription" to "Usar los colores del fondo de pantalla del sistema (Android 12+).",
     "removeCoverConfirm" to "¿Seguro que quieres quitar la foto de portada?",
     "removePlaylistConfirm" to "¿Seguro que quieres eliminar esta lista de reproducción?",
-    "predictiveBackNone" to "Ninguno",
     "predictiveBackAosp" to "AOSP",
     "predictiveBackMiuix" to "MIUIX",
     "predictiveBackScale" to "Escala",
@@ -1325,7 +1320,6 @@ private fun createRU(base: Strings): Strings = base.withOverrides(mapOf(
     "dynamicColorDescription" to "Использовать цвета системных обоев (Android 12+).",
     "removeCoverConfirm" to "Удалить фото обложки?",
     "removePlaylistConfirm" to "Удалить этот плейлист?",
-    "predictiveBackNone" to "Нет",
     "predictiveBackAosp" to "AOSP",
     "predictiveBackMiuix" to "MIUIX",
     "predictiveBackScale" to "Масштаб",
@@ -1503,7 +1497,6 @@ private fun createKA(base: Strings): Strings = base.withOverrides(mapOf(
     "dynamicColorDescription" to "გამოიყენე სისტემის ფონური ფერები (Android 12+).",
     "removeCoverConfirm" to "ნამდვილად გსურს გარეკანის ფოტოს წაშლა?",
     "removePlaylistConfirm" to "ნამდვილად გსურს ამ დასაკრავი სიის წაშლა?",
-    "predictiveBackNone" to "არცერთი",
     "predictiveBackAosp" to "AOSP",
     "predictiveBackMiuix" to "MIUIX",
     "predictiveBackScale" to "მასშტაბი",
@@ -1681,7 +1674,6 @@ private fun createAR(base: Strings): Strings = base.withOverrides(mapOf(
     "dynamicColorDescription" to "استخدم ألوان خلفية النظام (أندرويد 12 وما فوق).",
     "removeCoverConfirm" to "هل أنت متأكد من إزالة صورة الغلاف؟",
     "removePlaylistConfirm" to "هل أنت متأكد من حذف قائمة التشغيل هذه؟",
-    "predictiveBackNone" to "لا شيء",
     "predictiveBackAosp" to "AOSP",
     "predictiveBackMiuix" to "MIUIX",
     "predictiveBackScale" to "تكبير",

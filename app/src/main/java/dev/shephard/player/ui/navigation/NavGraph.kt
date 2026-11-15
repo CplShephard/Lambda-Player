@@ -51,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -78,18 +79,12 @@ import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.isLiquidGlassSupported
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
-import dev.shephard.player.extension.ExtensionDownloadManager
-import dev.shephard.player.extension.ExtensionManager
 import dev.shephard.player.ui.screens.AboutSettingsScreen
 import dev.shephard.player.ui.screens.m3.AboutSettingsScreenM3
 import dev.shephard.player.ui.screens.HomeScreen
 import dev.shephard.player.ui.screens.m3.HomeScreenM3
 import dev.shephard.player.ui.screens.MusicScreen
 import dev.shephard.player.ui.screens.m3.MusicScreenM3
-import dev.shephard.player.ui.screens.ExtensionSearchScreen
-import dev.shephard.player.ui.screens.OnlineModeSettingsScreen
-import dev.shephard.player.ui.screens.m3.ExtensionSearchScreenM3
-import dev.shephard.player.ui.screens.m3.OnlineModeSettingsScreenM3
 import dev.shephard.player.ui.screens.PlayerSettingsScreen
 import dev.shephard.player.ui.screens.m3.PlayerSettingsScreenM3
 import dev.shephard.player.ui.screens.PlaylistDetailScreen
@@ -123,7 +118,6 @@ import top.yukonga.miuix.kmp.blur.textureBlur
 data object MainRoute : NavKey
 data object ThemeRoute : NavKey
 data object PlayerRoute : NavKey
-data object OnlineModeRoute : NavKey
 data object AboutRoute : NavKey
 data object StatsRoute : NavKey
 
@@ -141,7 +135,6 @@ fun NavGraph(
     useMiuix: Boolean = true,
     preferences: PreferencesManager,
     mainPagerState: MainPagerState,
-    activeDestinations: List<Destination> = bottomNavDestinations,
     onOpenNowPlaying: () -> Unit = {},
     onMiniPlayerBoundsChanged: (androidx.compose.ui.geometry.Rect) -> Unit = {},
     onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
@@ -149,11 +142,8 @@ fun NavGraph(
 ) {
     val predictiveBackAnimation by preferences.predictiveBackAnimation
         .collectAsState(initial = PredictiveBackAnimation.MIUIX)
-    // MIUIX always exits to the right; every other style follows the gesture.
     val predictiveBackExitDirection = effectiveExitDirection(predictiveBackAnimation)
 
-    // Same wiring as InstallerX Revived: the transition decides how pages move while NavDisplay
-    // drives the back gesture. The same transitions are used by both the Material 3 and MIUIX UI.
     val transition = remember(predictiveBackAnimation, predictiveBackExitDirection) {
         installerNavTransition(
             animation = predictiveBackAnimation,
@@ -164,21 +154,24 @@ fun NavGraph(
         LayoutDirection.Rtl -> NavSwipeDirection.RightToLeft
         else -> NavSwipeDirection.LeftToRight
     }
-    // NONE: no predictive preview. Each entry takes the gesture itself and pops normally.
-    val interceptPredictiveBack =
-        predictiveBackAnimation == PredictiveBackAnimation.NONE && backStack.size > 1
+    // NONE animation removed: no predictive interception needed
+    val interceptPredictiveBack = false
 
     val roundAllCorners = predictiveBackAnimation == PredictiveBackAnimation.AOSP ||
         predictiveBackAnimation == PredictiveBackAnimation.SCALE ||
         predictiveBackAnimation == PredictiveBackAnimation.CLASSIC
-    val backdropColor = if (useMiuix) {
-        MiuixAppTheme.colorScheme.background
+    // Classic uses solid black/white per theme (not transparent)
+    val isDarkThemeForBackdrop = if (useMiuix) {
+        MiuixAppTheme.colorScheme.background.luminance() < 0.5f
     } else {
-        MaterialTheme.colorScheme.surfaceContainer
+        MaterialTheme.colorScheme.surface.luminance() < 0.5f
     }
-    // Same rule as InstallerX: clip to the device corner radius (Leading), or 32dp when every
-    // corner is rounded and the device reports no radius (All). Without this the Miuix submenus
-    // had square corners because Leading mode clipped at 0dp.
+    val backdropColor = when {
+        predictiveBackAnimation == PredictiveBackAnimation.CLASSIC ->
+            if (isDarkThemeForBackdrop) Color.Black else Color.White
+        useMiuix -> MiuixAppTheme.colorScheme.background
+        else -> MaterialTheme.colorScheme.surfaceContainer
+    }
     val navCornerRadius = rememberDeviceCornerRadius()
     val effects = remember(roundAllCorners, backdropColor, navCornerRadius) {
         NavDisplayEffects(
@@ -194,7 +187,6 @@ fun NavGraph(
     val lastPopTime = remember { mutableLongStateOf(0L) }
 
     fun pop() {
-        // NavDisplay and the entry-level handler can both report one back press; ignore the echo.
         val now = System.currentTimeMillis()
         if (now - lastPopTime.longValue < 100L) return
         if (backStack.size <= 1) return
@@ -203,16 +195,13 @@ fun NavGraph(
     }
 
     fun push(route: NavKey) {
-        // Guard against duplicate pushes from rapid taps on a settings card.
-        // Avoid adding the same entry more than once on rapid taps.
         if (backStack.lastOrNull() == route) return
         backStack.add(route)
     }
 
     val overlayHeight = remember { mutableStateOf(0.dp) }
     val overlayDensity = LocalDensity.current
-    // DSL block for NavDisplay (the public overload). entryProvider() itself is internal in miuix-nav.
-    val entryContent = remember(backStack, useMiuix, swipeBackDirection, interceptPredictiveBack, activeDestinations) {
+    val entryContent = remember(backStack, useMiuix, swipeBackDirection, interceptPredictiveBack) {
         val block: NavEntryBuilder.() -> Unit = {
             entry<MainRoute> {
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
@@ -230,33 +219,9 @@ fun NavGraph(
                                 state = mainPagerState.pagerState,
                                 beyondViewportPageCount = 1,
                             ) { page ->
-                                val dest = activeDestinations.getOrNull(page) ?: return@HorizontalPager
                                 Box(modifier = Modifier.fillMaxSize()) {
-                                    when (dest) {
-                                        Destination.Discover -> {
-                                            val ctx = androidx.compose.ui.platform.LocalContext.current
-                                            val extManager = remember { ExtensionManager(ctx) }
-                                            val dlManager = remember { ExtensionDownloadManager(ctx, extManager) }
-                                            val libVm: dev.shephard.player.player.LibraryViewModel = viewModel()
-                                            if (useMiuix) {
-                                                dev.shephard.player.ui.screens.ExtensionSearchScreen(
-                                                    extensionManager = extManager,
-                                                    downloadManager = dlManager,
-                                                    onLibraryRefresh = { libVm.loadTracks() },
-                                                    onBack = {},
-                                                    showBack = false
-                                                )
-                                            } else {
-                                                dev.shephard.player.ui.screens.m3.ExtensionSearchScreenM3(
-                                                    extensionManager = extManager,
-                                                    downloadManager = dlManager,
-                                                    onLibraryRefresh = { libVm.loadTracks() },
-                                                    onBack = {},
-                                                    showBack = false
-                                                )
-                                            }
-                                        }
-                                        Destination.Home -> if (useMiuix) {
+                                    when (page) {
+                                        0 -> if (useMiuix) {
                                             HomeScreen(
                                                 libraryViewModel = viewModel(),
                                                 playerViewModel = playerViewModel,
@@ -275,7 +240,7 @@ fun NavGraph(
                                                 onOpenStats = { push(StatsRoute) },
                                             )
                                         }
-                                        Destination.Library -> dev.shephard.player.ui.screens.LibraryScreen(
+                                        1 -> dev.shephard.player.ui.screens.LibraryScreen(
                                             useMiuix = useMiuix,
                                             libraryViewModel = viewModel(),
                                             playerViewModel = playerViewModel,
@@ -285,12 +250,11 @@ fun NavGraph(
                                             onOpenPlaylistDetail = { push(PlaylistDetailRoute(it)) },
                                             onOpenAlbumDetail = { id, album, artist -> push(AlbumDetailRoute(id, album, artist)) },
                                         )
-                                        Destination.Settings -> if (useMiuix) {
+                                        2 -> if (useMiuix) {
                                             SettingsScreen(
                                                 playerViewModel = playerViewModel,
                                                 onOpenThemeSettings = { push(ThemeRoute) },
                                                 onOpenPlayerSettings = { push(PlayerRoute) },
-                                                onOpenOnlineMode = { push(OnlineModeRoute) },
                                                 onOpenAbout = { push(AboutRoute) },
                                                 onOpenStats = { push(StatsRoute) },
                                             )
@@ -299,7 +263,6 @@ fun NavGraph(
                                                 playerViewModel = playerViewModel,
                                                 onOpenThemeSettings = { push(ThemeRoute) },
                                                 onOpenPlayerSettings = { push(PlayerRoute) },
-                                                onOpenOnlineMode = { push(OnlineModeRoute) },
                                                 onOpenAbout = { push(AboutRoute) },
                                                 onOpenStats = { push(StatsRoute) },
                                             )
@@ -358,26 +321,6 @@ fun NavGraph(
                     }
                 }
             }
-            entry<OnlineModeRoute>(swipeDismiss = swipeBackDirection) {
-                NavEntryBackHandler(interceptPredictiveBack, ::pop) {
-                    val context = androidx.compose.ui.platform.LocalContext.current
-                    val extManager = remember { ExtensionManager(context) }
-                    val prefsManager = remember { dev.shephard.player.player.PreferencesManager(context) }
-                    if (useMiuix) {
-                        OnlineModeSettingsScreen(
-                            preferencesManager = prefsManager,
-                            extensionManager = extManager,
-                            onBack = ::pop
-                        )
-                    } else {
-                        OnlineModeSettingsScreenM3(
-                            preferencesManager = prefsManager,
-                            extensionManager = extManager,
-                            onBack = ::pop
-                        )
-                    }
-                }
-            }
             entry<AboutRoute>(swipeDismiss = swipeBackDirection) {
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
                     if (useMiuix) {
@@ -406,8 +349,6 @@ fun NavGraph(
             }
             entry<PlaylistDetailRoute>(swipeDismiss = swipeBackDirection) { route ->
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
-                    // Record this submenu only; the mini player itself stays outside the
-                    // recording to avoid sampling the underlying main pager or itself.
                     val detailBackdrop = dev.shephard.player.ui.glass.rememberAppBlurBackdrop(LocalBlurEnabled.current)
                     Box(Modifier.fillMaxSize()) {
                     Box(Modifier.fillMaxSize().then(if (detailBackdrop != null) Modifier.layerBackdrop(detailBackdrop) else Modifier)) {
@@ -467,38 +408,22 @@ private fun MainDock(
     selectedIndex: () -> Int,
     onSelected: (Int) -> Unit,
 ) {
-    // FIX: preload floating-bar toggle synchronously — otherwise Miuix floating dock flashes from hidden to visible for 1 frame on launch
     val initialAppleStyle = androidx.compose.runtime.remember { kotlinx.coroutines.runBlocking { preferences.useAppleFloatingBar.first() } }
     val appleStyle by preferences.useAppleFloatingBar.collectAsState(initial = initialAppleStyle)
-    // Online Mode controls 4th tab (Discover)
-    val initialOnlineEnabled = androidx.compose.runtime.remember { kotlinx.coroutines.runBlocking { preferences.onlineModeEnabled.first() } }
-    val onlineEnabled by preferences.onlineModeEnabled.collectAsState(initial = initialOnlineEnabled)
-    val activeDestinations = remember(onlineEnabled) { activeBottomNavDestinations(onlineEnabled) }
     when {
         appleStyle && useMiuix -> AppleFloatingDock(
-            activeDestinations = activeDestinations,
             useMiuix = true,
             selectedIndex = selectedIndex,
             onSelected = onSelected,
         )
-        !useMiuix -> M3NavigationDock(
-            preferences = preferences,
-            activeDestinations = activeDestinations,
-            selectedIndex = selectedIndex,
-            onSelected = onSelected
-        )
-        else -> MiuixNavigationDock(
-            activeDestinations = activeDestinations,
-            selectedIndex = selectedIndex,
-            onSelected = onSelected
-        )
+        !useMiuix -> M3NavigationDock(preferences = preferences, selectedIndex = selectedIndex, onSelected = onSelected)
+        else -> MiuixNavigationDock(selectedIndex = selectedIndex, onSelected = onSelected)
     }
 }
 
 @Composable
 private fun M3NavigationDock(
     preferences: PreferencesManager,
-    activeDestinations: List<Destination> = bottomNavDestinations,
     selectedIndex: () -> Int,
     onSelected: (Int) -> Unit,
 ) {
@@ -515,9 +440,8 @@ private fun M3NavigationDock(
         windowInsets = insets,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) {
-        activeDestinations.forEachIndexed { index, dest ->
+        bottomNavDestinations.forEachIndexed { index, dest ->
             val label = when (dest) {
-                Destination.Discover -> "Discover"
                 Destination.Home -> strings.home
                 Destination.Library -> strings.library
                 Destination.Settings -> strings.settings
@@ -545,7 +469,6 @@ private fun M3NavigationDock(
 
 @Composable
 private fun MiuixNavigationDock(
-    activeDestinations: List<Destination> = bottomNavDestinations,
     selectedIndex: () -> Int,
     onSelected: (Int) -> Unit,
 ) {
@@ -554,31 +477,55 @@ private fun MiuixNavigationDock(
     val blurActive = blurOn && backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixAppTheme.colorScheme.surface
     val strings = LocalStrings.current
+    val density = LocalDensity.current
+    var dockHeight by remember { androidx.compose.runtime.mutableStateOf(0.dp) }
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // Reduced blur for the half-dock bottom dim (as per spec: from half-dock to bottom, reduced effect)
+    val reducedBlurModifier = if (blurActive && backdrop != null) {
+        Modifier.miuixBlurSurface(
+            backdrop = backdrop,
+            shape = RectangleShape,
+            blurRadius = 12f,
+            tintAlpha = 0.45f,
+            fallbackColor = MiuixAppTheme.colorScheme.surface.copy(alpha = 0.92f)
+        )
+    } else Modifier.background(barColor.copy(alpha = 0.96f))
 
-    Box(
-        modifier = Modifier
-            .then(
-                if (blurActive && backdrop != null) {
-                    Modifier.miuixBlurSurface(backdrop = backdrop, shape = RectangleShape, blurRadius = 25f, tintAlpha = .8f,
-                        fallbackColor = MiuixAppTheme.colorScheme.surface)
-                } else Modifier
-            )
-            .background(barColor)
-    ) {
-        NavigationBar(color = barColor) {
-            activeDestinations.forEachIndexed { index, dest ->
-                val label = when (dest) {
-                    Destination.Discover -> "Discover"
-                    Destination.Home -> strings.home
-                    Destination.Library -> strings.library
-                    Destination.Settings -> strings.settings
-                }
-                NavigationBarItem(
-                    selected = selectedIndex() == index,
-                    onClick = { onSelected(index) },
-                    icon = dest.selectedIcon,
-                    label = label,
+    Box(modifier = Modifier.fillMaxWidth()) {
+        // Fixed dim from half-dock height to screen bottom with reduced blur effect
+        // This reuses the topBar blur recipe but with half the dock as anchor
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(dockHeight / 2 + bottomInset)
+                .align(Alignment.BottomCenter)
+                .then(reducedBlurModifier)
+        )
+        Box(
+            modifier = Modifier
+                .onSizeChanged { dockHeight = with(density) { it.height.toDp() } }
+                .then(
+                    if (blurActive && backdrop != null) {
+                        Modifier.miuixBlurSurface(backdrop = backdrop, shape = RectangleShape, blurRadius = 25f, tintAlpha = .8f,
+                            fallbackColor = MiuixAppTheme.colorScheme.surface)
+                    } else Modifier
                 )
+                .background(barColor)
+        ) {
+            NavigationBar(color = barColor) {
+                bottomNavDestinations.forEachIndexed { index, dest ->
+                    val label = when (dest) {
+                        Destination.Home -> strings.home
+                        Destination.Library -> strings.library
+                        Destination.Settings -> strings.settings
+                    }
+                    NavigationBarItem(
+                        selected = selectedIndex() == index,
+                        onClick = { onSelected(index) },
+                        icon = dest.selectedIcon,
+                        label = label,
+                    )
+                }
             }
         }
     }
@@ -586,7 +533,6 @@ private fun MiuixNavigationDock(
 
 @Composable
 private fun AppleFloatingDock(
-    activeDestinations: List<Destination> = bottomNavDestinations,
     useMiuix: Boolean,
     selectedIndex: () -> Int,
     onSelected: (Int) -> Unit,
@@ -617,15 +563,12 @@ private fun AppleFloatingDock(
     }
     val labelOf: (Destination) -> String = { dest ->
         when (dest) {
-            Destination.Discover -> "Discover"
             Destination.Home -> strings.home
             Destination.Library -> strings.library
             Destination.Settings -> strings.settings
         }
     }
 
-    // Same wrapper as the original dock: full-width, centred. The bar itself sizes to its tabs
-    // (intrinsic width, 76dp minimum per tab), so it is not stretched to the screen width.
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -639,17 +582,14 @@ private fun AppleFloatingDock(
             ),
         contentAlignment = Alignment.Center
     ) {
-    // Miuix dock: InstallerX Revived's FloatingBottomBar (ported to ui/glass).
     FloatingBottomBar(
-        items = activeDestinations,
+        items = bottomNavDestinations,
         selectedIndex = selectedIndex,
         onSelected = onSelected,
         backdrop = effectiveBackdrop,
         mode = mode,
         colors = barColors,
         iconContent = { dest, index ->
-            // The outlined/filled selection change is specific to Material; Miuix uses
-            // the same solid icon in both states and indicates selection by tint instead.
             val icon = if (useMiuix || index == selectedIndex()) dest.selectedIcon else dest.unselectedIcon
             if (useMiuix) {
                 dev.shephard.player.ui.miuix.Icon(
@@ -698,8 +638,6 @@ private fun MiniPlayerHost(
             .map { it.currentTrack != null }
             .distinctUntilChanged()
     }.collectAsState(
-        // Seed from the current state so a re-composed host (e.g. after returning from a submenu)
-        // does not replay the enter animation while a track is already loaded.
         initial = playerViewModel.uiState.value.currentTrack != null
     )
 
@@ -737,10 +675,6 @@ private fun MiniPlayerHost(
     }
 }
 
-/**
- * Takes the back gesture for the entry it wraps (InstallerX InstallerNavEntry). When predictive
- * back is NONE the gesture is handled here, so NavDisplay does not run a predictive preview.
- */
 @Composable
 internal fun NavEntryBackHandler(
     interceptPredictiveBack: Boolean,

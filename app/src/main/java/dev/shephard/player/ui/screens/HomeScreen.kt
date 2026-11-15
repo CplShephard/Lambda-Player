@@ -85,19 +85,11 @@ fun HomeScreen(
 ) {
     val strings = LocalStrings.current
     val tracks by libraryViewModel.tracks.collectAsState()
-    val isLoading by libraryViewModel.isLoading.collectAsState()
     val hasScanned by libraryViewModel.hasScanned.collectAsState()
     val recentEvents by playerViewModel.statsEventsFlow.collectAsState()
     val totalListeningMs by playerViewModel.totalListeningMsLive.collectAsState()
 
-    // First-second loading overlay — hides the initial empty flash and gives a smooth 1s intro
-    var showMinLoading by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) {
-        libraryViewModel.ensureTracksLoaded()
-        kotlinx.coroutines.delay(1000)
-        showMinLoading = false
-    }
-    val showLoadingOverlay = showMinLoading || !hasScanned
+    LaunchedEffect(Unit) { libraryViewModel.ensureTracksLoaded() }
 
     val featuredTracks = dev.shephard.player.ui.components.rememberFeaturedTracks(tracks, 5)
 
@@ -185,13 +177,6 @@ fun HomeScreen(
                                     )
                                 }
                             }
-                    }
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = showLoadingOverlay,
-                        enter = androidx.compose.animation.fadeIn(),
-                        exit = androidx.compose.animation.fadeOut()
-                    ) {
-                        dev.shephard.player.ui.components.MiuixLibraryLoadingOverlay()
                     }
                 }
 }
