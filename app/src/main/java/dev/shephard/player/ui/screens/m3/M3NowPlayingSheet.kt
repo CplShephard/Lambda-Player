@@ -635,7 +635,7 @@ internal fun M3NowPlayingProgressLineage(playerViewModel: PlayerViewModel, isPla
     val fraction = if (prog.durationMs > 0) prog.positionMs.toFloat() / prog.durationMs else 0f
     androidx.compose.material3.LinearWavyProgressIndicator(
         progress = { fraction },
-        modifier = androidx.compose.foundation.layout.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
     )
 }
 
