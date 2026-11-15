@@ -808,10 +808,16 @@ fun FullScreenLyricsExperience(
                                             scaleX = scale
                                             scaleY = scale
                                             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
-                                            // Only active line letters move slowly
+                                            // Only active line letters move slowly; transitioning lines drag slightly down then settle
+                                            val lineSlideOffset by androidx.compose.animation.core.animateDpAsState(
+                                                targetValue = if (isActive) 0.dp else if (distance == 1) 4.dp else 0.dp,
+                                                animationSpec = androidx.compose.animation.core.tween(380, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                                                label = "lineSlide"
+                                            )
+                                            translationY += lineSlideOffset.toPx() * (if (index < activeIndex) -1f else 1f)
                                             if (shouldJiggle) {
                                                 translationX = jiggleX * 0.6f
-                                                translationY = jiggleY * 0.5f
+                                                translationY += jiggleY * 0.5f
                                             }
                                         }
                                         .blur(animatedBlur)
@@ -863,16 +869,11 @@ fun FullScreenLyricsExperience(
                         // Note animation as a line (QQ Music style) at lines alignment - hide when singing starts
                         androidx.compose.animation.AnimatedVisibility(
                             visible = showNoteAnim,
-                            enter = fadeIn(tween(220)) + androidx.compose.animation.slideInVertically(tween(220)),
-                            exit = fadeOut(tween(180)) + androidx.compose.animation.slideOutVertically(tween(180)),
+                            enter = fadeIn(tween(220)),
+                            exit = fadeOut(tween(180)),
                             modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 140.dp).fillMaxWidth().padding(horizontal = 18.dp)
                         ) {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(LocalLyricsForeground.current.copy(alpha = 0.08f)).padding(horizontal = 16.dp, vertical = 14.dp),
-                                contentAlignment = androidx.compose.ui.Alignment.Center
-                            ) {
-                                QqMusicNoteAnimation(primary = primary, foreground = LocalLyricsForeground.current)
-                            }
+                            QqMusicNoteAnimation(primary = primary, foreground = LocalLyricsForeground.current)
                         }
                     }
                 }
