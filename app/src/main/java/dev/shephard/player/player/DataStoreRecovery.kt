@@ -24,7 +24,7 @@ object DataStoreRecovery {
             try {
                 val prefs = PreferencesManager(appContext)
                 // This read itself may OOM; catch it
-                val json = kotlinx.coroutines.flow.first(prefs.listenStatsEventsJson)
+                val json = prefs.listenStatsEventsJson.first()
                 if (json.length > 500_000) {
                     // Move to file storage if not already
                     try {
