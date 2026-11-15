@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -42,6 +43,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -443,10 +446,11 @@ onDismiss: () -> Unit,
     }
 
     if (showQueue) {
-        dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { showQueue = false })
+        dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { onShowQueueChange(false) })
     }
 
-    if (showLyrics && !isLandscape) {
+    val isLandscapeOutside = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    if (showLyrics && !isLandscapeOutside) {
         dev.shephard.player.ui.screens.FullScreenLyricsExperience(
         playerViewModel = playerViewModel,
         useMiuix = false,
@@ -620,11 +624,22 @@ private fun M3LandscapeContent(
         }
     }
     if (showQueue) {
-        dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { showQueue = false })
+        dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { onShowQueueChange(false) })
     }
     if (showAddToPlaylist) {
-        M3AddToPlaylistDrawer(trackId = track?.id ?: -1L, track = track, playerViewModel = playerViewModel, onDismiss = { showAddToPlaylist = false }, strings = strings)
+        M3AddToPlaylistDrawer(trackId = track?.id ?: -1L, track = track, playerViewModel = playerViewModel, onDismiss = { onShowAddToPlaylistChange(false) }, strings = strings)
     }
+}
+
+
+@Composable
+internal fun M3NowPlayingProgressLineage(playerViewModel: PlayerViewModel, isPlaying: Boolean) {
+    val prog by playerViewModel.progress.collectAsState()
+    val fraction = if (prog.durationMs > 0) prog.positionMs.toFloat() / prog.durationMs else 0f
+    androidx.compose.material3.LinearWavyProgressIndicator(
+        progress = fraction,
+        modifier = androidx.compose.foundation.layout.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+    )
 }
 
 private fun m3FormatMillisLineage(ms: Long): String {
