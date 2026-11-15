@@ -15,17 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,8 +30,17 @@ import dev.shephard.player.extension.ExtensionDownloadManager
 import dev.shephard.player.extension.ExtensionManager
 import dev.shephard.player.extension.ExtensionTrack
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExtensionSearchScreen(
     extensionManager: ExtensionManager,
@@ -66,10 +64,10 @@ fun ExtensionSearchScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Online Search & Download") },
+                title = "Discover",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
                     }
                 }
             )
@@ -79,69 +77,73 @@ fun ExtensionSearchScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 12.dp)
         ) {
             if (activeExtensions.isEmpty()) {
                 Text(
-                    text = "No active extensions installed. Install a .sflx extension first.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "Aktif extension yok. Ayarlar → Online Mod üzerinden kurun.",
+                    style = MiuixTheme.textStyles.body2,
                     modifier = Modifier.padding(vertical = 16.dp)
                 )
             } else {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(activeExtensions, key = { it.manifest.name }) { ext ->
-                        FilterChip(
-                            selected = ext.manifest.name == selectedExtId,
-                            onClick = { selectedExtId = ext.manifest.name },
-                            label = { Text(ext.manifest.displayName) }
-                        )
+                        val selected = ext.manifest.name == selectedExtId
+                        Button(
+                            onClick = { selectedExtId = ext.manifest.name }
+                        ) {
+                            Text(if (selected) "✓ ${ext.manifest.displayName}" else ext.manifest.displayName)
+                        }
                     }
                 }
 
                 Spacer(Modifier.height(8.dp))
 
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    placeholder = { Text("Search tracks...") },
-                    trailingIcon = {
-                        IconButton(
-                            onClick = {
-                                val extId = selectedExtId ?: return@IconButton
-                                if (query.isBlank()) return@IconButton
-                                scope.launch {
-                                    isSearching = true
-                                    errorText = null
-                                    runCatching {
-                                        val runtime = extensionManager.getRuntime(extId)
-                                            ?: throw IllegalStateException("Extension unavailable")
-                                        runtime.search(query.trim())
-                                    }.onSuccess {
-                                        results = it
-                                    }.onFailure {
-                                        errorText = it.message
-                                    }
-                                    isSearching = false
-                                }
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        label = "Şarkı veya sanatçı ara..."
+                    )
+                    IconButton(
+                        onClick = {
+                            val extId = selectedExtId ?: return@IconButton
+                            if (query.isBlank()) return@IconButton
+                            scope.launch {
+                                isSearching = true
+                                errorText = null
+                                runCatching {
+                                    val runtime = extensionManager.getRuntime(extId)
+                                        ?: throw IllegalStateException("Extension aktif değil")
+                                    runtime.search(query.trim())
+                                }.onSuccess { results = it }.onFailure { errorText = it.message }
+                                isSearching = false
                             }
-                        ) {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
                         }
+                    ) {
+                        Icon(Icons.Default.Search, contentDescription = "Ara")
                     }
-                )
+                }
             }
 
             if (isSearching) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
+                Text(
+                    text = "Aranıyor...",
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 6.dp)
+                )
             }
 
             if (errorText != null) {
                 Text(
                     text = errorText!!,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MiuixTheme.textStyles.body2,
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
             }
@@ -151,49 +153,27 @@ fun ExtensionSearchScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (tasks.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = "Downloads (${tasks.size})",
-                            style = MaterialTheme.typography.titleSmall,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                    }
+                    item { SmallTitle(text = "İndirmeler (${tasks.size})") }
                     items(tasks, key = { it.id }) { task ->
                         Card(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
                                     text = "${task.track.artist} - ${task.track.title}",
-                                    style = MaterialTheme.typography.bodyMedium
+                                    style = MiuixTheme.textStyles.subtitle
                                 )
                                 Text(
                                     text = when (task.status) {
-                                        DownloadStatus.QUEUED -> "Queued"
-                                        DownloadStatus.DOWNLOADING -> "Downloading ${(task.progress * 100).toInt()}%"
-                                        DownloadStatus.TAGGING -> "Embedding metadata..."
-                                        DownloadStatus.COMPLETED -> "Completed (Added to library)"
-                                        DownloadStatus.FAILED -> "Failed: ${task.errorMessage}"
+                                        DownloadStatus.QUEUED -> "Sırada"
+                                        DownloadStatus.DOWNLOADING -> "İndiriliyor ${(task.progress * 100).toInt()}%"
+                                        DownloadStatus.TAGGING -> "Etiketleniyor..."
+                                        DownloadStatus.COMPLETED -> "Tamamlandı"
+                                        DownloadStatus.FAILED -> "Hata: ${task.errorMessage}"
                                     },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    style = MiuixTheme.textStyles.body2,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                                 )
-                                if (task.status == DownloadStatus.DOWNLOADING) {
-                                    LinearProgressIndicator(
-                                        progress = { task.progress },
-                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
-                                    )
-                                }
                             }
                         }
-                    }
-                }
-
-                if (results.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = "Results (${results.size})",
-                            style = MaterialTheme.typography.titleSmall,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
                     }
                 }
 
@@ -206,25 +186,22 @@ fun ExtensionSearchScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(track.title, style = MaterialTheme.typography.titleSmall)
+                                Text(track.title, style = MiuixTheme.textStyles.subtitle)
                                 Text(
                                     text = buildString {
                                         append(track.artist)
                                         if (track.album.isNotBlank()) append(" • ${track.album}")
                                     },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    style = MiuixTheme.textStyles.body2,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                                 )
                             }
                             IconButton(
                                 onClick = {
-                                    downloadManager.enqueueDownload(
-                                        track = track,
-                                        onComplete = onLibraryRefresh
-                                    )
+                                    downloadManager.enqueueDownload(track = track, onComplete = onLibraryRefresh)
                                 }
                             ) {
-                                Icon(Icons.Default.Download, contentDescription = "Download")
+                                Icon(Icons.Default.Download, contentDescription = "İndir")
                             }
                         }
                     }

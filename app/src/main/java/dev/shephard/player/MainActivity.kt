@@ -59,27 +59,40 @@ class MainActivity : ComponentActivity() {
             val prefs = remember { PreferencesManager(context) }
 
             // FIX: use the persisted value from the very first frame (no true->false flip)
+            // All theme-affecting prefs are read synchronously so the first frame
+            // already matches the last session — otherwise DataStore's async flow
+            // emits the default for ~1s and the whole theme visibly pops.
             val initialUseMiuix = remember { runBlocking { prefs.useMiuix.first() } }
             val useMiuix by prefs.useMiuix.collectAsState(initial = initialUseMiuix)
-            val themeMode by prefs.themeModeEnum.collectAsState(initial = dev.shephard.player.theme.ThemeMode.SYSTEM)
-            val paletteStyle by prefs.paletteStyle.collectAsState(initial = dev.shephard.player.theme.PaletteStyle.TonalSpot)
-            val colorSpec by prefs.colorSpec.collectAsState(initial = dev.shephard.player.theme.ThemeColorSpec.SPEC_2025)
-            val dynamicColor by prefs.dynamicColor.collectAsState(initial = false)
-            val dynamicByCover by prefs.dynamicColorByCover.collectAsState(initial = false)
+            val initialThemeMode = remember { runBlocking { prefs.themeModeEnum.first() } }
+            val themeMode by prefs.themeModeEnum.collectAsState(initial = initialThemeMode)
+            val initialPaletteStyle = remember { runBlocking { prefs.paletteStyle.first() } }
+            val paletteStyle by prefs.paletteStyle.collectAsState(initial = initialPaletteStyle)
+            val initialColorSpec = remember { runBlocking { prefs.colorSpec.first() } }
+            val colorSpec by prefs.colorSpec.collectAsState(initial = initialColorSpec)
+            val initialDynamicColor = remember { runBlocking { prefs.dynamicColor.first() } }
+            val dynamicColor by prefs.dynamicColor.collectAsState(initial = initialDynamicColor)
+            val initialDynamicByCover = remember { runBlocking { prefs.dynamicColorByCover.first() } }
+            val dynamicByCover by prefs.dynamicColorByCover.collectAsState(initial = initialDynamicByCover)
             val playerViewModel: PlayerViewModel = viewModel()
             val playerState by playerViewModel.uiState.collectAsState()
-            val useMiuixMonet by prefs.useMiuixMonet.collectAsState(initial = false)
+            val initialUseMiuixMonet = remember { runBlocking { prefs.useMiuixMonet.first() } }
+            val useMiuixMonet by prefs.useMiuixMonet.collectAsState(initial = initialUseMiuixMonet)
             val initialMiuixGreenAccent = remember { runBlocking { prefs.miuixGreenAccent.first() } }
             val miuixGreenAccent by prefs.miuixGreenAccent.collectAsState(initial = initialMiuixGreenAccent)
-            val seedColor by prefs.seedColor.collectAsState(initial = 0xFF22C55E.toInt())
+            val initialSeedColor = remember { runBlocking { prefs.seedColor.first() } }
+            val seedColor by prefs.seedColor.collectAsState(initial = initialSeedColor)
             // Read the persisted blur toggle synchronously so glass surfaces (dock,
             // top bars) don't render in their solid fallback state for a second on
             // every launch while DataStore warms up.
             val initialBlurEnabled = remember { runBlocking { prefs.liquidGlassEnabled.first() } }
             val blurEnabled by prefs.liquidGlassEnabled.collectAsState(initial = initialBlurEnabled)
-            val glassEnabled by prefs.liquidGlassEffect.collectAsState(initial = false)
-            val appleFloatingBar by prefs.useAppleFloatingBar.collectAsState(initial = false)
-            val languageCode by prefs.language.collectAsState(initial = "en")
+            val initialGlassEnabled = remember { runBlocking { prefs.liquidGlassEffect.first() } }
+            val glassEnabled by prefs.liquidGlassEffect.collectAsState(initial = initialGlassEnabled)
+            val initialAppleFloatingBar = remember { runBlocking { prefs.useAppleFloatingBar.first() } }
+            val appleFloatingBar by prefs.useAppleFloatingBar.collectAsState(initial = initialAppleFloatingBar)
+            val initialLanguageCode = remember { runBlocking { prefs.language.first() } }
+            val languageCode by prefs.language.collectAsState(initial = initialLanguageCode)
             val strings = remember(languageCode) { stringsFor(languageCode) }
 
             // Material 3 always uses the Monet (wallpaper-dynamic) palette — the

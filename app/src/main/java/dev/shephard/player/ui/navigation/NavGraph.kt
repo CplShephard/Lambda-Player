@@ -78,12 +78,18 @@ import dev.shephard.player.ui.glass.LocalContentBackdrop
 import dev.shephard.player.ui.glass.isLiquidGlassSupported
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
+import dev.shephard.player.extension.ExtensionDownloadManager
+import dev.shephard.player.extension.ExtensionManager
 import dev.shephard.player.ui.screens.AboutSettingsScreen
 import dev.shephard.player.ui.screens.m3.AboutSettingsScreenM3
 import dev.shephard.player.ui.screens.HomeScreen
 import dev.shephard.player.ui.screens.m3.HomeScreenM3
 import dev.shephard.player.ui.screens.MusicScreen
 import dev.shephard.player.ui.screens.m3.MusicScreenM3
+import dev.shephard.player.ui.screens.ExtensionSearchScreen
+import dev.shephard.player.ui.screens.OnlineModeSettingsScreen
+import dev.shephard.player.ui.screens.m3.ExtensionSearchScreenM3
+import dev.shephard.player.ui.screens.m3.OnlineModeSettingsScreenM3
 import dev.shephard.player.ui.screens.PlayerSettingsScreen
 import dev.shephard.player.ui.screens.m3.PlayerSettingsScreenM3
 import dev.shephard.player.ui.screens.PlaylistDetailScreen
@@ -116,6 +122,7 @@ import top.yukonga.miuix.kmp.blur.textureBlur
 data object MainRoute : NavKey
 data object ThemeRoute : NavKey
 data object PlayerRoute : NavKey
+data object OnlineModeRoute : NavKey
 data object AboutRoute : NavKey
 data object StatsRoute : NavKey
 
@@ -257,6 +264,7 @@ fun NavGraph(
                                                 playerViewModel = playerViewModel,
                                                 onOpenThemeSettings = { push(ThemeRoute) },
                                                 onOpenPlayerSettings = { push(PlayerRoute) },
+                                                onOpenOnlineMode = { push(OnlineModeRoute) },
                                                 onOpenAbout = { push(AboutRoute) },
                                                 onOpenStats = { push(StatsRoute) },
                                             )
@@ -320,6 +328,26 @@ fun NavGraph(
                         PlayerSettingsScreen(onBack = ::pop)
                     } else {
                         PlayerSettingsScreenM3(onBack = ::pop)
+                    }
+                }
+            }
+            entry<OnlineModeRoute>(swipeDismiss = swipeBackDirection) {
+                NavEntryBackHandler(interceptPredictiveBack, ::pop) {
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val extManager = remember { ExtensionManager(context) }
+                    val prefsManager = remember { dev.shephard.player.player.PreferencesManager(context) }
+                    if (useMiuix) {
+                        OnlineModeSettingsScreen(
+                            preferencesManager = prefsManager,
+                            extensionManager = extManager,
+                            onBack = ::pop
+                        )
+                    } else {
+                        OnlineModeSettingsScreenM3(
+                            preferencesManager = prefsManager,
+                            extensionManager = extManager,
+                            onBack = ::pop
+                        )
                     }
                 }
             }
@@ -444,6 +472,7 @@ private fun M3NavigationDock(
     ) {
         bottomNavDestinations.forEachIndexed { index, dest ->
             val label = when (dest) {
+                Destination.Discover -> "Discover"
                 Destination.Home -> strings.home
                 Destination.Library -> strings.library
                 Destination.Settings -> strings.settings
@@ -493,6 +522,7 @@ private fun MiuixNavigationDock(
         NavigationBar(color = barColor) {
             bottomNavDestinations.forEachIndexed { index, dest ->
                 val label = when (dest) {
+                    Destination.Discover -> "Discover"
                     Destination.Home -> strings.home
                     Destination.Library -> strings.library
                     Destination.Settings -> strings.settings
@@ -540,6 +570,7 @@ private fun AppleFloatingDock(
     }
     val labelOf: (Destination) -> String = { dest ->
         when (dest) {
+            Destination.Discover -> "Discover"
             Destination.Home -> strings.home
             Destination.Library -> strings.library
             Destination.Settings -> strings.settings

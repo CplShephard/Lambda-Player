@@ -85,13 +85,14 @@ fun HomeScreen(
 ) {
     val strings = LocalStrings.current
     val tracks by libraryViewModel.tracks.collectAsState()
+    val isLoading by libraryViewModel.isLoading.collectAsState()
+    val hasScanned by libraryViewModel.hasScanned.collectAsState()
     val recentEvents by playerViewModel.statsEventsFlow.collectAsState()
     val totalListeningMs by playerViewModel.totalListeningMsLive.collectAsState()
 
     LaunchedEffect(Unit) {
-        if (tracks.isEmpty()) {
-            libraryViewModel.ensureTracksLoaded()
-        }
+        libraryViewModel.ensureTracksLoaded()
+    }
     }
 
     val featuredTracks = dev.shephard.player.ui.components.rememberFeaturedTracks(tracks, 5)
@@ -149,7 +150,12 @@ fun HomeScreen(
                                 ),
                             verticalArrangement = Arrangement.spacedBy(24.dp)
                         ) {
-                            HomeYourMix(yourMix, useMiuix = true, onRemix = { playerViewModel.setQueueAndPlayRemixed(it, strings.yourMix) }) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
+                            HomeYourMix(
+                                yourMix,
+                                useMiuix = true,
+                                isLoading = !hasScanned,
+                                onRemix = { playerViewModel.setQueueAndPlayRemixed(it, strings.yourMix) }
+                            ) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
                             HomeListeningTime(totalListeningMs, useMiuix = true, onClick = onOpenStats)
                             if (featuredPlaylists.isNotEmpty()) {
                                 FeaturedPlaylistsSection(
