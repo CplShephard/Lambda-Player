@@ -174,7 +174,7 @@ fun HomeScreen(
                                         .captureForTopBarBlur(topBarState)
                                         .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                                         .overScrollVertical()
-                                        .padding(horizontal = 12.dp, top = innerPadding.calculateTopPadding() + 4.dp),
+                                        .padding(start = 12.dp, top = innerPadding.calculateTopPadding() + 4.dp, end = 12.dp),
                                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                                 ) {
                                     Column(
