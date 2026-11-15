@@ -27,7 +27,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
@@ -165,7 +164,7 @@ private fun OrphanCleanupSection(playerViewModel: PlayerViewModel) {
     var progress by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var report by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<PlayerViewModel.OrphanCleanupReport?>(null) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val libraryVm: dev.shephard.player.ui.screens.LibraryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val libraryVm: dev.shephard.player.player.LibraryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val libraryTracks by libraryVm.tracks.collectAsState()
 
     Column(modifier = androidx.compose.foundation.layout.fillMaxWidth().padding(vertical = 12.dp)) {

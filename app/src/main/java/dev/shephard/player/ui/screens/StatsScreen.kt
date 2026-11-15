@@ -46,6 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
+import androidx.compose.animation.togetherWith
 import dev.shephard.player.data.ListenStatsCalculator
 import dev.shephard.player.data.StatsPeriod
 import dev.shephard.player.data.StatsTrackEntry
