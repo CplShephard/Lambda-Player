@@ -17,7 +17,7 @@ class ExtensionRuntime(
     private val bridge = MornyeJsBridge(context, extension.manifest.name)
 
     private suspend fun <T> withRuntime(block: suspend (QuickJs) -> T): T = withContext(Dispatchers.IO) {
-        val qjs = QuickJs.create()
+        val qjs = QuickJs.create(Dispatchers.IO)
         try {
             registerBridge(qjs)
             val script = extension.indexJsFile.readText()
