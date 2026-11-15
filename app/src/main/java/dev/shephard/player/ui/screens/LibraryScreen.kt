@@ -237,8 +237,8 @@ fun LibraryScreen(
                 state = pagerState, modifier = Modifier.fillMaxSize().then(if (libraryTabsBackdrop != null) Modifier.layerBackdrop(libraryTabsBackdrop) else Modifier), beyondViewportPageCount = 1
             ) { page ->
             when (labels[page].first) {
-                0 -> if (useMiuix) MusicScreen(libraryViewModel, playerViewModel, { list, index -> onTrackClick(list, index, null) }, hasMiniPlayer, filteredSongs, embedded = true)
-                     else MusicScreenM3(libraryViewModel, playerViewModel, { list, index -> onTrackClick(list, index, null) }, hasMiniPlayer, filteredSongs, embedded = true)
+                0 -> if (useMiuix) MusicScreen(libraryViewModel, playerViewModel, { list, index -> onTrackClick(list, index, strings.music) }, hasMiniPlayer, filteredSongs, embedded = true)
+                     else MusicScreenM3(libraryViewModel, playerViewModel, { list, index -> onTrackClick(list, index, strings.music) }, hasMiniPlayer, filteredSongs, embedded = true)
                 3 -> if (useMiuix) PlaylistScreen(libraryViewModel, hasMiniPlayer, onTrackClick, onPlaylistRemixClick, onOpenPlaylistDetail, embedded = true, query = songSearch, sortMode = songSort, descending = sortDescending)
                      else PlaylistScreenM3(libraryViewModel, hasMiniPlayer, onTrackClick, onPlaylistRemixClick, onOpenPlaylistDetail, embedded = true, query = songSearch, sortMode = songSort, descending = sortDescending)
                 else -> if (!permission.hasPermission) {
