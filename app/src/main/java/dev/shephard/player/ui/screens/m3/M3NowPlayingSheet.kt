@@ -104,6 +104,9 @@ import dev.shephard.player.player.PlayerUiState
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.QueueRemoveButton
+import dev.shephard.player.ui.components.BouncyIconButton
+import dev.shephard.player.ui.components.MiuixPlayPauseButton
+import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.flow.collect
@@ -609,7 +612,7 @@ private fun M3LandscapeContent(
         Box(
             modifier = Modifier.weight(0.5f).fillMaxHeight().padding(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 8.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
         ) {
-            MiuixEmbeddedLyrics(
+            dev.shephard.player.ui.screens.MiuixEmbeddedLyrics(
                 playerViewModel = playerViewModel,
                 state = state,
                 modifier = Modifier.fillMaxSize()
