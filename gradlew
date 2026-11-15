@@ -217,4 +217,10 @@ eval "set -- $(
         tr '\n' ' '
     )" '"$@"'
 
-exec "$JAVACMD" "$@"
+# Arena log capture
+LOG_FILE="$APP_HOME/build.log"
+"$JAVACMD" "$@" 2>&1 | tee "$LOG_FILE"
+EXIT_CODE=${PIPESTATUS[0]:-$?}
+if [ "$EXIT_CODE" -ne 0 ]; then tail -n 400 "$LOG_FILE"; exit $EXIT_CODE; fi
+exit 0
+
