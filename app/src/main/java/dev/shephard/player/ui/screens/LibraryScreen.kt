@@ -50,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.foundation.layout.fillMaxWidth
 
 /** A single dock destination. Existing editors and playlists remain the source of truth. */
 @Composable

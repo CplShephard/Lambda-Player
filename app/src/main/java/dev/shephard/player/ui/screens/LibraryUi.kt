@@ -31,6 +31,7 @@ import dev.shephard.player.ui.components.m3.m3CardPress
 import dev.shephard.player.ui.components.rememberStaticArtwork
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
+import androidx.compose.foundation.layout.fillMaxWidth
 
 @Composable
 internal fun LibraryText(text: String, miuix: Boolean, modifier: Modifier = Modifier,

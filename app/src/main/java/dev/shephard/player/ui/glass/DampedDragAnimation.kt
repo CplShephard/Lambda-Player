@@ -142,7 +142,7 @@ class DampedDragAnimation(
         }
     }
 
-    private fun updateVelocity() {
+    internal fun updateVelocity() {
         velocityTracker.addPosition(
             System.currentTimeMillis(),
             Offset(value, 0f),

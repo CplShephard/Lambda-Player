@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "kotlin-compiler": "^2.4.21"
+  }
+}

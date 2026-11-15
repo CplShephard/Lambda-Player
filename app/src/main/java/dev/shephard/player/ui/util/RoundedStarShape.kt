@@ -68,7 +68,7 @@ class RoundedStarShape(
     })
 
 
-    private fun mapRange(a: Double, b: Double, c: Double, d: Double, x: Double): Double {
+    internal fun mapRange(a: Double, b: Double, c: Double, d: Double, x: Double): Double {
         return (x - a) / (b - a) * (d - c) + c
     }
 }
