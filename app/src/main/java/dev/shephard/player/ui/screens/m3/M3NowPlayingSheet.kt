@@ -109,7 +109,6 @@ import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.ui.components.QueueRemoveButton
 import dev.shephard.player.ui.components.BouncyIconButton
-import dev.shephard.player.ui.components.MiuixPlayPauseButton
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.player.RepeatMode
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -179,6 +178,7 @@ onDismiss: () -> Unit,
 ) {
     val track = state.currentTrack
     val isRemixed by playerViewModel.isRemixed.collectAsState()
+    val navigationDirection by playerViewModel.navigationDirection.collectAsState()
     val pendingCarouselIndex by playerViewModel.pendingCarouselIndex.collectAsState()
     val carouselContext = androidx.compose.ui.platform.LocalContext.current
     val carouselPrefs = remember(carouselContext) { dev.shephard.player.player.PreferencesManager(carouselContext) }
@@ -272,6 +272,7 @@ onDismiss: () -> Unit,
             M3LandscapeContent(
             playerViewModel = playerViewModel,
             state = state,
+            navigationDirection = navigationDirection,
             pendingCarouselIndex = pendingCarouselIndex,
             carouselStyle = carouselStyle,
             onAlbumClick = onAlbumClick,
@@ -463,6 +464,7 @@ onDismiss: () -> Unit,
 private fun M3LandscapeContent(
     playerViewModel: PlayerViewModel,
     state: dev.shephard.player.player.PlayerUiState,
+    navigationDirection: Int,
     pendingCarouselIndex: Int?,
     carouselStyle: String,
     onAlbumClick: (dev.shephard.player.data.AudioTrack) -> Unit,
@@ -482,7 +484,7 @@ private fun M3LandscapeContent(
         ) {
             // Keep transport and lyrics usable on short landscape windows by sizing the cover
             // from the space left after the fixed metadata and control rows.
-            val coverHeightLimit = (maxHeight - 230.dp).coerceAtLeast(40.dp)
+            val coverHeightLimit = (maxHeight - 215.dp).coerceAtLeast(48.dp)
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceBetween,
@@ -509,7 +511,7 @@ private fun M3LandscapeContent(
                     dev.shephard.player.player.CarouselStyle.TWO_PEEK -> .6f
                     else -> .8f
                 }
-                val artHeight = minOf(maxWidth * pageFraction, coverHeightLimit, configuration.screenHeightDp.dp * .42f)
+                val artHeight = minOf(maxWidth * pageFraction, coverHeightLimit, configuration.screenHeightDp.dp * .45f)
                 if (state.queue.isNotEmpty()) {
                     dev.shephard.player.ui.components.AlbumCarousel(
                         queue = state.queue, currentIndex = state.currentQueueIndex,
@@ -566,49 +568,41 @@ private fun M3LandscapeContent(
                     }
                 }
                 M3NowPlayingProgressLineage(playerViewModel = playerViewModel, isPlaying = state.isPlaying, compact = true)
-                // Controls
+                // Keep the landscape transport buttons on the same expressive M3 style as portrait.
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 3.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val isRemixed by playerViewModel.isRemixed.collectAsState()
-                    BouncyIconButton(
-                        onClick = { playerViewModel.remixQueue() },
+                    dev.shephard.player.ui.components.m3.M3PlaybackModeButton(
                         icon = Icons.Filled.Shuffle,
-                        contentDescription = strings.remix,
-                        tint = if (isRemixed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        iconSize = 20.dp
+                        description = strings.remix,
+                        active = isRemixed,
+                        onClick = playerViewModel::remixQueue,
+                        modifier = Modifier.size(40.dp),
                     )
-                    BouncyIconButton(
-                        onClick = { playerViewModel.skipToPrevious() },
-                        painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_rewind),
-                        contentDescription = strings.previous,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        iconSize = 24.dp
+                    dev.shephard.player.ui.components.m3.AnimatedPlaybackControls(
+                        modifier = Modifier.weight(1f),
+                        isPlayingProvider = { state.isPlaying },
+                        onPrevious = playerViewModel::skipToPrevious,
+                        onPlayPause = playerViewModel::togglePlayPause,
+                        onNext = playerViewModel::skipToNext,
+                        height = 48.dp,
+                        pressAnimationSpec = androidx.compose.animation.core.tween(
+                            240,
+                            easing = androidx.compose.animation.core.FastOutSlowInEasing,
+                        ),
+                        releaseDelay = 0L,
+                        playPauseIconSize = 26.dp,
+                        iconSize = 22.dp,
                     )
-                    MiuixPlayPauseButton(
-                        isPlaying = state.isPlaying,
-                        onClick = playerViewModel::togglePlayPause,
-                        playDescription = strings.play,
-                        pauseDescription = strings.pause,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        buttonSize = 52.dp,
-                        iconSize = 30.dp,
-                    )
-                    BouncyIconButton(
-                        onClick = { playerViewModel.skipToNext() },
-                        painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_fforward),
-                        contentDescription = strings.next,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        iconSize = 24.dp
-                    )
-                    BouncyIconButton(
-                        onClick = { playerViewModel.cycleRepeatMode() },
+                    dev.shephard.player.ui.components.m3.M3PlaybackModeButton(
                         icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-                        contentDescription = strings.repeat,
-                        tint = if (state.repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        iconSize = 20.dp
+                        description = strings.repeat,
+                        active = state.repeatMode != RepeatMode.OFF,
+                        onClick = playerViewModel::cycleRepeatMode,
+                        modifier = Modifier.size(40.dp),
                     )
                 }
             }
@@ -626,7 +620,8 @@ private fun M3LandscapeContent(
                 modifier = Modifier.fillMaxSize(),
                 foreground = MaterialTheme.colorScheme.onSurface,
                 titleStyle = MaterialTheme.typography.titleMedium,
-                baseTextStyle = MaterialTheme.typography.bodyMedium
+                baseTextStyle = MaterialTheme.typography.bodyMedium,
+                navigationDirection = navigationDirection,
             )
         }
     }
@@ -641,14 +636,70 @@ private fun M3LandscapeContent(
 
 @Composable
 internal fun M3NowPlayingProgressLineage(playerViewModel: PlayerViewModel, isPlaying: Boolean, compact: Boolean = false) {
-    val prog by playerViewModel.progress.collectAsState()
-    val fraction = if (prog.durationMs > 0) prog.positionMs.toFloat() / prog.durationMs else 0f
-    androidx.compose.material3.LinearWavyProgressIndicator(
-        progress = { fraction },
-        modifier = Modifier.fillMaxWidth()
-            .padding(horizontal = if (compact) 10.dp else 16.dp, vertical = if (compact) 2.dp else 8.dp)
-            .then(if (compact) Modifier.height(8.dp) else Modifier)
+    val progress by playerViewModel.progress.collectAsState()
+    val smoothFraction = dev.shephard.player.ui.components.rememberSmoothProgressFraction(
+        positionMs = progress.positionMs,
+        durationMs = progress.durationMs,
+        isPlaying = isPlaying,
     )
+    var seekFraction by remember { mutableStateOf<Float?>(null) }
+    LaunchedEffect(smoothFraction, progress.durationMs) {
+        val held = seekFraction ?: return@LaunchedEffect
+        if (kotlin.math.abs(held - smoothFraction) < 0.03f || kotlin.math.abs(held - smoothFraction) > 0.1f) {
+            seekFraction = null
+        }
+    }
+
+    val displayFraction = seekFraction ?: smoothFraction
+    val horizontalInset = if (compact) 30.dp else 22.dp
+    Column(modifier = Modifier.fillMaxWidth()) {
+        dev.shephard.player.ui.components.m3.M3WavySlider(
+            value = { seekFraction ?: smoothFraction },
+            onValueChange = { fraction ->
+                seekFraction = fraction
+                if (progress.durationMs > 0L) {
+                    playerViewModel.onSeekPreview((fraction * progress.durationMs).toLong())
+                }
+            },
+            onValueCommit = { fraction ->
+                seekFraction = fraction
+                if (progress.durationMs > 0L) {
+                    playerViewModel.onSeekCommit((fraction * progress.durationMs).toLong())
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+                .padding(horizontal = horizontalInset)
+                .then(if (compact) Modifier.height(24.dp) else Modifier),
+            enabled = progress.durationMs > 0L,
+            isPlaying = isPlaying,
+            activeTrackColor = MaterialTheme.colorScheme.primary,
+            inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.24f),
+            thumbColor = MaterialTheme.colorScheme.primary,
+            strokeWidth = if (compact) 4.dp else 5.dp,
+            thumbRadius = if (compact) 6.dp else 8.dp,
+            thumbLineHeightWhenInteracting = if (compact) 18.dp else 24.dp,
+            semanticsLabel = LocalStrings.current.playbackPosition,
+        )
+        if (!compact) {
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = horizontalInset)
+                    .padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = m3FormatMillisLineage((displayFraction * progress.durationMs).toLong()),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = m3FormatMillisLineage(progress.durationMs),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
 }
 
 private fun m3FormatMillisLineage(ms: Long): String {

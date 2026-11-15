@@ -569,7 +569,7 @@ private fun MiuixLandscapeContent(
         ) {
             // Reserve room for metadata and transport controls so the cover never pushes them
             // below the landscape viewport on short displays.
-            val coverHeightLimit = (maxHeight - 245.dp).coerceAtLeast(40.dp)
+            val coverHeightLimit = (maxHeight - 230.dp).coerceAtLeast(48.dp)
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceBetween,
@@ -606,7 +606,7 @@ private fun MiuixLandscapeContent(
                         dev.shephard.player.player.CarouselStyle.TWO_PEEK -> .6f
                         else -> .8f
                     }
-                    val artHeight = minOf(maxWidth * pageFraction, coverHeightLimit, configuration.screenHeightDp.dp * .42f)
+                    val artHeight = minOf(maxWidth * pageFraction, coverHeightLimit, configuration.screenHeightDp.dp * .45f)
                     if (state.queue.isNotEmpty()) {
                         dev.shephard.player.ui.components.AlbumCarousel(
                             queue = state.queue,
@@ -634,13 +634,7 @@ private fun MiuixLandscapeContent(
                 }
                 androidx.compose.animation.AnimatedContent(
                     targetState = track,
-                    transitionSpec = {
-                        val forward = navigationDirection >= 0
-                        val slideSpec = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(durationMillis = 320, easing = androidx.compose.animation.core.FastOutSlowInEasing)
-                        val fadeSpec = androidx.compose.animation.core.tween<Float>(durationMillis = 220, easing = androidx.compose.animation.core.LinearOutSlowInEasing)
-                        (slideInHorizontally(slideSpec) { if (forward) it else -it } + fadeIn(fadeSpec)) togetherWith
-                            (slideOutHorizontally(slideSpec) { if (forward) -it else it } + fadeOut(fadeSpec))
-                    },
+                    transitionSpec = { landscapeTrackTransition(navigationDirection) },
                     label = "nowPlayingMetadataLand",
                 ) { current ->
                     Column(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -670,20 +664,48 @@ private fun MiuixLandscapeContent(
                         tint = Color.White,
                         iconSize = 22.dp,
                     )
-                    BouncyIconButton(
-                        onClick = { track?.id?.takeIf { it > 0 }?.let(playerViewModel::toggleLike) },
-                        icon = if (track?.id != null && state.likedSongIds.contains(track.id)) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                        contentDescription = strings.likedSongs,
-                        tint = if (track?.id != null && state.likedSongIds.contains(track.id)) MiuixAppTheme.colorScheme.primary else Color.White,
-                        iconSize = 22.dp,
-                    )
+                    val trackId = track?.id ?: -1L
+                    val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
+                    Box(
+                        modifier = Modifier.size(48.dp).bounceClick {
+                            if (trackId > 0) {
+                                if (isLiked) onShowPlaylistsChange(true) else playerViewModel.addToLiked(trackId)
+                            }
+                        },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        androidx.compose.animation.AnimatedContent(
+                            targetState = isLiked,
+                            transitionSpec = {
+                                (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)) +
+                                    androidx.compose.animation.scaleIn(
+                                        initialScale = 0.45f,
+                                        animationSpec = androidx.compose.animation.core.spring(
+                                            dampingRatio = 0.55f,
+                                            stiffness = 400f,
+                                        ),
+                                    )).togetherWith(
+                                    androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150)) +
+                                        androidx.compose.animation.scaleOut(targetScale = 1.35f),
+                                )
+                            },
+                            label = "landscapeLikeMorph",
+                        ) { liked ->
+                            Icon(
+                                imageVector = if (liked) Icons.Filled.Check else Icons.Filled.Add,
+                                contentDescription = if (liked) strings.likedSongs else strings.addToPlaylist,
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp),
+                            )
+                        }
+                    }
                 }
                 SeekBarRow(playerViewModel = playerViewModel, compact = true)
                 // Compact landscape transport controls stay proportional to the cover.
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 3.dp, start = 0.dp, end = 0.dp),
+                        .padding(top = 2.dp, start = 0.dp, end = 0.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -693,14 +715,14 @@ private fun MiuixLandscapeContent(
                         icon = Icons.Filled.Shuffle,
                         contentDescription = strings.remix,
                         tint = if (isRemixed) MiuixAppTheme.colorScheme.primary else Color.White,
-                        iconSize = 20.dp
+                        iconSize = 18.dp
                     )
                     BouncyIconButton(
                         onClick = { playerViewModel.skipToPrevious() },
                         painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_rewind),
                         contentDescription = strings.previous,
                         tint = Color.White,
-                        iconSize = 24.dp
+                        iconSize = 22.dp
                     )
                     MiuixPlayPauseButton(
                         isPlaying = state.isPlaying,
@@ -708,22 +730,22 @@ private fun MiuixLandscapeContent(
                         playDescription = strings.play,
                         pauseDescription = strings.pause,
                         tint = Color.White,
-                        buttonSize = 52.dp,
-                        iconSize = 30.dp,
+                        buttonSize = 48.dp,
+                        iconSize = 28.dp,
                     )
                     BouncyIconButton(
                         onClick = { playerViewModel.skipToNext() },
                         painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_fforward),
                         contentDescription = strings.next,
                         tint = Color.White,
-                        iconSize = 24.dp
+                        iconSize = 22.dp
                     )
                     BouncyIconButton(
                         onClick = { playerViewModel.cycleRepeatMode() },
                         icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                         contentDescription = strings.repeat,
                         tint = if (state.repeatMode != RepeatMode.OFF) MiuixAppTheme.colorScheme.primary else Color.White,
-                        iconSize = 20.dp
+                        iconSize = 18.dp
                     )
                 }
             }
@@ -742,7 +764,8 @@ private fun MiuixLandscapeContent(
             MiuixEmbeddedLyrics(
                 playerViewModel = playerViewModel,
                 state = state,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                navigationDirection = navigationDirection,
             )
         }
     }
@@ -756,12 +779,42 @@ private fun MiuixLandscapeContent(
 
 @Composable
 internal fun MiuixEmbeddedLyrics(
-playerViewModel: PlayerViewModel,
-state: dev.shephard.player.player.PlayerUiState,
-modifier: Modifier = Modifier,
-foreground: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.White,
-titleStyle: androidx.compose.ui.text.TextStyle? = null,
-baseTextStyle: androidx.compose.ui.text.TextStyle? = null
+    playerViewModel: PlayerViewModel,
+    state: dev.shephard.player.player.PlayerUiState,
+    modifier: Modifier = Modifier,
+    foreground: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.White,
+    titleStyle: androidx.compose.ui.text.TextStyle? = null,
+    baseTextStyle: androidx.compose.ui.text.TextStyle? = null,
+    navigationDirection: Int = 1,
+) {
+    // Animate the complete lyrics snapshot by track id. Lyrics/loading updates for the same track
+    // replace its content in place, while track changes reuse Now Playing's directional transition.
+    AnimatedContent(
+        targetState = state,
+        modifier = modifier,
+        transitionSpec = { landscapeTrackTransition(navigationDirection) },
+        contentKey = { it.currentTrack?.id },
+        label = "landscapeLyricsTrackTransition",
+    ) { lyricsState ->
+        MiuixEmbeddedLyricsContent(
+            playerViewModel = playerViewModel,
+            state = lyricsState,
+            modifier = Modifier.fillMaxSize(),
+            foreground = foreground,
+            titleStyle = titleStyle,
+            baseTextStyle = baseTextStyle,
+        )
+    }
+}
+
+@Composable
+private fun MiuixEmbeddedLyricsContent(
+    playerViewModel: PlayerViewModel,
+    state: dev.shephard.player.player.PlayerUiState,
+    modifier: Modifier,
+    foreground: androidx.compose.ui.graphics.Color,
+    titleStyle: androidx.compose.ui.text.TextStyle?,
+    baseTextStyle: androidx.compose.ui.text.TextStyle?,
 ) {
     // Yatay mod artık dikeyle birebir aynı animasyonlar — kart kaldırıldı, dik çizgi ile bölünmüş
     val progress by playerViewModel.progress.collectAsState()
@@ -776,6 +829,7 @@ baseTextStyle: androidx.compose.ui.text.TextStyle? = null
     val lyricsListState = rememberLazyListState()
     val density = androidx.compose.ui.platform.LocalDensity.current
     val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
+    var positionedInitialActiveLine by remember(state.currentTrack?.id) { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val preferences = remember(context) { dev.shephard.player.player.PreferencesManager(context) }
     val blurEnabled by preferences.lyricsBackgroundBlurEnabled.collectAsState(initial = true)
@@ -787,6 +841,7 @@ baseTextStyle: androidx.compose.ui.text.TextStyle? = null
         isPlaying = isPlaying,
         enabled = synced.isNotEmpty(),
         frameAccurate = hasWordSync,
+        trackId = state.currentTrack?.id,
     )
     val activeIndex by remember(synced, syncOffsetMs) {
         androidx.compose.runtime.derivedStateOf {
@@ -802,31 +857,15 @@ baseTextStyle: androidx.compose.ui.text.TextStyle? = null
             }
         }
     }
-    val showNoteAnim by remember(synced, smoothPositionMs.longValue, activeIndex, syncOffsetMs) {
-        androidx.compose.runtime.derivedStateOf {
-            if (!hasWordSync) false else {
-                val pos = smoothPositionMs.longValue - syncOffsetMs
-                val curr = synced.getOrNull(activeIndex)
-                val inWord = curr?.words?.any { w -> pos in w.startMs..w.endMs } == true
-                if (inWord) false else {
-                    if (activeIndex < 0) {
-                        val first = synced.firstOrNull()?.timeMs ?: 0L
-                        pos < first - 250
-                    } else {
-                        val next = synced.getOrNull(activeIndex + 1)
-                        val lastEnd = curr?.words?.lastOrNull()?.endMs ?: curr?.timeMs ?: pos
-                        val gapFromEnd = pos - lastEnd
-                        val gapToNext = if (next != null) next.timeMs - pos else 0L
-                        gapFromEnd > 700 || gapToNext > 800
-                    }
-                }
-            }
-        }
-    }
-
-    LaunchedEffect(activeIndex) {
+    LaunchedEffect(state.currentTrack?.id, activeIndex) {
         if (synced.isNotEmpty() && activeIndex >= 0) {
             try {
+                // Lyrics may arrive before the lazy list has completed its first measure. Wait for
+                // its viewport so the initial active line can be positioned immediately, not after
+                // a stale/zero-height scroll attempt.
+                while (lyricsListState.layoutInfo.viewportSize.height == 0) {
+                    androidx.compose.runtime.withFrameNanos { }
+                }
                 val layoutInfo = lyricsListState.layoutInfo
                 val viewportHeight = layoutInfo.viewportSize.height
                 val targetIndex = activeIndex.coerceIn(synced.indices)
@@ -840,7 +879,10 @@ baseTextStyle: androidx.compose.ui.text.TextStyle? = null
                     ).size.height + with(density) { (LyricLineVerticalPadding * 2).toPx() }.toInt()
                 }
                 val desiredOffset = viewportHeight * LyricAnchorFraction - itemHeight / 2f - layoutInfo.beforeContentPadding
-                if (visible != null) {
+                if (!positionedInitialActiveLine) {
+                    lyricsListState.scrollToItem(index = targetIndex, scrollOffset = -desiredOffset.toInt())
+                    positionedInitialActiveLine = true
+                } else if (visible != null) {
                     lyricsListState.animateScrollBy(visible.offset - desiredOffset, animationSpec = androidx.compose.animation.core.tween(LyricMoveDurationMs, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 } else {
                     lyricsListState.animateScrollToItem(index = targetIndex, scrollOffset = -desiredOffset.toInt())
@@ -925,10 +967,35 @@ baseTextStyle: androidx.compose.ui.text.TextStyle? = null
                 LazyColumn(state = lyricsListState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(plain.size) { idx -> Text(text = plain[idx], style = textStyle.copy(color = fg.copy(alpha = 0.82f), fontSize = 13.sp), modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) }
                 }
+            } else if (state.lyricsLoading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    androidx.compose.foundation.layout.Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            color = primary,
+                            modifier = Modifier.size(28.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        if (state.lyricsAutoSearchLoading) {
+                            Text(
+                                dev.shephard.player.ui.i18n.LocalStrings.current.lyricsSearching,
+                                color = fg.copy(alpha = 0.75f),
+                                style = textStyle,
+                            )
+                        }
+                    }
+                }
             } else {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        QqMusicNoteAnimation(primary = primary, foreground = fg)
+                        Icon(
+                            imageVector = Icons.Filled.MusicNote,
+                            contentDescription = null,
+                            tint = primary.copy(alpha = 0.75f),
+                            modifier = Modifier.size(40.dp),
+                        )
                         Text(
                             dev.shephard.player.ui.i18n.LocalStrings.current.noLyricsFound,
                             color = fg.copy(alpha = 0.55f),
@@ -937,14 +1004,6 @@ baseTextStyle: androidx.compose.ui.text.TextStyle? = null
                         )
                     }
                 }
-            }
-            androidx.compose.animation.AnimatedVisibility(
-                visible = showNoteAnim,
-                enter = androidx.compose.animation.fadeIn(tween(220)),
-                exit = androidx.compose.animation.fadeOut(tween(180)),
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 100.dp).fillMaxWidth().padding(horizontal = 18.dp)
-            ) {
-                QqMusicNoteAnimation(primary = primary, foreground = fg)
             }
         }
     }
@@ -1025,6 +1084,7 @@ private fun SeekBarRow(playerViewModel: PlayerViewModel, compact: Boolean = fals
             seekFraction = null
         }
     }
+    val horizontalInset = if (compact) 28.dp else 22.dp
     Column(modifier = Modifier.fillMaxWidth()) {
         MinimalSeekBar(
         progress = seekFraction ?: smoothFraction,
@@ -1036,14 +1096,14 @@ private fun SeekBarRow(playerViewModel: PlayerViewModel, compact: Boolean = fals
             seekFraction = fraction
             if (progress.durationMs > 0) playerViewModel.onSeekCommit((fraction * progress.durationMs).toLong())
         },
-        modifier = Modifier.padding(horizontal = if (compact) 10.dp else 22.dp),
+        modifier = Modifier.padding(horizontal = horizontalInset),
         trackHeight = if (compact) 4.dp else 6.dp,
         expandOnPress = true,
         activeColor = Color.White,
         inactiveColor = Color.White.copy(alpha = 0.3f)
     )
         Row(
-        modifier = Modifier.fillMaxWidth().padding(top = if (compact) 2.dp else 6.dp, start = if (compact) 10.dp else 22.dp, end = if (compact) 10.dp else 22.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = if (compact) 2.dp else 6.dp, start = horizontalInset, end = horizontalInset),
         horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(

@@ -112,6 +112,7 @@ data class PlayerUiState(
     val syncedLyrics: List<SyncedLyricLine> = emptyList(),
     val lyricsVisible: Boolean = false,
     val lyricsLoading: Boolean = false,
+    val lyricsAutoSearchLoading: Boolean = false,
 )
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
@@ -214,6 +215,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 ?: queueTracks.find { it.id.toString() == mediaItem.mediaId }
             finalizeStatsSession()
             statsSessionTrackId = track?.id
+            // Reset the sampled playhead before publishing the new track so lyrics cannot briefly
+            // calculate their active line from the previous track's position.
+            _progress.value = PlaybackProgress(
+                positionMs = 0L,
+                durationMs = currentDurationMs(track, preferTrackDuration = true)
+            )
             _uiState.value = _uiState.value.copy(
                 currentTrack = track,
                 coverColorAvailable = false,
@@ -222,17 +229,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 syncedLyrics = emptyList(),
                 lyricsVisible = false,
                 lyricsLoading = track != null,
+                lyricsAutoSearchLoading = false,
             )
             if (track != null) {
                 recordRecentTrackStart(track)
             }
-            // Media3 can report TIME_UNSET for a short period while the next
-            // item is preparing. Use the scanned track duration immediately so
-            // the seek bar does not briefly render the new song as 0:00.
-            _progress.value = PlaybackProgress(
-                positionMs = 0L,
-                durationMs = currentDurationMs(track, preferTrackDuration = true)
-            )
             if (_uiState.value.crossfadeEnabled) {
                 performCrossfadeIn()
             }
@@ -915,6 +916,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             currentTrack = null, currentQueueIndex = 0, queue = emptyList(),
             currentPlaylistName = null, isPlaying = false, lyrics = emptyList(),
             syncedLyrics = emptyList(), lyricsVisible = false, lyricsLoading = false,
+            lyricsAutoSearchLoading = false,
             glowColorArgb = DEFAULT_GLOW_COLOR, coverColorAvailable = false,
         )
     }
@@ -1302,11 +1304,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 syncedLyrics = emptyList(),
                 lyricsVisible = false,
                 lyricsLoading = false,
+                lyricsAutoSearchLoading = false,
             )
             return
         }
 
-        _uiState.value = _uiState.value.copy(lyricsLoading = true)
+        _uiState.value = _uiState.value.copy(
+            lyricsLoading = true,
+            lyricsAutoSearchLoading = false,
+        )
         _lyricsSyncOffsetMs.value = 0
         lyricsLoadJob = viewModelScope.launch {
             // This coroutine is not wrapped by anything else. An uncaught exception here (bad
@@ -1324,21 +1330,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 val embedded = withContext(Dispatchers.IO) { loadEmbeddedLyricsDocument(track) }
                 val hasEmbedded = embedded != null && embedded.lines.isNotEmpty()
-                // If lyrics already exist (saved handled above, embedded/.lrc here) do not run automatic online search.
-                // This avoids wasteful network calls for tracks where the user already picked/imported lyrics or
-                // where embedded/.lrc lyrics are available - requested via ayarlar automatic search fix.
+                // Saved lyrics were checked above. Embedded/.lrc lyrics also win before any online
+                // request so automatic search never hits the network for a track that has lyrics.
+                if (hasEmbedded) {
+                    applyLyricsDocument(track, embedded)
+                    return@launch
+                }
+
                 when (mode) {
                     LyricsAutoSearchMode.OFF,
                     LyricsAutoSearchMode.ONLINE_FIRST -> applyLyricsDocument(track, embedded)
 
                     LyricsAutoSearchMode.EMBEDDED_FIRST,
-                    LyricsAutoSearchMode.BEST_MATCH -> {
-                        if (hasEmbedded) {
-                            applyLyricsDocument(track, embedded)
-                        } else {
-                            autoSearchLyricsAndApply(track, fallback = null)
-                        }
-                    }
+                    LyricsAutoSearchMode.BEST_MATCH -> autoSearchLyricsAndApply(track, fallback = null)
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
@@ -1346,7 +1350,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 runCatching { applyLyricsDocument(track, null) }
             } finally {
                 if (lyricsLoadGeneration == generation && _uiState.value.currentTrack?.id == track.id) {
-                    _uiState.value = _uiState.value.copy(lyricsLoading = false)
+                    _uiState.value = _uiState.value.copy(
+                        lyricsLoading = false,
+                        lyricsAutoSearchLoading = false,
+                    )
                 }
             }
         }
@@ -1373,14 +1380,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      * Falls back to [fallback] (embedded or .lrc lyrics) when no candidate is good enough.
      */
     private suspend fun autoSearchLyricsAndApply(track: AudioTrack, fallback: LyricsDocument?) {
-        val best = findBestOnlineLyrics(track)
         if (_uiState.value.currentTrack?.id != track.id) return
-        val onlineDocument = best?.let { parseLyricsDocument(it.rawLyrics) }
-        if (onlineDocument != null && onlineDocument.lines.isNotEmpty()) {
-            persistLyricsDocument(track.id, onlineDocument)
-            applyLyricsDocument(track, onlineDocument)
-        } else {
-            applyLyricsDocument(track, fallback)
+        _uiState.value = _uiState.value.copy(lyricsAutoSearchLoading = true)
+        try {
+            val best = findBestOnlineLyrics(track)
+            if (_uiState.value.currentTrack?.id != track.id) return
+            val onlineDocument = best?.let { parseLyricsDocument(it.rawLyrics) }
+            if (onlineDocument != null && onlineDocument.lines.isNotEmpty()) {
+                persistLyricsDocument(track.id, onlineDocument)
+                applyLyricsDocument(track, onlineDocument)
+            } else {
+                applyLyricsDocument(track, fallback)
+            }
+        } finally {
+            if (_uiState.value.currentTrack?.id == track.id) {
+                _uiState.value = _uiState.value.copy(lyricsAutoSearchLoading = false)
+            }
         }
     }
 
@@ -1656,6 +1671,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         lyricsLoadJob?.cancel()
         _uiState.value = _uiState.value.copy(
             lyricsLoading = false,
+            lyricsAutoSearchLoading = false,
             lyrics = document.lines,
             syncedLyrics = document.syncedLines,
             lyricsVisible = true,
