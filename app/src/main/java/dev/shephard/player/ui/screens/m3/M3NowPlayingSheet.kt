@@ -727,7 +727,7 @@ strings: dev.shephard.player.ui.i18n.Strings
 
 
 @Composable
-private fun M3NowPlayingProgressLineage(playerViewModel: PlayerViewModel, isPlaying: Boolean) {
+internal fun M3NowPlayingProgressLineage(playerViewModel: PlayerViewModel, isPlaying: Boolean) {
     val progress by playerViewModel.progress.collectAsState()
     val fraction = if (progress.durationMs > 0) progress.positionMs.toFloat() / progress.durationMs else 0f
     androidx.compose.material3.LinearWavyProgressIndicator(
