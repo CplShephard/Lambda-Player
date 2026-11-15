@@ -1179,19 +1179,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 val embedded = withContext(Dispatchers.IO) { loadEmbeddedLyricsDocument(track) }
                 val hasEmbedded = embedded != null && embedded.lines.isNotEmpty()
+                // If lyrics already exist (saved handled above, embedded/.lrc here) do not run automatic online search.
+                // This avoids wasteful network calls for tracks where the user already picked/imported lyrics or
+                // where embedded/.lrc lyrics are available - requested via ayarlar automatic search fix.
                 when (mode) {
                     LyricsAutoSearchMode.OFF,
                     LyricsAutoSearchMode.ONLINE_FIRST -> applyLyricsDocument(track, embedded)
 
-                    LyricsAutoSearchMode.EMBEDDED_FIRST -> {
+                    LyricsAutoSearchMode.EMBEDDED_FIRST,
+                    LyricsAutoSearchMode.BEST_MATCH -> {
                         if (hasEmbedded) {
                             applyLyricsDocument(track, embedded)
                         } else {
                             autoSearchLyricsAndApply(track, fallback = null)
                         }
                     }
-
-                    LyricsAutoSearchMode.BEST_MATCH -> autoSearchLyricsAndApply(track, fallback = embedded)
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
