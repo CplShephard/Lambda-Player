@@ -22,6 +22,8 @@ import dev.shephard.player.ui.miuix.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -107,6 +109,26 @@ fun PlaybackSettingsSheet(
             items = normalizationModes.map { volumeNormalizationLabel(it, strings) },
             selectedIndex = normalizationModes.indexOf(state.volumeNormalization),
             onSelectedIndexChange = { playerViewModel.setVolumeNormalization(normalizationModes[it]) }
+        )
+
+        HorizontalDivider(color = MiuixAppTheme.colorScheme.surfaceVariant)
+
+        // Lyrics translation language (QQ Music style)
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val prefs = remember(context) { dev.shephard.player.player.PreferencesManager(context) }
+        val transLang by prefs.lyricsTranslationLanguage.collectAsState(initial = "off")
+        val scope = androidx.compose.runtime.rememberCoroutineScope()
+        val transOptions = dev.shephard.player.player.LyricsTranslator.supportedLanguages
+        MiuixSpinnerRow(
+            title = strings.lyricsTranslationLanguage,
+            summary = strings.lyricsTranslationLanguageDescription,
+            items = transOptions.map { dev.shephard.player.player.LyricsTranslator.labelFor(it.first, strings) },
+            selectedIndex = transOptions.indexOfFirst { it.first == transLang }.coerceAtLeast(0),
+            onSelectedIndexChange = { idx ->
+                val code = transOptions[idx].first
+                scope.launch { prefs.setLyricsTranslationLanguage(code); prefs.setLyricsTranslationVisible(code != "off") }
+                if (code != "off") playerViewModel.ensureLyricsTranslation(code)
+            }
         )
 
         HorizontalDivider(color = MiuixAppTheme.colorScheme.surfaceVariant)

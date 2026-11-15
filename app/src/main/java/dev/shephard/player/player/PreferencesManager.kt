@@ -68,6 +68,7 @@ object PrefsKeys {
     val LYRICS_AUTO_SCROLL_ENABLED = booleanPreferencesKey("lyrics_auto_scroll_enabled")
     val LYRICS_SKIP_SEARCH_PROMPT = booleanPreferencesKey("lyrics_skip_search_prompt")
     val LYRICS_TRANSLATION_VISIBLE = booleanPreferencesKey("lyrics_translation_visible")
+    val LYRICS_TRANSLATION_LANGUAGE = stringPreferencesKey("lyrics_translation_language")
     val CAROUSEL_STYLE = stringPreferencesKey("carousel_style")
     val LYRICS_SYNC_OFFSETS_JSON = stringPreferencesKey("lyrics_sync_offsets_json")
 }
@@ -276,6 +277,10 @@ class PreferencesManager(private val context: Context) {
 
     val lyricsTranslationVisible: Flow<Boolean> = context.dataStore.data.map {
         it[PrefsKeys.LYRICS_TRANSLATION_VISIBLE] ?: true
+    }
+
+    val lyricsTranslationLanguage: Flow<String> = context.dataStore.data.map {
+        it[PrefsKeys.LYRICS_TRANSLATION_LANGUAGE] ?: "off"
     }
 
     val lyricsSyncOffsetsJson: Flow<String> = context.dataStore.data.map {
@@ -554,6 +559,10 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setLyricsTranslationVisible(visible: Boolean) {
         context.dataStore.edit { it[PrefsKeys.LYRICS_TRANSLATION_VISIBLE] = visible }
+    }
+
+    suspend fun setLyricsTranslationLanguage(language: String) {
+        context.dataStore.edit { it[PrefsKeys.LYRICS_TRANSLATION_LANGUAGE] = language }
     }
 
     suspend fun setLyricsSyncOffsetsJson(json: String) {

@@ -77,6 +77,10 @@ class Strings internal constructor(private val texts: Map<String, String>) {
     val carouselTwoPeek: String get() = texts.getValue("carouselTwoPeek")
     val lyricsShowTranslation: String get() = texts.getValue("lyricsShowTranslation")
     val lyricsHideTranslation: String get() = texts.getValue("lyricsHideTranslation")
+    val lyricsTranslationLanguage: String get() = texts.getValue("lyricsTranslationLanguage")
+    val lyricsTranslationLanguageDescription: String get() = texts.getValue("lyricsTranslationLanguageDescription")
+    val lyricsTranslationOff: String get() = texts.getValue("lyricsTranslationOff")
+    val lyricsTranslationOriginal: String get() = texts.getValue("lyricsTranslationOriginal")
     val lyricsOptions: String get() = texts.getValue("lyricsOptions")
     val lyricsEdit: String get() = texts.getValue("lyricsEdit")
     val lyricsSave: String get() = texts.getValue("lyricsSave")
@@ -334,6 +338,14 @@ private fun createEN(): Strings = Strings(mapOf(
     "carouselTwoPeek" to "Both neighboring covers",
     "lyricsShowTranslation" to "Show translation",
     "lyricsHideTranslation" to "Hide translation",
+    "lyricsTranslationLanguage" to "Lyrics translation language",
+    "lyricsTranslationLanguageDescription" to "Show translation under each line in the chosen language (QQ Music style)",
+    "lyricsTranslationOff" to "Off",
+    "lyricsTranslationOriginal" to "Original (from source)",
+    "lyricsShakeEffect" to "Premium shake effect",
+    "lyricsShakeEffectDescription" to "Letters jiggle lightly as lines enter and exit",
+    "lyricsNoteAnimation" to "Music note animation",
+    "lyricsNoteAnimationDescription" to "Show animated notes during instrumental gaps (QQ Music style)",
     "lyricsOptions" to "Lyrics options",
     "lyricsEdit" to "Edit lyrics",
     "lyricsSave" to "Save lyrics",
@@ -786,6 +798,14 @@ private fun createTR(base: Strings): Strings = base.withOverrides(mapOf(
     "lyricsAutoSearchEmbedded" to "Gömülü öncelikli",
     "lyricsAutoSearchBestMatch" to "En uygun",
     "lyricsAutoSearchOnline" to "Online öncelikli",
+    "lyricsTranslationLanguage" to "Şarkı sözü çeviri dili",
+    "lyricsTranslationLanguageDescription" to "Her satırın altında seçilen dilde çeviriyi göster (QQ Music tarzı)",
+    "lyricsTranslationOff" to "Kapalı",
+    "lyricsTranslationOriginal" to "Orijinal (kaynak)",
+    "lyricsShakeEffect" to "Premium sallanma efekti",
+    "lyricsShakeEffectDescription" to "Satırlar girerken ve çıkarken harfler hafifçe sallansın",
+    "lyricsNoteAnimation" to "Nota animasyonu",
+    "lyricsNoteAnimationDescription" to "Şarkı söylenmeyen kısımlarda nota animasyonu göster (QQ Music tarzı)",
     "volumeNormalizationTitle" to "Ses seviyesi normalizasyonu",
     "volumeNormalizationDescription" to "Şarkılar arasındaki ses seviyesi farkını dengeler.",
     "volumeNormalizationNone" to "Kapalı",

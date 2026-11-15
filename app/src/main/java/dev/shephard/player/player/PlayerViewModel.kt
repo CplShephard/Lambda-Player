@@ -1526,12 +1526,41 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             put("lines", org.json.JSONArray(document.lines))
             put("syncedLyrics", org.json.JSONArray().apply {
                 document.syncedLines.forEach { line ->
-                    put(org.json.JSONObject().put("timeMs", line.timeMs).put("text", line.text))
+                    val o = org.json.JSONObject().put("timeMs", line.timeMs).put("text", line.text)
+                    line.translation?.takeIf { it.isNotBlank() }?.let { o.put("translation", it) }
+                    if (line.words.isNotEmpty()) {
+                        o.put("words", org.json.JSONArray().apply {
+                            line.words.forEach { w -> put(org.json.JSONObject().put("startMs", w.startMs).put("endMs", w.endMs).put("startChar", w.startChar).put("endChar", w.endChar)) }
+                        })
+                    }
+                    put(o)
                 }
             })
         }
         obj.put(trackId.toString(), payload)
         prefs.setLyricsJson(obj.toString())
+    }
+
+    /** Translate current synced lyrics to target language if needed (QQ Music style) */
+    fun ensureLyricsTranslation(targetLang: String) {
+        if (targetLang == "off") return
+        val current = _uiState.value
+        if (current.syncedLyrics.isEmpty()) return
+        viewModelScope.launch {
+            val updated = current.syncedLyrics.map { line ->
+                if (targetLang == "original") line
+                else {
+                    val translated = try {
+                        LyricsTranslator.translateIfNeeded(line.text, targetLang, line.translation)
+                    } catch (_: Exception) { line.translation }
+                    if (translated != null && translated != line.translation) line.copy(translation = translated) else line
+                }
+            }
+            // Only update if changed
+            if (updated != current.syncedLyrics) {
+                _uiState.value = _uiState.value.copy(syncedLyrics = updated)
+            }
+        }
     }
 
     fun searchLyrics(query: String, autoApply: Boolean = false) {
