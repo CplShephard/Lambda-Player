@@ -31,6 +31,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -772,6 +775,7 @@ private fun PlaylistListView(
     onCreate: () -> Unit
 ) {
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
 
 Box(modifier = Modifier.fillMaxSize()) {
 
@@ -832,7 +836,7 @@ Scaffold(
                         } else dev.shephard.player.ui.components.LayoutSwitchAnimation(layout, Modifier.fillMaxSize()) { displayLayout ->
 if (displayLayout == LayoutMode.GRID) {
                             LazyVerticalGrid(
-                                columns = GridCells.Fixed(2),
+                                columns = GridCells.Fixed(if (isLandscape) 8 else 2),
                                 state = playlistGridState,
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -851,7 +855,7 @@ if (displayLayout == LayoutMode.GRID) {
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                item(key = "pinned_header", span = { GridItemSpan(2) }) {
+                                item(key = "pinned_header", span = { GridItemSpan(if (isLandscape) 8 else 2) }) {
                                     Column(modifier = Modifier.fillMaxWidth()) {
                                         AnimatedVisibility(
                                             visible = hasPinned,
@@ -876,6 +880,37 @@ if (displayLayout == LayoutMode.GRID) {
                                     val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
                                     Box(modifier = Modifier.animateItem()) {
                                         PlaylistGridCard(playlist = pl, plTracks = plTracks, strings = strings,
+                                            onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
+                                    }
+                                }
+                            }
+                        } else if (isLandscape) {
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(2),
+                                state = playlistGridState,
+                                modifier = Modifier.fillMaxSize()
+                                    .then(if (embedded) Modifier else Modifier
+                                        .captureForTopBarBlur(topBarState)
+                                        .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                                        .overScrollVertical()),
+                                contentPadding = PaddingValues(start = 16.dp, top = innerPadding.calculateTopPadding() + 8.dp, end = 16.dp, bottom = 220.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                item(key = "pinned_header", span = { GridItemSpan(2) }) {
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        AnimatedVisibility(visible = hasPinned, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+                                            Text(text = strings.pinnedPlaylists, style = MiuixAppTheme.typography.labelMedium,
+                                                color = MiuixAppTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 4.dp))
+                                        }
+                                    }
+                                }
+                                items(count = sortedPlaylists.size, key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }) { i ->
+                                    val pl = sortedPlaylists[i]
+                                    val realIdx = playlists.indexOf(pl)
+                                    val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+                                    Box(modifier = Modifier.animateItem()) {
+                                        PlaylistListCard(playlist = pl, plTracks = plTracks, strings = strings,
                                             onClick = { onOpen(realIdx) }, onMenu = { onMenu(realIdx) }, onPlay = { onPlay(pl) })
                                     }
                                 }
@@ -1153,6 +1188,7 @@ internal fun PlaylistDetailView(
     isAlbum: Boolean = false
 ) {
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
     val reorderItems = remember { mutableStateListOf<AudioTrack>() }
     var dragInfo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var isReordering by remember { mutableStateOf(false) }
@@ -1180,7 +1216,7 @@ internal fun PlaylistDetailView(
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val detailCollapse by dev.shephard.player.ui.components.rememberScrollFraction(listState)
-    val reorderableHeaderItemCount = 2
+    val reorderableHeaderItemCount = if (isLandscape) 0 else 2
     val reorderableState = rememberReorderableLazyListState(
         lazyListState = listState
     ) { from, to ->
@@ -1240,6 +1276,76 @@ internal fun PlaylistDetailView(
                 }
             }
         ) { innerPadding ->
+        if (isLandscape) {
+            Row(
+                modifier = Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding() + 8.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                PlaylistLandscapeHeader(
+                    playlist = playlist,
+                    displayTracks = displayTracks,
+                    strings = strings,
+                    isHomeSimplified = isHomeSimplified,
+                    isAlbum = isAlbum,
+                    onPickCover = onPickCover,
+                    onPlayAll = onPlayAll,
+                    onPlayRemix = onPlayRemix,
+                    onAddTracks = onAddTracks,
+                    onChangeSort = onChangeSort,
+                    modifier = Modifier.weight(0.42f).fillMaxHeight(),
+                )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.weight(0.58f).fillMaxHeight()
+                        .captureForTopBarBlur(topBarState)
+                        .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                        .overScrollVertical(),
+                    contentPadding = PaddingValues(start = 8.dp, end = 12.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (displayTracks.isEmpty()) {
+                        item {
+                            Text(
+                                text = if (playlist.isSystem) "No liked songs yet" else "No tracks yet. Tap \"${strings.addTracks}\".",
+                                style = MiuixAppTheme.typography.bodyMedium,
+                                color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 16.dp),
+                            )
+                        }
+                    } else if (playlist.sortMode == "custom" && !playlist.isSystem && !isHomeSimplified && !isAlbum) {
+                        itemsIndexed(reorderItems, key = { _, track -> track.id }) { index, track ->
+                            ReorderableItem(state = reorderableState, key = track.id) { isDragging ->
+                                Box(modifier = Modifier.animateItem()) {
+                                    DraggablePlaylistTrackRow(
+                                        track = track,
+                                        isDragged = isDragging,
+                                        onTrackClick = { onTrackClick(reorderItems.toList(), index) },
+                                        onRemove = { onRemoveTrack(track.id) },
+                                        onMore = { onTrackOptions(track) },
+                                        dragHandleModifier = Modifier.draggableHandle(),
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        itemsIndexed(displayTracks, key = { _, track -> track.id }) { index, track ->
+                            Box(modifier = Modifier.animateItem(
+                                fadeInSpec = androidx.compose.animation.core.tween(250),
+                                fadeOutSpec = androidx.compose.animation.core.tween(200),
+                                placementSpec = androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 380f),
+                            )) {
+                                PlaylistTrackRow(
+                                    track = track,
+                                    onClick = { onTrackClick(displayTracks, index) },
+                                    onRemove = { onRemoveTrack(track.id) },
+                                    onMore = { onTrackOptions(track) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -1434,6 +1540,161 @@ internal fun PlaylistDetailView(
                 }
             }
         }
+        }
+        }
+    }
+}
+
+@Composable
+private fun PlaylistLandscapeHeader(
+    playlist: LocalPlaylist,
+    displayTracks: List<AudioTrack>,
+    strings: dev.shephard.player.ui.i18n.Strings,
+    isHomeSimplified: Boolean,
+    isAlbum: Boolean,
+    onPickCover: () -> Unit,
+    onPlayAll: () -> Unit,
+    onPlayRemix: () -> Unit,
+    onAddTracks: () -> Unit,
+    onChangeSort: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val editable = !playlist.isSystem && !isHomeSimplified && !isAlbum
+    Column(
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(bottom = 100.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.78f)
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(20.dp))
+                .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                .then(if (editable) Modifier.clickable(onClick = onPickCover) else Modifier),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (playlist.isSystem) {
+                Box(
+                    modifier = Modifier.fillMaxSize().background(
+                        Brush.linearGradient(
+                            listOf(
+                                MiuixAppTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                MiuixAppTheme.colorScheme.tertiary.copy(alpha = 0.6f),
+                            ),
+                        ),
+                    ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.Favorite, null, tint = Color.White, modifier = Modifier.size(64.dp))
+                }
+            } else {
+                PlaylistCoverArt(
+                    coverUri = playlist.coverUri,
+                    tracks = displayTracks,
+                    animateVideo = true,
+                    placeholderColor = MiuixAppTheme.colorScheme.surfaceVariant,
+                    placeholderIconColor = MiuixAppTheme.colorScheme.primary,
+                    fallback = {
+                        Icon(Icons.Filled.LibraryMusic, null, tint = MiuixAppTheme.colorScheme.primary, modifier = Modifier.size(44.dp))
+                    },
+                )
+                if (editable) {
+                    Box(
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).size(30.dp)
+                            .clip(RoundedCornerShape(8.dp)).background(MiuixAppTheme.colorScheme.surface.copy(alpha = 0.7f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Filled.Edit, null, tint = MiuixAppTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+        }
+        Text(
+            text = playlist.name,
+            style = MiuixAppTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MiuixAppTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (isAlbum) {
+            displayTracks.firstOrNull()?.artist?.let { artist ->
+                Text(artist, style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Text(
+            text = "${displayTracks.size} ${strings.trackCount}",
+            style = MiuixAppTheme.typography.bodySmall,
+            color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.weight(1f).clip(RoundedCornerShape(14.dp))
+                    .background(MiuixAppTheme.colorScheme.primary)
+                    .clickable(enabled = displayTracks.isNotEmpty(), onClick = onPlayAll)
+                    .padding(horizontal = 6.dp, vertical = 11.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.PlayArrow, strings.play, tint = Color.White, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(strings.play, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            }
+            Row(
+                modifier = Modifier.weight(1f).clip(RoundedCornerShape(14.dp))
+                    .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                    .clickable(enabled = displayTracks.isNotEmpty(), onClick = onPlayRemix)
+                    .padding(horizontal = 6.dp, vertical = 11.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.Shuffle, strings.remix, tint = MiuixAppTheme.colorScheme.onBackground, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(strings.remix, color = MiuixAppTheme.colorScheme.onBackground, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            }
+        }
+        if (editable) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                    .background(MiuixAppTheme.colorScheme.surfaceVariant).clickable(onClick = onAddTracks)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(Icons.Filled.Add, strings.addTracks, tint = MiuixAppTheme.colorScheme.onBackground, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(strings.addTracks, color = MiuixAppTheme.colorScheme.onBackground, maxLines = 1)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                listOf(
+                    "custom" to strings.customOrder,
+                    "alphabetical" to strings.alphabetical,
+                    "artist" to strings.sortByArtist,
+                    "timeAdded" to strings.timeAdded,
+                ).forEach { (mode, label) ->
+                    val selected = playlist.sortMode == mode
+                    Text(
+                        text = label,
+                        style = MiuixAppTheme.typography.labelSmall,
+                        color = if (selected) MiuixAppTheme.colorScheme.onPrimary else MiuixAppTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                            .background(if (selected) MiuixAppTheme.colorScheme.primary else MiuixAppTheme.colorScheme.surfaceVariant)
+                            .clickable { onChangeSort(mode) }.padding(horizontal = 10.dp, vertical = 6.dp),
+                        maxLines = 1,
+                    )
+                }
+            }
         }
     }
 }

@@ -99,10 +99,12 @@ fun SegmentedColumn(
     modifier: Modifier = Modifier,
     title: String = "",
     contentPadding: PaddingValues = PaddingValues(horizontal = PADDING_HORIZONTAL.dp, vertical = PADDING_VERTICAL.dp),
+    columns: Int = 1,
     content: SegmentedColumnScope.() -> Unit
 ) {
     val scope = SegmentedColumnScope().apply(content)
     val allItems = scope.items
+    val activeColumnCount = columns.coerceAtLeast(1).coerceAtMost(allItems.size.coerceAtLeast(1))
 
     if (allItems.isEmpty()) return
 
@@ -136,8 +138,8 @@ fun SegmentedColumn(
             content = {
                 allItems.forEachIndexed { index, itemData ->
                     key(itemData.key ?: index) {
-                        val isFirst = index == firstVisibleIndex || (index == 0 && !itemData.visible)
-                        val isLast = index == lastVisibleIndex || (index == allItems.lastIndex && !itemData.visible)
+                        val isFirst = activeColumnCount > 1 || index == firstVisibleIndex || (index == 0 && !itemData.visible)
+                        val isLast = activeColumnCount > 1 || index == lastVisibleIndex || (index == allItems.lastIndex && !itemData.visible)
 
                         val baseTopRadius = if (isFirst) CornerRadius else ConnectionRadius
                         val baseBottomRadius = if (isLast) CornerRadius else ConnectionRadius
@@ -197,42 +199,76 @@ fun SegmentedColumn(
                 }
             }
         ) { measurables, constraints ->
-            val placeables = measurables.map { it.measure(constraints) }
+            val gridColumns = if (constraints.hasBoundedWidth) activeColumnCount else 1
+            val horizontalSpacingPx = with(density) { 8.dp.roundToPx() }
+            val availableWidth = constraints.maxWidth
+            val cellWidth = if (gridColumns > 1) {
+                ((availableWidth - horizontalSpacingPx * (gridColumns - 1)) / gridColumns).coerceAtLeast(0)
+            } else availableWidth
+            val itemConstraints = if (gridColumns > 1) {
+                constraints.copy(minWidth = 0, maxWidth = cellWidth)
+            } else constraints
+            val placeables = measurables.map { it.measure(itemConstraints) }
 
-            val itemSpacingPx = with(density) { 2.dp.roundToPx() }
-            var totalHeight = 0
-            val yPositions = IntArray(placeables.size)
+            if (gridColumns == 1) {
+                val itemSpacingPx = with(density) { 2.dp.roundToPx() }
+                var totalHeight = 0
+                val yPositions = IntArray(placeables.size)
+                var isFirstItemPlaced = true
 
-            var isFirstItemPlaced = true
-
-            placeables.forEachIndexed { index, placeable ->
-                val progress = progresses[index].value
-                val customPaddingPx = allItems[index].customTopPadding?.let { with(density) { it.roundToPx() } }
-
-                if (progress > 0f) {
-                    val spacing = when {
-                        customPaddingPx != null -> (customPaddingPx * progress).roundToInt()
-                        !isFirstItemPlaced -> (itemSpacingPx * progress).roundToInt()
-                        else -> 0
-                    }
-
-                    totalHeight += spacing
-                    yPositions[index] = totalHeight
-
-                    val animatedItemHeight = (placeable.height * progress).roundToInt()
-                    totalHeight += animatedItemHeight
-
-                    isFirstItemPlaced = false
-                } else {
-                    yPositions[index] = totalHeight
-                }
-            }
-
-            layout(constraints.maxWidth, totalHeight) {
                 placeables.forEachIndexed { index, placeable ->
                     val progress = progresses[index].value
+                    val customPaddingPx = allItems[index].customTopPadding?.let { with(density) { it.roundToPx() } }
                     if (progress > 0f) {
-                        placeable.placeRelative(0, yPositions[index])
+                        val spacing = when {
+                            customPaddingPx != null -> (customPaddingPx * progress).roundToInt()
+                            !isFirstItemPlaced -> (itemSpacingPx * progress).roundToInt()
+                            else -> 0
+                        }
+                        totalHeight += spacing
+                        yPositions[index] = totalHeight
+                        totalHeight += (placeable.height * progress).roundToInt()
+                        isFirstItemPlaced = false
+                    } else {
+                        yPositions[index] = totalHeight
+                    }
+                }
+
+                layout(constraints.maxWidth, totalHeight) {
+                    placeables.forEachIndexed { index, placeable ->
+                        if (progresses[index].value > 0f) placeable.placeRelative(0, yPositions[index])
+                    }
+                }
+            } else {
+                val rowCount = (placeables.size + gridColumns - 1) / gridColumns
+                val rowHeights = IntArray(rowCount)
+                placeables.forEachIndexed { index, placeable ->
+                    val animatedHeight = (placeable.height * progresses[index].value).roundToInt()
+                    val row = index / gridColumns
+                    rowHeights[row] = maxOf(rowHeights[row], animatedHeight)
+                }
+                val verticalSpacingPx = with(density) { 8.dp.roundToPx() }
+                val rowYPositions = IntArray(rowCount)
+                var totalHeight = 0
+                var hasPlacedRow = false
+                rowHeights.forEachIndexed { row, rowHeight ->
+                    if (rowHeight > 0) {
+                        if (hasPlacedRow) totalHeight += verticalSpacingPx
+                        rowYPositions[row] = totalHeight
+                        totalHeight += rowHeight
+                        hasPlacedRow = true
+                    } else {
+                        rowYPositions[row] = totalHeight
+                    }
+                }
+                layout(constraints.maxWidth, totalHeight) {
+                    placeables.forEachIndexed { index, placeable ->
+                        if (progresses[index].value > 0f) {
+                            val column = index % gridColumns
+                            val row = index / gridColumns
+                            val x = column * (cellWidth + horizontalSpacingPx)
+                            placeable.placeRelative(x, rowYPositions[row])
+                        }
                     }
                 }
             }

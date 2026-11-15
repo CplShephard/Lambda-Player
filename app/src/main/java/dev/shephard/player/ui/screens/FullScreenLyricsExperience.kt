@@ -217,7 +217,6 @@ fun FullScreenLyricsExperience(
     androidx.compose.runtime.SideEffect {
         if (showSearch && !searchState.autoApplied) lastSearchForExit = searchState
     }
-    var showFetchLyrics by remember { mutableStateOf(false) }
     val promptedTracks = remember { mutableSetOf<Long>() }
     var showSettings by remember { mutableStateOf(false) }
     var lyricsOnly by remember { mutableStateOf(false) }
@@ -274,31 +273,25 @@ fun FullScreenLyricsExperience(
 
     LaunchedEffect(track?.id) {
         searchQuery = track?.title.orEmpty()
-        showFetchLyrics = false
         playerViewModel.clearLyricsSearch()
     }
 
     // Decide only after saved, embedded and automatic lyrics have finished loading.
-    // Lambda's manual search remains separate; never interrupt it with the prompt.
+    // Missing lyrics stay inline with the animated note row instead of interrupting playback with a popup.
     LaunchedEffect(track?.id, state.lyricsLoading, state.lyrics, skipLyricsPrompt, showSearch) {
         val current = track
         if (current != null && skipLyricsPrompt != null && !state.lyricsLoading && !showSearch && current.id !in promptedTracks) {
             promptedTracks.add(current.id)
-            if (!showSearch) {
-                if (state.lyrics.isEmpty() && skipLyricsPrompt != true) {
-                    playerViewModel.clearLyricsSearch()
-                    showFetchLyrics = true
-                } else if (playerViewModel.consumeFirstLyricsOpenSearch()) {
-                    // Keep the existing Online First mode if the prompt is suppressed or lyrics exist.
-                    showSearch = true
-                    playerViewModel.searchLyrics(current.title)
-                }
+            if (state.lyrics.isEmpty() && skipLyricsPrompt != true) {
+                playerViewModel.clearLyricsSearch()
+            } else if (playerViewModel.consumeFirstLyricsOpenSearch()) {
+                showSearch = true
+                playerViewModel.searchLyrics(current.title)
             }
         }
     }
     LaunchedEffect(searchState.autoApplied) {
-        if (searchState.autoApplied && (showFetchLyrics || showSearch)) {
-            showFetchLyrics = false
+        if (searchState.autoApplied && showSearch) {
             showSearch = false
             playerViewModel.clearLyricsSearch()
         }
@@ -435,7 +428,7 @@ fun FullScreenLyricsExperience(
         val navigationBack = rememberNavigationEventState(currentInfo = NavigationEventInfo.None)
         NavigationBackHandler(
             state = navigationBack,
-            isBackEnabled = !showOptions && !showFetchLyrics && !closing,
+            isBackEnabled = !showOptions && !closing,
             onBackCancelled = { scope.launch { backProgress.animateTo(0f, spring(dampingRatio = 0.82f, stiffness = 380f)) } },
             onBackCompleted = {
                 if (lyricsOnly) { lyricsOnly = false; scope.launch { backProgress.snapTo(0f) } }
@@ -690,7 +683,7 @@ fun FullScreenLyricsExperience(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        Icon(Icons.Filled.Lyrics, contentDescription = null, tint = LocalLyricsForeground.current.copy(alpha = 0.72f), modifier = Modifier.size(54.dp))
+                        QqMusicNoteAnimation(primary = primary, foreground = LocalLyricsForeground.current)
                         Spacer(Modifier.height(14.dp))
                         BasicText(strings.noLyricsFound, style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.78f)))
                         Spacer(Modifier.height(16.dp))
@@ -912,40 +905,7 @@ fun FullScreenLyricsExperience(
         }
             }
         }
-        if (showFetchLyrics) {
-            val searchFromPrompt: (Boolean) -> Unit = { forcePick ->
-                showFetchLyrics = false
-                showSearch = true
-                searchQuery = track?.title.orEmpty()
-                val query = listOfNotNull(track?.title?.takeIf { it.isNotBlank() },
-                    track?.artist?.takeIf { it.isNotBlank() && !it.equals("<unknown>", true) }).joinToString(" ")
-                playerViewModel.searchLyrics(query, autoApply = !forcePick)
-            }
-            val dismissPrompt = { showFetchLyrics = false; playerViewModel.clearLyricsSearch() }
-            val importLyrics = {
-                showFetchLyrics = false
-                playerViewModel.clearLyricsSearch()
-                importLauncher.launch(arrayOf("*/*", "text/*", "text/plain", "application/octet-stream", "application/x-lrc", "text/lrc", "text/x-lrc", "application/ttml+xml", "application/xml"))
-            }
-            if (useMiuix) {
-                dev.shephard.player.ui.components.MiuixFetchLyricsDialog(
-                    song = track, dontShowAgain = skipLyricsPrompt == true,
-                    onDontShowAgainChange = { value -> scope.launch { preferences.setLyricsSkipSearchPrompt(value) } },
-                    onSearch = searchFromPrompt, onDismiss = dismissPrompt, onImport = importLyrics,
-                )
-            } else {
-                MaterialTheme(colorScheme = dev.shephard.player.ui.theme.PlayerTheme.colorScheme) {
-                    dev.shephard.player.ui.components.FetchLyricsDialog(
-                        uiState = searchState, currentSong = track, dontShowAgain = skipLyricsPrompt == true,
-                        onDontShowAgainChange = { value -> scope.launch { preferences.setLyricsSkipSearchPrompt(value) } },
-                        onConfirm = searchFromPrompt,
-                        onPickResult = { result -> playerViewModel.selectLyricsSearchResult(result); showFetchLyrics = false },
-                        onManualSearch = { title, artist -> playerViewModel.searchLyrics(listOfNotNull(title.trim().takeIf { it.isNotBlank() }, artist?.trim()?.takeIf { it.isNotBlank() }).joinToString(" ")) },
-                        onDismiss = dismissPrompt, onImport = importLyrics,
-                    )
-                }
-            }
-        }
+
     }
 }
 

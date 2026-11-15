@@ -132,6 +132,7 @@ fun PlaylistScreenM3(
 
     val json by prefs.playlistsJson.collectAsState(initial = "[]")
     val playlistsLayout by prefs.playlistsLayout.collectAsState(initial = LayoutMode.LIST)
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
     val likedSongIdsJson by prefs.likedSongIds.collectAsState(initial = "[]")
     val likedIds = remember(likedSongIdsJson) {
         try {
@@ -432,7 +433,7 @@ fun PlaylistScreenM3(
                             ) { layout ->
                                 if (layout == LayoutMode.GRID) {
                                     LazyVerticalGrid(
-                                        columns = GridCells.Fixed(2),
+                                        columns = GridCells.Fixed(if (isLandscape) 8 else 2),
                                         modifier = Modifier.fillMaxSize(),
                                         contentPadding = PaddingValues(
                                             start = 8.dp,
@@ -447,6 +448,30 @@ fun PlaylistScreenM3(
                                             val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
                                             Box(modifier = Modifier.animateItem()) {
                                                 PlaylistGridCardM3(
+                                                    playlist = pl,
+                                                    plTracks = plTracks,
+                                                    strings = strings,
+                                                    onClick = { onOpenPlaylistDetail(realIdx) },
+                                                    onMore = { playlistMenuIndex = realIdx },
+                                                    onPlay = { playPlaylist(pl, plTracks) },
+                                                )
+                                            }
+                                        }
+                                    }
+                                } else if (isLandscape) {
+                                    LazyVerticalGrid(
+                                        columns = GridCells.Fixed(2),
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = 220.dp, top = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    ) {
+                                        items(count = sortedPlaylists.size, key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }) { i ->
+                                            val pl = sortedPlaylists[i]
+                                            val realIdx = playlists.indexOf(pl)
+                                            val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+                                            Box(modifier = Modifier.animateItem()) {
+                                                PlaylistRowM3(
                                                     playlist = pl,
                                                     plTracks = plTracks,
                                                     strings = strings,

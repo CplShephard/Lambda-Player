@@ -163,10 +163,8 @@ fun PlaybackSettingsSheet(
 @Composable
 private fun OrphanCleanupSection(playerViewModel: PlayerViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val strings = LocalStrings.current
     var showDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var progress by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
-    var report by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<PlayerViewModel.OrphanCleanupReport?>(null) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val libraryVm: dev.shephard.player.player.LibraryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val libraryTracks by libraryVm.tracks.collectAsState()
@@ -175,20 +173,15 @@ private fun OrphanCleanupSection(playerViewModel: PlayerViewModel) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                 Text(text = "Storage orphan cleanup", style = MiuixAppTheme.typography.bodyLarge, color = MiuixAppTheme.colorScheme.onBackground)
-                Text(text = "Scan DataStore for tracks not on device and remove only unnecessary (GEREKSIZ) leftover metadata", style = MiuixAppTheme.typography.bodyMedium, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
-                if (report != null) {
-                    Text(text = report!!.summary(), style = MiuixAppTheme.typography.bodyMedium, color = MiuixAppTheme.colorScheme.primary, modifier = Modifier.padding(top = 6.dp))
-                }
             }
             MiuixAppTheme.let {
                 top.yukonga.miuix.kmp.basic.Button(
                     onClick = {
-                        progress = 0; report = null; showDialog = true
+                        progress = 0; showDialog = true
                         scope.launch {
                             val ids = libraryTracks.map { it.id.toString() }.toSet()
                             val stable = libraryTracks.map { dev.shephard.player.data.TrackFingerprint.stableKey(it) }.toSet()
                             val res = playerViewModel.scanAndCleanOrphanedData(ids, stable) { p -> progress = p }
-                            report = res
                             kotlinx.coroutines.delay(400)
                             showDialog = false
                             android.widget.Toast.makeText(context, res.summary(), android.widget.Toast.LENGTH_LONG).show()
@@ -196,9 +189,6 @@ private fun OrphanCleanupSection(playerViewModel: PlayerViewModel) {
                     }
                 ) { Text("Scan & clean") }
             }
-        }
-        if (report != null) {
-            Text(text = "${report!!.totalRemoved} orphan items removed — listening ${report!!.removedListening}, lyrics ${report!!.removedLyrics}", style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
         }
     }
     if (showDialog) {
@@ -222,8 +212,6 @@ private fun OrphanCleanupProgressDialog(progress: Int, onDismiss: () -> Unit) {
                 ) {
                     Box(modifier = Modifier.fillMaxWidth(fraction = progress / 100f).height(10.dp).clip(RoundedCornerShape(6.dp)).background(MiuixAppTheme.colorScheme.primary))
                 }
-                Text(text = "${progress}% — checking listening stats, lyrics, overrides…", style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
-                Text(text = "Only GEREKSIZ (orphaned) entries will be deleted from DataStore directory", style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), modifier = Modifier.padding(top = 6.dp))
             }
         },
         buttons = {

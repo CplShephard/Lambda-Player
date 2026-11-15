@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -17,6 +18,8 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.dp
 import dev.shephard.player.ui.util.TrackOverlayForBack
 import top.yukonga.miuix.kmp.nav.gesture.WindowNavigationEventBridge
 
@@ -38,12 +41,16 @@ fun M3BottomSheetWrapper(
     TrackOverlayForBack()
     val scope = rememberCoroutineScope()
     val currentOnDismiss by rememberUpdatedState(onDismissRequest)
+    val windowWidth = LocalConfiguration.current.screenWidthDp.dp
+    val drawerWidth = minOf(420.dp, windowWidth * 0.88f)
+    val leftAlignedOffset = -(windowWidth - drawerWidth) / 2
     var closing by remember { mutableStateOf(false) }
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
+        sheetMaxWidth = drawerWidth,
         containerColor = containerColor,
-        modifier = modifier,
+        modifier = Modifier.absoluteOffset(x = leftAlignedOffset).then(modifier),
     ) {
         // ModalBottomSheet is a separate Android window, but its built-in PredictiveBackHandler
         // registers on the inherited LocalNavigationEventDispatcherOwner (our NavDisplay entry

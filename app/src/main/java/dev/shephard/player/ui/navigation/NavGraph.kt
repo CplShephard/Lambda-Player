@@ -16,8 +16,10 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -29,6 +31,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.material3.Icon as M3Icon
@@ -50,6 +53,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.navigationevent.NavigationEventInfo
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.graphics.Color
@@ -110,7 +114,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import top.yukonga.miuix.kmp.basic.NavigationBar
-import top.yukonga.miuix.kmp.basic.NavigationBarItem
+import top.yukonga.miuix.kmp.basic.NavigationBarDefaults
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurColors
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -274,11 +278,12 @@ fun NavGraph(
                             }
                         }
 
+                        val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
                         AnimatedVisibility(
                             visible = true,
                             modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .fillMaxWidth()
+                                .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomCenter)
+                                .fillMaxWidth(if (isLandscape) 0.5f else 1f)
                                 .zIndex(1f),
                             enter = fadeIn(tween(200)) + slideInVertically(initialOffsetY = { it }),
                             exit = fadeOut(tween(150)) + slideOutVertically(targetOffsetY = { it })
@@ -343,10 +348,28 @@ fun NavGraph(
             }
             entry<AlbumDetailRoute>(swipeDismiss = swipeBackDirection) { route ->
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
-                    dev.shephard.player.ui.screens.AlbumDetailScreen(
-                        albumId = route.albumId, albumName = route.title, artist = route.artist,
-                        useMiuix = useMiuix, player = playerViewModel, onBack = ::pop,
-                    )
+                    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
+                    val albumBackdrop = dev.shephard.player.ui.glass.rememberAppBlurBackdrop(LocalBlurEnabled.current)
+                    Box(Modifier.fillMaxSize()) {
+                        Box(Modifier.fillMaxSize().then(if (albumBackdrop != null) Modifier.layerBackdrop(albumBackdrop) else Modifier)) {
+                            dev.shephard.player.ui.screens.AlbumDetailScreen(
+                                albumId = route.albumId, albumName = route.title, artist = route.artist,
+                                useMiuix = useMiuix, player = playerViewModel, onBack = ::pop,
+                            )
+                        }
+                        if (isLandscape) {
+                            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(0.5f)) {
+                                CompositionLocalProvider(LocalContentBackdrop provides albumBackdrop) {
+                                    MiniPlayerHost(
+                                        playerViewModel = playerViewModel,
+                                        useMiuix = useMiuix,
+                                        onOpenNowPlaying = onOpenNowPlaying,
+                                        onBoundsChanged = onMiniPlayerBoundsChanged,
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
             entry<PlaylistDetailRoute>(swipeDismiss = swipeBackDirection) { route ->
@@ -372,10 +395,19 @@ fun NavGraph(
                         )
                     }
                     }
-                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+                    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
+                    Box(
+                        Modifier
+                            .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomCenter)
+                            .fillMaxWidth(if (isLandscape) 0.5f else 1f)
+                    ) {
                         CompositionLocalProvider(LocalContentBackdrop provides detailBackdrop) {
-                            MiniPlayerHost(playerViewModel = playerViewModel, useMiuix = useMiuix,
-                                onOpenNowPlaying = onOpenNowPlaying, onBoundsChanged = onMiniPlayerBoundsChanged)
+                            MiniPlayerHost(
+                                playerViewModel = playerViewModel,
+                                useMiuix = useMiuix,
+                                onOpenNowPlaying = onOpenNowPlaying,
+                                onBoundsChanged = onMiniPlayerBoundsChanged,
+                            )
                         }
                     }
                     }
@@ -430,6 +462,7 @@ private fun M3NavigationDock(
     onSelected: (Int) -> Unit,
 ) {
     val strings = LocalStrings.current
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
     val initialCorner = androidx.compose.runtime.remember { kotlinx.coroutines.runBlocking { preferences.m3NavBarCornerRadius.first() } }
     val cornerRadius by preferences.m3NavBarCornerRadius.collectAsState(initial = initialCorner)
     val insets = WindowInsets.safeDrawing.only(
@@ -451,6 +484,10 @@ private fun M3NavigationDock(
             M3NavigationBarItem(
                 selected = selectedIndex() == index,
                 onClick = { onSelected(index) },
+                colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                ),
                 icon = {
                     M3Icon(
                         imageVector = if (selectedIndex() == index) dest.selectedIcon else dest.unselectedIcon,
@@ -464,6 +501,7 @@ private fun M3NavigationDock(
                         overflow = TextOverflow.Ellipsis
                     )
                 },
+                alwaysShowLabel = !isLandscape,
             )
         }
     }
@@ -479,6 +517,7 @@ private fun MiuixNavigationDock(
     val blurActive = blurOn && backdrop != null
     val barColor = if (blurActive) Color.Transparent else MiuixAppTheme.colorScheme.surface
     val strings = LocalStrings.current
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
     val density = LocalDensity.current
     var dockHeight by remember { androidx.compose.runtime.mutableStateOf(0.dp) }
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -516,17 +555,59 @@ private fun MiuixNavigationDock(
         ) {
             NavigationBar(color = barColor) {
                 bottomNavDestinations.forEachIndexed { index, dest ->
+                    val isSelected = selectedIndex() == index
                     val label = when (dest) {
                         Destination.Home -> strings.home
                         Destination.Library -> strings.library
                         Destination.Settings -> strings.settings
                     }
-                    NavigationBarItem(
-                        selected = selectedIndex() == index,
-                        onClick = { onSelected(index) },
-                        icon = dest.selectedIcon,
-                        label = label,
+                    val labelColor = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onSurfaceContainer.copy(
+                        alpha = if (isSelected) 1f else NavigationBarDefaults.UnselectedAlpha,
                     )
+                    val iconColor = if (isSelected) MiuixAppTheme.colorScheme.primary else labelColor
+                    Column(
+                        modifier = Modifier
+                            .height(NavigationBarDefaults.ItemHeight)
+                            .weight(1f)
+                            .selectable(
+                                selected = isSelected,
+                                onClick = { onSelected(index) },
+                                role = Role.Tab,
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Top,
+                    ) {
+                        if (isLandscape && !isSelected) {
+                            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                dev.shephard.player.ui.miuix.Icon(
+                                    imageVector = dest.unselectedIcon,
+                                    contentDescription = label,
+                                    modifier = Modifier.size(NavigationBarDefaults.IconSize),
+                                    tint = iconColor,
+                                )
+                            }
+                        } else {
+                            dev.shephard.player.ui.miuix.Icon(
+                                imageVector = if (!isLandscape || isSelected) dest.selectedIcon else dest.unselectedIcon,
+                                contentDescription = null,
+                                modifier = Modifier.padding(top = NavigationBarDefaults.IconTopPadding)
+                                    .size(NavigationBarDefaults.IconSize),
+                                tint = iconColor,
+                            )
+                            dev.shephard.player.ui.miuix.Text(
+                                text = label,
+                                fontSize = NavigationBarDefaults.LabelFontSize,
+                                fontWeight = if (isSelected) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                color = labelColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(bottom = NavigationBarDefaults.BottomPadding),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -552,6 +633,7 @@ private fun AppleFloatingDock(
         else -> FloatingBottomBarMode.None
     }
     val strings = LocalStrings.current
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
     val contentColor = if (useMiuix) MiuixAppTheme.colorScheme.onSurface
     else MaterialTheme.colorScheme.onSurface
     val barColors = if (useMiuix) {
@@ -592,7 +674,7 @@ private fun AppleFloatingDock(
         mode = mode,
         colors = barColors,
         iconContent = { dest, index ->
-            val icon = if (useMiuix || index == selectedIndex()) dest.selectedIcon else dest.unselectedIcon
+            val icon = if ((useMiuix && !isLandscape) || index == selectedIndex()) dest.selectedIcon else dest.unselectedIcon
             if (useMiuix) {
                 dev.shephard.player.ui.miuix.Icon(
                     imageVector = icon,
@@ -605,23 +687,25 @@ private fun AppleFloatingDock(
                 )
             }
         },
-        labelContent = { dest, _ ->
-            if (useMiuix) {
-                dev.shephard.player.ui.miuix.Text(
-                    text = labelOf(dest),
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Visible,
-                )
-            } else {
-                M3Text(
-                    text = labelOf(dest),
-                    fontSize = 11.sp,
-                    lineHeight = 14.sp,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Visible,
-                )
+        labelContent = { dest, index ->
+            if (!isLandscape || index == selectedIndex()) {
+                if (useMiuix) {
+                    dev.shephard.player.ui.miuix.Text(
+                        text = labelOf(dest),
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Visible,
+                    )
+                } else {
+                    M3Text(
+                        text = labelOf(dest),
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Visible,
+                    )
+                }
             }
         },
     )

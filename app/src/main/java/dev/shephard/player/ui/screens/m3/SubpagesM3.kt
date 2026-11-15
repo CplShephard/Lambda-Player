@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -71,6 +73,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -109,6 +112,7 @@ fun SettingsScreenM3(
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
     val strings = LocalStrings.current
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
     val totalMs by playerViewModel.totalListeningMsLive.collectAsState()
 
     val m3TopBarState = rememberExpressiveTopBarState()
@@ -123,54 +127,63 @@ fun SettingsScreenM3(
             )
         },
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding() + 4.dp, bottom = padding.calculateBottomPadding() + 80.dp)
-        ) {
-            item { LineageSectionHeader(title = strings.settings) }
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = m3ItemCardColors()
+        if (isLandscape) {
+            Row(
+                modifier = Modifier.fillMaxSize().padding(
+                    top = padding.calculateTopPadding() + 4.dp,
+                    bottom = padding.calculateBottomPadding() + 190.dp,
+                ),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    LineageListItem(
-                        headline = strings.themeSettings,
-                        supporting = strings.themeSettingsSummary,
-                        leadingContent = { Icon(Icons.Filled.ColorLens, null, tint = MaterialTheme.colorScheme.primary) },
-                        onClick = onOpenThemeSettings
-                    )
+                    LineageSectionHeader(title = strings.settings)
+                    SettingsNavigationCardM3(strings.themeSettings, strings.themeSettingsSummary, Icons.Filled.ColorLens, onOpenThemeSettings)
+                    SettingsNavigationCardM3(strings.playbackSettings, strings.playbackSettingsSummary, Icons.Filled.Headphones, onOpenPlayerSettings)
+                }
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    LineageSectionHeader(title = strings.aboutSectionTitle)
+                    SettingsNavigationCardM3(strings.aboutLambdaPlayerTitle, strings.aboutLambdaPlayerSummary, Icons.Filled.Info, onOpenAbout)
                 }
             }
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = m3ItemCardColors()
-                ) {
-                    LineageListItem(
-                        headline = strings.playbackSettings,
-                        supporting = strings.playbackSettingsSummary,
-                        leadingContent = { Icon(Icons.Filled.Headphones, null, tint = MaterialTheme.colorScheme.primary) },
-                        onClick = onOpenPlayerSettings
-                    )
-                }
-            }
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = m3ItemCardColors()
-                ) {
-                    LineageListItem(
-                        headline = strings.aboutLambdaPlayerTitle,
-                        supporting = strings.aboutLambdaPlayerSummary,
-                        leadingContent = { Icon(Icons.Filled.Info, null, tint = MaterialTheme.colorScheme.primary) },
-                        onClick = onOpenAbout
-                    )
-                }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(top = padding.calculateTopPadding() + 4.dp, bottom = padding.calculateBottomPadding() + 80.dp)
+            ) {
+                item { LineageSectionHeader(title = strings.settings) }
+                item { SettingsNavigationCardM3(strings.themeSettings, strings.themeSettingsSummary, Icons.Filled.ColorLens, onOpenThemeSettings) }
+                item { SettingsNavigationCardM3(strings.playbackSettings, strings.playbackSettingsSummary, Icons.Filled.Headphones, onOpenPlayerSettings) }
+                item { SettingsNavigationCardM3(strings.aboutLambdaPlayerTitle, strings.aboutLambdaPlayerSummary, Icons.Filled.Info, onOpenAbout) }
             }
         }
+    }
+}
+
+@Composable
+private fun SettingsNavigationCardM3(
+    title: String,
+    summary: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = m3ItemCardColors(),
+    ) {
+        LineageListItem(
+            headline = title,
+            supporting = summary,
+            leadingContent = { Icon(icon, null, tint = MaterialTheme.colorScheme.primary) },
+            onClick = onClick,
+        )
     }
 }
 
@@ -181,6 +194,7 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
     val prefs = remember { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
     val strings = LocalStrings.current
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
     val crossfade by prefs.crossfadeEnabled.collectAsState(initial = false)
     val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
     val playWith by prefs.playWithOthers.collectAsState(initial = false)
@@ -208,7 +222,7 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
             contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 80.dp)
         ) {
             item {
-                SegmentedColumn(title = strings.playbackSettings) {
+                SegmentedColumn(title = strings.playbackSettings, columns = if (isLandscape) 2 else 1) {
                     item {
                         SwitchWidget(
                             icon = Icons.TwoTone.SwapHoriz,
@@ -416,7 +430,7 @@ fun StatsScreenM3(
                             var expanded by remember { androidx.compose.runtime.mutableStateOf(false) }
                             IconButton(onClick = { expanded = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Top count") }
                             androidx.compose.material3.DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                                listOf(10,20,30,40,50).forEach { count ->
+                                listOf(10, 20, 30).forEach { count ->
                                     androidx.compose.material3.DropdownMenuItem(
                                         text = { Text("Top $count") },
                                         onClick = { expanded = false; scope.launch { prefs.setStatsTopCount(count) } },

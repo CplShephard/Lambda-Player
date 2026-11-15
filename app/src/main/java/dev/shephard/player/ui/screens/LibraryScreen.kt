@@ -13,6 +13,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -67,6 +68,12 @@ fun LibraryScreen(
     onOpenAlbumDetail: (Long, String, String) -> Unit,
 ) {
     val strings = LocalStrings.current
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
+    val listBottomPadding = if (isLandscape) {
+        if (hasMiniPlayer) 190.dp else 110.dp
+    } else {
+        if (hasMiniPlayer) 150.dp else 96.dp
+    }
     val context = LocalContext.current
     val prefs = remember(context) { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
@@ -150,8 +157,8 @@ fun LibraryScreen(
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().background(if (useMiuix) MiuixAppTheme.colorScheme.background else MaterialTheme.colorScheme.surface)
         .then(if (useMiuix) Modifier.miuixHeaderSafeTop() else Modifier.statusBarsPadding())) {
-        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            LibraryText(strings.library, useMiuix, Modifier.weight(1f), color = foreground, fontSize = 30.sp, bold = true)
+        Row(Modifier.fillMaxWidth().padding(start = if (isLandscape) 14.dp else 20.dp, end = 8.dp, top = if (isLandscape) 4.dp else 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            LibraryText(strings.library, useMiuix, Modifier.weight(1f), color = foreground, fontSize = if (isLandscape) 24.sp else 30.sp, bold = true)
             LibraryHeaderButton(useMiuix, Icons.Default.Search, strings.search, foreground) {
                 showSearch = !showSearch; if (!showSearch) songSearch = ""
             }
@@ -173,8 +180,8 @@ fun LibraryScreen(
             enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
             exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
         ) {
-            if (useMiuix) dev.shephard.player.ui.miuix.OutlinedTextField(songSearch, { songSearch = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp), singleLine = true, placeholder = { dev.shephard.player.ui.miuix.Text(strings.search) })
-            else OutlinedTextField(songSearch, { songSearch = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp), singleLine = true, label = { Text(strings.search) })
+            if (useMiuix) dev.shephard.player.ui.miuix.OutlinedTextField(songSearch, { songSearch = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (isLandscape) 2.dp else 6.dp), singleLine = true, placeholder = { dev.shephard.player.ui.miuix.Text(strings.search) })
+            else OutlinedTextField(songSearch, { songSearch = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (isLandscape) 2.dp else 6.dp), singleLine = true, label = { Text(strings.search) })
         }
         // Fixed shade under Library tabs reusing miuix topBar dim (Library has no collapsing bar)
         val libraryTabsBackdrop = if (useMiuix) rememberLibraryTabsBackdrop() else null
@@ -189,12 +196,12 @@ fun LibraryScreen(
                     onSelected = { index ->
                         selectTab(index)
                     },
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = if (isLandscape) 3.dp else 6.dp),
                     animateSelection = true,
                 )
             }
         } else {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = if (isLandscape) 3.dp else 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 labels.forEach { (index, label) ->
                     val selected = selectedTab == index
                     val chipBackground by androidx.compose.animation.animateColorAsState(
@@ -285,8 +292,8 @@ fun LibraryScreen(
                     } else dev.shephard.player.ui.components.LayoutSwitchAnimation(albumLayout, Modifier.fillMaxSize()) { displayLayout ->
 if (group == null && displayLayout == dev.shephard.player.player.LayoutMode.GRID) {
                         androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-                            columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
-                            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = if (hasMiniPlayer) 150.dp else 96.dp),
+                            columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(if (isLandscape) 8 else 2),
+                            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = listBottomPadding),
                             horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(matchingGroups.size, key = { matchingGroups[it].key }) { i ->
@@ -294,8 +301,28 @@ if (group == null && displayLayout == dev.shephard.player.player.LayoutMode.GRID
                                 Box(Modifier.animateItem()) { LibraryAlbumTile(entry.key, entry.value, useMiuix) { entry.value.firstOrNull()?.let { track -> onOpenAlbumDetail(track.albumId ?: 0L, track.album, track.artist) } } }
                             }
                         }
+                    } else if (isLandscape) {
+                        androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                            columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
+                            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = listBottomPadding),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            if (group == null) {
+                                gridItems(matchingGroups, key = { it.key }) { entry ->
+                                    Box(Modifier.animateItem()) { LibraryAlbumRow(entry.key, entry.value, useMiuix) { entry.value.firstOrNull()?.let { track -> onOpenAlbumDetail(track.albumId ?: 0L, track.album, track.artist) } } }
+                                }
+                            } else {
+                                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
+                                    LibraryText("‹  ${group.orEmpty()}", useMiuix, Modifier.clickable { group = null; songSearch = "" }.padding(12.dp), color = accent)
+                                }
+                                gridItems(visibleTracks, key = { it.id }) { track ->
+                                    Box(Modifier.animateItem()) { LibrarySongRow(track, useMiuix, onClick = { onTrackClick(visibleTracks, visibleTracks.indexOf(track), group) }, onMore = { options = track }) }
+                                }
+                            }
+                        }
                     } else {
-                        LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = if (hasMiniPlayer) 150.dp else 96.dp),
+                        LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = listBottomPadding),
                             verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             if (group == null) {
                                 items(matchingGroups, key = { it.key }) { entry ->

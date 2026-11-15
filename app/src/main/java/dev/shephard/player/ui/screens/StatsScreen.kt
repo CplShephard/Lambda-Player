@@ -105,7 +105,7 @@ fun StatsScreen(
                             icon = androidx.compose.material.icons.Icons.Filled.MoreVert,
                             description = "Top count",
                             color = cs.onBackground,
-                            choices = listOf(10, 20, 30, 40, 50).map { count ->
+                            choices = listOf(10, 20, 30).map { count ->
                                 Triple("Top $count", topCount == count, {
                                     scope.launch { prefs.setStatsTopCount(count) }
                                 })

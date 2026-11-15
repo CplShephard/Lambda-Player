@@ -305,7 +305,7 @@ fun <T> FloatingBottomBar(
         val scale = LocalFloatingBottomBarTabScale.current
         val contentColor = LocalFloatingBottomBarContentColor.current
         items.forEachIndexed { index, item ->
-            val tabColor = if (!isLiquidGlassMode && index == currentIndex) colors.activeContentColor else contentColor
+            val tabColor = if (index == currentIndex) colors.activeContentColor else contentColor
             Column(
                 modifier = Modifier
                     .defaultMinSize(minWidth = 76.dp)
