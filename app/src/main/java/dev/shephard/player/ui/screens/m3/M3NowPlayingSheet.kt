@@ -502,7 +502,7 @@ private fun M3LandscapeContent(
                     dev.shephard.player.player.CarouselStyle.TWO_PEEK -> .6f
                     else -> .8f
                 }
-                val artHeight = minOf(maxWidth * pageFraction, configuration.screenHeightDp.dp * .60f)
+                val artHeight = minOf(maxWidth * pageFraction, configuration.screenHeightDp.dp * .42f)
                 if (state.queue.isNotEmpty()) {
                     dev.shephard.player.ui.components.AlbumCarousel(
                         queue = state.queue, currentIndex = state.currentQueueIndex,
@@ -611,12 +611,18 @@ private fun M3LandscapeContent(
             }
         }
         Box(
-            modifier = Modifier.weight(0.5f).fillMaxHeight().padding(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 8.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            modifier = Modifier.fillMaxHeight().width(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        )
+        Box(
+            modifier = Modifier.weight(0.5f).fillMaxHeight().padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
         ) {
             dev.shephard.player.ui.screens.MiuixEmbeddedLyrics(
                 playerViewModel = playerViewModel,
                 state = state,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                foreground = MaterialTheme.colorScheme.onSurface,
+                titleStyle = MaterialTheme.typography.titleMedium,
+                baseTextStyle = MaterialTheme.typography.bodyMedium
             )
         }
     }

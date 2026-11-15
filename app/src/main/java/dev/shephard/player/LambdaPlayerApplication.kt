@@ -17,6 +17,8 @@ class LambdaPlayerApplication : Application(), ImageLoaderFactory {
     @OptIn(ExperimentalComposeUiApi::class)
     override fun onCreate() {
         super.onCreate()
+        // OOM self-heal: migrate bloated DataStore listen stats before any UI collects it
+        try { kotlinx.coroutines.runBlocking { dev.shephard.player.player.DataStoreRecovery.maybeRecover(this) } } catch (_: Exception) {}
         // Compose 1.12.0 regression (b/530704636): moving focus from one text field to another
         // closes the keyboard and reopens it, because the old field's hideKeyboard is no longer
         // coalesced with the new field's showKeyboard. Going back to the Choreographer-based

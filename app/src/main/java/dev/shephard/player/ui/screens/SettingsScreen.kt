@@ -561,6 +561,11 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
                 onSelectedIndexChange = { idx -> scope.launch { prefs.setVolumeNormalization(normalizationModes[idx]) } }
             )
         }
+
+        // ── TEMİZLEME: Oynatma ayarları içinde gereksiz (GEREKSIZ) DataStore verilerini temizle ──
+        SmallTitle(text = "Temizleme", insideMargin = PaddingValues(16.dp, 8.dp))
+        OrphanCleanupCard()
+
         Spacer(Modifier.height(110.dp))
     }
 }
@@ -928,6 +933,117 @@ private fun formatListeningTime(
     ) else "%d%s %02d%s".format(
         m, strings.minuteShort,
         s, strings.secondShort
+    )
+}
+
+@Composable
+private fun OrphanCleanupCard() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var showDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var progress by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var report by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<dev.shephard.player.player.PlayerViewModel.OrphanCleanupReport?>(null) }
+    val playerViewModel: dev.shephard.player.player.PlayerViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val libraryVm: dev.shephard.player.player.LibraryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val libraryTracks by libraryVm.tracks.collectAsState()
+
+    SectionCard {
+        androidx.compose.foundation.layout.Row(
+            modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+        ) {
+            androidx.compose.foundation.layout.Column(
+                modifier = androidx.compose.ui.Modifier.weight(1f).padding(end = 12.dp)
+            ) {
+                Text(
+                    text = "Gereksiz verileri temizle",
+                    style = MiuixAppTheme.typography.titleMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    color = MiuixAppTheme.colorScheme.onBackground
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Cihazda olmayan şarkılara ait gereksiz (GEREKSIZ) DataStore verilerini tara ve sil — dinleme istatistikleri, şarkı sözleri, kapak ayarları",
+                    style = MiuixAppTheme.typography.bodySmall,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
+                )
+                if (report != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = report!!.summary(),
+                        style = MiuixAppTheme.typography.bodySmall,
+                        color = MiuixAppTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "${'$'}{report!!.totalRemoved} öğe silindi — dinleme ${'$'}{report!!.removedListening}, söz ${'$'}{report!!.removedLyrics}, override ${'$'}{report!!.removedOverrides}",
+                        style = MiuixAppTheme.typography.bodySmall,
+                        color = MiuixAppTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            top.yukonga.miuix.kmp.basic.Button(
+                onClick = {
+                    progress = 0; report = null; showDialog = true
+                    scope.launch {
+                        val ids = libraryTracks.map { it.id.toString() }.toSet()
+                        val stable = libraryTracks.map { dev.shephard.player.data.TrackFingerprint.stableKey(it) }.toSet()
+                        val res = playerViewModel.scanAndCleanOrphanedData(ids, stable) { p -> progress = p }
+                        report = res
+                        kotlinx.coroutines.delay(400)
+                        showDialog = false
+                        android.widget.Toast.makeText(context, res.summary(), android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            ) { Text("TEMİZLE") }
+        }
+    }
+    if (showDialog) {
+        OrphanCleanupProgressDialogForSettings(progress = progress, onDismiss = { showDialog = false })
+    }
+}
+
+@Composable
+private fun OrphanCleanupProgressDialogForSettings(progress: Int, onDismiss: () -> Unit) {
+    dev.shephard.player.ui.miuix.MiuixDialog(
+        onDismissRequest = { onDismiss() },
+        title = "Taranıyor… ${'$'}progress%",
+        text = {
+            androidx.compose.foundation.layout.Column(
+                modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+            ) {
+                androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.padding(top = 4.dp))
+                androidx.compose.foundation.layout.Box(
+                    modifier = androidx.compose.ui.Modifier.fillMaxWidth().height(10.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(MiuixAppTheme.colorScheme.surfaceVariant)
+                ) {
+                    androidx.compose.foundation.layout.Box(
+                        modifier = androidx.compose.ui.Modifier.fillMaxWidth(fraction = progress / 100f).height(10.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(MiuixAppTheme.colorScheme.primary)
+                    )
+                }
+                Text(
+                    text = "${'$'}progress% — dinleme geçmişi, şarkı sözleri, override kontrol ediliyor…",
+                    style = MiuixAppTheme.typography.bodySmall,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant,
+                    modifier = androidx.compose.ui.Modifier.padding(top = 10.dp)
+                )
+                Text(
+                    text = "Sadece GEREKSIZ (orphan) kayıtlar silinecek",
+                    style = MiuixAppTheme.typography.bodySmall,
+                    color = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = androidx.compose.ui.Modifier.padding(top = 6.dp)
+                )
+            }
+        },
+        buttons = {
+            androidx.compose.foundation.layout.Row(
+                modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
+            ) {
+                top.yukonga.miuix.kmp.basic.TextButton(onClick = { onDismiss() }, text = "İptal")
+            }
+        }
     )
 }
 

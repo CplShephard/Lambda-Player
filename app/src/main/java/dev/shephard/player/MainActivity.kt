@@ -52,6 +52,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        // Emergency OOM recovery: if DataStore file bloated to >5MB, migrate/clear before any collect()
+        try { kotlinx.coroutines.runBlocking { dev.shephard.player.player.DataStoreRecovery.maybeRecover(this@MainActivity) } } catch (_: Exception) {}
         externalAudioUriState.value = audioUriFromIntent(intent)
         enableEdgeToEdge()
         setContent {

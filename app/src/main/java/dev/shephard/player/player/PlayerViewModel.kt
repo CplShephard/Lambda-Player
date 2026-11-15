@@ -20,6 +20,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.data.ListenEvent
 import dev.shephard.player.data.ListenStatsCalculator
+import dev.shephard.player.data.ListenStatsStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -298,13 +299,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun loadStatsEvents() {
         viewModelScope.launch {
-            val json = prefs.listenStatsEventsJson.first()
-            val loadedEvents = ListenStatsCalculator.decodeEvents(json)
+            val loadedEvents = try {
+                ListenStatsStorage.load(getApplication()) { prefs.listenStatsEventsJson.first() }
+            } catch (e: OutOfMemoryError) {
+                emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }
 
             statsEvents = if (statsEvents.isEmpty()) {
                 loadedEvents
             } else {
-                loadedEvents + statsEvents
+                // deduplicate merging: if we already have events, prefer in-memory but cap
+                (loadedEvents + statsEvents).takeLast(15000)
             }
             statsEventsLoaded = true
             _statsEventsFlow.value = statsEvents
@@ -312,6 +319,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (statsEvents.size != loadedEvents.size) {
                 persistStatsEvents()
             }
+            // One-time migration: clear heavy DataStore key after successful file load
+            try {
+                ListenStatsStorage.clearDataStoreKeyIfNeeded(
+                    getJson = { prefs.listenStatsEventsJson.first() },
+                    clearAction = { prefs.clearListenStatsEventsJson() }
+                )
+            } catch (_: Exception) {}
         }
     }
 
@@ -580,10 +594,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (!statsEventsLoaded) return
         val snapshot = statsEvents
         viewModelScope.launch {
-            // Preserve write order, including clear, while moving large JSON encoding off Main.
             statsWriteMutex.withLock {
-                val json = withContext(Dispatchers.Default) { ListenStatsCalculator.encodeEvents(snapshot) }
-                prefs.setListenStatsEventsJson(json)
+                try {
+                    ListenStatsStorage.save(getApplication(), snapshot)
+                } catch (e: OutOfMemoryError) {
+                    // drop oldest half and retry once
+                    try {
+                        val trimmed = snapshot.takeLast((snapshot.size * 0.5).toInt().coerceAtLeast(1000))
+                        statsEvents = trimmed
+                        _statsEventsFlow.value = trimmed
+                        ListenStatsStorage.save(getApplication(), trimmed)
+                    } catch (_: Exception) {}
+                } catch (e: Exception) {}
             }
         }
     }
@@ -591,6 +613,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun clearListenStats() {
         statsEvents = emptyList()
         _statsEventsFlow.value = emptyList()
+        viewModelScope.launch {
+            try { ListenStatsStorage.clear(getApplication()) } catch (_: Exception) {}
+            try { prefs.clearListenStatsEventsJson() } catch (_: Exception) {}
+        }
         persistStatsEvents()
     }
 
@@ -612,9 +638,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         var removedOffsets = 0
         var removedLiked = 0
 
-        // Step 1: listening events (stableKey based)
+        // Step 1: listening events (stableKey based) — now file-backed
         onProgress(5)
-        val currentEvents = statsEvents.ifEmpty { ListenStatsCalculator.decodeEvents(prefs.listenStatsEventsJson.first()) }
+        val currentEvents = statsEvents.ifEmpty {
+            try { ListenStatsStorage.load(getApplication()) { prefs.listenStatsEventsJson.first() } } catch (_: Exception) { emptyList() }
+        }
         kotlinx.coroutines.delay(120) // simulate scan
         onProgress(25)
         val filteredEvents = currentEvents.filter { ev ->
@@ -625,8 +653,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (removedListening > 0) {
             statsEvents = filteredEvents
             _statsEventsFlow.value = filteredEvents
-            val json = ListenStatsCalculator.encodeEvents(filteredEvents)
-            prefs.setListenStatsEventsJson(json)
+            try { ListenStatsStorage.save(getApplication(), filteredEvents) } catch (_: Exception) {}
+            try { prefs.clearListenStatsEventsJson() } catch (_: Exception) {}
         }
         onProgress(45)
 
