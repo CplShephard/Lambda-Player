@@ -35,6 +35,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlin.math.abs
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 
 private const val SETTLED_PAGE_OFFSET_EPSILON = 0.001f
 

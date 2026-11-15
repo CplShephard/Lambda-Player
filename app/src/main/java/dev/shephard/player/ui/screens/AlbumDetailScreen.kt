@@ -7,6 +7,9 @@ import dev.shephard.player.data.AudioTrack
 import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.ui.i18n.LocalStrings
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
 
 /** Read-only album route reuses the actual playlist-detail UI without persisting a playlist. */
 @Composable

@@ -25,6 +25,9 @@ import dev.shephard.player.ui.components.MiuixDrawer
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
 
 /** Bulk chooser is independent of the list/grid layout and persists into existing playlists. */
 @Composable

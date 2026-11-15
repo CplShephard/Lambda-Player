@@ -20,6 +20,8 @@ import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.MiuixDialog
 import dev.shephard.player.ui.miuix.Switch
 import dev.shephard.player.ui.miuix.Text
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 
 /** Miuix-window counterpart of the automatic missing-lyrics prompt. */
 @Composable

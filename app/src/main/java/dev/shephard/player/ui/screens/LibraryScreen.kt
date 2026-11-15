@@ -46,6 +46,10 @@ import dev.shephard.player.ui.screens.m3.M3EditTrackDialogLineage
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material.icons.filled.MoreVert
 
 /** A single dock destination. Existing editors and playlists remain the source of truth. */
 @Composable

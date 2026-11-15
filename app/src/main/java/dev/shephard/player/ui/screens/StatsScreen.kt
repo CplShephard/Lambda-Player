@@ -61,6 +61,7 @@ import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.Text
+import androidx.compose.material.icons.filled.MoreVert
 
 @Composable
 fun StatsScreen(

@@ -3,6 +3,7 @@ package dev.shephard.player.ui.i18n
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
 
 /**
  * Translation values are stored in a map instead of a 255-argument data-class

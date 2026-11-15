@@ -13,6 +13,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 
 /** Swipe the mini player down to close the entire playback session. */
 fun Modifier.swipeDownToStop(onStop: () -> Unit): Modifier = composed {

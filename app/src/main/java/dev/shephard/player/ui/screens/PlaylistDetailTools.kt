@@ -32,6 +32,8 @@ import dev.shephard.player.ui.components.MiuixDrawer
 import dev.shephard.player.ui.components.PlaylistCoverArt
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 
 /** Playlist action sheet following Pixel's header + grouped action rows. */
 @Composable
