@@ -860,14 +860,19 @@ fun FullScreenLyricsExperience(
                             }
                         }
                     }
-                        // Floating music notes at lines alignment (QQ Music style) - hide when singing
+                        // Note animation as a line (QQ Music style) at lines alignment - hide when singing starts
                         androidx.compose.animation.AnimatedVisibility(
                             visible = showNoteAnim,
-                            enter = fadeIn(tween(220)),
-                            exit = fadeOut(tween(180)),
-                            modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 140.dp)
+                            enter = fadeIn(tween(220)) + androidx.compose.animation.slideInVertically(tween(220)),
+                            exit = fadeOut(tween(180)) + androidx.compose.animation.slideOutVertically(tween(180)),
+                            modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 140.dp).fillMaxWidth().padding(horizontal = 18.dp)
                         ) {
-                            QqMusicNoteAnimation(primary = primary, foreground = LocalLyricsForeground.current)
+                            Box(
+                                modifier = Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(LocalLyricsForeground.current.copy(alpha = 0.08f)).padding(horizontal = 16.dp, vertical = 14.dp),
+                                contentAlignment = androidx.compose.ui.Alignment.Center
+                            ) {
+                                QqMusicNoteAnimation(primary = primary, foreground = LocalLyricsForeground.current)
+                            }
                         }
                     }
                 }
