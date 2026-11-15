@@ -860,12 +860,12 @@ fun FullScreenLyricsExperience(
                             }
                         }
                     }
-                        // Floating music notes overlay during gaps (centered, like QQ Music)
+                        // Floating music notes at lines alignment (QQ Music style) - hide when singing
                         androidx.compose.animation.AnimatedVisibility(
                             visible = showNoteAnim,
-                            enter = fadeIn(tween(220)) ,
+                            enter = fadeIn(tween(220)),
                             exit = fadeOut(tween(180)),
-                            modifier = Modifier.align(androidx.compose.ui.Alignment.Center)
+                            modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 140.dp)
                         ) {
                             QqMusicNoteAnimation(primary = primary, foreground = LocalLyricsForeground.current)
                         }
