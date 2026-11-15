@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.Icon as MiuixIcon
 import dev.shephard.player.ui.miuix.Text as MiuixText
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun MiuixLibraryLoadingOverlay() {
@@ -61,7 +62,7 @@ fun MiuixLibraryLoadingOverlay() {
             Spacer(Modifier.height(14.dp))
             MiuixText(
                 text = "Loading library",
-                style = MiuixAppTheme.textStyles.title3.copy(
+                style = MiuixTheme.textStyles.title3.copy(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 17.sp
                 ),
