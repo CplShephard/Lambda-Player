@@ -40,6 +40,7 @@ import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.LyricsAutoSearchMode
 import dev.shephard.player.player.VolumeNormalization
 import dev.shephard.player.ui.i18n.LocalStrings
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun PlaybackSettingsSheet(

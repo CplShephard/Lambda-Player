@@ -522,13 +522,7 @@ onDismiss: () -> Unit
         }
 
         if (showPlaylists) {
-            AddToPlaylistDrawer(
-            trackId = track?.id ?: -1L,
-            track = track,
-            playerViewModel = playerViewModel,
-            onDismiss = { showPlaylists = false },
-            strings = strings
-        )
+            AddToPlaylistDrawer(track?.id ?: -1L, track, playerViewModel, { showPlaylists = false }, strings)
         }
     }
 }

@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.first
 import kotlin.math.abs
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.fillMaxSize
 
 private const val SETTLED_PAGE_OFFSET_EPSILON = 0.001f
 
