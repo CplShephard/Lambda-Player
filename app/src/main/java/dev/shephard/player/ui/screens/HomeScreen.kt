@@ -93,7 +93,6 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         libraryViewModel.ensureTracksLoaded()
     }
-    }
 
     val featuredTracks = dev.shephard.player.ui.components.rememberFeaturedTracks(tracks, 5)
 
