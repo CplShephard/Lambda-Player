@@ -523,7 +523,7 @@ onDismiss: () -> Unit
 
         if (showPlaylists) {
             AddToPlaylistDrawer(
-            trackId = trackId,
+            trackId = track?.id ?: -1L,
             track = track,
             playerViewModel = playerViewModel,
             onDismiss = { showPlaylists = false },
@@ -785,10 +785,7 @@ private fun MiuixLandscapeContent(
 }
 
 @Composable
-private fun MiuixEmbeddedLyrics
-
-@Composable
-private fun MiuixEmbeddedLyrics(
+internal fun MiuixEmbeddedLyrics(
 playerViewModel: PlayerViewModel,
 state: dev.shephard.player.player.PlayerUiState,
 modifier: Modifier = Modifier

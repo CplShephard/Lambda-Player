@@ -167,7 +167,7 @@ private fun OrphanCleanupSection(playerViewModel: PlayerViewModel) {
     val libraryVm: dev.shephard.player.player.LibraryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val libraryTracks by libraryVm.tracks.collectAsState()
 
-    Column(modifier = androidx.compose.foundation.layout.fillMaxWidth().padding(vertical = 12.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                 Text(text = "Storage orphan cleanup", style = MiuixAppTheme.typography.bodyLarge, color = MiuixAppTheme.colorScheme.onBackground)

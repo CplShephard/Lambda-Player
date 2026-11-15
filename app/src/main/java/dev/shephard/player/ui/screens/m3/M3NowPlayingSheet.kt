@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -45,6 +46,8 @@ import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
@@ -446,7 +449,8 @@ onDismiss: () -> Unit,
         dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { showQueue = false })
     }
 
-    if (showLyrics && !isLandscape) {
+    val isLandscapeOutside = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    if (showLyrics && !isLandscapeOutside) {
         dev.shephard.player.ui.screens.FullScreenLyricsExperience(
         playerViewModel = playerViewModel,
         useMiuix = false,
@@ -719,6 +723,17 @@ strings: dev.shephard.player.ui.i18n.Strings
             }
         }
     }
+}
+
+
+@Composable
+private fun M3NowPlayingProgressLineage(playerViewModel: PlayerViewModel, isPlaying: Boolean) {
+    val progress by playerViewModel.progress.collectAsState()
+    val fraction = if (progress.durationMs > 0) progress.positionMs.toFloat() / progress.durationMs else 0f
+    androidx.compose.material3.LinearWavyProgressIndicator(
+        progress = { fraction },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+    )
 }
 
 private fun contrastColorFor(color: Color): Color =
