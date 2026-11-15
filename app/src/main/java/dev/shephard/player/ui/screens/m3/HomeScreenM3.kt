@@ -98,7 +98,12 @@ fun HomeScreenM3(
 ) {
     val strings = LocalStrings.current
     val tracks by libraryViewModel.tracks.collectAsState()
+    val hasScanned by libraryViewModel.hasScanned.collectAsState()
     val recentEvents by playerViewModel.statsEventsFlow.collectAsState()
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        libraryViewModel.ensureTracksLoaded()
+    }
     val totalListeningMs by playerViewModel.totalListeningMsLive.collectAsState()
 
     val featuredTracks = dev.shephard.player.ui.components.rememberFeaturedTracks(tracks, 10)
@@ -151,7 +156,12 @@ fun HomeScreenM3(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             item(key = "your_mix") {
-                                HomeYourMix(yourMix, useMiuix = false, onRemix = { playerViewModel.setQueueAndPlayRemixed(it, strings.yourMix) }) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
+                                HomeYourMix(
+                                    yourMix,
+                                    useMiuix = false,
+                                    isLoading = !hasScanned,
+                                    onRemix = { playerViewModel.setQueueAndPlayRemixed(it, strings.yourMix) }
+                                ) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
                             }
                             item(key = "listening_time") {
                                 HomeListeningTime(totalListeningMs, useMiuix = false, onClick = onOpenStats)

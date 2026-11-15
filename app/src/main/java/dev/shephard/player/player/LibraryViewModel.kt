@@ -40,7 +40,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val _tracks = MutableStateFlow<List<AudioTrack>>(emptyList())
     val tracks: StateFlow<List<AudioTrack>> = _tracks.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false)
+    private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     private val _hasScanned = MutableStateFlow(false)

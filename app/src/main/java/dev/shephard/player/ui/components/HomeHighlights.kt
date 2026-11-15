@@ -118,6 +118,7 @@ fun rememberRecentTracks(tracks: List<AudioTrack>, history: List<ListenEvent>, l
 fun HomeYourMix(
     tracks: List<AudioTrack>,
     useMiuix: Boolean,
+    isLoading: Boolean = false,
     onRemix: (List<AudioTrack>) -> Unit,
     onPlay: (List<AudioTrack>, Int) -> Unit,
 ) {
@@ -149,13 +150,29 @@ fun HomeYourMix(
                     modifier = Modifier.size(36.dp))
             }
         }
-        if (tracks.isEmpty()) {
-            Box(Modifier.fillMaxWidth().height(100.dp).padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(24.dp)).background(surface), contentAlignment = Alignment.Center) {
-                Text(strings.noSongsToPlay, color = ink.copy(alpha = .65f), modifier = Modifier.padding(16.dp))
+        when {
+            isLoading -> {
+                Box(
+                    Modifier.fillMaxWidth().height(100.dp).padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(24.dp)).background(surface),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        color = accent,
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 3.dp
+                    )
+                }
             }
-        } else {
-            PixelMixCollage(tracks = tracks, surface = surface, accent = accent, pattern = pattern, useMiuix = useMiuix, onPlay = onPlay)
+            tracks.isEmpty() -> {
+                Box(Modifier.fillMaxWidth().height(100.dp).padding(horizontal = 16.dp)
+                    .clip(RoundedCornerShape(24.dp)).background(surface), contentAlignment = Alignment.Center) {
+                    Text(strings.noSongsToPlay, color = ink.copy(alpha = .65f), modifier = Modifier.padding(16.dp))
+                }
+            }
+            else -> {
+                PixelMixCollage(tracks = tracks, surface = surface, accent = accent, pattern = pattern, useMiuix = useMiuix, onPlay = onPlay)
+            }
         }
     }
 
