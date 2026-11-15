@@ -167,11 +167,11 @@ fun NowPlayingSheet(
     }
 
     val artSlideSpec = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(
-        durationMillis = 320,
+        durationMillis = 260,
         easing = androidx.compose.animation.core.FastOutSlowInEasing
     )
     val artFadeSpec = androidx.compose.animation.core.tween<Float>(
-        durationMillis = 220,
+        durationMillis = 180,
         easing = androidx.compose.animation.core.LinearOutSlowInEasing
     )
 
@@ -921,7 +921,7 @@ private fun AmbientGlowBackground(
             androidx.compose.animation.Crossfade(
                 targetState = track?.albumArtUri,
                 animationSpec = androidx.compose.animation.core.tween(
-                    durationMillis = 720,
+                    durationMillis = 420,
                     easing = androidx.compose.animation.core.FastOutSlowInEasing
                 ),
                 label = "ambientAlbumArtFade"
@@ -933,10 +933,10 @@ private fun AmbientGlowBackground(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxSize()
-                            .graphicsLayer { scaleX = 1.15f; scaleY = 1.15f }
-                            .blur(radius = 60.dp),
+                            .graphicsLayer { scaleX = 1.08f; scaleY = 1.08f }
+                            .blur(radius = 32.dp),
                         colorFilter = ColorFilter.colorMatrix(
-                            ColorMatrix().apply { setToSaturation(1.35f) }
+                            ColorMatrix().apply { setToSaturation(1.25f) }
                         )
                     )
                 } else {

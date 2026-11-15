@@ -62,6 +62,7 @@ object PrefsKeys {
     val PREDICTIVE_BACK_ANIMATION = stringPreferencesKey("predictive_back_animation")
     val PREDICTIVE_BACK_EXIT_DIRECTION = stringPreferencesKey("predictive_back_exit_direction")
     val M3_BLUR_BACKUP = intPreferencesKey("m3_blur_backup")
+    val DYNAMIC_COLOR_BY_COVER_BACKUP = intPreferencesKey("dynamic_color_by_cover_backup")
     val M3_NAV_BAR_CORNER_RADIUS = intPreferencesKey("m3_nav_bar_corner_radius")
     val LYRICS_BACKGROUND_BLUR_ENABLED = booleanPreferencesKey("lyrics_background_blur_enabled")
     val LYRICS_BACKGROUND_BLUR_STRENGTH = floatPreferencesKey("lyrics_background_blur_strength")
@@ -460,13 +461,30 @@ class PreferencesManager(private val context: Context) {
                     prefs[PrefsKeys.M3_BLUR_BACKUP] = 0
                 }
                 prefs[PrefsKeys.LIQUID_GLASS_ENABLED] = false
+                // Restore dynamic-color-by-cover if it was backed up when leaving Miuix with custom colors off.
+                val coverBackup = prefs[PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP]
+                if (coverBackup != null) {
+                    prefs[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = coverBackup == 1
+                    prefs.remove(PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP)
+                }
             } else {
                 // A cover-based palette is incompatible with Miuix while custom colors are off.
                 // Make the transition atomic so the switch and the rendered theme agree.
+                // Backup like blur so we can restore when custom colors are re-enabled or user returns to Material.
                 if (!(prefs[PrefsKeys.USE_MIUIX_MONET] ?: false)) {
+                    val currentCover = prefs[PrefsKeys.DYNAMIC_COLOR_BY_COVER] ?: false
+                    if (currentCover) {
+                        prefs[PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP] = 1
+                    }
                     prefs[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = false
+                } else {
+                    val coverBackup = prefs[PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP]
+                    if (coverBackup != null) {
+                        prefs[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = coverBackup == 1
+                        prefs.remove(PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP)
+                    }
                 }
-                // Switching back to Miuix: restore the backup if one exists,
+                // Switching back to Miuix: restore the blur backup if one exists,
                 // then forget it.
                 val backup = prefs[PrefsKeys.M3_BLUR_BACKUP]
                 if (backup != null) {
@@ -506,7 +524,19 @@ class PreferencesManager(private val context: Context) {
     suspend fun setUseMiuixMonet(use: Boolean) {
         context.dataStore.edit {
             it[PrefsKeys.USE_MIUIX_MONET] = use
-            if (!use && (it[PrefsKeys.USE_MIUIX] ?: true)) it[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = false
+            if (!use && (it[PrefsKeys.USE_MIUIX] ?: true)) {
+                val currentCover = it[PrefsKeys.DYNAMIC_COLOR_BY_COVER] ?: false
+                if (currentCover) {
+                    it[PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP] = 1
+                }
+                it[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = false
+            } else if (use) {
+                val backup = it[PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP]
+                if (backup != null) {
+                    it[PrefsKeys.DYNAMIC_COLOR_BY_COVER] = backup == 1
+                    it.remove(PrefsKeys.DYNAMIC_COLOR_BY_COVER_BACKUP)
+                }
+            }
         }
     }
 

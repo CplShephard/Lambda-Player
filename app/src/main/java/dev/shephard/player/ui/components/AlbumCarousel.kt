@@ -105,7 +105,10 @@ fun AlbumCarousel(
             ownScrollsInFlight++
             try {
                 if (shiftOnly) pagerState.scrollToPage(targetIndex)
-                else pagerState.animateScrollToPage(targetIndex, animationSpec = spring())
+                else pagerState.animateScrollToPage(
+                    targetIndex,
+                    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
+                )
             } finally { ownScrollsInFlight-- }
         }
         lastSettledSongId = queue.getOrNull(actualIndex)?.id

@@ -1250,7 +1250,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
                     }
                     if (bitmap == null) null else try {
-                        val palette = Palette.from(bitmap).generate()
+                        val palette = Palette.from(bitmap).maximumColorCount(16).generate()
                         (palette.vibrantSwatch ?: palette.dominantSwatch)?.rgb
                     } finally { bitmap.recycle() }
                 }.getOrNull()
