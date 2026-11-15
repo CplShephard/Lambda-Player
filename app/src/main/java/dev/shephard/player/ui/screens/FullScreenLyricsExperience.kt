@@ -83,6 +83,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
@@ -538,7 +539,17 @@ fun FullScreenLyricsExperience(
                     showSettings = showSettings,
                     onDismiss = { showOptions = false },
                     onSearch = { showOptions = false; showSettings = false; showSearch = true },
-                    onImport = { showOptions = false; importLauncher.launch(arrayOf("text/*", "application/octet-stream", "application/x-lrc", "application/ttml+xml", "application/xml")) },
+                    onImport = { showOptions = false; importLauncher.launch(arrayOf("*/*", "text/*", "text/plain", "application/octet-stream", "application/x-lrc", "text/lrc", "text/x-lrc", "application/ttml+xml", "application/xml")) },
+                    onScanStorage = {
+                        showOptions = false
+                        scope.launch(Dispatchers.IO) {
+                            val found = playerViewModel.scanStorageLyricsAndApply()
+                            withContext(Dispatchers.Main) {
+                                val msg = if (found) "Lyrics found and applied" else "No .lrc file found in storage"
+                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
                     onEdit = {
                         showOptions = false; showSearch = false
                         if (isEditing) { if (editText != editSource) playerViewModel.setManualLyricsText(editText); isEditing = false }
@@ -842,7 +853,7 @@ fun FullScreenLyricsExperience(
             val importLyrics = {
                 showFetchLyrics = false
                 playerViewModel.clearLyricsSearch()
-                importLauncher.launch(arrayOf("text/*", "application/octet-stream", "application/x-lrc", "application/ttml+xml", "application/xml"))
+                importLauncher.launch(arrayOf("*/*", "text/*", "text/plain", "application/octet-stream", "application/x-lrc", "text/lrc", "text/x-lrc", "application/ttml+xml", "application/xml"))
             }
             if (useMiuix) {
                 dev.shephard.player.ui.components.MiuixFetchLyricsDialog(
@@ -906,6 +917,7 @@ private fun LyricsOptionsDrawer(
     onDismiss: () -> Unit,
     onSearch: () -> Unit,
     onImport: () -> Unit,
+    onScanStorage: () -> Unit = {},
     onEdit: () -> Unit,
     onCopy: () -> Unit,
     onExport: () -> Unit,
@@ -931,6 +943,7 @@ private fun LyricsOptionsDrawer(
                 }
                 Action(Icons.Filled.Search, strings.search, action = { closeThen(onSearch) })
                 Action(Icons.Filled.FolderOpen, strings.lyricsImport, action = { closeThen(onImport) })
+                Action(Icons.Filled.Storage, strings.lyricsScanStorage, action = { closeThen(onScanStorage) })
                 Action(if (isEditing) Icons.Filled.Check else Icons.Filled.Edit, if (isEditing) strings.lyricsSave else strings.lyricsEdit, action = { closeThen(onEdit) })
                 if (hasTranslation) Action(Icons.Filled.Translate, if (showTranslation) strings.lyricsHideTranslation else strings.lyricsShowTranslation, action = onToggleTranslation)
                 Action(Icons.Filled.ContentCopy, strings.lyricsCopy, hasLyrics, { closeThen(onCopy) })

@@ -1318,33 +1318,73 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val context = getApplication<Application>()
         val resolver = context.contentResolver
         val projection = arrayOf(MediaStore.Files.FileColumns._ID, MediaStore.Files.FileColumns.DISPLAY_NAME)
+        // Match both .lrc and .lrc.txt (case-insensitive) - %.lrc% covers both
         val cursor = resolver.query(
             MediaStore.Files.getContentUri("external"),
             projection,
             "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ?",
-            arrayOf("%.lrc"),
+            arrayOf("%.lrc%"),
             null
-        )
-        cursor?.use { c ->
+        ) ?: return null
+        cursor.use { c ->
             val idCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
             val nameCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
             val baseName = track.title.replace(" ", "_")
+            val audioFileName = runCatching {
+                resolver.query(track.uri, arrayOf(MediaStore.Audio.Media.DISPLAY_NAME), null, null, null)?.use { ac ->
+                    if (ac.moveToFirst()) ac.getString(0) else null
+                }
+            }.getOrNull()
+            val audioBase = audioFileName?.substringBeforeLast(".")?.takeIf { it.isNotBlank() }
+            val candidates = mutableListOf<Triple<Long, String, Int>>()
             while (c.moveToNext()) {
                 val id = c.getLong(idCol)
                 val name = c.getString(nameCol) ?: continue
-                if (name.contains(baseName, ignoreCase = true) ||
-                    track.uri.lastPathSegment?.let { name.contains(it.substringBeforeLast("."), ignoreCase = true) } == true
-                ) {
-                    val lrcUri = android.content.ContentUris.withAppendedId(
-                        MediaStore.Files.getContentUri("external"), id
-                    )
-                    resolver.openInputStream(lrcUri)?.use { stream ->
-                        return stream.bufferedReader().readText()
-                    }
-                }
+                val lower = name.lowercase()
+                // Accept .lrc, .lrc.txt, .txt containing lrc, etc.
+                if (!lower.contains(".lrc")) continue
+                var score = 0
+                if (audioBase != null && lower.contains(audioBase.lowercase())) score = 10
+                else if (lower.contains(baseName.lowercase())) score = 8
+                else if (lower.contains(track.title.lowercase())) score = 6
+                else if (lower.contains(track.artist.lowercase()) && track.artist.isNotBlank() && !track.artist.equals("<unknown>", true)) score = 4
+                else if (track.uri.lastPathSegment?.substringBeforeLast(".")?.let { lower.contains(it.lowercase()) } == true) score = 5
+                // Even low-score files are candidates but ranked
+                candidates.add(Triple(id, name, score))
+            }
+            val sorted = candidates.sortedByDescending { it.third }
+            // Try best matches first
+            for ((id, _, score) in sorted) {
+                if (score == 0 && sorted.any { it.third > 0 }) continue // skip unrelated if we have better
+                val lrcUri = android.content.ContentUris.withAppendedId(
+                    MediaStore.Files.getContentUri("external"), id
+                )
+                val text = runCatching { resolver.openInputStream(lrcUri)?.bufferedReader()?.readText() }.getOrNull()
+                if (text.isNullOrBlank()) continue
+                // Validate looks like lyrics
+                if (text.length < 2) continue
+                return text
+            }
+            // Fallback: if no scored candidate, try any .lrc file that might be generic
+            if (sorted.isEmpty()) return null
+            for ((id, _, _) in sorted.take(5)) {
+                val lrcUri = android.content.ContentUris.withAppendedId(
+                    MediaStore.Files.getContentUri("external"), id
+                )
+                val text = runCatching { resolver.openInputStream(lrcUri)?.bufferedReader()?.readText() }.getOrNull()
+                if (!text.isNullOrBlank()) return text
             }
         }
         return null
+    }
+
+    /** Scan storage for .lrc/.lrc.txt matching current track and apply if found (for UI button) */
+    suspend fun scanStorageLyricsAndApply(): Boolean = withContext(Dispatchers.IO) {
+        val track = _uiState.value.currentTrack ?: return@withContext false
+        val raw = loadLyricsFromLrcFile(track) ?: return@withContext false
+        if (raw.isBlank()) return@withContext false
+        withContext(Dispatchers.Main) { setManualLyricsText(raw) }
+        true
     }
 
     private fun parseLyricsDocument(content: String): LyricsDocument {

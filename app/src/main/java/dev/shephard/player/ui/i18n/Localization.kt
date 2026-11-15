@@ -81,6 +81,7 @@ class Strings internal constructor(private val texts: Map<String, String>) {
     val lyricsEdit: String get() = texts.getValue("lyricsEdit")
     val lyricsSave: String get() = texts.getValue("lyricsSave")
     val lyricsImport: String get() = texts.getValue("lyricsImport")
+    val lyricsScanStorage: String get() = texts.getValue("lyricsScanStorage")
     val lyricsExport: String get() = texts.getValue("lyricsExport")
     val lyricsCopy: String get() = texts.getValue("lyricsCopy")
     val lyricsSettingsTitle: String get() = texts.getValue("lyricsSettingsTitle")
@@ -337,6 +338,7 @@ private fun createEN(): Strings = Strings(mapOf(
     "lyricsEdit" to "Edit lyrics",
     "lyricsSave" to "Save lyrics",
     "lyricsImport" to "Import lyrics",
+    "lyricsScanStorage" to "Scan storage for .lrc",
     "lyricsExport" to "Export lyrics",
     "lyricsCopy" to "Copy lyrics",
     "lyricsSettingsTitle" to "Lyrics settings",
@@ -607,6 +609,7 @@ private fun createTR(base: Strings): Strings = base.withOverrides(mapOf(
     "lyricsEdit" to "Şarkı sözlerini düzenle",
     "lyricsSave" to "Şarkı sözlerini kaydet",
     "lyricsImport" to "Şarkı sözü içe aktar",
+    "lyricsScanStorage" to "Depolamayı tara (.lrc)",
     "lyricsExport" to "Şarkı sözlerini dışa aktar",
     "lyricsCopy" to "Şarkı sözlerini kopyala",
     "lyricsSettingsTitle" to "Şarkı sözü ayarları",
