@@ -43,6 +43,7 @@ import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.components.MiuixDrawer
 import dev.shephard.player.ui.components.MiuixDrawerActionHeader
 import dev.shephard.player.ui.components.captureForTopBarBlur
+import dev.shephard.player.ui.components.bottomOverlayContentPadding
 import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.miuix.OutlinedTextField
 import dev.shephard.player.ui.miuix.Text
@@ -104,6 +105,14 @@ fun MusicScreen(
     val prefs = remember { PreferencesManager(context) }
     val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
     val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
+    val listBottomPadding = bottomOverlayContentPadding(
+        fallback = when {
+            hasMiniPlayer && isLandscape -> 136.dp
+            hasMiniPlayer -> 144.dp
+            isLandscape -> 84.dp
+            else -> 96.dp
+        },
+    )
 
     val strings = LocalStrings.current
 
@@ -185,7 +194,7 @@ if (displayLayout == LayoutMode.GRID) {
                                         start = 12.dp,
                                         end = 12.dp,
                                         top = innerPadding.calculateTopPadding() + 8.dp,
-                                        bottom = 220.dp
+                                        bottom = listBottomPadding
                                     ),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -211,7 +220,7 @@ if (displayLayout == LayoutMode.GRID) {
                                         start = 12.dp,
                                         end = 12.dp,
                                         top = innerPadding.calculateTopPadding() + 8.dp,
-                                        bottom = 220.dp
+                                        bottom = listBottomPadding
                                     ),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -239,7 +248,7 @@ if (displayLayout == LayoutMode.GRID) {
                                         start = 16.dp,
                                         end = 16.dp,
                                         top = innerPadding.calculateTopPadding() + 8.dp,
-                                        bottom = 220.dp
+                                        bottom = listBottomPadding
                                     ),
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {

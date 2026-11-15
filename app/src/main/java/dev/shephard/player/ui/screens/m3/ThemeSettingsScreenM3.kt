@@ -139,7 +139,11 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(if (isLandscape) 2 else 1),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), bottom = paddingValues.calculateBottomPadding() + 80.dp),
+            contentPadding = PaddingValues(
+                top = paddingValues.calculateTopPadding(),
+                bottom = paddingValues.calculateBottomPadding() +
+                    dev.shephard.player.ui.components.bottomOverlayContentPadding(fallback = 40.dp),
+            ),
             verticalArrangement = Arrangement.spacedBy(if (isLandscape) 12.dp else 0.dp),
         ) {
             // UI Style - M3 switcher restored

@@ -304,9 +304,7 @@ onDismiss: () -> Unit
             carouselStyle = carouselStyle,
             onAlbumClick = onAlbumClick,
             strings = strings,
-            showQueue = showQueue,
             onShowQueueChange = { showQueue = it },
-            showPlaylists = showPlaylists,
             onShowPlaylistsChange = { showPlaylists = it },
         )
         } else {
@@ -549,9 +547,7 @@ private fun MiuixLandscapeContent(
     carouselStyle: String,
     onAlbumClick: (AudioTrack) -> Unit,
     strings: dev.shephard.player.ui.i18n.Strings,
-    showQueue: Boolean,
     onShowQueueChange: (Boolean) -> Unit,
-    showPlaylists: Boolean,
     onShowPlaylistsChange: (Boolean) -> Unit,
 ) {
     val configuration = LocalConfiguration.current
@@ -769,12 +765,6 @@ private fun MiuixLandscapeContent(
             )
         }
     }
-    if (showQueue) {
-        QueueDrawer(playerViewModel = playerViewModel, useMiuix = true, onDismiss = { onShowQueueChange(false) })
-    }
-    if (showPlaylists) {
-        AddToPlaylistDrawer(track?.id ?: -1L, track, playerViewModel, { onShowPlaylistsChange(false) }, strings)
-    }
 }
 
 @Composable
@@ -834,6 +824,7 @@ private fun MiuixEmbeddedLyricsContent(
     val preferences = remember(context) { dev.shephard.player.player.PreferencesManager(context) }
     val blurEnabled by preferences.lyricsBackgroundBlurEnabled.collectAsState(initial = true)
     val blurStrength by preferences.lyricsBackgroundBlurStrength.collectAsState(initial = 36f)
+    val lyricsShakeEnabled by preferences.lyricsShakeEffectEnabled.collectAsState(initial = true)
 
     val hasWordSync = remember(synced) { synced.any { it.words.isNotEmpty() } }
     val smoothPositionMs = rememberSmoothLyricsPosition(
@@ -911,7 +902,15 @@ private fun MiuixEmbeddedLyricsContent(
                         val isActive = index == activeIndex
                         val distance = if (activeIndex < 0) 0 else kotlin.math.abs(index - activeIndex)
                         val lineBlur = if (blurEnabled && activeIndex >= 0) kotlin.math.min(10f, distance * (blurStrength / 24f)).dp else 0.dp
-                        val activeAmount by androidx.compose.animation.core.animateFloatAsState(targetValue = if (isActive) 1f else 0f, animationSpec = androidx.compose.animation.core.tween(LyricMoveDurationMs, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "lyricLineSizeH")
+                        val lyricPositionMs = smoothPositionMs.longValue - syncOffsetMs
+                        val wordTimingStarted = line.words.firstOrNull()?.let { lyricPositionMs >= it.startMs } ?: true
+                        val scaleLineActive = isActive && wordTimingStarted
+                        val activeAmount by androidx.compose.animation.core.animateFloatAsState(targetValue = if (scaleLineActive) 1f else 0f, animationSpec = androidx.compose.animation.core.tween(LyricMoveDurationMs, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "lyricLineSizeH")
+                        val shakeProgress by androidx.compose.animation.core.animateFloatAsState(
+                            targetValue = if (lyricsShakeEnabled && scaleLineActive) 1f else 0f,
+                            animationSpec = androidx.compose.animation.core.tween(220, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                            label = "lyricShakeProgressH",
+                        )
                         val animatedBlur by androidx.compose.animation.core.animateDpAsState(targetValue = lineBlur, animationSpec = androidx.compose.animation.core.tween(LyricMoveDurationMs), label = "lyricLineBlurH")
                         val fg = foreground
                         val karaoke = isActive && line.words.isNotEmpty()
@@ -924,9 +923,7 @@ private fun MiuixEmbeddedLyricsContent(
                         }
                         val animatedColor by androidx.compose.animation.animateColorAsState(targetValue = targetColor, animationSpec = androidx.compose.animation.core.tween(LyricMoveDurationMs), label = "lyricLineColorH")
                         var textLayout by remember { androidx.compose.runtime.mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
-                        var shakeTrigger by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-                        androidx.compose.runtime.LaunchedEffect(isActive) { shakeTrigger++ }
-                        val shouldJiggle = isActive
+                        val shouldJiggle = lyricsShakeEnabled && scaleLineActive
                         val infinite = androidx.compose.animation.core.rememberInfiniteTransition(label = "lyricJiggleH")
                         val jiggleX by infinite.animateFloat(initialValue = -0.3f, targetValue = 0.3f, animationSpec = androidx.compose.animation.core.infiniteRepeatable(tween(700, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "jiggleXH")
                         val jiggleY by infinite.animateFloat(initialValue = -0.3f, targetValue = 0.3f, animationSpec = androidx.compose.animation.core.infiniteRepeatable(tween(800, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "jiggleYH")
@@ -937,7 +934,10 @@ private fun MiuixEmbeddedLyricsContent(
                                 scaleX = scale; scaleY = scale
                                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
                                 translationY += lineSlideOffset.toPx() * (if (index < activeIndex) -1f else 1f)
-                                if (shouldJiggle) { translationX = jiggleX * 0.6f; translationY += jiggleY * 0.5f }
+                                if (shouldJiggle) {
+                                    translationX = jiggleX * with(density) { 2.dp.toPx() } * shakeProgress
+                                    translationY += jiggleY * with(density) { 1.5.dp.toPx() } * shakeProgress
+                                }
                             }.blur(animatedBlur).padding(horizontal = LyricLineHorizontalPadding, vertical = LyricLineVerticalPadding),
                         ) {
                             androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxWidth()) {

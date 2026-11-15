@@ -633,6 +633,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         availableStableKeys: Set<String>,
         onProgress: (Int) -> Unit = {}
     ): OrphanCleanupReport = withContext(Dispatchers.IO) {
+        suspend fun reportProgress(progress: Int) {
+            withContext(Dispatchers.Main.immediate) { onProgress(progress) }
+        }
+
         var removedListening = 0
         var removedLyrics = 0
         var removedOverrides = 0
@@ -640,12 +644,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         var removedLiked = 0
 
         // Step 1: listening events (stableKey based) — now file-backed
-        onProgress(5)
+        reportProgress(5)
         val currentEvents = statsEvents.ifEmpty {
             try { ListenStatsStorage.load(getApplication()) { prefs.listenStatsEventsJson.first() } } catch (_: Exception) { emptyList() }
         }
         kotlinx.coroutines.delay(120) // simulate scan
-        onProgress(25)
+        reportProgress(25)
         val filteredEvents = currentEvents.filter { ev ->
             val key = ev.stableKey ?: dev.shephard.player.data.TrackFingerprint.stableKey(ev.title, ev.artist, ev.album, 0L)
             key in availableStableKeys
@@ -657,7 +661,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             try { ListenStatsStorage.save(getApplication(), filteredEvents) } catch (_: Exception) {}
             try { prefs.clearListenStatsEventsJson() } catch (_: Exception) {}
         }
-        onProgress(45)
+        reportProgress(45)
 
         // Step 2: lyrics_json (trackId keyed)
         val lyricsRaw = prefs.lyricsJson.first()
@@ -672,7 +676,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
         if (lyricsChanged) prefs.setLyricsJson(lyricsObj.toString())
-        onProgress(65)
+        reportProgress(65)
         kotlinx.coroutines.delay(80)
 
         // Step 3: track overrides
@@ -684,7 +688,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (k !in availableTrackIds) { overridesObj.remove(k); removedOverrides++; overridesChanged = true }
         }
         if (overridesChanged) prefs.setTrackOverridesJson(overridesObj.toString())
-        onProgress(80)
+        reportProgress(80)
         kotlinx.coroutines.delay(80)
 
         // Step 4: sync offsets
@@ -696,7 +700,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (k !in availableTrackIds) { offsetsObj.remove(k); removedOffsets++; offsetsChanged = true }
         }
         if (offsetsChanged) prefs.setLyricsSyncOffsetsJson(offsetsObj.toString())
-        onProgress(90)
+        reportProgress(90)
         kotlinx.coroutines.delay(80)
 
         // Step 5: liked ids
@@ -708,7 +712,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (id in availableTrackIds) keptLiked.put(likedArr.optLong(i)) else removedLiked++
         }
         if (removedLiked > 0) prefs.setLikedSongIds(keptLiked.toString())
-        onProgress(100)
+        reportProgress(100)
 
         OrphanCleanupReport(removedListening, removedLyrics, removedOverrides, removedOffsets, removedLiked)
     }
@@ -724,13 +728,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         fun summary(): String = buildString {
             if (totalRemoved == 0) append("No orphaned data found")
             else {
-                append("Cleaned ${'$'}totalRemoved items: ")
-                if (removedListening>0) append("listening ${'$'}removedListening, ")
-                if (removedLyrics>0) append("lyrics ${'$'}removedLyrics, ")
-                if (removedOverrides>0) append("overrides ${'$'}removedOverrides, ")
-                if (removedOffsets>0) append("offsets ${'$'}removedOffsets, ")
-                if (removedLiked>0) append("liked ${'$'}removedLiked, ")
-                trimEnd(); if (endsWith(",")) deleteAt(length-1)
+                append("Cleaned $totalRemoved items: ")
+                if (removedListening > 0) append("listening $removedListening, ")
+                if (removedLyrics > 0) append("lyrics $removedLyrics, ")
+                if (removedOverrides > 0) append("overrides $removedOverrides, ")
+                if (removedOffsets > 0) append("offsets $removedOffsets, ")
+                if (removedLiked > 0) append("liked $removedLiked, ")
+                trimEnd(); if (endsWith(",")) deleteAt(length - 1)
             }
         }
     }

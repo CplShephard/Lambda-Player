@@ -7,6 +7,7 @@ import dev.shephard.player.ui.components.m3.m3CardPressLayer
 import androidx.compose.foundation.interaction.MutableInteractionSource
 
 import dev.shephard.player.ui.components.LocalBottomOverlayHeight
+import dev.shephard.player.ui.components.bottomOverlayContentPadding
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -133,6 +134,14 @@ fun PlaylistScreenM3(
     val json by prefs.playlistsJson.collectAsState(initial = "[]")
     val playlistsLayout by prefs.playlistsLayout.collectAsState(initial = LayoutMode.LIST)
     val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
+    val listBottomPadding = bottomOverlayContentPadding(
+        fallback = when {
+            hasMiniPlayer && isLandscape -> 136.dp
+            hasMiniPlayer -> 144.dp
+            isLandscape -> 84.dp
+            else -> 96.dp
+        },
+    )
     val likedSongIdsJson by prefs.likedSongIds.collectAsState(initial = "[]")
     val likedIds = remember(likedSongIdsJson) {
         try {
@@ -335,8 +344,12 @@ fun PlaylistScreenM3(
 
     // Real height of the mini player + dock (measured in NavGraph), so the FAB always clears them.
     val overlayHeight by LocalBottomOverlayHeight.current
+    val fabBottomPadding = bottomOverlayContentPadding(
+        fallback = if (hasMiniPlayer) 152.dp else 96.dp,
+        extraSpace = 8.dp,
+    )
     val fabLift by androidx.compose.animation.core.animateDpAsState(
-        targetValue = overlayHeight + 8.dp,
+        targetValue = maxOf(overlayHeight + 8.dp, fabBottomPadding),
         animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 300f),
         label = "playlistFabLift"
     )
@@ -439,7 +452,7 @@ fun PlaylistScreenM3(
                                             start = 8.dp,
                                             end = 8.dp,
                                             top = 4.dp,
-                                            bottom = 220.dp
+                                            bottom = listBottomPadding
                                         )
                                     ) {
                                         items(count = sortedPlaylists.size, key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }) { i ->
@@ -462,7 +475,7 @@ fun PlaylistScreenM3(
                                     LazyVerticalGrid(
                                         columns = GridCells.Fixed(2),
                                         modifier = Modifier.fillMaxSize(),
-                                        contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = 220.dp, top = 4.dp),
+                                        contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = listBottomPadding, top = 4.dp),
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                                         verticalArrangement = Arrangement.spacedBy(4.dp),
                                     ) {
@@ -485,7 +498,7 @@ fun PlaylistScreenM3(
                                 } else {
                                     LazyColumn(
                                         modifier = Modifier.fillMaxSize(),
-                                        contentPadding = PaddingValues(bottom = 220.dp, top = 4.dp)
+                                        contentPadding = PaddingValues(bottom = listBottomPadding, top = 4.dp)
                                     ) {
                                         items(count = sortedPlaylists.size, key = { i -> sortedPlaylists[i].name + "_" + sortedPlaylists[i].createdAt }) { i ->
                                             val pl = sortedPlaylists[i]

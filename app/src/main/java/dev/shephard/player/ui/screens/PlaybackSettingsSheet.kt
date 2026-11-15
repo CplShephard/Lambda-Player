@@ -156,69 +156,102 @@ fun PlaybackSettingsSheet(
         HorizontalDivider(color = MiuixAppTheme.colorScheme.surfaceVariant)
 
         // Orphan data cleanup (GEREKSIZ metadata) with progress bar to 100%
-        OrphanCleanupSection(playerViewModel = playerViewModel)
+        OrphanCleanupSection(playerViewModel = playerViewModel, strings = strings)
     }
 }
 
 @Composable
-private fun OrphanCleanupSection(playerViewModel: PlayerViewModel) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+private fun OrphanCleanupSection(
+    playerViewModel: PlayerViewModel,
+    strings: dev.shephard.player.ui.i18n.Strings,
+) {
+    val context = LocalContext.current
     var showDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var progress by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val libraryVm: dev.shephard.player.player.LibraryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val libraryTracks by libraryVm.tracks.collectAsState()
+    val libraryHasScanned by libraryVm.hasScanned.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(libraryVm) { libraryVm.ensureTracksLoaded() }
 
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                Text(text = "Storage orphan cleanup", style = MiuixAppTheme.typography.bodyLarge, color = MiuixAppTheme.colorScheme.onBackground)
-            }
-            MiuixAppTheme.let {
-                top.yukonga.miuix.kmp.basic.Button(
-                    onClick = {
-                        progress = 0; showDialog = true
-                        scope.launch {
-                            val ids = libraryTracks.map { it.id.toString() }.toSet()
-                            val stable = libraryTracks.map { dev.shephard.player.data.TrackFingerprint.stableKey(it) }.toSet()
-                            val res = playerViewModel.scanAndCleanOrphanedData(ids, stable) { p -> progress = p }
-                            kotlinx.coroutines.delay(400)
-                            showDialog = false
-                            android.widget.Toast.makeText(context, res.summary(), android.widget.Toast.LENGTH_LONG).show()
+        Text(
+            text = strings.orphanCleanupTitle,
+            style = MiuixAppTheme.typography.bodyLarge,
+            color = MiuixAppTheme.colorScheme.onBackground,
+        )
+        Text(
+            text = strings.orphanCleanupDescription,
+            style = MiuixAppTheme.typography.bodyMedium,
+            color = MiuixAppTheme.colorScheme.onBackground.copy(alpha = 0.72f),
+            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            top.yukonga.miuix.kmp.basic.Button(
+                onClick = {
+                    progress = 0
+                    showDialog = true
+                    scope.launch {
+                        val ids = libraryTracks.map { it.id.toString() }.toSet()
+                        val stable = libraryTracks.map { dev.shephard.player.data.TrackFingerprint.stableKey(it) }.toSet()
+                        val report = playerViewModel.scanAndCleanOrphanedData(ids, stable) { progress = it }
+                        kotlinx.coroutines.delay(400)
+                        showDialog = false
+                        val message = if (report.totalRemoved == 0) {
+                            strings.orphanCleanupNoData
+                        } else {
+                            strings.orphanCleanupComplete.format(report.totalRemoved)
                         }
+                        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
                     }
-                ) { Text("Scan & clean") }
-            }
+                },
+                enabled = libraryHasScanned,
+            ) { Text(strings.orphanCleanupAction) }
         }
     }
     if (showDialog) {
-        OrphanCleanupProgressDialog(progress = progress, onDismiss = { showDialog = false })
+        OrphanCleanupProgressDialog(
+            progress = progress,
+            strings = strings,
+            onDismiss = { showDialog = false },
+        )
     }
 }
 
 @Composable
-private fun OrphanCleanupProgressDialog(progress: Int, onDismiss: () -> Unit) {
-    var show by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
-    androidx.compose.runtime.LaunchedEffect(progress) { if (progress >= 100) kotlinx.coroutines.delay(350) }
+private fun OrphanCleanupProgressDialog(
+    progress: Int,
+    strings: dev.shephard.player.ui.i18n.Strings,
+    onDismiss: () -> Unit,
+) {
     dev.shephard.player.ui.miuix.MiuixDialog(
-        onDismissRequest = { show = false; onDismiss() },
-        title = "Scanning DataStore… ${progress}%",
+        onDismissRequest = onDismiss,
+        title = strings.orphanCleanupScanning.format(progress),
         text = {
             Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 4.dp))
-                // Linear progress bar filling to 100%
+                Spacer(modifier = Modifier.height(4.dp))
                 Box(
-                    modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(6.dp)).background(MiuixAppTheme.colorScheme.surfaceVariant)
+                    modifier = Modifier.fillMaxWidth().height(10.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MiuixAppTheme.colorScheme.surfaceVariant),
                 ) {
-                    Box(modifier = Modifier.fillMaxWidth(fraction = progress / 100f).height(10.dp).clip(RoundedCornerShape(6.dp)).background(MiuixAppTheme.colorScheme.primary))
+                    Box(
+                        modifier = Modifier.fillMaxWidth(fraction = progress / 100f).height(10.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(MiuixAppTheme.colorScheme.primary),
+                    )
                 }
             }
         },
         buttons = {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                top.yukonga.miuix.kmp.basic.TextButton(onClick = { show = false; onDismiss() }, text = "Cancel")
+                top.yukonga.miuix.kmp.basic.TextButton(onClick = onDismiss, text = strings.cancel)
             }
-        }
+        },
     )
 }
 

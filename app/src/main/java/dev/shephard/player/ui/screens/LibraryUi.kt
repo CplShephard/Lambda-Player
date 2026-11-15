@@ -91,7 +91,7 @@ internal fun LibraryArtwork(track: AudioTrack?, miuix: Boolean, modifier: Modifi
 
 @Composable
 internal fun LibraryAlbumRow(name: String, tracks: List<AudioTrack>, miuix: Boolean, onClick: () -> Unit) {
-    val bg = if (miuix) MiuixAppTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceContainerHigh
+    val bg = if (miuix) MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceContainerHigh
     val fg = if (miuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
     val shape = RoundedCornerShape(18.dp)
     Row(Modifier.fillMaxWidth().clip(shape).background(bg)
@@ -107,7 +107,7 @@ internal fun LibraryAlbumRow(name: String, tracks: List<AudioTrack>, miuix: Bool
 
 @Composable
 internal fun LibraryAlbumTile(name: String, tracks: List<AudioTrack>, miuix: Boolean, onClick: () -> Unit) {
-    val bg = if (miuix) MiuixAppTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceContainerHigh
+    val bg = if (miuix) MiuixAppTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceContainerHigh
     val fg = if (miuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
     val shape = RoundedCornerShape(20.dp)
     Column(Modifier.fillMaxWidth().clip(shape).background(bg)

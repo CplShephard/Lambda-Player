@@ -264,6 +264,7 @@ fun NavGraph(
                                                 onOpenPlayerSettings = { push(PlayerRoute) },
                                                 onOpenAbout = { push(AboutRoute) },
                                                 onOpenStats = { push(StatsRoute) },
+                                                hasMiniPlayer = hasMiniPlayer,
                                             )
                                         } else {
                                             SettingsScreenM3(
@@ -272,6 +273,7 @@ fun NavGraph(
                                                 onOpenPlayerSettings = { push(PlayerRoute) },
                                                 onOpenAbout = { push(AboutRoute) },
                                                 onOpenStats = { push(StatsRoute) },
+                                                hasMiniPlayer = hasMiniPlayer,
                                             )
                                         }
                                     }
@@ -324,7 +326,11 @@ fun NavGraph(
                     if (useMiuix) {
                         PlayerSettingsScreen(onBack = ::pop)
                     } else {
-                        PlayerSettingsScreenM3(onBack = ::pop)
+                        PlayerSettingsScreenM3(
+                            onBack = ::pop,
+                            playerViewModel = playerViewModel,
+                            hasMiniPlayer = hasMiniPlayer,
+                        )
                     }
                 }
             }
