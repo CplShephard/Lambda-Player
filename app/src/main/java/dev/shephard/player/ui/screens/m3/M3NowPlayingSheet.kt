@@ -429,10 +429,7 @@ onDismiss: () -> Unit,
                         )
                         }
                         if (showAddToPlaylist && track != null) {
-                            M3AddToPlaylistDrawer(
-                            trackId = trackId,
-                            track = track,
-                            playerViewModel = playerViewModel,
+                            M3AddToPlaylistDrawer(trackId, track, playerViewModel,
                             onDismiss = { showAddToPlaylist = false },
                             strings = strings
                         )
@@ -627,7 +624,7 @@ private fun M3LandscapeContent(
         dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { showQueue = false })
     }
     if (showAddToPlaylist) {
-        M3AddToPlaylistDrawer(trackId = track?.id ?: -1L, track = track, playerViewModel = playerViewModel, onDismiss = { showAddToPlaylist = false }, strings = strings)
+        M3AddToPlaylistDrawer(track?.id ?: -1L, track, playerViewModel, { showAddToPlaylist = false }, strings)
     }
 }
 
