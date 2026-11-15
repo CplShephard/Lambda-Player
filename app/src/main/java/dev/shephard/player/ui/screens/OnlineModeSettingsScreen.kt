@@ -15,23 +15,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,8 +30,18 @@ import androidx.compose.ui.unit.dp
 import dev.shephard.player.extension.ExtensionManager
 import dev.shephard.player.player.PreferencesManager
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnlineModeSettingsScreen(
     preferencesManager: PreferencesManager,
@@ -62,7 +57,6 @@ fun OnlineModeSettingsScreen(
     val scope = rememberCoroutineScope()
 
     var registryUrlInput by remember(savedRegistryUrl) { mutableStateOf(savedRegistryUrl) }
-    var isLoadingRegistry by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
 
     val filePicker = rememberLauncherForActivityResult(
@@ -72,8 +66,8 @@ fun OnlineModeSettingsScreen(
             scope.launch {
                 val res = extensionManager.installFromUri(uri)
                 statusMessage = res.fold(
-                    onSuccess = { "Installed ${it.manifest.displayName} (${it.manifest.version})" },
-                    onFailure = { "Install failed: ${it.message}" }
+                    onSuccess = { "${it.manifest.displayName} (${it.manifest.version}) kuruldu" },
+                    onFailure = { "Kurulum hatası: ${it.message}" }
                 )
             }
         }
@@ -82,10 +76,10 @@ fun OnlineModeSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Online Mod") },
+                title = "Online Mod",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
                     }
                 }
             )
@@ -95,16 +89,11 @@ fun OnlineModeSettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                    )
-                ) {
+                Card(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -114,20 +103,18 @@ fun OnlineModeSettingsScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Online Mod",
-                                style = MaterialTheme.typography.titleMedium
+                                style = MiuixTheme.textStyles.title3
                             )
                             Text(
                                 text = "Dock üzerinde Discover sekmesini ve extensionları gösterir",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = MiuixTheme.textStyles.body2,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )
                         }
                         Switch(
                             checked = onlineModeEnabled,
                             onCheckedChange = { enabled ->
-                                scope.launch {
-                                    preferencesManager.setOnlineModeEnabled(enabled)
-                                }
+                                scope.launch { preferencesManager.setOnlineModeEnabled(enabled) }
                             }
                         )
                     }
@@ -136,53 +123,41 @@ fun OnlineModeSettingsScreen(
 
             item {
                 AnimatedVisibility(visible = onlineModeEnabled) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                            )
-                        ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Card(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = "Extension Registry Linki",
-                                    style = MaterialTheme.typography.titleSmall
-                                )
+                                Text("Extension Registry Linki", style = MiuixTheme.textStyles.subtitle)
                                 Spacer(Modifier.height(8.dp))
-                                OutlinedTextField(
-                                    value = registryUrlInput,
-                                    onValueChange = { registryUrlInput = it },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    placeholder = { Text("https://.../registry.json") },
-                                    trailingIcon = {
-                                        IconButton(
-                                            onClick = {
-                                                scope.launch {
-                                                    val url = registryUrlInput.trim()
-                                                    if (url.isNotEmpty()) {
-                                                        preferencesManager.setExtensionRegistryUrl(url)
-                                                        isLoadingRegistry = true
-                                                        val res = extensionManager.fetchRegistry(url)
-                                                        isLoadingRegistry = false
-                                                        res.onFailure {
-                                                            statusMessage = "Registry hatası: ${it.message}"
-                                                        }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    TextField(
+                                        value = registryUrlInput,
+                                        onValueChange = { registryUrlInput = it },
+                                        modifier = Modifier.weight(1f),
+                                        singleLine = true,
+                                        label = "Registry URL"
+                                    )
+                                    IconButton(
+                                        onClick = {
+                                            scope.launch {
+                                                val url = registryUrlInput.trim()
+                                                if (url.isNotEmpty()) {
+                                                    preferencesManager.setExtensionRegistryUrl(url)
+                                                    val res = extensionManager.fetchRegistry(url)
+                                                    res.onFailure {
+                                                        statusMessage = "Registry hatası: ${it.message}"
                                                     }
                                                 }
                                             }
-                                        ) {
-                                            Icon(Icons.Default.Refresh, contentDescription = "Yükle")
                                         }
+                                    ) {
+                                        Icon(Icons.Default.Refresh, contentDescription = "Yükle")
                                     }
-                                )
+                                }
                                 Spacer(Modifier.height(8.dp))
                                 Button(
                                     onClick = { filePicker.launch(arrayOf("*/*")) },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(Icons.Default.Add, contentDescription = null)
-                                    Spacer(Modifier.padding(4.dp))
                                     Text("Cihazdan .sflx Yükle")
                                 }
                             }
@@ -191,27 +166,19 @@ fun OnlineModeSettingsScreen(
                         if (statusMessage != null) {
                             Text(
                                 text = statusMessage!!,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary
+                                style = MiuixTheme.textStyles.body2,
+                                color = MiuixTheme.colorScheme.primary
                             )
                         }
 
-                        Text(
-                            text = "Kurulu Extensionlar (${installed.size})",
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        SmallTitle(text = "Kurulu Extensionlar (${installed.size})")
                     }
                 }
             }
 
             if (onlineModeEnabled) {
                 items(installed, key = { "inst_${it.manifest.name}" }) { ext ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                        )
-                    ) {
+                    Card(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -219,14 +186,11 @@ fun OnlineModeSettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = ext.manifest.displayName,
-                                    style = MaterialTheme.typography.titleSmall
-                                )
+                                Text(ext.manifest.displayName, style = MiuixTheme.textStyles.subtitle)
                                 Text(
                                     text = "v${ext.manifest.version} • ${ext.manifest.author}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    style = MiuixTheme.textStyles.body2,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                                 )
                             }
                             Switch(
@@ -245,26 +209,12 @@ fun OnlineModeSettingsScreen(
                 }
 
                 item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "Extension Listesi (${registry.size})",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (isLoadingRegistry) {
-                            CircularProgressIndicator(modifier = Modifier.padding(4.dp))
-                        }
-                    }
+                    SmallTitle(text = "Extension Listesi (${registry.size})")
                 }
 
                 items(registry, key = { "reg_${it.id}" }) { item ->
                     val isInstalled = installed.any { it.manifest.name == item.name }
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                        )
-                    ) {
+                    Card(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -272,14 +222,14 @@ fun OnlineModeSettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(item.displayName, style = MaterialTheme.typography.titleSmall)
+                                Text(item.displayName, style = MiuixTheme.textStyles.subtitle)
                                 Text(
-                                    "v${item.version} • ${item.author}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = "v${item.version} • ${item.author}",
+                                    style = MiuixTheme.textStyles.body2,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                                 )
                             }
-                            OutlinedButton(
+                            Button(
                                 onClick = {
                                     scope.launch {
                                         val res = extensionManager.installFromUrl(item.downloadUrl)

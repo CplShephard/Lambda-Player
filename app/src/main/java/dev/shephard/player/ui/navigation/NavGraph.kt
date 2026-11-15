@@ -88,6 +88,8 @@ import dev.shephard.player.ui.screens.MusicScreen
 import dev.shephard.player.ui.screens.m3.MusicScreenM3
 import dev.shephard.player.ui.screens.ExtensionSearchScreen
 import dev.shephard.player.ui.screens.OnlineModeSettingsScreen
+import dev.shephard.player.ui.screens.m3.ExtensionSearchScreenM3
+import dev.shephard.player.ui.screens.m3.OnlineModeSettingsScreenM3
 import dev.shephard.player.ui.screens.PlayerSettingsScreen
 import dev.shephard.player.ui.screens.m3.PlayerSettingsScreenM3
 import dev.shephard.player.ui.screens.PlaylistDetailScreen
@@ -334,11 +336,19 @@ fun NavGraph(
                     val context = androidx.compose.ui.platform.LocalContext.current
                     val extManager = remember { ExtensionManager(context) }
                     val prefsManager = remember { dev.shephard.player.player.PreferencesManager(context) }
-                    OnlineModeSettingsScreen(
-                        preferencesManager = prefsManager,
-                        extensionManager = extManager,
-                        onBack = ::pop
-                    )
+                    if (useMiuix) {
+                        OnlineModeSettingsScreen(
+                            preferencesManager = prefsManager,
+                            extensionManager = extManager,
+                            onBack = ::pop
+                        )
+                    } else {
+                        OnlineModeSettingsScreenM3(
+                            preferencesManager = prefsManager,
+                            extensionManager = extManager,
+                            onBack = ::pop
+                        )
+                    }
                 }
             }
             entry<AboutRoute>(swipeDismiss = swipeBackDirection) {
