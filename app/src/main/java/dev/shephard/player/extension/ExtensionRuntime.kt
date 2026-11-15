@@ -2,6 +2,7 @@ package dev.shephard.player.extension
 
 import android.content.Context
 import com.dokar.quickjs.QuickJs
+import com.dokar.quickjs.binding.define
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
