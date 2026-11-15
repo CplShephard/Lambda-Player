@@ -26,6 +26,7 @@ class MornyeJsBridge(
     context: Context,
     private val extensionId: String
 ) {
+    private val appContext = context.applicationContext
     private val prefs = context.getSharedPreferences("ext_storage_$extensionId", Context.MODE_PRIVATE)
     private val cookieStore = ConcurrentHashMap<String, MutableList<Cookie>>()
 

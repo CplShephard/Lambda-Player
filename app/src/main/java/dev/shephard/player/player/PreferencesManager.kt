@@ -612,6 +612,10 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun setOnlineModeEnabled(enabled: Boolean) {
+        context.getSharedPreferences("lambda_online_gate", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("online_mode_enabled", enabled)
+            .apply()
         context.dataStore.edit { it[PrefsKeys.ONLINE_MODE_ENABLED] = enabled }
     }
 
