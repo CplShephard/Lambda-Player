@@ -143,13 +143,13 @@ fun SettingsScreenM3(
             Row(
                 modifier = Modifier.fillMaxSize().padding(
                     top = padding.calculateTopPadding() + 4.dp,
-                    bottom = padding.calculateBottomPadding() + listBottomPadding,
+                    bottom = padding.calculateBottomPadding(),
                 ),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.Top,
             ) {
                 Column(
-                    modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                    modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(bottom = listBottomPadding),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     LineageSectionHeader(title = strings.settings)
@@ -157,7 +157,7 @@ fun SettingsScreenM3(
                     SettingsNavigationCardM3(strings.playbackSettings, strings.playbackSettingsSummary, Icons.Filled.Headphones, onOpenPlayerSettings)
                 }
                 Column(
-                    modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                    modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(bottom = listBottomPadding),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     LineageSectionHeader(title = strings.aboutSectionTitle)

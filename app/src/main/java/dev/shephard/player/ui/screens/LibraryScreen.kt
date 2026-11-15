@@ -23,9 +23,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,12 +34,10 @@ import dev.shephard.player.player.LibraryViewModel
 import dev.shephard.player.player.PlayerViewModel
 import dev.shephard.player.player.PreferencesManager
 import dev.shephard.player.player.rememberAudioPermissionState
-import top.yukonga.miuix.kmp.blur.layerBackdrop
 import dev.shephard.player.ui.components.miuixHeaderSafeTop
 import dev.shephard.player.ui.components.MiuixSwitcherPills
 import dev.shephard.player.ui.components.LibraryTabsFixedShade
 import dev.shephard.player.ui.components.bottomOverlayContentPadding
-import dev.shephard.player.ui.components.rememberLibraryTabsBackdrop
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.screens.m3.MusicScreenM3
@@ -165,16 +160,6 @@ fun LibraryScreen(
     Column(
         Modifier.fillMaxSize()
             .background(if (useMiuix) MiuixAppTheme.colorScheme.background else MaterialTheme.colorScheme.surface)
-            .drawBehind {
-                if (useMiuix) {
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(accent.copy(alpha = 0.12f), accent.copy(alpha = 0.035f), Color.Transparent),
-                            endY = size.height * 0.38f,
-                        ),
-                    )
-                }
-            }
             .then(if (useMiuix) Modifier.miuixHeaderSafeTop() else Modifier.statusBarsPadding())
     ) {
         Row(Modifier.fillMaxWidth().padding(start = if (isLandscape) 14.dp else 20.dp, end = 8.dp, top = if (isLandscape) 4.dp else 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -203,11 +188,10 @@ fun LibraryScreen(
             if (useMiuix) dev.shephard.player.ui.miuix.OutlinedTextField(songSearch, { songSearch = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (isLandscape) 2.dp else 6.dp), singleLine = true, placeholder = { dev.shephard.player.ui.miuix.Text(strings.search) })
             else OutlinedTextField(songSearch, { songSearch = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (isLandscape) 2.dp else 6.dp), singleLine = true, label = { Text(strings.search) })
         }
-        // Fixed shade under Library tabs reusing miuix topBar dim (Library has no collapsing bar)
-        val libraryTabsBackdrop = if (useMiuix) rememberLibraryTabsBackdrop() else null
+        // Keep the tabs on a solid surface instead of the dark, blurred Library overlay.
         if (useMiuix) {
             LibraryTabsFixedShade(
-                backdrop = libraryTabsBackdrop,
+                backdrop = null,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 MiuixSwitcherPills(
@@ -264,7 +248,7 @@ fun LibraryScreen(
         }
         val pagerContent: @Composable () -> Unit = {
             androidx.compose.foundation.pager.HorizontalPager(
-                state = pagerState, modifier = Modifier.fillMaxSize().then(if (libraryTabsBackdrop != null) Modifier.layerBackdrop(libraryTabsBackdrop) else Modifier), beyondViewportPageCount = 1
+                state = pagerState, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 1
             ) { page ->
             when (labels[page].first) {
                 0 -> if (useMiuix) MusicScreen(libraryViewModel, playerViewModel, { list, index -> onTrackClick(list, index, strings.music) }, hasMiniPlayer, filteredSongs, embedded = true)

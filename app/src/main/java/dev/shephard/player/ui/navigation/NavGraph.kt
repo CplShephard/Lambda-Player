@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.material3.Icon as M3Icon
@@ -57,7 +58,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.style.TextOverflow
@@ -127,6 +127,9 @@ data object ThemeRoute : NavKey
 data object PlayerRoute : NavKey
 data object AboutRoute : NavKey
 data object StatsRoute : NavKey
+
+// Preserve a portrait-like card width on wide landscape viewports for both player styles.
+private val LandscapeMiniPlayerMaxWidth = 400.dp
 
 /** Playlist detail is a first-class submenu, exactly like the settings submenus above. */
 data class PlaylistDetailRoute(val index: Int) : NavKey
@@ -293,7 +296,8 @@ fun NavGraph(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .onSizeChanged { overlayHeight.value = with(overlayDensity) { it.height.toDp() } }
+                                    .onSizeChanged { overlayHeight.value = with(overlayDensity) { it.height.toDp() } },
+                                horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 MiniPlayerHost(
                                     playerViewModel = playerViewModel,
@@ -498,7 +502,7 @@ private fun M3NavigationDock(
                     M3Icon(
                         imageVector = if (selectedIndex() == index) dest.selectedIcon else dest.unselectedIcon,
                         contentDescription = label,
-                        modifier = Modifier.graphicsLayer { rotationZ = if (isLandscape) 90f else 0f },
+                        modifier = Modifier,
                     )
                 },
                 label = {
@@ -591,8 +595,7 @@ private fun MiuixNavigationDock(
                                 dev.shephard.player.ui.miuix.Icon(
                                     imageVector = dest.unselectedIcon,
                                     contentDescription = label,
-                                    modifier = Modifier.size(NavigationBarDefaults.IconSize)
-                                        .graphicsLayer { rotationZ = if (isLandscape) 90f else 0f },
+                                    modifier = Modifier.size(NavigationBarDefaults.IconSize),
                                     tint = iconColor,
                                 )
                             }
@@ -601,8 +604,7 @@ private fun MiuixNavigationDock(
                                 imageVector = if (!isLandscape || isSelected) dest.selectedIcon else dest.unselectedIcon,
                                 contentDescription = null,
                                 modifier = Modifier.padding(top = NavigationBarDefaults.IconTopPadding)
-                                    .size(NavigationBarDefaults.IconSize)
-                                    .graphicsLayer { rotationZ = if (isLandscape) 90f else 0f },
+                                    .size(NavigationBarDefaults.IconSize),
                                 tint = iconColor,
                             )
                             dev.shephard.player.ui.miuix.Text(
@@ -688,13 +690,13 @@ private fun AppleFloatingDock(
                 dev.shephard.player.ui.miuix.Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.graphicsLayer { rotationZ = if (isLandscape) 90f else 0f },
+                    modifier = Modifier,
                 )
             } else {
                 M3Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.graphicsLayer { rotationZ = if (isLandscape) 90f else 0f },
+                    modifier = Modifier,
                 )
             }
         },
@@ -737,12 +739,19 @@ private fun MiniPlayerHost(
     }.collectAsState(
         initial = playerViewModel.uiState.value.currentTrack != null
     )
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
 
     AnimatedVisibility(
         visible = visible,
-        modifier = Modifier.onGloballyPositioned { coordinates ->
-            onBoundsChanged(coordinates.boundsInRoot())
-        }.swipeDownToStop { playerViewModel.closePlayer() },
+        modifier = Modifier
+            .then(
+                if (isLandscape) Modifier.widthIn(max = LandscapeMiniPlayerMaxWidth)
+                else Modifier.fillMaxWidth()
+            )
+            .onGloballyPositioned { coordinates ->
+                onBoundsChanged(coordinates.boundsInRoot())
+            }
+            .swipeDownToStop { playerViewModel.closePlayer() },
         enter = fadeIn(tween(200)) + slideInVertically(
             initialOffsetY = { it / 2 },
             animationSpec = androidx.compose.animation.core.spring(0.85f, 300f)
