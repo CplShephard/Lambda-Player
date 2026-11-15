@@ -589,7 +589,7 @@ private fun MiuixLandscapeContent(
                         dev.shephard.player.player.CarouselStyle.TWO_PEEK -> .6f
                         else -> .8f
                     }
-                    val artHeight = minOf(maxWidth * pageFraction, configuration.screenHeightDp.dp * .62f)
+                    val artHeight = minOf(maxWidth * pageFraction, configuration.screenHeightDp.dp * .42f)
                     if (state.queue.isNotEmpty()) {
                         dev.shephard.player.ui.components.AlbumCarousel(
                             queue = state.queue,
@@ -642,120 +642,100 @@ private fun MiuixLandscapeContent(
             }
             Column(modifier = Modifier.fillMaxWidth()) {
                 SeekBarRow(playerViewModel = playerViewModel)
-                Column(modifier = Modifier.fillMaxWidth().graphicsLayer(scaleX = 0.82f, scaleY = 0.82f)) {
+                // Kontroller artık ölçeklenmeden direkt görünür — yatay mod kesilme düzeltmesi
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, start = 8.dp, end = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val isRemixed by playerViewModel.isRemixed.collectAsState()
+                    BouncyIconButton(
+                        onClick = { playerViewModel.remixQueue() },
+                        icon = Icons.Filled.Shuffle,
+                        contentDescription = strings.remix,
+                        tint = if (isRemixed) MiuixAppTheme.colorScheme.primary else Color.White,
+                        iconSize = 26.dp
+                    )
+                    BouncyIconButton(
+                        onClick = { playerViewModel.skipToPrevious() },
+                        painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_rewind),
+                        contentDescription = strings.previous,
+                        tint = Color.White,
+                        iconSize = 32.dp
+                    )
+                    MiuixPlayPauseButton(
+                        isPlaying = state.isPlaying,
+                        onClick = playerViewModel::togglePlayPause,
+                        playDescription = strings.play,
+                        pauseDescription = strings.pause,
+                        tint = Color.White,
+                    )
+                    BouncyIconButton(
+                        onClick = { playerViewModel.skipToNext() },
+                        painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_fforward),
+                        contentDescription = strings.next,
+                        tint = Color.White,
+                        iconSize = 32.dp
+                    )
+                    BouncyIconButton(
+                        onClick = { playerViewModel.cycleRepeatMode() },
+                        icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                        contentDescription = strings.repeat,
+                        tint = if (state.repeatMode != RepeatMode.OFF) MiuixAppTheme.colorScheme.primary else Color.White,
+                        iconSize = 26.dp
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                        .padding(top = 6.dp, bottom = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp, start = 8.dp, end = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.12f))
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val isRemixed by playerViewModel.isRemixed.collectAsState()
                         BouncyIconButton(
-                            onClick = { playerViewModel.remixQueue() },
-                            icon = Icons.Filled.Shuffle,
-                            contentDescription = strings.remix,
-                            tint = if (isRemixed) MiuixAppTheme.colorScheme.primary else Color.White,
-                            iconSize = 24.dp
-                        )
-                        BouncyIconButton(
-                            onClick = { playerViewModel.skipToPrevious() },
-                            painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_rewind),
-                            contentDescription = strings.previous,
+                            onClick = { onShowQueueChange(true) },
+                            icon = Icons.AutoMirrored.Filled.QueueMusic,
+                            contentDescription = strings.queue,
                             tint = Color.White,
-                            iconSize = 30.dp
-                        )
-                        MiuixPlayPauseButton(
-                            isPlaying = state.isPlaying,
-                            onClick = playerViewModel::togglePlayPause,
-                            playDescription = strings.play,
-                            pauseDescription = strings.pause,
-                            tint = Color.White,
+                            iconSize = 26.dp
                         )
                         BouncyIconButton(
-                            onClick = { playerViewModel.skipToNext() },
-                            painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_fforward),
-                            contentDescription = strings.next,
+                            onClick = { playerViewModel.toggleLike(track?.id ?: -1L) },
+                            icon = if (track?.id != null && state.likedSongIds.contains(track.id)) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            contentDescription = strings.likedSongs,
                             tint = Color.White,
-                            iconSize = 30.dp
+                            iconSize = 26.dp
                         )
                         BouncyIconButton(
-                            onClick = { playerViewModel.cycleRepeatMode() },
-                            icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-                            contentDescription = strings.repeat,
-                            tint = if (state.repeatMode != RepeatMode.OFF) MiuixAppTheme.colorScheme.primary else Color.White,
-                            iconSize = 24.dp
+                            onClick = { /* show lyrics handled via sheet elsewhere */ },
+                            icon = Icons.Filled.Lyrics,
+                            contentDescription = strings.lyrics,
+                            tint = Color.White,
+                            iconSize = 26.dp
                         )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp)
-                            .padding(top = 4.dp, bottom = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color.White.copy(alpha = 0.12f))
-                                .padding(horizontal = 10.dp, vertical = 3.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            BouncyIconButton(
-                                onClick = { onShowQueueChange(true) },
-                                icon = Icons.AutoMirrored.Filled.QueueMusic,
-                                contentDescription = strings.queue,
-                                tint = Color.White,
-                                iconSize = 24.dp
-                            )
-                            val trackId = track?.id ?: -1L
-                            val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .bounceClick {
-                                        if (trackId > 0) {
-                                            if (isLiked) {
-                                                onShowPlaylistsChange(true)
-                                            } else {
-                                                playerViewModel.addToLiked(trackId)
-                                            }
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                androidx.compose.animation.AnimatedContent(
-                                    targetState = isLiked,
-                                    transitionSpec = {
-                                        (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(200)) +
-                                            androidx.compose.animation.scaleIn(initialScale = 0.45f, animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 400f))).togetherWith(
-                                            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150)) +
-                                                androidx.compose.animation.scaleOut(targetScale = 1.35f)
-                                        )
-                                    },
-                                    label = "likeMorphLand"
-                                ) { liked ->
-                                    Icon(
-                                        imageVector = if (liked) Icons.Filled.Check else Icons.Filled.Add,
-                                        contentDescription = if (liked) "Added" else "Add",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
             }
         }
+        // Ortadan ikiye bölen dik çizgi — arkaplan kartı kaldırıldı
+        Box(
+            modifier = Modifier.fillMaxHeight().width(1.dp).background(Color.White.copy(alpha = 0.12f))
+        )
         Box(
             modifier = Modifier
                 .weight(0.5f)
                 .fillMaxHeight()
-                .padding(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.Black.copy(alpha = 0.18f))
+                .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
         ) {
             MiuixEmbeddedLyrics(
                 playerViewModel = playerViewModel,
@@ -776,20 +756,42 @@ private fun MiuixLandscapeContent(
 internal fun MiuixEmbeddedLyrics(
 playerViewModel: PlayerViewModel,
 state: dev.shephard.player.player.PlayerUiState,
-modifier: Modifier = Modifier
+modifier: Modifier = Modifier,
+foreground: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.White,
+titleStyle: androidx.compose.ui.text.TextStyle? = null,
+baseTextStyle: androidx.compose.ui.text.TextStyle? = null
 ) {
+    // Yatay mod artık dikeyle birebir aynı animasyonlar — kart kaldırıldı, dik çizgi ile bölünmüş
     val progress by playerViewModel.progress.collectAsState()
     val syncOffsetMs by playerViewModel.lyricsSyncOffsetMs.collectAsState()
     val synced = state.syncedLyrics
     val plain = state.lyrics
+    val textStyle = baseTextStyle ?: MiuixAppTheme.typography.bodyMedium
+    val primary = MiuixAppTheme.colorScheme.primary
+    val isPlaying = state.isPlaying
+    // Adaptive foreground: Miuix always white (dark bg), M3 will override via caller param
+    val fg = foreground
     val lyricsListState = rememberLazyListState()
-    val textStyle = MiuixAppTheme.typography.bodyMedium
-    val activeIndex by remember(synced, progress.positionMs, syncOffsetMs) {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val preferences = remember(context) { dev.shephard.player.player.PreferencesManager(context) }
+    val blurEnabled by preferences.lyricsBackgroundBlurEnabled.collectAsState(initial = true)
+    val blurStrength by preferences.lyricsBackgroundBlurStrength.collectAsState(initial = 36f)
+
+    val hasWordSync = remember(synced) { synced.any { it.words.isNotEmpty() } }
+    val smoothPositionMs = rememberSmoothLyricsPosition(
+        positionMs = progress.positionMs,
+        isPlaying = isPlaying,
+        enabled = synced.isNotEmpty(),
+        frameAccurate = hasWordSync,
+    )
+    val activeIndex by remember(synced, syncOffsetMs) {
         androidx.compose.runtime.derivedStateOf {
             if (synced.isEmpty()) -1 else {
                 var low = 0
                 var high = synced.lastIndex
-                val pos = progress.positionMs - syncOffsetMs
+                val pos = smoothPositionMs.longValue - syncOffsetMs
                 while (low <= high) {
                     val mid = (low + high).ushr(1)
                     if (synced[mid].timeMs <= pos) low = mid + 1 else high = mid - 1
@@ -798,93 +800,144 @@ modifier: Modifier = Modifier
             }
         }
     }
+    val showNoteAnim by remember(synced, smoothPositionMs.longValue, activeIndex, syncOffsetMs) {
+        androidx.compose.runtime.derivedStateOf {
+            if (!hasWordSync) false else {
+                val pos = smoothPositionMs.longValue - syncOffsetMs
+                val curr = synced.getOrNull(activeIndex)
+                val inWord = curr?.words?.any { w -> pos in w.startMs..w.endMs } == true
+                if (inWord) false else {
+                    if (activeIndex < 0) {
+                        val first = synced.firstOrNull()?.timeMs ?: 0L
+                        pos < first - 250
+                    } else {
+                        val next = synced.getOrNull(activeIndex + 1)
+                        val lastEnd = curr?.words?.lastOrNull()?.endMs ?: curr?.timeMs ?: pos
+                        val gapFromEnd = pos - lastEnd
+                        val gapToNext = if (next != null) next.timeMs - pos else 0L
+                        gapFromEnd > 700 || gapToNext > 800
+                    }
+                }
+            }
+        }
+    }
+
     LaunchedEffect(activeIndex) {
         if (synced.isNotEmpty() && activeIndex >= 0) {
             try {
                 val layoutInfo = lyricsListState.layoutInfo
                 val viewportHeight = layoutInfo.viewportSize.height
-                if (viewportHeight == 0) {
-                    lyricsListState.animateScrollToItem(activeIndex)
+                val targetIndex = activeIndex.coerceIn(synced.indices)
+                val visible = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }
+                val itemHeight = visible?.size ?: run {
+                    val textWidthPx = (layoutInfo.viewportSize.width - with(density) { (LyricLineHorizontalPadding * 2).toPx() }).toInt().coerceAtLeast(1)
+                    textMeasurer.measure(
+                        text = synced[targetIndex].text,
+                        style = lyricLineLayoutStyle(textStyle),
+                        constraints = androidx.compose.ui.unit.Constraints(maxWidth = textWidthPx),
+                    ).size.height + with(density) { (LyricLineVerticalPadding * 2).toPx() }.toInt()
+                }
+                val desiredOffset = viewportHeight * LyricAnchorFraction - itemHeight / 2f - layoutInfo.beforeContentPadding
+                if (visible != null) {
+                    lyricsListState.animateScrollBy(visible.offset - desiredOffset, animationSpec = androidx.compose.animation.core.tween(LyricMoveDurationMs, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 } else {
-                    val target = activeIndex.coerceIn(synced.indices)
-                    val visible = layoutInfo.visibleItemsInfo.firstOrNull { it.index == target }
-                    val itemHeight = visible?.size ?: 60
-                    val desiredOffset = viewportHeight * 0.4f - itemHeight / 2f - layoutInfo.beforeContentPadding
-                    if (visible != null) {
-                        lyricsListState.animateScrollBy(visible.offset - desiredOffset, animationSpec = androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                    } else {
-                        lyricsListState.animateScrollToItem(index = target, scrollOffset = -desiredOffset.toInt())
-                    }
+                    lyricsListState.animateScrollToItem(index = targetIndex, scrollOffset = -desiredOffset.toInt())
                 }
             } catch (_: Exception) {}
         }
     }
+
     Column(modifier = modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
         Text(
-        text = dev.shephard.player.ui.i18n.LocalStrings.current.lyrics,
-        style = MiuixAppTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        color = Color.White,
-        modifier = Modifier.padding(bottom = 6.dp)
-    )
-        if (synced.isNotEmpty()) {
-            LazyColumn(
-            state = lyricsListState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                itemsIndexed(synced, key = { idx, line -> "${line.timeMs}_$idx" }) { idx, line ->
-                    val isActive = idx == activeIndex
-                    val color = if (isActive) Color.White else Color.White.copy(alpha = 0.55f)
-                    val scale = if (isActive) 1f else 0.92f
-                    Column(
-                    modifier = Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer(scaleX = scale, scaleY = scale)
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable { playerViewModel.seekTo((line.timeMs + syncOffsetMs).coerceAtLeast(0)) }
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                        text = line.text,
-                        style = textStyle.copy(color = color, fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium, fontSize = if (isActive) 15.sp else 13.sp),
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                        if (!line.translation.isNullOrBlank()) {
-                            Text(
-                            text = line.translation,
-                            style = textStyle.copy(color = color.copy(alpha = 0.78f), fontSize = 12.sp),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
+            text = dev.shephard.player.ui.i18n.LocalStrings.current.lyrics,
+            style = (titleStyle ?: MiuixAppTheme.typography.titleMedium),
+            fontWeight = FontWeight.Bold,
+            color = fg,
+            modifier = Modifier.padding(bottom = 6.dp)
+        )
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            if (synced.isNotEmpty()) {
+                LazyColumn(
+                    state = lyricsListState,
+                    modifier = Modifier.fillMaxSize().padding(top = 4.dp),
+                    contentPadding = PaddingValues(top = 28.dp, bottom = 26.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    itemsIndexed(synced, key = { index, line -> "${line.timeMs}_$index" }) { index, line ->
+                        val isActive = index == activeIndex
+                        val distance = if (activeIndex < 0) 0 else kotlin.math.abs(index - activeIndex)
+                        val lineBlur = if (blurEnabled && activeIndex >= 0) kotlin.math.min(10f, distance * (blurStrength / 24f)).dp else 0.dp
+                        val activeAmount by androidx.compose.animation.core.animateFloatAsState(targetValue = if (isActive) 1f else 0f, animationSpec = androidx.compose.animation.core.tween(LyricMoveDurationMs, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "lyricLineSizeH")
+                        val animatedBlur by androidx.compose.animation.core.animateDpAsState(targetValue = lineBlur, animationSpec = androidx.compose.animation.core.tween(LyricMoveDurationMs), label = "lyricLineBlurH")
+                        val fg = foreground
+                        val karaoke = isActive && line.words.isNotEmpty()
+                        val targetColor = when {
+                            karaoke -> fg.copy(alpha = 0.45f)
+                            isActive -> fg
+                            index < activeIndex && line.words.isNotEmpty() && distance <= 2 -> fg.copy(alpha = 0.90f)
+                            distance > 3 -> fg.copy(alpha = 0.40f)
+                            else -> fg.copy(alpha = 0.72f)
+                        }
+                        val animatedColor by androidx.compose.animation.animateColorAsState(targetValue = targetColor, animationSpec = androidx.compose.animation.core.tween(LyricMoveDurationMs), label = "lyricLineColorH")
+                        var textLayout by remember { androidx.compose.runtime.mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+                        var shakeTrigger by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                        androidx.compose.runtime.LaunchedEffect(isActive) { shakeTrigger++ }
+                        val shouldJiggle = isActive
+                        val infinite = androidx.compose.animation.core.rememberInfiniteTransition(label = "lyricJiggleH")
+                        val jiggleX by infinite.animateFloat(initialValue = -0.3f, targetValue = 0.3f, animationSpec = androidx.compose.animation.core.infiniteRepeatable(tween(700, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "jiggleXH")
+                        val jiggleY by infinite.animateFloat(initialValue = -0.3f, targetValue = 0.3f, animationSpec = androidx.compose.animation.core.infiniteRepeatable(tween(800, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "jiggleYH")
+                        val lineSlideOffset by androidx.compose.animation.core.animateDpAsState(targetValue = if (isActive) 0.dp else if (distance == 1) 4.dp else 0.dp, animationSpec = androidx.compose.animation.core.tween(380, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "lineSlideH")
+                        androidx.compose.foundation.layout.Column(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).clickable { playerViewModel.seekTo((line.timeMs + syncOffsetMs).coerceAtLeast(0)) }.graphicsLayer {
+                                val scale = LyricInactiveScale + (1f - LyricInactiveScale) * activeAmount
+                                scaleX = scale; scaleY = scale
+                                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
+                                translationY += lineSlideOffset.toPx() * (if (index < activeIndex) -1f else 1f)
+                                if (shouldJiggle) { translationX = jiggleX * 0.6f; translationY += jiggleY * 0.5f }
+                            }.blur(animatedBlur).padding(horizontal = LyricLineHorizontalPadding, vertical = LyricLineVerticalPadding),
+                        ) {
+                            androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxWidth()) {
+                                androidx.compose.foundation.text.BasicText(
+                                    text = line.text,
+                                    onTextLayout = { textLayout = it },
+                                    modifier = Modifier.fillMaxWidth().drawWithContent {
+                                        drawContent()
+                                        if (karaoke) textLayout?.let { layout ->
+                                            drawKaraokeHighlight(layout = layout, line = line, positionMs = smoothPositionMs.longValue - syncOffsetMs, color = fg)
+                                        }
+                                    },
+                                    style = lyricLineLayoutStyle(textStyle).copy(color = animatedColor),
+                                )
+                            }
+                            if (!line.translation.isNullOrBlank()) {
+                                androidx.compose.foundation.text.BasicText(
+                                    text = line.translation,
+                                    modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
+                                    style = textStyle.copy(color = animatedColor.copy(alpha = animatedColor.alpha * .78f), fontSize = 16.sp, lineHeight = 22.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Left),
+                                )
+                            }
                         }
                     }
                 }
+            } else if (plain.isNotEmpty()) {
+                LazyColumn(state = lyricsListState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(plain.size) { idx -> Text(text = plain[idx], style = textStyle.copy(color = fg.copy(alpha = 0.82f), fontSize = 13.sp), modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) }
+                }
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Filled.Lyrics, null, tint = fg.copy(alpha = 0.6f), modifier = Modifier.size(28.dp))
+                        Text(dev.shephard.player.ui.i18n.LocalStrings.current.noLyricsFound, color = fg.copy(alpha = 0.55f), style = textStyle, modifier = Modifier.padding(top = 8.dp))
+                    }
+                }
             }
-        } else if (plain.isNotEmpty()) {
-            LazyColumn(
-            state = lyricsListState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showNoteAnim,
+                enter = androidx.compose.animation.fadeIn(tween(220)),
+                exit = androidx.compose.animation.fadeOut(tween(180)),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 100.dp).fillMaxWidth().padding(horizontal = 18.dp)
             ) {
-                items(plain.size) { idx ->
-                    Text(
-                    text = plain[idx],
-                    style = textStyle.copy(color = Color.White.copy(alpha = 0.82f), fontSize = 13.sp),
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-                }
-            }
-        } else {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Filled.Lyrics, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(28.dp))
-                    Text(dev.shephard.player.ui.i18n.LocalStrings.current.noLyricsFound, color = Color.White.copy(alpha = 0.55f), style = textStyle, modifier = Modifier.padding(top = 8.dp))
-                }
+                QqMusicNoteAnimation(primary = primary, foreground = fg)
             }
         }
     }
