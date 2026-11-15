@@ -30,7 +30,7 @@ private val ClassicScalePop: NavTransition = object : NavTransition {
 
     override val motion: NavMotion = ClassicScaleMotion
 
-    override fun scrimFraction(scope: NavTransitionScope): Float = coverProgress(scope.relativeDepth)
+    override fun scrimFraction(scope: NavTransitionScope): Float = 1f // solid black/white background for classic
 
     override fun Modifier.transformEntry(scope: NavTransitionScope): Modifier {
         val zIndex = if (scope.relativeDepth > 0f) 1f else 0f

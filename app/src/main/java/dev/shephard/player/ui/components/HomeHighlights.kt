@@ -131,7 +131,7 @@ fun HomeYourMix(
     Column(Modifier.fillMaxWidth()) {
         // Pixel's hero: a two-line title with a prominent shuffle button.
         Box(Modifier.fillMaxWidth().height(220.dp).padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Column(Modifier.align(Alignment.TopStart).padding(top = 24.dp, start = 12.dp)) {
+            Column(Modifier.align(Alignment.TopStart).padding(top = 8.dp, start = 12.dp)) {
                 Text(strings.yourMixTitle, fontWeight = FontWeight.Black, fontSize = 64.sp, lineHeight = 62.sp, color = ink)
                 Text(strings.yourMixSubtitle, color = ink.copy(alpha = .7f),
                     style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
