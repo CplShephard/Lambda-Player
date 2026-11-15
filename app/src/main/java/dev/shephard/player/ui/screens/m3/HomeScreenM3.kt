@@ -7,6 +7,7 @@ import dev.shephard.player.ui.components.PlaylistCoverArt
 import dev.shephard.player.ui.components.m3.m3CardPress
 import dev.shephard.player.ui.components.HomeYourMix
 import dev.shephard.player.ui.components.HomeListeningTime
+import dev.shephard.player.ui.components.bottomOverlayContentPadding
 import dev.shephard.player.ui.components.rememberHomeMix
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -99,6 +100,14 @@ fun HomeScreenM3(
 ) {
     val strings = LocalStrings.current
     val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
+    val listBottomPadding = bottomOverlayContentPadding(
+        fallback = when {
+            hasMiniPlayer && isLandscape -> 136.dp
+            hasMiniPlayer -> 144.dp
+            isLandscape -> 84.dp
+            else -> 96.dp
+        },
+    )
     val tracks by libraryViewModel.tracks.collectAsState()
     val hasScanned by libraryViewModel.hasScanned.collectAsState()
     val recentEvents by playerViewModel.statsEventsFlow.collectAsState()
@@ -155,7 +164,7 @@ fun HomeScreenM3(
                             ) {
                                 LazyColumn(
                                     modifier = Modifier.weight(1f).fillMaxSize(),
-                                    contentPadding = PaddingValues(start = 12.dp, end = 8.dp, bottom = if (hasMiniPlayer) 190.dp else 110.dp),
+                                    contentPadding = PaddingValues(start = 12.dp, end = 8.dp, bottom = listBottomPadding),
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
                                 ) {
                                     item(key = "your_mix") {
@@ -163,16 +172,17 @@ fun HomeScreenM3(
                                             yourMix,
                                             useMiuix = false,
                                             isLoading = !hasScanned,
+                                            compact = isLandscape,
                                             onRemix = { playerViewModel.setQueueAndPlayRemixed(it, strings.yourMix) }
                                         ) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
                                     }
                                     item(key = "listening_time") {
-                                        HomeListeningTime(totalListeningMs, useMiuix = false, onClick = onOpenStats)
+                                        HomeListeningTime(totalListeningMs, useMiuix = false, onClick = onOpenStats, compact = isLandscape)
                                     }
                                 }
                                 LazyColumn(
                                     modifier = Modifier.weight(1f).fillMaxSize(),
-                                    contentPadding = PaddingValues(start = 8.dp, end = 12.dp, bottom = 20.dp),
+                                    contentPadding = PaddingValues(start = 8.dp, end = 12.dp, bottom = listBottomPadding),
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
                                     if (featuredPlaylists.isNotEmpty()) {
@@ -187,6 +197,7 @@ fun HomeScreenM3(
                                                     LineageHorizontalMediaItem(
                                                         headline = pl.name,
                                                         subhead = "${plTracks.size} tracks",
+                                                        thumbnailSize = if (isLandscape) 108.dp else 128.dp,
                                                         thumbnailContent = {
                                                             PlaylistCoverArt(
                                                                 coverUri = pl.coverUri,
@@ -212,6 +223,7 @@ fun HomeScreenM3(
                                             RecentlyPlayedSectionM3(
                                                 title = strings.recentlyPlayed,
                                                 tracks = recentlyPlayedTracks,
+                                                compact = isLandscape,
                                                 onTrackClick = { index -> onTrackClick(recentlyPlayedTracks, index, strings.recentlyPlayed) },
                                             )
                                         }
@@ -223,7 +235,7 @@ fun HomeScreenM3(
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(
                                     top = padding.calculateTopPadding() + 4.dp,
-                                    bottom = 220.dp
+                                    bottom = listBottomPadding
                                 ),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
@@ -232,11 +244,12 @@ fun HomeScreenM3(
                                         yourMix,
                                         useMiuix = false,
                                         isLoading = !hasScanned,
+                                        compact = isLandscape,
                                         onRemix = { playerViewModel.setQueueAndPlayRemixed(it, strings.yourMix) }
                                     ) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
                                 }
                                 item(key = "listening_time") {
-                                    HomeListeningTime(totalListeningMs, useMiuix = false, onClick = onOpenStats)
+                                    HomeListeningTime(totalListeningMs, useMiuix = false, onClick = onOpenStats, compact = isLandscape)
                                 }
                                 if (featuredPlaylists.isNotEmpty()) {
                                     item {
@@ -250,6 +263,7 @@ fun HomeScreenM3(
                                                 LineageHorizontalMediaItem(
                                                     headline = pl.name,
                                                     subhead = "${plTracks.size} tracks",
+                                                    thumbnailSize = if (isLandscape) 108.dp else 128.dp,
                                                     thumbnailContent = {
                                                         PlaylistCoverArt(
                                                             coverUri = pl.coverUri,
@@ -275,6 +289,7 @@ fun HomeScreenM3(
                                         RecentlyPlayedSectionM3(
                                             title = strings.recentlyPlayed,
                                             tracks = recentlyPlayedTracks,
+                                            compact = isLandscape,
                                             onTrackClick = { index ->
                                                 onTrackClick(recentlyPlayedTracks, index, strings.recentlyPlayed)
                                             },
@@ -291,6 +306,7 @@ fun HomeScreenM3(
 private fun RecentlyPlayedSectionM3(
     title: String,
     tracks: List<AudioTrack>,
+    compact: Boolean = false,
     onTrackClick: (Int) -> Unit,
 ) {
     val pagerState = rememberPagerState(pageCount = { tracks.size })
@@ -299,7 +315,7 @@ private fun RecentlyPlayedSectionM3(
         Spacer(Modifier.height(10.dp))
         HorizontalPager(
             state = pagerState,
-            pageSize = PageSize.Fixed(268.dp),
+            pageSize = PageSize.Fixed(if (compact) 196.dp else 268.dp),
             contentPadding = PaddingValues(start = 20.dp, end = 60.dp),
             pageSpacing = 16.dp,
             beyondViewportPageCount = 1,
@@ -318,7 +334,7 @@ private fun RecentlyPlayedSectionM3(
                     },
                     label = "m3RecentTrackBounceFade",
                 ) { displayedTrack ->
-                    RecentlyPlayedCardM3(displayedTrack) { onTrackClick(0) }
+                    RecentlyPlayedCardM3(displayedTrack, compact = compact) { onTrackClick(0) }
                 }
             } else {
                 AnimatedContent(
@@ -330,7 +346,7 @@ private fun RecentlyPlayedSectionM3(
                     },
                     label = "m3RecentTrackSlide",
                 ) { displayedTrack ->
-                    RecentlyPlayedCardM3(displayedTrack) { onTrackClick(page) }
+                    RecentlyPlayedCardM3(displayedTrack, compact = compact) { onTrackClick(page) }
                 }
             }
         }
@@ -340,11 +356,12 @@ private fun RecentlyPlayedSectionM3(
 @Composable
 private fun RecentlyPlayedCardM3(
     track: AudioTrack,
+    compact: Boolean = false,
     onClick: () -> Unit,
 ) {
     Box(
         modifier = Modifier
-            .width(268.dp)
+            .width(if (compact) 196.dp else 268.dp)
             .aspectRatio(1f)
             .shadow(8.dp, RoundedCornerShape(18.dp))
             .clip(RoundedCornerShape(18.dp))

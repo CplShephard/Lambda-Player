@@ -5,6 +5,7 @@ package dev.shephard.player.ui.screens
 import dev.shephard.player.ui.components.PlaylistCoverArt
 import dev.shephard.player.ui.components.HomeYourMix
 import dev.shephard.player.ui.components.HomeListeningTime
+import dev.shephard.player.ui.components.bottomOverlayContentPadding
 import dev.shephard.player.ui.components.rememberHomeMix
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -87,6 +88,14 @@ fun HomeScreen(
 ) {
     val strings = LocalStrings.current
     val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
+    val listBottomPadding = bottomOverlayContentPadding(
+        fallback = when {
+            hasMiniPlayer && isLandscape -> 136.dp
+            hasMiniPlayer -> 144.dp
+            isLandscape -> 84.dp
+            else -> 96.dp
+        },
+    )
     val tracks by libraryViewModel.tracks.collectAsState()
     val hasScanned by libraryViewModel.hasScanned.collectAsState()
     val recentEvents by playerViewModel.statsEventsFlow.collectAsState()
@@ -142,6 +151,7 @@ fun HomeScreen(
                                     yourMix,
                                     useMiuix = true,
                                     isLoading = !hasScanned,
+                                    compact = isLandscape,
                                     onRemix = { playerViewModel.setQueueAndPlayRemixed(it, strings.yourMix) }
                                 ) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
                             }
@@ -152,6 +162,7 @@ fun HomeScreen(
                                         playlists = featuredPlaylists,
                                         tracks = tracks,
                                         likedIds = likedIds,
+                                        compact = isLandscape,
                                         onPlaylistClick = { pl ->
                                             val i = dev.shephard.player.ui.screens.ensureLikedSongsPlaylist(rawPlaylists, strings).indexOf(pl)
                                             if (i >= 0) onOpenPlaylistDetail(i)
@@ -162,6 +173,7 @@ fun HomeScreen(
                                     RecentlyPlayedSection(
                                         title = strings.recentlyPlayed,
                                         tracks = recentlyPlayedTracks,
+                                        compact = isLandscape,
                                         onTrackClick = { recentIdx ->
                                             onTrackClick(recentlyPlayedTracks, recentIdx, strings.recentlyPlayed)
                                         }
@@ -180,16 +192,16 @@ fun HomeScreen(
                                     Column(
                                         modifier = Modifier.weight(1f).fillMaxHeight()
                                             .verticalScroll(rememberScrollState())
-                                            .padding(bottom = if (hasMiniPlayer) 190.dp else 110.dp),
+                                            .padding(bottom = listBottomPadding),
                                         verticalArrangement = Arrangement.spacedBy(16.dp),
                                     ) {
                                         mixContent()
-                                        HomeListeningTime(totalListeningMs, useMiuix = true, onClick = onOpenStats)
+                                        HomeListeningTime(totalListeningMs, useMiuix = true, onClick = onOpenStats, compact = isLandscape)
                                     }
                                     Column(
                                         modifier = Modifier.weight(1f).fillMaxHeight()
                                             .verticalScroll(rememberScrollState())
-                                            .padding(bottom = 20.dp),
+                                            .padding(bottom = listBottomPadding),
                                         verticalArrangement = Arrangement.spacedBy(20.dp),
                                     ) {
                                         recommendationsContent()
@@ -203,11 +215,11 @@ fun HomeScreen(
                                         .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                                         .overScrollVertical()
                                         .verticalScroll(scrollState)
-                                        .padding(top = innerPadding.calculateTopPadding() + 4.dp, bottom = 220.dp),
+                                        .padding(top = innerPadding.calculateTopPadding() + 4.dp, bottom = listBottomPadding),
                                     verticalArrangement = Arrangement.spacedBy(24.dp)
                                 ) {
                                     mixContent()
-                                    HomeListeningTime(totalListeningMs, useMiuix = true, onClick = onOpenStats)
+                                    HomeListeningTime(totalListeningMs, useMiuix = true, onClick = onOpenStats, compact = isLandscape)
                                     recommendationsContent()
                                 }
                             }
@@ -356,6 +368,7 @@ private fun FeaturedSongCard(
 private fun RecentlyPlayedSection(
     title: String,
     tracks: List<AudioTrack>,
+    compact: Boolean = false,
     onTrackClick: (Int) -> Unit
 ) {
     val pagerState = rememberPagerState(pageCount = { tracks.size })
@@ -371,7 +384,7 @@ private fun RecentlyPlayedSection(
         Spacer(modifier = Modifier.height(10.dp))
         HorizontalPager(
             state = pagerState,
-            pageSize = PageSize.Fixed(268.dp),
+            pageSize = PageSize.Fixed(if (compact) 196.dp else 268.dp),
             contentPadding = PaddingValues(start = 20.dp, end = 60.dp),
             pageSpacing = 16.dp,
             beyondViewportPageCount = 1
@@ -395,7 +408,7 @@ private fun RecentlyPlayedSection(
                     },
                     label = "recentTrackBounceFade"
                 ) { targetTrack ->
-                    RecentlyPlayedCard(track = targetTrack, onClick = { onTrackClick(0) })
+                    RecentlyPlayedCard(track = targetTrack, compact = compact, onClick = { onTrackClick(0) })
                 }
             } else {
                 AnimatedContent(
@@ -409,7 +422,7 @@ private fun RecentlyPlayedSection(
                     },
                     label = "recentTrackSlideRight"
                 ) { targetTrack ->
-                    RecentlyPlayedCard(track = targetTrack, onClick = { onTrackClick(page) })
+                    RecentlyPlayedCard(track = targetTrack, compact = compact, onClick = { onTrackClick(page) })
                 }
             }
         }
@@ -419,11 +432,12 @@ private fun RecentlyPlayedSection(
 @Composable
 private fun RecentlyPlayedCard(
     track: AudioTrack,
+    compact: Boolean = false,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
-            .width(268.dp)
+            .width(if (compact) 196.dp else 268.dp)
             .aspectRatio(1f)
             .shadow(8.dp, RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
@@ -495,6 +509,7 @@ private fun FeaturedPlaylistsSection(
     playlists: List<LocalPlaylist>,
     tracks: List<AudioTrack>,
     likedIds: List<Long>,
+    compact: Boolean = false,
     onPlaylistClick: (LocalPlaylist) -> Unit
 ) {
     val pagerState = rememberPagerState(pageCount = { playlists.size })
@@ -510,14 +525,14 @@ private fun FeaturedPlaylistsSection(
         Spacer(modifier = Modifier.height(10.dp))
         HorizontalPager(
             state = pagerState,
-            pageSize = PageSize.Fixed(172.dp),
+            pageSize = PageSize.Fixed(if (compact) 140.dp else 172.dp),
             contentPadding = PaddingValues(start = 20.dp, end = 60.dp),
             pageSpacing = 16.dp,
             beyondViewportPageCount = 1
         ) { page ->
             val pl = playlists[page]
             val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-            FeaturedPlaylistCard(playlist = pl, plTracks = plTracks, onClick = { onPlaylistClick(pl) })
+            FeaturedPlaylistCard(playlist = pl, plTracks = plTracks, compact = compact, onClick = { onPlaylistClick(pl) })
         }
     }
 }
@@ -526,11 +541,12 @@ private fun FeaturedPlaylistsSection(
 private fun FeaturedPlaylistCard(
     playlist: LocalPlaylist,
     plTracks: List<AudioTrack>,
+    compact: Boolean = false,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
-            .width(172.dp)
+            .width(if (compact) 140.dp else 172.dp)
             .aspectRatio(1f)
             .shadow(8.dp, RoundedCornerShape(18.dp))
             .clip(RoundedCornerShape(18.dp))

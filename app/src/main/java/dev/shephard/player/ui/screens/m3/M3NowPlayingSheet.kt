@@ -276,9 +276,7 @@ onDismiss: () -> Unit,
             pendingCarouselIndex = pendingCarouselIndex,
             carouselStyle = carouselStyle,
             onAlbumClick = onAlbumClick,
-            showQueue = showQueue,
             onShowQueueChange = { showQueue = it },
-            showAddToPlaylist = showAddToPlaylist,
             onShowAddToPlaylistChange = { showAddToPlaylist = it },
             strings = strings,
         )
@@ -430,12 +428,6 @@ onDismiss: () -> Unit,
                             tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         }
-                        if (showAddToPlaylist && track != null) {
-                            M3AddToPlaylistDrawer(trackId, track, playerViewModel,
-                            onDismiss = { showAddToPlaylist = false },
-                            strings = strings
-                        )
-                        }
                     }
                 }
 
@@ -446,6 +438,15 @@ onDismiss: () -> Unit,
 
     if (showQueue) {
         dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { showQueue = false })
+    }
+    if (showAddToPlaylist && track != null) {
+        M3AddToPlaylistDrawer(
+            trackId = track.id,
+            track = track,
+            playerViewModel = playerViewModel,
+            onDismiss = { showAddToPlaylist = false },
+            strings = strings,
+        )
     }
 
     val isLandscapeOutside = dev.shephard.player.ui.util.isLandscapeWindow()
@@ -468,9 +469,7 @@ private fun M3LandscapeContent(
     pendingCarouselIndex: Int?,
     carouselStyle: String,
     onAlbumClick: (dev.shephard.player.data.AudioTrack) -> Unit,
-    showQueue: Boolean,
     onShowQueueChange: (Boolean) -> Unit,
-    showAddToPlaylist: Boolean,
     onShowAddToPlaylistChange: (Boolean) -> Unit,
     strings: dev.shephard.player.ui.i18n.Strings,
 ) {
@@ -580,7 +579,7 @@ private fun M3LandscapeContent(
                         description = strings.remix,
                         active = isRemixed,
                         onClick = playerViewModel::remixQueue,
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(48.dp),
                     )
                     dev.shephard.player.ui.components.m3.AnimatedPlaybackControls(
                         modifier = Modifier.weight(1f),
@@ -602,7 +601,7 @@ private fun M3LandscapeContent(
                         description = strings.repeat,
                         active = state.repeatMode != RepeatMode.OFF,
                         onClick = playerViewModel::cycleRepeatMode,
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(48.dp),
                     )
                 }
             }
@@ -624,12 +623,6 @@ private fun M3LandscapeContent(
                 navigationDirection = navigationDirection,
             )
         }
-    }
-    if (showQueue) {
-        dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { onShowQueueChange(false) })
-    }
-    if (showAddToPlaylist) {
-        M3AddToPlaylistDrawer(track?.id ?: -1L, track, playerViewModel, { onShowAddToPlaylistChange(false) }, strings)
     }
 }
 

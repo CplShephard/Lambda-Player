@@ -121,12 +121,21 @@ fun SettingsScreen(
     onOpenThemeSettings: () -> Unit = {},
     onOpenPlayerSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
-    onOpenStats: () -> Unit = {}
+    onOpenStats: () -> Unit = {},
+    hasMiniPlayer: Boolean = false,
 ) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
     val strings = LocalStrings.current
     val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
+    val listBottomPadding = dev.shephard.player.ui.components.bottomOverlayContentPadding(
+        fallback = when {
+            hasMiniPlayer && isLandscape -> 136.dp
+            hasMiniPlayer -> 144.dp
+            isLandscape -> 84.dp
+            else -> 96.dp
+        },
+    )
 
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
 
@@ -150,7 +159,7 @@ fun SettingsScreen(
                     .overScrollVertical()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 12.dp)
-                    .padding(top = innerPadding.calculateTopPadding() + 16.dp, bottom = 16.dp),
+                    .padding(top = innerPadding.calculateTopPadding() + 16.dp, bottom = listBottomPadding),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (isLandscape) {
@@ -203,7 +212,6 @@ fun SettingsScreen(
                     )
                 }
 
-                Spacer(Modifier.height(if (isLandscape) 190.dp else 110.dp))
             }
         }
     }
@@ -581,7 +589,6 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             ThemeBackOptions()
             ThemeLanguageOptions()
         }
-        Spacer(Modifier.height(110.dp))
     }
 }
 
@@ -674,11 +681,8 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // ── TEMİZLEME: Oynatma ayarları içinde gereksiz (GEREKSIZ) DataStore verilerini temizle ──
-        SmallTitle(text = "Temizleme", insideMargin = PaddingValues(16.dp, 8.dp))
+        SmallTitle(text = strings.orphanCleanupSection, insideMargin = PaddingValues(16.dp, 8.dp))
         OrphanCleanupCard()
-
-        Spacer(Modifier.height(110.dp))
     }
 }
 
@@ -907,6 +911,7 @@ private fun SettingsPageScaffold(
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
     val scrollState = rememberScrollState()
     val scrollProgress by dev.shephard.player.ui.components.rememberScrollFraction(scrollState)
+    val bottomPadding = dev.shephard.player.ui.components.bottomOverlayContentPadding(fallback = 40.dp)
 
             Scaffold(
             modifier = Modifier.fillMaxSize(),
@@ -929,11 +934,10 @@ private fun SettingsPageScaffold(
                     .overScrollVertical()
                     .verticalScroll(scrollState)
                     .padding(horizontal = 12.dp)
-                    .padding(top = innerPadding.calculateTopPadding() + 8.dp, bottom = 16.dp),
+                    .padding(top = innerPadding.calculateTopPadding() + 8.dp, bottom = bottomPadding),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 content()
-                Spacer(Modifier.height(24.dp))
             }
         }
 }
@@ -1050,78 +1054,99 @@ private fun formatListeningTime(
 
 @Composable
 private fun OrphanCleanupCard() {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    var showDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    var progress by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
-    val playerViewModel: dev.shephard.player.player.PlayerViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
-    val libraryVm: dev.shephard.player.player.LibraryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val strings = LocalStrings.current
+    var showDialog by remember { mutableStateOf(false) }
+    var progress by remember { mutableIntStateOf(0) }
+    val playerViewModel: PlayerViewModel = viewModel()
+    val libraryVm: dev.shephard.player.player.LibraryViewModel = viewModel()
     val libraryTracks by libraryVm.tracks.collectAsState()
+    val libraryHasScanned by libraryVm.hasScanned.collectAsState()
+    LaunchedEffect(libraryVm) { libraryVm.ensureTracksLoaded() }
 
     SectionCard {
-        androidx.compose.foundation.layout.Row(
-            modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            androidx.compose.foundation.layout.Column(
-                modifier = androidx.compose.ui.Modifier.weight(1f).padding(end = 12.dp)
-            ) {
-                Text(
-                    text = "Gereksiz verileri temizle",
-                    style = MiuixAppTheme.typography.titleMedium,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                    color = MiuixAppTheme.colorScheme.onBackground
-                )
+            Text(
+                text = strings.orphanCleanupTitle,
+                style = MiuixAppTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MiuixAppTheme.colorScheme.onBackground,
+            )
+            Text(
+                text = strings.orphanCleanupDescription,
+                style = MiuixAppTheme.typography.bodyMedium,
+                color = MiuixAppTheme.colorScheme.onBackground.copy(alpha = 0.72f),
+            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                top.yukonga.miuix.kmp.basic.Button(
+                    onClick = {
+                        progress = 0
+                        showDialog = true
+                        scope.launch {
+                            val ids = libraryTracks.map { it.id.toString() }.toSet()
+                            val stable = libraryTracks.map { dev.shephard.player.data.TrackFingerprint.stableKey(it) }.toSet()
+                            val report = playerViewModel.scanAndCleanOrphanedData(ids, stable) { progress = it }
+                            kotlinx.coroutines.delay(400)
+                            showDialog = false
+                            val message = if (report.totalRemoved == 0) {
+                                strings.orphanCleanupNoData
+                            } else {
+                                strings.orphanCleanupComplete.format(report.totalRemoved)
+                            }
+                            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    },
+                    enabled = libraryHasScanned,
+                ) { Text(strings.orphanCleanupAction) }
             }
-            top.yukonga.miuix.kmp.basic.Button(
-                onClick = {
-                    progress = 0; showDialog = true
-                    scope.launch {
-                        val ids = libraryTracks.map { it.id.toString() }.toSet()
-                        val stable = libraryTracks.map { dev.shephard.player.data.TrackFingerprint.stableKey(it) }.toSet()
-                        val res = playerViewModel.scanAndCleanOrphanedData(ids, stable) { p -> progress = p }
-                        kotlinx.coroutines.delay(400)
-                        showDialog = false
-                        android.widget.Toast.makeText(context, res.summary(), android.widget.Toast.LENGTH_LONG).show()
-                    }
-                }
-            ) { Text("TEMİZLE") }
         }
     }
     if (showDialog) {
-        OrphanCleanupProgressDialogForSettings(progress = progress, onDismiss = { showDialog = false })
+        OrphanCleanupProgressDialogForSettings(
+            progress = progress,
+            strings = strings,
+            onDismiss = { showDialog = false },
+        )
     }
 }
 
 @Composable
-private fun OrphanCleanupProgressDialogForSettings(progress: Int, onDismiss: () -> Unit) {
+private fun OrphanCleanupProgressDialogForSettings(
+    progress: Int,
+    strings: dev.shephard.player.ui.i18n.Strings,
+    onDismiss: () -> Unit,
+) {
     dev.shephard.player.ui.miuix.MiuixDialog(
-        onDismissRequest = { onDismiss() },
-        title = "Taranıyor… ${'$'}progress%",
+        onDismissRequest = onDismiss,
+        title = strings.orphanCleanupScanning.format(progress),
         text = {
             androidx.compose.foundation.layout.Column(
-                modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
-                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.padding(top = 4.dp))
-                androidx.compose.foundation.layout.Box(
-                    modifier = androidx.compose.ui.Modifier.fillMaxWidth().height(10.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(MiuixAppTheme.colorScheme.surfaceVariant)
+                Spacer(modifier = Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(10.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MiuixAppTheme.colorScheme.surfaceVariant),
                 ) {
-                    androidx.compose.foundation.layout.Box(
-                        modifier = androidx.compose.ui.Modifier.fillMaxWidth(fraction = progress / 100f).height(10.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(MiuixAppTheme.colorScheme.primary)
+                    Box(
+                        modifier = Modifier.fillMaxWidth(fraction = progress / 100f).height(10.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(MiuixAppTheme.colorScheme.primary),
                     )
                 }
             }
         },
         buttons = {
-            androidx.compose.foundation.layout.Row(
-                modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
-            ) {
-                top.yukonga.miuix.kmp.basic.TextButton(onClick = { onDismiss() }, text = "İptal")
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                top.yukonga.miuix.kmp.basic.TextButton(onClick = onDismiss, text = strings.cancel)
             }
-        }
+        },
     )
 }
 

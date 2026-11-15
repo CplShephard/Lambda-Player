@@ -98,6 +98,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.Composable
@@ -182,6 +183,7 @@ fun FullScreenLyricsExperience(
     val blurEnabled by preferences.lyricsBackgroundBlurEnabled.collectAsState(initial = true)
     val savedBlurStrength by preferences.lyricsBackgroundBlurStrength.collectAsState(initial = 36f)
     val autoScroll by preferences.lyricsAutoScrollEnabled.collectAsState(initial = true)
+    val lyricsShakeEnabled by preferences.lyricsShakeEffectEnabled.collectAsState(initial = true)
     val showTranslation by preferences.lyricsTranslationVisible.collectAsState(initial = true)
     val transLang by preferences.lyricsTranslationLanguage.collectAsState(initial = "off")
     val skipLyricsPrompt by preferences.lyricsSkipSearchPrompt.collectAsState(initial = null)
@@ -575,11 +577,13 @@ fun FullScreenLyricsExperience(
                         LyricsSettingsPanel(
                             useMiuix = useMiuix, primary = primary, textStyle = textStyle,
                             blurEnabled = blurEnabled, blurStrength = blurStrength, autoScroll = autoScroll,
+                            shakeEffectEnabled = lyricsShakeEnabled,
                             syncOffsetMs = syncOffsetMs,
                             onBlurEnabledChange = { enabled -> scope.launch { preferences.setLyricsBackgroundBlurEnabled(enabled) } },
                             onBlurStrengthChange = { blurStrength = it },
                             onBlurStrengthChangeFinished = { scope.launch { preferences.setLyricsBackgroundBlurStrength(blurStrength) } },
                             onAutoScrollChange = { enabled -> scope.launch { preferences.setLyricsAutoScrollEnabled(enabled) } },
+                            onShakeEffectChange = { enabled -> scope.launch { preferences.setLyricsShakeEffectEnabled(enabled) } },
                             onOffsetChange = playerViewModel::setLyricsSyncOffset,
                             onExport = {
                                 closeThen {
@@ -723,8 +727,11 @@ fun FullScreenLyricsExperience(
                                 } else 0.dp
                                 // Grow/shrink is a pure scale (layout size is fixed), timed and eased
                                 // exactly like the scroll so the line lands at full size in place.
+                                val lyricPositionMs = smoothPositionMs.longValue - syncOffsetMs
+                                val wordTimingStarted = line.words.firstOrNull()?.let { lyricPositionMs >= it.startMs } ?: true
+                                val scaleLineActive = isActive && wordTimingStarted
                                 val activeAmount by animateFloatAsState(
-                                    targetValue = if (isActive) 1f else 0f,
+                                    targetValue = if (scaleLineActive) 1f else 0f,
                                     animationSpec = tween(LyricMoveDurationMs, easing = FastOutSlowInEasing),
                                     label = "lyricLineSize",
                                 )
@@ -750,16 +757,13 @@ fun FullScreenLyricsExperience(
                                     label = "lyricLineColor",
                                 )
                                 var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
-                                // Premium shake: jiggle intensity spikes when line becomes active/inactive (QQ Music feel)
-                                var shakeTrigger by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-                                androidx.compose.runtime.LaunchedEffect(isActive) { shakeTrigger++ }
                                 val shakeProgress by animateFloatAsState(
-                                    targetValue = if (shakeTrigger > 0) 1f else 0f,
-                                    animationSpec = tween(520, easing = FastOutSlowInEasing),
-                                    label = "shakeProgress"
+                                    targetValue = if (lyricsShakeEnabled && scaleLineActive) 1f else 0f,
+                                    animationSpec = tween(220, easing = FastOutSlowInEasing),
+                                    label = "shakeProgress",
                                 )
-                                // Only active line letters move slowly; others have single transition animation
-                                val shouldJiggle = isActive
+                                // Keep the optional premium wobble subtle and attached to the active lyric line.
+                                val shouldJiggle = lyricsShakeEnabled && scaleLineActive
                                 val infinite = rememberInfiniteTransition(label = "lyricJiggle")
                                 val jiggleX by infinite.animateFloat(
                                     initialValue = -0.3f, targetValue = 0.3f,
@@ -787,8 +791,8 @@ fun FullScreenLyricsExperience(
                                             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
                                             translationY += lineSlideOffset.toPx() * (if (index < activeIndex) -1f else 1f)
                                             if (shouldJiggle) {
-                                                translationX = jiggleX * 0.6f
-                                                translationY += jiggleY * 0.5f
+                                                translationX = jiggleX * with(density) { 2.dp.toPx() } * shakeProgress
+                                                translationY += jiggleY * with(density) { 1.5.dp.toPx() } * shakeProgress
                                             }
                                         }
                                         .blur(animatedBlur)
@@ -804,7 +808,7 @@ fun FullScreenLyricsExperience(
                                                 if (karaoke) textLayout?.let { layout ->
                                                     drawKaraokeHighlight(
                                                         layout = layout, line = line,
-                                                        positionMs = smoothPositionMs.longValue - syncOffsetMs,
+                                                        positionMs = lyricPositionMs,
                                                         color = foreground,
                                                     )
                                                 }
@@ -973,11 +977,13 @@ private fun LyricsSettingsPanel(
     blurEnabled: Boolean,
     blurStrength: Float,
     autoScroll: Boolean,
+    shakeEffectEnabled: Boolean,
     syncOffsetMs: Int,
     onBlurEnabledChange: (Boolean) -> Unit,
     onBlurStrengthChange: (Float) -> Unit,
     onBlurStrengthChangeFinished: () -> Unit,
     onAutoScrollChange: (Boolean) -> Unit,
+    onShakeEffectChange: (Boolean) -> Unit,
     onOffsetChange: (Int) -> Unit,
     onExport: () -> Unit,
     exportEnabled: Boolean,
@@ -990,11 +996,13 @@ private fun LyricsSettingsPanel(
             blurEnabled = blurEnabled,
             blurStrength = blurStrength,
             autoScroll = autoScroll,
+            shakeEffectEnabled = shakeEffectEnabled,
             syncOffsetMs = syncOffsetMs,
             onBlurEnabledChange = onBlurEnabledChange,
             onBlurStrengthChange = onBlurStrengthChange,
             onBlurStrengthChangeFinished = onBlurStrengthChangeFinished,
             onAutoScrollChange = onAutoScrollChange,
+            onShakeEffectChange = onShakeEffectChange,
             onOffsetChange = onOffsetChange,
             onExport = onExport,
             exportEnabled = exportEnabled,
@@ -1026,6 +1034,19 @@ private fun LyricsSettingsPanel(
             )
             Spacer(Modifier.weight(1f))
             LyricsIconButton(Icons.Filled.FileDownload, "Export lyrics", onExport, enabled = exportEnabled)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                BasicText(
+                    strings.lyricsShakeEffect,
+                    style = textStyle.copy(color = LocalLyricsForeground.current, fontSize = 14.sp, fontWeight = FontWeight.Medium),
+                )
+                BasicText(
+                    strings.lyricsShakeEffectDescription,
+                    style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.68f), fontSize = 12.sp),
+                )
+            }
+            Switch(checked = shakeEffectEnabled, onCheckedChange = onShakeEffectChange)
         }
         BasicText(
             "${strings.blurEffect} · ${blurStrength.toInt()} dp",
@@ -1062,11 +1083,13 @@ private fun MiuixLyricsSettingsPanel(
     blurEnabled: Boolean,
     blurStrength: Float,
     autoScroll: Boolean,
+    shakeEffectEnabled: Boolean,
     syncOffsetMs: Int,
     onBlurEnabledChange: (Boolean) -> Unit,
     onBlurStrengthChange: (Float) -> Unit,
     onBlurStrengthChangeFinished: () -> Unit,
     onAutoScrollChange: (Boolean) -> Unit,
+    onShakeEffectChange: (Boolean) -> Unit,
     onOffsetChange: (Int) -> Unit,
     onExport: () -> Unit,
     exportEnabled: Boolean,
@@ -1109,6 +1132,20 @@ private fun MiuixLyricsSettingsPanel(
             top.yukonga.miuix.kmp.basic.Switch(
                 checked = autoScroll,
                 onCheckedChange = onAutoScrollChange,
+                colors = switchColors,
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                BasicText(strings.lyricsShakeEffect, style = labelStyle)
+                BasicText(
+                    strings.lyricsShakeEffectDescription,
+                    style = textStyle.copy(color = foreground.copy(alpha = 0.68f), fontSize = 12.sp),
+                )
+            }
+            top.yukonga.miuix.kmp.basic.Switch(
+                checked = shakeEffectEnabled,
+                onCheckedChange = onShakeEffectChange,
                 colors = switchColors,
             )
         }

@@ -72,6 +72,7 @@ import dev.shephard.player.ui.miuix.Icon
 import dev.shephard.player.ui.miuix.IconButton
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.components.MiuixDrawer
+import dev.shephard.player.ui.components.bottomOverlayContentPadding
 import dev.shephard.player.ui.components.MiuixDrawerActionHeader
 import dev.shephard.player.ui.components.captureForTopBarBlur
 import dev.shephard.player.ui.components.miuixHeaderSafeTop
@@ -433,6 +434,7 @@ LaunchedEffect(playlists) {
     // inside this page. Opening it just pushes the route.
     PlaylistListView(
         embedded = embedded,
+        hasMiniPlayer = hasMiniPlayer,
         playlists = playlists,
         query = query,
         sortMode = sortMode,
@@ -761,6 +763,7 @@ internal fun resolvePlaylistTracks(pl: LocalPlaylist, tracks: List<AudioTrack>, 
 @Composable
 private fun PlaylistListView(
     embedded: Boolean,
+    hasMiniPlayer: Boolean,
     playlists: List<LocalPlaylist>,
     query: String,
     sortMode: Int,
@@ -776,6 +779,18 @@ private fun PlaylistListView(
 ) {
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
     val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
+    val listBottomPadding = bottomOverlayContentPadding(
+        fallback = when {
+            hasMiniPlayer && isLandscape -> 136.dp
+            hasMiniPlayer -> 144.dp
+            isLandscape -> 84.dp
+            else -> 96.dp
+        },
+    )
+    val fabBottomPadding = bottomOverlayContentPadding(
+        fallback = if (hasMiniPlayer) 144.dp else 96.dp,
+        extraSpace = 8.dp,
+    )
 
 Box(modifier = Modifier.fillMaxSize()) {
 
@@ -850,7 +865,7 @@ if (displayLayout == LayoutMode.GRID) {
                                     start = 16.dp,
                                     top = innerPadding.calculateTopPadding() + 8.dp,
                                     end = 16.dp,
-                                    bottom = 220.dp
+                                    bottom = listBottomPadding
                                 ),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -893,7 +908,7 @@ if (displayLayout == LayoutMode.GRID) {
                                         .captureForTopBarBlur(topBarState)
                                         .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
                                         .overScrollVertical()),
-                                contentPadding = PaddingValues(start = 16.dp, top = innerPadding.calculateTopPadding() + 8.dp, end = 16.dp, bottom = 220.dp),
+                                contentPadding = PaddingValues(start = 16.dp, top = innerPadding.calculateTopPadding() + 8.dp, end = 16.dp, bottom = listBottomPadding),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
@@ -930,7 +945,7 @@ if (displayLayout == LayoutMode.GRID) {
                                     start = 16.dp,
                                     top = innerPadding.calculateTopPadding() + 8.dp,
                                     end = 16.dp,
-                                    bottom = 220.dp
+                                    bottom = listBottomPadding
                                 ),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
@@ -975,7 +990,7 @@ FloatingActionButton(
         onClick = onCreate,
         modifier = Modifier
             .align(Alignment.BottomEnd)
-            .padding(bottom = 180.dp, end = 24.dp)
+            .padding(bottom = fabBottomPadding, end = 24.dp)
             .bounceClick(onClick = onCreate),
         shape = RoundedCornerShape(20.dp),
         containerColor = MiuixAppTheme.colorScheme.primary

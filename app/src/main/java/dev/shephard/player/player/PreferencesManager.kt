@@ -67,6 +67,7 @@ object PrefsKeys {
     val LYRICS_BACKGROUND_BLUR_ENABLED = booleanPreferencesKey("lyrics_background_blur_enabled")
     val LYRICS_BACKGROUND_BLUR_STRENGTH = floatPreferencesKey("lyrics_background_blur_strength")
     val LYRICS_AUTO_SCROLL_ENABLED = booleanPreferencesKey("lyrics_auto_scroll_enabled")
+    val LYRICS_SHAKE_EFFECT_ENABLED = booleanPreferencesKey("lyrics_shake_effect_enabled")
     val LYRICS_SKIP_SEARCH_PROMPT = booleanPreferencesKey("lyrics_skip_search_prompt")
     val LYRICS_TRANSLATION_VISIBLE = booleanPreferencesKey("lyrics_translation_visible")
     val LYRICS_TRANSLATION_LANGUAGE = stringPreferencesKey("lyrics_translation_language")
@@ -267,6 +268,10 @@ class PreferencesManager(private val context: Context) {
 
     val lyricsAutoScrollEnabled: Flow<Boolean> = context.dataStore.data.map {
         it[PrefsKeys.LYRICS_AUTO_SCROLL_ENABLED] ?: true
+    }
+
+    val lyricsShakeEffectEnabled: Flow<Boolean> = context.dataStore.data.map {
+        it[PrefsKeys.LYRICS_SHAKE_EFFECT_ENABLED] ?: true
     }
 
     val carouselStyle: Flow<String> = context.dataStore.data.map {
@@ -582,6 +587,10 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setLyricsAutoScrollEnabled(enabled: Boolean) {
         context.dataStore.edit { it[PrefsKeys.LYRICS_AUTO_SCROLL_ENABLED] = enabled }
+    }
+
+    suspend fun setLyricsShakeEffectEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[PrefsKeys.LYRICS_SHAKE_EFFECT_ENABLED] = enabled }
     }
 
     suspend fun setCarouselStyle(style: String) {

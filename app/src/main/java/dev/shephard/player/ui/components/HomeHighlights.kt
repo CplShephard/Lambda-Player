@@ -119,6 +119,7 @@ fun HomeYourMix(
     tracks: List<AudioTrack>,
     useMiuix: Boolean,
     isLoading: Boolean = false,
+    compact: Boolean = false,
     onRemix: (List<AudioTrack>) -> Unit,
     onPlay: (List<AudioTrack>, Int) -> Unit,
 ) {
@@ -130,15 +131,31 @@ fun HomeYourMix(
     val accent = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
     Column(Modifier.fillMaxWidth()) {
         // Pixel's hero: a two-line title with a prominent shuffle button.
-        Box(Modifier.fillMaxWidth().height(220.dp).padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Box(
+            Modifier.fillMaxWidth()
+                .height(if (compact) 152.dp else 220.dp)
+                .padding(horizontal = 16.dp, vertical = if (compact) 8.dp else 12.dp)
+        ) {
             Column(Modifier.align(Alignment.TopStart).padding(top = 8.dp, start = 12.dp)) {
-                Text(strings.yourMixTitle, fontWeight = FontWeight.Black, fontSize = 64.sp, lineHeight = 62.sp, color = ink)
-                Text(strings.yourMixSubtitle, color = ink.copy(alpha = .7f),
-                    style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp))
+                Text(
+                    strings.yourMixTitle,
+                    fontWeight = FontWeight.Black,
+                    fontSize = if (compact) 44.sp else 64.sp,
+                    lineHeight = if (compact) 42.sp else 62.sp,
+                    color = ink,
+                )
+                Text(
+                    strings.yourMixSubtitle,
+                    color = ink.copy(alpha = .7f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(start = 8.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             Box(
-                Modifier.align(Alignment.BottomEnd).padding(end = 12.dp).size(72.dp)
-                    .clip(RoundedCornerShape(28.dp))
+                Modifier.align(Alignment.BottomEnd).padding(end = 12.dp).size(if (compact) 56.dp else 72.dp)
+                    .clip(RoundedCornerShape(if (compact) 22.dp else 28.dp))
                     .background(if (tracks.isNotEmpty()) accent else surface)
                     .clickable(enabled = tracks.isNotEmpty()) {
                         onRemix(tracks)
@@ -171,7 +188,7 @@ fun HomeYourMix(
                 }
             }
             else -> {
-                PixelMixCollage(tracks = tracks, surface = surface, accent = accent, pattern = pattern, useMiuix = useMiuix, onPlay = onPlay)
+                PixelMixCollage(tracks = tracks, surface = surface, accent = accent, pattern = pattern, useMiuix = useMiuix, compact = compact, onPlay = onPlay)
             }
         }
     }
@@ -187,6 +204,7 @@ private fun PixelMixCollage(
     accent: Color,
     pattern: CollagePattern,
     useMiuix: Boolean,
+    compact: Boolean,
     onPlay: (List<AudioTrack>, Int) -> Unit,
 ) {
     @Composable
@@ -202,9 +220,13 @@ private fun PixelMixCollage(
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
     }
-    BoxWithConstraints(Modifier.fillMaxWidth().height(400.dp).padding(14.dp)) {
+    BoxWithConstraints(
+        Modifier.fillMaxWidth()
+            .height(if (compact) 248.dp else 400.dp)
+            .padding(if (compact) 8.dp else 14.dp)
+    ) {
         val h = maxHeight
-        val base = minOf(300.dp, h)
+        val base = minOf(if (compact) 184.dp else 300.dp, h)
         val configs = remember(pattern, base, h) { buildCollageConfigs(pattern, base, h) }
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().height(h * .6f)) {
@@ -223,7 +245,7 @@ private fun PixelMixCollage(
 
 /** Live listening total, linked to the existing statistics page. */
 @Composable
-fun HomeListeningTime(totalMs: Long, useMiuix: Boolean, onClick: () -> Unit) {
+fun HomeListeningTime(totalMs: Long, useMiuix: Boolean, onClick: () -> Unit, compact: Boolean = false) {
     val strings = LocalStrings.current
     val accent = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
     val surface = if (useMiuix) MiuixAppTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primaryContainer
@@ -236,17 +258,17 @@ fun HomeListeningTime(totalMs: Long, useMiuix: Boolean, onClick: () -> Unit) {
             .background(Brush.linearGradient(listOf(surface, accent.copy(alpha = .24f))))
             .then(if (useMiuix) Modifier.clickable(onClick = onClick)
                 else Modifier.m3CardPress(shape = RoundedCornerShape(26.dp), onClick = onClick))
-            .padding(18.dp),
+            .padding(if (compact) 12.dp else 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(50.dp).clip(CircleShape).background(accent.copy(alpha = .16f)), contentAlignment = Alignment.Center) {
-            Icon(Icons.Filled.Headphones, null, tint = accent, modifier = Modifier.size(25.dp))
+        Box(Modifier.size(if (compact) 40.dp else 50.dp).clip(CircleShape).background(accent.copy(alpha = .16f)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Filled.Headphones, null, tint = accent, modifier = Modifier.size(if (compact) 21.dp else 25.dp))
         }
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(if (compact) 10.dp else 14.dp))
         Column(Modifier.weight(1f)) {
             Text(strings.totalListeningTime, color = ink.copy(alpha = .72f), style = MaterialTheme.typography.labelLarge, maxLines = 2)
-            Text(time, color = ink, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+            Text(time, color = ink, fontSize = if (compact) 21.sp else 25.sp, fontWeight = FontWeight.Bold)
         }
-        Icon(Icons.Filled.AutoAwesome, null, tint = accent, modifier = Modifier.size(23.dp))
+        Icon(Icons.Filled.AutoAwesome, null, tint = accent, modifier = Modifier.size(if (compact) 20.dp else 23.dp))
     }
 }

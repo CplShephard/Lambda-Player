@@ -23,6 +23,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,6 +41,7 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import dev.shephard.player.ui.components.miuixHeaderSafeTop
 import dev.shephard.player.ui.components.MiuixSwitcherPills
 import dev.shephard.player.ui.components.LibraryTabsFixedShade
+import dev.shephard.player.ui.components.bottomOverlayContentPadding
 import dev.shephard.player.ui.components.rememberLibraryTabsBackdrop
 import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
@@ -69,11 +73,14 @@ fun LibraryScreen(
 ) {
     val strings = LocalStrings.current
     val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
-    val listBottomPadding = if (isLandscape) {
-        if (hasMiniPlayer) 190.dp else 110.dp
-    } else {
-        if (hasMiniPlayer) 150.dp else 96.dp
-    }
+    val listBottomPadding = bottomOverlayContentPadding(
+        fallback = when {
+            hasMiniPlayer && isLandscape -> 136.dp
+            hasMiniPlayer -> 144.dp
+            isLandscape -> 84.dp
+            else -> 96.dp
+        },
+    )
     val context = LocalContext.current
     val prefs = remember(context) { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
@@ -155,8 +162,21 @@ fun LibraryScreen(
     val foreground = if (useMiuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
     val accent = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-    Column(Modifier.fillMaxSize().background(if (useMiuix) MiuixAppTheme.colorScheme.background else MaterialTheme.colorScheme.surface)
-        .then(if (useMiuix) Modifier.miuixHeaderSafeTop() else Modifier.statusBarsPadding())) {
+    Column(
+        Modifier.fillMaxSize()
+            .background(if (useMiuix) MiuixAppTheme.colorScheme.background else MaterialTheme.colorScheme.surface)
+            .drawBehind {
+                if (useMiuix) {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(accent.copy(alpha = 0.12f), accent.copy(alpha = 0.035f), Color.Transparent),
+                            endY = size.height * 0.38f,
+                        ),
+                    )
+                }
+            }
+            .then(if (useMiuix) Modifier.miuixHeaderSafeTop() else Modifier.statusBarsPadding())
+    ) {
         Row(Modifier.fillMaxWidth().padding(start = if (isLandscape) 14.dp else 20.dp, end = 8.dp, top = if (isLandscape) 4.dp else 12.dp), verticalAlignment = Alignment.CenterVertically) {
             LibraryText(strings.library, useMiuix, Modifier.weight(1f), color = foreground, fontSize = if (isLandscape) 24.sp else 30.sp, bold = true)
             LibraryHeaderButton(useMiuix, Icons.Default.Search, strings.search, foreground) {
@@ -417,7 +437,7 @@ if (group == null && displayLayout == dev.shephard.player.player.LayoutMode.GRID
                 val stableKeys = tracks.filter { it.id != trackToDelete?.id }.map { dev.shephard.player.data.TrackFingerprint.stableKey(it) }.toSet()
                 // show scanningprogress to 100% before actual orphan deletion (as requested: popup with progress bar)
                 for (p in 0..100 step 12) { withContext(Dispatchers.Main) { deleteProgress = p }; kotlinx.coroutines.delay(45) }
-                val report = playerViewModel.scanAndCleanOrphanedData(ids, stableKeys) { p -> scope.launch(Dispatchers.Main) { deleteProgress = p } }
+                val report = playerViewModel.scanAndCleanOrphanedData(ids, stableKeys) { p -> deleteProgress = p }
                 withContext(Dispatchers.Main) { lastCleanupReport = report; deleteProgress = 100; showDeleteProgress = false }
                 // now actually delete the music file
                 withContext(Dispatchers.Main) { confirmDelete() }
@@ -426,25 +446,38 @@ if (group == null && displayLayout == dev.shephard.player.player.LayoutMode.GRID
         if (showDeleteProgress) {
             if (useMiuix) dev.shephard.player.ui.miuix.MiuixDialog(
                 onDismissRequest = { showDeleteProgress = false },
-                title = "DataStore orphan scan… ${deleteProgress}%",
+                title = strings.orphanCleanupScanning.format(deleteProgress),
                 text = {
                     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
-                            Box(modifier = Modifier.fillMaxWidth(fraction = deleteProgress/100f).height(10.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.primary))
+                            Box(modifier = Modifier.fillMaxWidth(fraction = deleteProgress / 100f).height(10.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.primary))
                         }
-                        Text(text = "${deleteProgress}% — scanning for GEREKSIZ leftover metadata (listening stats, lyrics…)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
-                        if (lastCleanupReport != null) Text(text = lastCleanupReport!!.summary(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 6.dp))
-                        Text(text = "Only orphaned DataStore entries will be removed, music file deletion follows.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=0.7f), modifier = Modifier.padding(top=6.dp))
+                        Text(
+                            text = strings.orphanCleanupDescription,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                        lastCleanupReport?.let { report ->
+                            val result = if (report.totalRemoved == 0) strings.orphanCleanupNoData
+                                else strings.orphanCleanupComplete.format(report.totalRemoved)
+                            Text(
+                                text = result,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
+                        }
                     }
                 },
                 buttons = { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { top.yukonga.miuix.kmp.basic.TextButton(onClick = { showDeleteProgress = false }, text = strings.cancel) } }
             ) else AlertDialog(
                 onDismissRequest = { showDeleteProgress = false },
-                title = { Text("Scanning… ${deleteProgress}%") },
+                title = { Text(strings.orphanCleanupScanning.format(deleteProgress)) },
                 text = {
                     Column {
-                        LinearProgressIndicator(progress = { deleteProgress/100f }, modifier = Modifier.fillMaxWidth())
-                        Text("${deleteProgress}% — scanning DataStore for orphaned leftover metadata")
+                        LinearProgressIndicator(progress = { deleteProgress / 100f }, modifier = Modifier.fillMaxWidth())
+                        Text(strings.orphanCleanupDescription)
                     }
                 },
                 confirmButton = {}, dismissButton = { TextButton(onClick = { showDeleteProgress = false }) { Text(strings.cancel) } }

@@ -73,6 +73,7 @@ import dev.shephard.player.player.rememberAudioPermissionState
 import dev.shephard.player.ui.components.m3.BaseWidget
 import dev.shephard.player.ui.components.m3.LineageGridMediaItem
 import dev.shephard.player.ui.components.m3.LineageListItemWithThumbnail
+import dev.shephard.player.ui.components.bottomOverlayContentPadding
 import dev.shephard.player.ui.components.m3.LineageNoElements
 import dev.shephard.player.ui.components.m3.LineageSortingChip
 import dev.shephard.player.ui.components.m3.SegmentedColumn
@@ -111,6 +112,14 @@ fun MusicScreenM3(
     val prefs = remember { PreferencesManager(context) }
     val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
     val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
+    val listBottomPadding = bottomOverlayContentPadding(
+        fallback = when {
+            hasMiniPlayer && isLandscape -> 136.dp
+            hasMiniPlayer -> 144.dp
+            isLandscape -> 84.dp
+            else -> 96.dp
+        },
+    )
     val strings = LocalStrings.current
 
     val permissionState = rememberAudioPermissionState(
@@ -225,7 +234,7 @@ fun MusicScreenM3(
                                 contentPadding = PaddingValues(
                                     start = 8.dp,
                                     end = 8.dp,
-                                    bottom = 220.dp
+                                    bottom = listBottomPadding
                                 ),
                             ) {
                                 gridItems(tracks, key = { it.id }) { track ->
@@ -247,7 +256,7 @@ fun MusicScreenM3(
                             LazyVerticalGrid(
                                 columns = GridCells.Fixed(2),
                                 modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(bottom = 220.dp, top = 4.dp, start = 8.dp, end = 8.dp),
+                                contentPadding = PaddingValues(bottom = listBottomPadding, top = 4.dp, start = 8.dp, end = 8.dp),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
@@ -274,7 +283,7 @@ fun MusicScreenM3(
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(
-                                    bottom = 220.dp,
+                                    bottom = listBottomPadding,
                                     top = 4.dp
                                 ),
                             ) {

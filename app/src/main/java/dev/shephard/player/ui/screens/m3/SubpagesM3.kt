@@ -52,11 +52,13 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -65,6 +67,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -108,11 +111,20 @@ fun SettingsScreenM3(
     onOpenPlayerSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     onOpenStats: () -> Unit = {},
+    hasMiniPlayer: Boolean = false,
 ) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
     val strings = LocalStrings.current
     val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
+    val listBottomPadding = dev.shephard.player.ui.components.bottomOverlayContentPadding(
+        fallback = when {
+            hasMiniPlayer && isLandscape -> 136.dp
+            hasMiniPlayer -> 144.dp
+            isLandscape -> 84.dp
+            else -> 96.dp
+        },
+    )
     val totalMs by playerViewModel.totalListeningMsLive.collectAsState()
 
     val m3TopBarState = rememberExpressiveTopBarState()
@@ -131,7 +143,7 @@ fun SettingsScreenM3(
             Row(
                 modifier = Modifier.fillMaxSize().padding(
                     top = padding.calculateTopPadding() + 4.dp,
-                    bottom = padding.calculateBottomPadding() + 190.dp,
+                    bottom = padding.calculateBottomPadding() + listBottomPadding,
                 ),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.Top,
@@ -155,7 +167,7 @@ fun SettingsScreenM3(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = padding.calculateTopPadding() + 4.dp, bottom = padding.calculateBottomPadding() + 80.dp)
+                contentPadding = PaddingValues(top = padding.calculateTopPadding() + 4.dp, bottom = padding.calculateBottomPadding() + listBottomPadding)
             ) {
                 item { LineageSectionHeader(title = strings.settings) }
                 item { SettingsNavigationCardM3(strings.themeSettings, strings.themeSettingsSummary, Icons.Filled.ColorLens, onOpenThemeSettings) }
@@ -189,12 +201,31 @@ private fun SettingsNavigationCardM3(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlayerSettingsScreenM3(onBack: () -> Unit) {
+fun PlayerSettingsScreenM3(
+    onBack: () -> Unit,
+    playerViewModel: PlayerViewModel = viewModel(),
+    libraryViewModel: LibraryViewModel = viewModel(),
+    hasMiniPlayer: Boolean = false,
+) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
     val strings = LocalStrings.current
     val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
+    val bottomContentPadding = dev.shephard.player.ui.components.bottomOverlayContentPadding(
+        fallback = when {
+            hasMiniPlayer && isLandscape -> 136.dp
+            hasMiniPlayer -> 144.dp
+            isLandscape -> 84.dp
+            else -> 96.dp
+        },
+    )
+    val libraryTracks by libraryViewModel.tracks.collectAsState()
+    val libraryHasScanned by libraryViewModel.hasScanned.collectAsState()
+    var showCleanupDialog by remember { mutableStateOf(false) }
+    var cleanupProgress by remember { mutableIntStateOf(0) }
+    var cleanupRunning by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { libraryViewModel.ensureTracksLoaded() }
     val crossfade by prefs.crossfadeEnabled.collectAsState(initial = false)
     val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
     val playWith by prefs.playWithOthers.collectAsState(initial = false)
@@ -219,7 +250,7 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 80.dp)
+            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + bottomContentPadding)
         ) {
             item {
                 SegmentedColumn(title = strings.playbackSettings, columns = if (isLandscape) 2 else 1) {
@@ -278,6 +309,97 @@ fun PlayerSettingsScreenM3(onBack: () -> Unit) {
                             onCheckedChange = { scope.launch { prefs.setPlayWithOthers(it) } }
                         )
                     }
+                }
+            }
+            item {
+                OrphanCleanupCardM3(
+                    strings = strings,
+                    libraryReady = libraryHasScanned,
+                    cleanupRunning = cleanupRunning,
+                    onClean = {
+                        cleanupProgress = 0
+                        showCleanupDialog = true
+                        cleanupRunning = true
+                        scope.launch {
+                            try {
+                                val ids = libraryTracks.map { it.id.toString() }.toSet()
+                                val stable = libraryTracks.map { dev.shephard.player.data.TrackFingerprint.stableKey(it) }.toSet()
+                                val report = playerViewModel.scanAndCleanOrphanedData(ids, stable) { cleanupProgress = it.coerceIn(0, 100) }
+                                kotlinx.coroutines.delay(400)
+                                val message = if (report.totalRemoved == 0) {
+                                    strings.orphanCleanupNoData
+                                } else {
+                                    strings.orphanCleanupComplete.format(report.totalRemoved)
+                                }
+                                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                android.widget.Toast.makeText(context, strings.actionFailed, android.widget.Toast.LENGTH_LONG).show()
+                            } finally {
+                                cleanupRunning = false
+                                showCleanupDialog = false
+                            }
+                        }
+                    },
+                )
+            }
+        }
+        if (showCleanupDialog) {
+            AlertDialog(
+                onDismissRequest = { showCleanupDialog = false },
+                title = { Text(strings.orphanCleanupScanning.format(cleanupProgress)) },
+                text = {
+                    LinearProgressIndicator(
+                        progress = { cleanupProgress / 100f },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { showCleanupDialog = false }) { Text(strings.cancel) }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun OrphanCleanupCardM3(
+    strings: dev.shephard.player.ui.i18n.Strings,
+    libraryReady: Boolean,
+    cleanupRunning: Boolean,
+    onClean: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        LineageSectionHeader(title = strings.orphanCleanupSection)
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = m3ItemCardColors(),
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Filled.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Text(
+                        text = strings.orphanCleanupTitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Text(
+                    text = strings.orphanCleanupDescription,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = onClean,
+                    enabled = libraryReady && !cleanupRunning,
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Text(strings.orphanCleanupAction)
                 }
             }
         }
