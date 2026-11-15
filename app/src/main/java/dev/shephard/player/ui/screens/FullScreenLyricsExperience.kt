@@ -1264,6 +1264,7 @@ private fun LyricsSearchResultCard(
             )
             LyricsPill(result.source, primary, selected = result.source == "QQ Music", onClick = onClick)
             if (result.syncedLyrics != null) LyricsPill("Synced", primary, selected = true, onClick = onClick)
+            if (result.syncedLyrics?.let { isWordByWordLyrics(it) } == true) LyricsPill("word-by-word", primary, selected = true, onClick = onClick)
             if (result.instrumental) LyricsPill("Instrumental", primary, selected = false, onClick = onClick)
         }
     }
@@ -1667,6 +1668,10 @@ private fun formatLrcTime(ms: Long): String {
     val centiseconds = (safe % 1_000L) / 10L
     return "%02d:%02d.%02d".format(minutes, seconds, centiseconds)
 }
+
+private fun isWordByWordLyrics(synced: String): Boolean =
+    // Enhanced LRC word tag like <00:12.000> indicates word-by-word (like original QQ QRC)
+    Regex("<\\d{1,3}:\\d{2}[.:]\\d{1,3}>").containsMatchIn(synced)
 
 private fun formatLyricsDuration(ms: Long): String {
     val totalSeconds = (ms.coerceAtLeast(0L) / 1_000L)

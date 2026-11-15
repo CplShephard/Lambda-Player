@@ -106,6 +106,7 @@ import dev.shephard.player.ui.miuix.MiuixAppTheme
 import dev.shephard.player.ui.miuix.Text
 import dev.shephard.player.ui.theme.material.PresetColors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.zhanghai.android.appiconloader.AppIconLoader
@@ -183,28 +184,39 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val strings = LocalStrings.current
 
-    val useMiuix by prefs.useMiuix.collectAsState(initial = true)
-    val themeMode by prefs.themeMode.collectAsState(initial = ThemeModePreference.LIGHT)
+    val initialUseMiuix = remember { kotlinx.coroutines.runBlocking { prefs.useMiuix.first() } }
+    val useMiuix by prefs.useMiuix.collectAsState(initial = initialUseMiuix)
+    val initialThemeMode = remember { kotlinx.coroutines.runBlocking { prefs.themeMode.first() } }
+    val themeMode by prefs.themeMode.collectAsState(initial = initialThemeMode)
     val liquidGlassEnabledLoaded by prefs.liquidGlassEnabled.collectAsState(initial = null as Boolean?)
     val liquidGlassEnabled = liquidGlassEnabledLoaded == true
-    val glassEffect by prefs.liquidGlassEffect.collectAsState(initial = false)
-    val dynamicByCover by prefs.dynamicColorByCover.collectAsState(initial = false)
-    val appleFloatingBar by prefs.useAppleFloatingBar.collectAsState(initial = false)
+    val initialGlassEffect = remember { kotlinx.coroutines.runBlocking { prefs.liquidGlassEffect.first() } }
+    val glassEffect by prefs.liquidGlassEffect.collectAsState(initial = initialGlassEffect)
+    val initialDynamicByCover = remember { kotlinx.coroutines.runBlocking { prefs.dynamicColorByCover.first() } }
+    val dynamicByCover by prefs.dynamicColorByCover.collectAsState(initial = initialDynamicByCover)
+    val initialAppleFloatingBar = remember { kotlinx.coroutines.runBlocking { prefs.useAppleFloatingBar.first() } }
+    val appleFloatingBar by prefs.useAppleFloatingBar.collectAsState(initial = initialAppleFloatingBar)
 
     // Fix custom colors re-animation: use nullable initial to avoid false->true flicker on enter
     val useMiuixMonetNullable by prefs.useMiuixMonet.collectAsState(initial = null as Boolean?)
     val useMiuixMonet = useMiuixMonetNullable ?: false
-    val miuixGreenAccent by prefs.miuixGreenAccent.collectAsState(initial = false)
+    val initialMiuixGreenAccent = remember { kotlinx.coroutines.runBlocking { prefs.miuixGreenAccent.first() } }
+    val miuixGreenAccent by prefs.miuixGreenAccent.collectAsState(initial = initialMiuixGreenAccent)
     val dynamicColorNullable by prefs.dynamicColor.collectAsState(initial = null as Boolean?)
     val dynamicColor = dynamicColorNullable ?: false
-    val paletteStyle by prefs.paletteStyle.collectAsState(initial = PaletteStyle.TonalSpot)
-    val colorSpec by prefs.colorSpec.collectAsState(initial = ThemeColorSpec.SPEC_2025)
-    val seedColor by prefs.seedColor.collectAsState(initial = PresetColors.first().color.toArgb())
+    val initialPaletteStyle = remember { kotlinx.coroutines.runBlocking { prefs.paletteStyle.first() } }
+    val paletteStyle by prefs.paletteStyle.collectAsState(initial = initialPaletteStyle)
+    val initialColorSpec = remember { kotlinx.coroutines.runBlocking { prefs.colorSpec.first() } }
+    val colorSpec by prefs.colorSpec.collectAsState(initial = initialColorSpec)
+    val initialSeedColor = remember { kotlinx.coroutines.runBlocking { prefs.seedColor.first() } }
+    val seedColor by prefs.seedColor.collectAsState(initial = initialSeedColor)
 
-    val language by prefs.language.collectAsState(initial = "en")
+    val initialLanguage = remember { kotlinx.coroutines.runBlocking { prefs.language.first() } }
+    val language by prefs.language.collectAsState(initial = initialLanguage)
     val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
     val playlistsLayout by prefs.playlistsLayout.collectAsState(initial = LayoutMode.LIST)
-    val predictiveBack by prefs.predictiveBackAnimation.collectAsState(initial = PredictiveBackAnimation.MIUIX)
+    val initialPredictiveBack = remember { kotlinx.coroutines.runBlocking { prefs.predictiveBackAnimation.first() } }
+    val predictiveBack by prefs.predictiveBackAnimation.collectAsState(initial = initialPredictiveBack)
 
     SettingsPageScaffold(title = strings.themeSettings, onBack = onBack) {
         // ── Group 1: UI Style (identical to InstallerX Revived) ──────────────
