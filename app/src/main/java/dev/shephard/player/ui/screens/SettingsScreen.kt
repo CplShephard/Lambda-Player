@@ -126,6 +126,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
     val strings = LocalStrings.current
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
 
     val topBarState = dev.shephard.player.ui.components.rememberCollapsingTopBarState()
 
@@ -152,26 +153,57 @@ fun SettingsScreen(
                     .padding(top = innerPadding.calculateTopPadding() + 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                SettingsNavigationCard(
-                    icon = Icons.Filled.ColorLens,
-                    title = strings.themeSettings,
-                    summary = strings.themeSettingsSummary,
-                    onClick = onOpenThemeSettings
-                )
-                SettingsNavigationCard(
-                    icon = Icons.Filled.MusicNote,
-                    title = strings.playbackSettings,
-                    summary = strings.playbackSettingsSummary,
-                    onClick = onOpenPlayerSettings
-                )
-                SettingsNavigationCard(
-                    icon = Icons.Filled.Info,
-                    title = strings.aboutLambdaPlayerTitle,
-                    summary = strings.aboutLambdaPlayerSummary,
-                    onClick = onOpenAbout
-                )
+                if (isLandscape) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            SettingsNavigationCard(
+                                icon = Icons.Filled.ColorLens,
+                                title = strings.themeSettings,
+                                summary = strings.themeSettingsSummary,
+                                onClick = onOpenThemeSettings
+                            )
+                            SettingsNavigationCard(
+                                icon = Icons.Filled.MusicNote,
+                                title = strings.playbackSettings,
+                                summary = strings.playbackSettingsSummary,
+                                onClick = onOpenPlayerSettings
+                            )
+                        }
+                        Column(Modifier.weight(1f)) {
+                            SettingsNavigationCard(
+                                icon = Icons.Filled.Info,
+                                title = strings.aboutLambdaPlayerTitle,
+                                summary = strings.aboutLambdaPlayerSummary,
+                                onClick = onOpenAbout
+                            )
+                        }
+                    }
+                } else {
+                    SettingsNavigationCard(
+                        icon = Icons.Filled.ColorLens,
+                        title = strings.themeSettings,
+                        summary = strings.themeSettingsSummary,
+                        onClick = onOpenThemeSettings
+                    )
+                    SettingsNavigationCard(
+                        icon = Icons.Filled.MusicNote,
+                        title = strings.playbackSettings,
+                        summary = strings.playbackSettingsSummary,
+                        onClick = onOpenPlayerSettings
+                    )
+                    SettingsNavigationCard(
+                        icon = Icons.Filled.Info,
+                        title = strings.aboutLambdaPlayerTitle,
+                        summary = strings.aboutLambdaPlayerSummary,
+                        onClick = onOpenAbout
+                    )
+                }
 
-                Spacer(Modifier.height(110.dp))
+                Spacer(Modifier.height(if (isLandscape) 190.dp else 110.dp))
             }
         }
     }
@@ -183,6 +215,7 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     val prefs = remember { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
     val strings = LocalStrings.current
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
 
     val initialUseMiuix = remember { kotlinx.coroutines.runBlocking { prefs.useMiuix.first() } }
     val useMiuix by prefs.useMiuix.collectAsState(initial = initialUseMiuix)
@@ -218,7 +251,8 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
     val initialPredictiveBack = remember { kotlinx.coroutines.runBlocking { prefs.predictiveBackAnimation.first() } }
     val predictiveBack by prefs.predictiveBackAnimation.collectAsState(initial = initialPredictiveBack)
 
-    SettingsPageScaffold(title = strings.themeSettings, onBack = onBack) {
+    @Composable
+    fun ThemeStyleOptions() {
         // ── Group 1: UI Style (identical to InstallerX Revived) ──────────────
         SmallTitle(
             text = strings.themeUiStyleSection,
@@ -238,7 +272,10 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             )
 
         }
+    }
 
+    @Composable
+    fun ThemeMiuixOptions() {
         // ── Group 2: Miuix UI + Miuix Custom Colors (InstallerX layout) ──────
         SmallTitle(
             text = strings.themeMiuixUiSection,
@@ -367,7 +404,10 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
             }
             }
         }
+    }
 
+    @Composable
+    fun ThemeAccentOptions() {
         // Fixed: avoid re-animation on enter/exit, only show when data loaded, snap on first load
         val accentGridTarget = useMiuixMonet &&
             paletteStyle != PaletteStyle.Monochrome &&
@@ -446,7 +486,10 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 }
             }
         }
+    }
 
+    @Composable
+    fun ThemeLayoutOptions() {
         // Layout is placed after accent colors and before predictive back. Grid/list selection
         // lives in Library; the dock style is the remaining page-layout preference.
         SmallTitle(text = strings.layout, insideMargin = PaddingValues(16.dp, 8.dp))
@@ -456,7 +499,10 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 scope.launch { prefs.setUseAppleFloatingBar(enabled) }
             }
         }
+    }
 
+    @Composable
+    fun ThemeBackOptions() {
         // ── Predictive Back (exactly like InstallerX Revived Miuix page) ─────
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             SmallTitle(
@@ -485,7 +531,10 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 )
             }
         }
+    }
 
+    @Composable
+    fun ThemeLanguageOptions() {
         // Language uses the same library spinner (and library padding) as every other switcher.
         SmallTitle(
             text = strings.language,
@@ -505,7 +554,33 @@ fun ThemeSettingsScreen(onBack: () -> Unit) {
                 }
             )
         }
-
+    }
+    SettingsPageScaffold(title = strings.themeSettings, onBack = onBack) {
+        if (isLandscape) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ThemeStyleOptions()
+                    ThemeMiuixOptions()
+                    ThemeAccentOptions()
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ThemeLayoutOptions()
+                    ThemeBackOptions()
+                    ThemeLanguageOptions()
+                }
+            }
+        } else {
+            ThemeStyleOptions()
+            ThemeMiuixOptions()
+            ThemeAccentOptions()
+            ThemeLayoutOptions()
+            ThemeBackOptions()
+            ThemeLanguageOptions()
+        }
         Spacer(Modifier.height(110.dp))
     }
 }
@@ -516,6 +591,7 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
     val prefs = remember { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
     val strings = LocalStrings.current
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
     val crossfade by prefs.crossfadeEnabled.collectAsState(initial = false)
     val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
     val playWith by prefs.playWithOthers.collectAsState(initial = false)
@@ -529,37 +605,73 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
             insideMargin = PaddingValues(16.dp, 8.dp),
         )
         SectionCard(contentPadding = PaddingValues(0.dp)) {
-            MiuixSwitchRow(label = strings.crossfade, checked = crossfade) { scope.launch { prefs.setCrossfadeEnabled(it) } }
-            Spacer(Modifier.height(8.dp))
-            MiuixSwitchRow(label = strings.gapless, checked = gapless) { scope.launch { prefs.setGaplessEnabled(it) } }
-            Spacer(Modifier.height(8.dp))
-            MiuixSwitchRow(label = strings.playWithOthers, checked = playWith) { scope.launch { prefs.setPlayWithOthers(it) } }
-            Spacer(Modifier.height(8.dp))
             val carouselModes = dev.shephard.player.player.CarouselStyle.visibleOptions
-            MiuixSpinnerRow(
-                title = strings.carouselTitle, summary = strings.carouselDescription,
-                items = listOf(strings.carouselNoPeek, strings.carouselOnePeek),
-                selectedIndex = carouselModes.indexOf(carouselStyle).coerceAtLeast(0),
-                onSelectedIndexChange = { idx -> carouselModes.getOrNull(idx)?.let { style -> scope.launch { prefs.setCarouselStyle(style) } } }
-            )
-            Spacer(Modifier.height(8.dp))
             val lyricsModes = LyricsAutoSearchMode.entries
-            MiuixSpinnerRow(
-                title = strings.lyricsAutoSearchTitle,
-                summary = strings.lyricsAutoSearchDescription,
-                items = lyricsModes.map { lyricsAutoSearchLabel(it, strings) },
-                selectedIndex = lyricsModes.indexOf(lyricsAutoSearch),
-                onSelectedIndexChange = { idx -> scope.launch { prefs.setLyricsAutoSearchMode(lyricsModes[idx]) } }
-            )
-            Spacer(Modifier.height(8.dp))
             val normalizationModes = VolumeNormalization.entries
-            MiuixSpinnerRow(
-                title = strings.volumeNormalizationTitle,
-                summary = strings.volumeNormalizationDescription,
-                items = normalizationModes.map { volumeNormalizationLabel(it, strings) },
-                selectedIndex = normalizationModes.indexOf(volumeNormalization),
-                onSelectedIndexChange = { idx -> scope.launch { prefs.setVolumeNormalization(normalizationModes[idx]) } }
-            )
+            if (isLandscape) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        MiuixSwitchRow(label = strings.crossfade, checked = crossfade) { scope.launch { prefs.setCrossfadeEnabled(it) } }
+                        Spacer(Modifier.height(8.dp))
+                        MiuixSwitchRow(label = strings.gapless, checked = gapless) { scope.launch { prefs.setGaplessEnabled(it) } }
+                        Spacer(Modifier.height(8.dp))
+                        MiuixSwitchRow(label = strings.playWithOthers, checked = playWith) { scope.launch { prefs.setPlayWithOthers(it) } }
+                        Spacer(Modifier.height(8.dp))
+                        MiuixSpinnerRow(
+                            title = strings.carouselTitle, summary = strings.carouselDescription,
+                            items = listOf(strings.carouselNoPeek, strings.carouselOnePeek),
+                            selectedIndex = carouselModes.indexOf(carouselStyle).coerceAtLeast(0),
+                            onSelectedIndexChange = { idx -> carouselModes.getOrNull(idx)?.let { style -> scope.launch { prefs.setCarouselStyle(style) } } }
+                        )
+                    }
+                    Column(Modifier.weight(1f)) {
+                        MiuixSpinnerRow(
+                            title = strings.lyricsAutoSearchTitle,
+                            summary = strings.lyricsAutoSearchDescription,
+                            items = lyricsModes.map { lyricsAutoSearchLabel(it, strings) },
+                            selectedIndex = lyricsModes.indexOf(lyricsAutoSearch),
+                            onSelectedIndexChange = { idx -> scope.launch { prefs.setLyricsAutoSearchMode(lyricsModes[idx]) } }
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        MiuixSpinnerRow(
+                            title = strings.volumeNormalizationTitle,
+                            summary = strings.volumeNormalizationDescription,
+                            items = normalizationModes.map { volumeNormalizationLabel(it, strings) },
+                            selectedIndex = normalizationModes.indexOf(volumeNormalization),
+                            onSelectedIndexChange = { idx -> scope.launch { prefs.setVolumeNormalization(normalizationModes[idx]) } }
+                        )
+                    }
+                }
+            } else {
+                MiuixSwitchRow(label = strings.crossfade, checked = crossfade) { scope.launch { prefs.setCrossfadeEnabled(it) } }
+                Spacer(Modifier.height(8.dp))
+                MiuixSwitchRow(label = strings.gapless, checked = gapless) { scope.launch { prefs.setGaplessEnabled(it) } }
+                Spacer(Modifier.height(8.dp))
+                MiuixSwitchRow(label = strings.playWithOthers, checked = playWith) { scope.launch { prefs.setPlayWithOthers(it) } }
+                Spacer(Modifier.height(8.dp))
+                MiuixSpinnerRow(
+                    title = strings.carouselTitle, summary = strings.carouselDescription,
+                    items = listOf(strings.carouselNoPeek, strings.carouselOnePeek),
+                    selectedIndex = carouselModes.indexOf(carouselStyle).coerceAtLeast(0),
+                    onSelectedIndexChange = { idx -> carouselModes.getOrNull(idx)?.let { style -> scope.launch { prefs.setCarouselStyle(style) } } }
+                )
+                Spacer(Modifier.height(8.dp))
+                MiuixSpinnerRow(
+                    title = strings.lyricsAutoSearchTitle,
+                    summary = strings.lyricsAutoSearchDescription,
+                    items = lyricsModes.map { lyricsAutoSearchLabel(it, strings) },
+                    selectedIndex = lyricsModes.indexOf(lyricsAutoSearch),
+                    onSelectedIndexChange = { idx -> scope.launch { prefs.setLyricsAutoSearchMode(lyricsModes[idx]) } }
+                )
+                Spacer(Modifier.height(8.dp))
+                MiuixSpinnerRow(
+                    title = strings.volumeNormalizationTitle,
+                    summary = strings.volumeNormalizationDescription,
+                    items = normalizationModes.map { volumeNormalizationLabel(it, strings) },
+                    selectedIndex = normalizationModes.indexOf(volumeNormalization),
+                    onSelectedIndexChange = { idx -> scope.launch { prefs.setVolumeNormalization(normalizationModes[idx]) } }
+                )
+            }
         }
 
         // ── TEMİZLEME: Oynatma ayarları içinde gereksiz (GEREKSIZ) DataStore verilerini temizle ──
@@ -942,7 +1054,6 @@ private fun OrphanCleanupCard() {
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var showDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var progress by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
-    var report by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<dev.shephard.player.player.PlayerViewModel.OrphanCleanupReport?>(null) }
     val playerViewModel: dev.shephard.player.player.PlayerViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val libraryVm: dev.shephard.player.player.LibraryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val libraryTracks by libraryVm.tracks.collectAsState()
@@ -962,35 +1073,14 @@ private fun OrphanCleanupCard() {
                     fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                     color = MiuixAppTheme.colorScheme.onBackground
                 )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "Cihazda olmayan şarkılara ait gereksiz (GEREKSIZ) DataStore verilerini tara ve sil — dinleme istatistikleri, şarkı sözleri, kapak ayarları",
-                    style = MiuixAppTheme.typography.bodySmall,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                )
-                if (report != null) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = report!!.summary(),
-                        style = MiuixAppTheme.typography.bodySmall,
-                        color = MiuixAppTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = "${'$'}{report!!.totalRemoved} öğe silindi — dinleme ${'$'}{report!!.removedListening}, söz ${'$'}{report!!.removedLyrics}, override ${'$'}{report!!.removedOverrides}",
-                        style = MiuixAppTheme.typography.bodySmall,
-                        color = MiuixAppTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
             top.yukonga.miuix.kmp.basic.Button(
                 onClick = {
-                    progress = 0; report = null; showDialog = true
+                    progress = 0; showDialog = true
                     scope.launch {
                         val ids = libraryTracks.map { it.id.toString() }.toSet()
                         val stable = libraryTracks.map { dev.shephard.player.data.TrackFingerprint.stableKey(it) }.toSet()
                         val res = playerViewModel.scanAndCleanOrphanedData(ids, stable) { p -> progress = p }
-                        report = res
                         kotlinx.coroutines.delay(400)
                         showDialog = false
                         android.widget.Toast.makeText(context, res.summary(), android.widget.Toast.LENGTH_LONG).show()
@@ -1022,18 +1112,6 @@ private fun OrphanCleanupProgressDialogForSettings(progress: Int, onDismiss: () 
                         modifier = androidx.compose.ui.Modifier.fillMaxWidth(fraction = progress / 100f).height(10.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).background(MiuixAppTheme.colorScheme.primary)
                     )
                 }
-                Text(
-                    text = "${'$'}progress% — dinleme geçmişi, şarkı sözleri, override kontrol ediliyor…",
-                    style = MiuixAppTheme.typography.bodySmall,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant,
-                    modifier = androidx.compose.ui.Modifier.padding(top = 10.dp)
-                )
-                Text(
-                    text = "Sadece GEREKSIZ (orphan) kayıtlar silinecek",
-                    style = MiuixAppTheme.typography.bodySmall,
-                    color = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = androidx.compose.ui.Modifier.padding(top = 6.dp)
-                )
             }
         },
         buttons = {

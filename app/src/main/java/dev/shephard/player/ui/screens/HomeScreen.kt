@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -84,6 +86,7 @@ fun HomeScreen(
     onOpenStats: () -> Unit = {}
 ) {
     val strings = LocalStrings.current
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
     val tracks by libraryViewModel.tracks.collectAsState()
     val hasScanned by libraryViewModel.hasScanned.collectAsState()
     val recentEvents by playerViewModel.statsEventsFlow.collectAsState()
@@ -134,26 +137,15 @@ fun HomeScreen(
                             )
                         }
                     ) { innerPadding ->
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .captureForTopBarBlur(topBarState)
-                                    .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                                    .overScrollVertical()
-                                    .verticalScroll(scrollState)
-                                    .padding(
-                                        top = innerPadding.calculateTopPadding() + 4.dp,
-                                        bottom = 220.dp
-                                    ),
-                                verticalArrangement = Arrangement.spacedBy(24.dp)
-                            ) {
+                            val mixContent: @Composable () -> Unit = {
                                 HomeYourMix(
                                     yourMix,
                                     useMiuix = true,
                                     isLoading = !hasScanned,
                                     onRemix = { playerViewModel.setQueueAndPlayRemixed(it, strings.yourMix) }
                                 ) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
-                                HomeListeningTime(totalListeningMs, useMiuix = true, onClick = onOpenStats)
+                            }
+                            val recommendationsContent: @Composable () -> Unit = {
                                 if (featuredPlaylists.isNotEmpty()) {
                                     FeaturedPlaylistsSection(
                                         title = strings.featuredPlaylists,
@@ -166,7 +158,6 @@ fun HomeScreen(
                                         }
                                     )
                                 }
-
                                 if (recentlyPlayedTracks.isNotEmpty()) {
                                     RecentlyPlayedSection(
                                         title = strings.recentlyPlayed,
@@ -175,6 +166,49 @@ fun HomeScreen(
                                             onTrackClick(recentlyPlayedTracks, recentIdx, strings.recentlyPlayed)
                                         }
                                     )
+                                }
+                            }
+                            if (isLandscape) {
+                                Row(
+                                    modifier = Modifier.fillMaxSize()
+                                        .captureForTopBarBlur(topBarState)
+                                        .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                                        .overScrollVertical()
+                                        .padding(horizontal = 12.dp, top = innerPadding.calculateTopPadding() + 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                ) {
+                                    Column(
+                                        modifier = Modifier.weight(1f).fillMaxHeight()
+                                            .verticalScroll(rememberScrollState())
+                                            .padding(bottom = if (hasMiniPlayer) 190.dp else 110.dp),
+                                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                                    ) {
+                                        mixContent()
+                                        HomeListeningTime(totalListeningMs, useMiuix = true, onClick = onOpenStats)
+                                    }
+                                    Column(
+                                        modifier = Modifier.weight(1f).fillMaxHeight()
+                                            .verticalScroll(rememberScrollState())
+                                            .padding(bottom = 20.dp),
+                                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                                    ) {
+                                        recommendationsContent()
+                                    }
+                                }
+                            } else {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .captureForTopBarBlur(topBarState)
+                                        .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                                        .overScrollVertical()
+                                        .verticalScroll(scrollState)
+                                        .padding(top = innerPadding.calculateTopPadding() + 4.dp, bottom = 220.dp),
+                                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                                ) {
+                                    mixContent()
+                                    HomeListeningTime(totalListeningMs, useMiuix = true, onClick = onOpenStats)
+                                    recommendationsContent()
                                 }
                             }
                     }

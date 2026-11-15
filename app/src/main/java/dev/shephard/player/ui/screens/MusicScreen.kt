@@ -103,6 +103,7 @@ fun MusicScreen(
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
     val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
 
     val strings = LocalStrings.current
 
@@ -170,7 +171,7 @@ fun MusicScreen(
                             dev.shephard.player.ui.components.LayoutSwitchAnimation(musicsLayout, Modifier.fillMaxSize()) { displayLayout ->
 if (displayLayout == LayoutMode.GRID) {
                                 LazyVerticalGrid(
-                                    columns = GridCells.Fixed(2),
+                                    columns = GridCells.Fixed(if (isLandscape) 8 else 2),
                                     state = gridState,
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -191,6 +192,32 @@ if (displayLayout == LayoutMode.GRID) {
                                 ) {
                                     gridItemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
                                         Box(Modifier.animateItem()) { GridTrackCard(
+                                            track = track,
+                                            onClick = { onTrackClick(tracks, index) },
+                                            onMenuClick = { selectedTrackForMenu = track }
+                                        ) }
+                                    }
+                                }
+                            } else if (isLandscape) {
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(2),
+                                    state = gridState,
+                                    modifier = Modifier.fillMaxSize()
+                                        .then(if (embedded) Modifier else Modifier
+                                            .captureForTopBarBlur(topBarState)
+                                            .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                                            .overScrollVertical()),
+                                    contentPadding = PaddingValues(
+                                        start = 12.dp,
+                                        end = 12.dp,
+                                        top = innerPadding.calculateTopPadding() + 8.dp,
+                                        bottom = 220.dp
+                                    ),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    gridItemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+                                        Box(Modifier.animateItem()) { TrackRow(
                                             track = track,
                                             onClick = { onTrackClick(tracks, index) },
                                             onMenuClick = { selectedTrackForMenu = track }

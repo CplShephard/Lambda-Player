@@ -21,6 +21,7 @@ import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -266,7 +267,7 @@ onDismiss: () -> Unit,
     }
 )
     ) {
-        val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
         if (isLandscape) {
             M3LandscapeContent(
             playerViewModel = playerViewModel,
@@ -446,7 +447,7 @@ onDismiss: () -> Unit,
         dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { showQueue = false })
     }
 
-    val isLandscapeOutside = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isLandscapeOutside = dev.shephard.player.ui.util.isLandscapeWindow()
     if (showLyrics && !isLandscapeOutside) {
         dev.shephard.player.ui.screens.FullScreenLyricsExperience(
         playerViewModel = playerViewModel,
@@ -476,11 +477,17 @@ private fun M3LandscapeContent(
     Row(
         modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()
     ) {
-        Column(
+        BoxWithConstraints(
             modifier = Modifier.weight(0.5f).fillMaxHeight().padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Keep transport and lyrics usable on short landscape windows by sizing the cover
+            // from the space left after the fixed metadata and control rows.
+            val coverHeightLimit = (maxHeight - 230.dp).coerceAtLeast(40.dp)
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
             Box(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
                 Box(modifier = Modifier.size(width = 36.dp, height = 4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
             }
@@ -502,7 +509,7 @@ private fun M3LandscapeContent(
                     dev.shephard.player.player.CarouselStyle.TWO_PEEK -> .6f
                     else -> .8f
                 }
-                val artHeight = minOf(maxWidth * pageFraction, configuration.screenHeightDp.dp * .42f)
+                val artHeight = minOf(maxWidth * pageFraction, coverHeightLimit, configuration.screenHeightDp.dp * .42f)
                 if (state.queue.isNotEmpty()) {
                     dev.shephard.player.ui.components.AlbumCarousel(
                         queue = state.queue, currentIndex = state.currentQueueIndex,
@@ -529,10 +536,39 @@ private fun M3LandscapeContent(
                 Text(track?.artist ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Column(modifier = Modifier.fillMaxWidth()) {
-                M3NowPlayingProgressLineage(playerViewModel = playerViewModel, isPlaying = state.isPlaying)
+                val trackId = track?.id ?: -1L
+                val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    BouncyIconButton(
+                        onClick = { onShowQueueChange(true) },
+                        icon = Icons.AutoMirrored.Filled.QueueMusic,
+                        contentDescription = strings.queue,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        iconSize = 22.dp,
+                    )
+                    Box(
+                        modifier = Modifier.size(40.dp).combinedClickable(
+                            onClick = { if (trackId > 0) playerViewModel.toggleLike(trackId) },
+                            onLongClick = { onShowAddToPlaylistChange(true) },
+                        ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            contentDescription = strings.likedSongs,
+                            tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+                M3NowPlayingProgressLineage(playerViewModel = playerViewModel, isPlaying = state.isPlaying, compact = true)
                 // Controls
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 3.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -542,14 +578,14 @@ private fun M3LandscapeContent(
                         icon = Icons.Filled.Shuffle,
                         contentDescription = strings.remix,
                         tint = if (isRemixed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        iconSize = 24.dp
+                        iconSize = 20.dp
                     )
                     BouncyIconButton(
                         onClick = { playerViewModel.skipToPrevious() },
                         painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_rewind),
                         contentDescription = strings.previous,
                         tint = MaterialTheme.colorScheme.onSurface,
-                        iconSize = 30.dp
+                        iconSize = 24.dp
                     )
                     MiuixPlayPauseButton(
                         isPlaying = state.isPlaying,
@@ -557,57 +593,25 @@ private fun M3LandscapeContent(
                         playDescription = strings.play,
                         pauseDescription = strings.pause,
                         tint = MaterialTheme.colorScheme.onSurface,
+                        buttonSize = 52.dp,
+                        iconSize = 30.dp,
                     )
                     BouncyIconButton(
                         onClick = { playerViewModel.skipToNext() },
                         painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_fforward),
                         contentDescription = strings.next,
                         tint = MaterialTheme.colorScheme.onSurface,
-                        iconSize = 30.dp
+                        iconSize = 24.dp
                     )
                     BouncyIconButton(
                         onClick = { playerViewModel.cycleRepeatMode() },
                         icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                         contentDescription = strings.repeat,
                         tint = if (state.repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        iconSize = 24.dp
+                        iconSize = 20.dp
                     )
                 }
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(top = 4.dp, bottom = 6.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)).padding(horizontal = 10.dp, vertical = 3.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        BouncyIconButton(
-                            onClick = { onShowQueueChange(true) },
-                            icon = Icons.AutoMirrored.Filled.QueueMusic,
-                            contentDescription = strings.queue,
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            iconSize = 24.dp
-                        )
-                        val trackId = track?.id ?: -1L
-                        val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
-                        Box(
-                            modifier = Modifier.size(40.dp).bounceClick {
-                                if (trackId > 0) {
-                                    if (isLiked) onShowAddToPlaylistChange(true) else playerViewModel.addToLiked(trackId)
-                                }
-                            },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (isLiked) Icons.Filled.Check else Icons.Filled.Add,
-                                contentDescription = if (isLiked) "Added" else "Add",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                }
+            }
             }
         }
         Box(
@@ -636,12 +640,14 @@ private fun M3LandscapeContent(
 
 
 @Composable
-internal fun M3NowPlayingProgressLineage(playerViewModel: PlayerViewModel, isPlaying: Boolean) {
+internal fun M3NowPlayingProgressLineage(playerViewModel: PlayerViewModel, isPlaying: Boolean, compact: Boolean = false) {
     val prog by playerViewModel.progress.collectAsState()
     val fraction = if (prog.durationMs > 0) prog.positionMs.toFloat() / prog.durationMs else 0f
     androidx.compose.material3.LinearWavyProgressIndicator(
         progress = { fraction },
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+        modifier = Modifier.fillMaxWidth()
+            .padding(horizontal = if (compact) 10.dp else 16.dp, vertical = if (compact) 2.dp else 8.dp)
+            .then(if (compact) Modifier.height(8.dp) else Modifier)
     )
 }
 

@@ -16,7 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import dev.shephard.player.ui.components.m3.rememberExpressiveTopBarState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -75,6 +76,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
     val prefs = remember { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
     val strings = LocalStrings.current
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
 
     val initialThemeMode = remember { kotlinx.coroutines.runBlocking { prefs.themeModeEnum.first() } }
     val themeMode by prefs.themeModeEnum.collectAsState(initial = initialThemeMode)
@@ -134,13 +136,15 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                 )
             },
         ) { paddingValues ->
-        LazyColumn(
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(if (isLandscape) 2 else 1),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), bottom = paddingValues.calculateBottomPadding() + 80.dp)
+            contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), bottom = paddingValues.calculateBottomPadding() + 80.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 12.dp else 0.dp),
         ) {
             // UI Style - M3 switcher restored
             item {
-                SegmentedColumn(title = strings.themeUiStyleSection) {
+                SegmentedColumn(title = strings.themeUiStyleSection, columns = 1) {
                     item {
                         DropDownMenuWidget(
                             icon = Icons.TwoTone.ColorLens,
@@ -156,7 +160,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
 
             // M3 UI Section - bring back switchers
             item {
-                SegmentedColumn(title = strings.themeM3UiSection) {
+                SegmentedColumn(title = strings.themeM3UiSection, columns = 1) {
                     item {
                         DropDownMenuWidget(
                             icon = Icons.Filled.DarkMode,
@@ -218,7 +222,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
                         enter = androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(300)) + androidx.compose.animation.expandVertically(animationSpec = androidx.compose.animation.core.tween(400)),
                         exit = androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(250)) + androidx.compose.animation.shrinkVertically(animationSpec = androidx.compose.animation.core.tween(350))
                     ) {
-                    SegmentedColumn(title = strings.accentColor) {
+                    SegmentedColumn(title = strings.accentColor, columns = 1) {
                         item {
                             BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
                                 val itemMinWidth = 88.dp
@@ -252,7 +256,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
             }
 
             item {
-                SegmentedColumn(title = strings.navBarCornerRadius) {
+                SegmentedColumn(title = strings.navBarCornerRadius, columns = 1) {
                     item {
                         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -283,7 +287,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
             // Predictive Back (InstallerX Revived)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 item {
-                    SegmentedColumn(title = strings.predictiveBackTitle) {
+                    SegmentedColumn(title = strings.predictiveBackTitle, columns = 1) {
                         item {
                             DropDownMenuWidget(
                                 icon = Icons.TwoTone.ColorLens,
@@ -300,7 +304,7 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
 
             // Language - switcher restored
             item {
-                SegmentedColumn(title = strings.language) {
+                SegmentedColumn(title = strings.language, columns = 1) {
                     item {
                         val langIndex = AllLanguages.indexOfFirst { it.code == language }.coerceAtLeast(0)
                         DropDownMenuWidget(

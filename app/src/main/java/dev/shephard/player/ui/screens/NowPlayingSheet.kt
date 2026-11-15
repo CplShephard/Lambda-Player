@@ -293,7 +293,7 @@ onDismiss: () -> Unit
 
         if (!isAnimatedCover) AmbientGlowBackground(track = track, isPlaying = state.isPlaying, isAnimated = false)
 
-        val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
         if (isLandscape) {
             MiuixLandscapeContent(
             playerViewModel = playerViewModel,
@@ -561,14 +561,20 @@ private fun MiuixLandscapeContent(
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .weight(0.5f)
                 .fillMaxHeight()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
+            // Reserve room for metadata and transport controls so the cover never pushes them
+            // below the landscape viewport on short displays.
+            val coverHeightLimit = (maxHeight - 245.dp).coerceAtLeast(40.dp)
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -600,7 +606,7 @@ private fun MiuixLandscapeContent(
                         dev.shephard.player.player.CarouselStyle.TWO_PEEK -> .6f
                         else -> .8f
                     }
-                    val artHeight = minOf(maxWidth * pageFraction, configuration.screenHeightDp.dp * .42f)
+                    val artHeight = minOf(maxWidth * pageFraction, coverHeightLimit, configuration.screenHeightDp.dp * .42f)
                     if (state.queue.isNotEmpty()) {
                         dev.shephard.player.ui.components.AlbumCarousel(
                             queue = state.queue,
@@ -652,12 +658,32 @@ private fun MiuixLandscapeContent(
                 }
             }
             Column(modifier = Modifier.fillMaxWidth()) {
-                SeekBarRow(playerViewModel = playerViewModel)
-                // Kontroller artık ölçeklenmeden direkt görünür — yatay mod kesilme düzeltmesi
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    BouncyIconButton(
+                        onClick = { onShowQueueChange(true) },
+                        icon = Icons.AutoMirrored.Filled.QueueMusic,
+                        contentDescription = strings.queue,
+                        tint = Color.White,
+                        iconSize = 22.dp,
+                    )
+                    BouncyIconButton(
+                        onClick = { track?.id?.takeIf { it > 0 }?.let(playerViewModel::toggleLike) },
+                        icon = if (track?.id != null && state.likedSongIds.contains(track.id)) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        contentDescription = strings.likedSongs,
+                        tint = if (track?.id != null && state.likedSongIds.contains(track.id)) MiuixAppTheme.colorScheme.primary else Color.White,
+                        iconSize = 22.dp,
+                    )
+                }
+                SeekBarRow(playerViewModel = playerViewModel, compact = true)
+                // Compact landscape transport controls stay proportional to the cover.
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp, start = 8.dp, end = 8.dp),
+                        .padding(top = 3.dp, start = 0.dp, end = 0.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -667,14 +693,14 @@ private fun MiuixLandscapeContent(
                         icon = Icons.Filled.Shuffle,
                         contentDescription = strings.remix,
                         tint = if (isRemixed) MiuixAppTheme.colorScheme.primary else Color.White,
-                        iconSize = 26.dp
+                        iconSize = 20.dp
                     )
                     BouncyIconButton(
                         onClick = { playerViewModel.skipToPrevious() },
                         painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_rewind),
                         contentDescription = strings.previous,
                         tint = Color.White,
-                        iconSize = 32.dp
+                        iconSize = 24.dp
                     )
                     MiuixPlayPauseButton(
                         isPlaying = state.isPlaying,
@@ -682,60 +708,25 @@ private fun MiuixLandscapeContent(
                         playDescription = strings.play,
                         pauseDescription = strings.pause,
                         tint = Color.White,
+                        buttonSize = 52.dp,
+                        iconSize = 30.dp,
                     )
                     BouncyIconButton(
                         onClick = { playerViewModel.skipToNext() },
                         painter = androidx.compose.ui.res.painterResource(dev.shephard.player.R.drawable.ic_nowplaying_fforward),
                         contentDescription = strings.next,
                         tint = Color.White,
-                        iconSize = 32.dp
+                        iconSize = 24.dp
                     )
                     BouncyIconButton(
                         onClick = { playerViewModel.cycleRepeatMode() },
                         icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                         contentDescription = strings.repeat,
                         tint = if (state.repeatMode != RepeatMode.OFF) MiuixAppTheme.colorScheme.primary else Color.White,
-                        iconSize = 26.dp
+                        iconSize = 20.dp
                     )
                 }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
-                        .padding(top = 6.dp, bottom = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.12f))
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        BouncyIconButton(
-                            onClick = { onShowQueueChange(true) },
-                            icon = Icons.AutoMirrored.Filled.QueueMusic,
-                            contentDescription = strings.queue,
-                            tint = Color.White,
-                            iconSize = 26.dp
-                        )
-                        BouncyIconButton(
-                            onClick = { playerViewModel.toggleLike(track?.id ?: -1L) },
-                            icon = if (track?.id != null && state.likedSongIds.contains(track.id)) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                            contentDescription = strings.likedSongs,
-                            tint = Color.White,
-                            iconSize = 26.dp
-                        )
-                        BouncyIconButton(
-                            onClick = { /* show lyrics handled via sheet elsewhere */ },
-                            icon = Icons.Filled.Lyrics,
-                            contentDescription = strings.lyrics,
-                            tint = Color.White,
-                            iconSize = 26.dp
-                        )
-                    }
-                }
+            }
             }
         }
         // Ortadan ikiye bölen dik çizgi — arkaplan kartı kaldırıldı
@@ -937,8 +928,13 @@ baseTextStyle: androidx.compose.ui.text.TextStyle? = null
             } else {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Filled.Lyrics, null, tint = fg.copy(alpha = 0.6f), modifier = Modifier.size(28.dp))
-                        Text(dev.shephard.player.ui.i18n.LocalStrings.current.noLyricsFound, color = fg.copy(alpha = 0.55f), style = textStyle, modifier = Modifier.padding(top = 8.dp))
+                        QqMusicNoteAnimation(primary = primary, foreground = fg)
+                        Text(
+                            dev.shephard.player.ui.i18n.LocalStrings.current.noLyricsFound,
+                            color = fg.copy(alpha = 0.55f),
+                            style = textStyle,
+                            modifier = Modifier.padding(top = 10.dp),
+                        )
                     }
                 }
             }
@@ -1014,7 +1010,7 @@ isAnimated: Boolean = false
 }
 
 @Composable
-private fun SeekBarRow(playerViewModel: PlayerViewModel) {
+private fun SeekBarRow(playerViewModel: PlayerViewModel, compact: Boolean = false) {
     val progress by playerViewModel.progress.collectAsState()
     val state by playerViewModel.uiState.collectAsState()
     val smoothFraction = dev.shephard.player.ui.components.rememberSmoothProgressFraction(
@@ -1040,24 +1036,24 @@ private fun SeekBarRow(playerViewModel: PlayerViewModel) {
             seekFraction = fraction
             if (progress.durationMs > 0) playerViewModel.onSeekCommit((fraction * progress.durationMs).toLong())
         },
-        modifier = Modifier.padding(horizontal = 22.dp),
-        trackHeight = 6.dp,
+        modifier = Modifier.padding(horizontal = if (compact) 10.dp else 22.dp),
+        trackHeight = if (compact) 4.dp else 6.dp,
         expandOnPress = true,
         activeColor = Color.White,
         inactiveColor = Color.White.copy(alpha = 0.3f)
     )
         Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 6.dp, start = 22.dp, end = 22.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = if (compact) 2.dp else 6.dp, start = if (compact) 10.dp else 22.dp, end = if (compact) 10.dp else 22.dp),
         horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
             formatMillis(if (seekFraction != null) (seekFraction!! * progress.durationMs).toLong() else progress.positionMs),
-            style = MiuixAppTheme.typography.labelMedium,
+            style = if (compact) MiuixAppTheme.typography.labelSmall else MiuixAppTheme.typography.labelMedium,
             color = Color.White.copy(alpha = 0.75f)
         )
             Text(
             formatMillis(progress.durationMs),
-            style = MiuixAppTheme.typography.labelMedium,
+            style = if (compact) MiuixAppTheme.typography.labelSmall else MiuixAppTheme.typography.labelMedium,
             color = Color.White.copy(alpha = 0.75f)
         )
         }

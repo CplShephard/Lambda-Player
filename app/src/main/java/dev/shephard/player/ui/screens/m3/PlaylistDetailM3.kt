@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,6 +33,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -133,6 +135,7 @@ internal fun M3PlaylistDetail(
 
     // Same rules as the MIUIX detail: system (liked songs) and Home playlists are read-only.
     val canEdit = !playlist.isSystem && !isHomeSimplified && !isAlbum
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
 
     var showAddTracks by remember { mutableStateOf(false) }
     var renameDialog by remember { mutableStateOf(false) }
@@ -248,7 +251,7 @@ internal fun M3PlaylistDetail(
 
     val listState = rememberLazyListState()
     // The header (cover, title, buttons, sort chips) is the only item before the tracks.
-    val reorderHeaderItemCount = 1
+    val reorderHeaderItemCount = if (isLandscape) 0 else 1
     val reorderableState = rememberReorderableLazyListState(lazyListState = listState) { from, to ->
         val fromIdx = from.index - reorderHeaderItemCount
         val toIdx = to.index - reorderHeaderItemCount
@@ -378,6 +381,72 @@ internal fun M3PlaylistDetail(
             )
         },
     ) { padding ->
+        if (isLandscape) {
+            Row(
+                modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding() + 8.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                M3PlaylistLandscapeHeader(
+                    playlist = playlist,
+                    tracks = displayTracks,
+                    strings = strings,
+                    canEdit = canEdit,
+                    isAlbum = isAlbum,
+                    onPickCover = { coverPicker.launch(arrayOf("image/*", "video/mp4")) },
+                    onPlayAll = onPlayAll,
+                    onPlayRemix = onPlayRemix,
+                    onAddTracks = { showAddTracks = true },
+                    sortMode = playlist.sortMode,
+                    onChangeSort = onChangeSort,
+                    modifier = Modifier.weight(0.42f).fillMaxHeight(),
+                )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.weight(0.58f).fillMaxHeight(),
+                    contentPadding = PaddingValues(start = 8.dp, end = 12.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (displayTracks.isEmpty()) {
+                        item(key = "empty") {
+                            Text(
+                                text = if (playlist.isSystem) "No liked songs yet" else "No tracks yet. Tap \"${strings.addTracks}\".",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 16.dp),
+                            )
+                        }
+                    } else if (customOrder) {
+                        itemsIndexed(reorderItems, key = { _, track -> track.id }) { index, track ->
+                            ReorderableItem(state = reorderableState, key = track.id) { isDragging ->
+                                Box(modifier = Modifier.animateItem()) {
+                                    M3PlaylistTrackRow(
+                                        track = track,
+                                        isDragged = isDragging,
+                                        onClick = { onTrackClick(reorderItems.toList(), index) },
+                                        onMore = { onTrackOptions(track) },
+                                        dragHandleModifier = Modifier.draggableHandle(),
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        itemsIndexed(displayTracks, key = { _, track -> track.id }) { index, track ->
+                            Box(modifier = Modifier.animateItem(
+                                fadeInSpec = androidx.compose.animation.core.tween(250),
+                                fadeOutSpec = androidx.compose.animation.core.tween(200),
+                                placementSpec = androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 380f),
+                            )) {
+                                M3PlaylistTrackRow(
+                                    track = track,
+                                    onClick = { onTrackClick(displayTracks, index) },
+                                    onMore = { onTrackOptions(track) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -537,10 +606,103 @@ internal fun M3PlaylistDetail(
                 }
             }
         }
+        }
     }
     }
 
 
+}
+
+@Composable
+private fun M3PlaylistLandscapeHeader(
+    playlist: LocalPlaylist,
+    tracks: List<AudioTrack>,
+    strings: Strings,
+    canEdit: Boolean,
+    isAlbum: Boolean,
+    onPickCover: () -> Unit,
+    onPlayAll: () -> Unit,
+    onPlayRemix: () -> Unit,
+    onAddTracks: () -> Unit,
+    sortMode: String,
+    onChangeSort: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(bottom = 100.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier.fillMaxWidth(0.78f).aspectRatio(1f)
+                .clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.secondaryContainer)
+                .then(if (canEdit) Modifier.clickable(onClick = onPickCover) else Modifier),
+        ) {
+            PlaylistCoverArt(
+                coverUri = playlist.coverUri,
+                tracks = tracks,
+                animateVideo = true,
+                placeholderColor = MaterialTheme.colorScheme.secondaryContainer,
+                placeholderIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                fallback = {
+                    Icon(Icons.Filled.QueueMusic, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(56.dp))
+                },
+            )
+            if (canEdit) {
+                Box(
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).size(30.dp)
+                        .clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.Edit, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+        Text(playlist.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (isAlbum) {
+            tracks.firstOrNull()?.artist?.let { artist ->
+                Text(artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Text("${tracks.size} ${strings.trackCount}", style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onPlayAll, enabled = tracks.isNotEmpty(), modifier = Modifier.weight(1f)) {
+                Icon(Icons.Filled.PlayArrow, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(strings.play, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            FilledTonalButton(onClick = onPlayRemix, enabled = tracks.isNotEmpty(), modifier = Modifier.weight(1f)) {
+                Icon(Icons.Filled.Shuffle, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(strings.remix, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        if (canEdit) {
+            OutlinedButton(onClick = onAddTracks, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.Add, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(strings.addTracks, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                listOf(
+                    "custom" to strings.customOrder,
+                    "alphabetical" to strings.alphabetical,
+                    "artist" to strings.sortByArtist,
+                    "timeAdded" to strings.timeAdded,
+                ).forEach { (mode, label) ->
+                    FilterChip(selected = sortMode == mode, onClick = { onChangeSort(mode) }, label = { Text(label, maxLines = 1) })
+                }
+            }
+        }
+    }
 }
 
 /**

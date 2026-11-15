@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -97,6 +98,7 @@ fun HomeScreenM3(
     onOpenStats: () -> Unit = {}
 ) {
     val strings = LocalStrings.current
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
     val tracks by libraryViewModel.tracks.collectAsState()
     val hasScanned by libraryViewModel.hasScanned.collectAsState()
     val recentEvents by playerViewModel.statsEventsFlow.collectAsState()
@@ -146,67 +148,138 @@ fun HomeScreenM3(
                         )
                     },
                 ) { padding ->
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(
-                                top = padding.calculateTopPadding() + 4.dp,
-                                bottom = 220.dp
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            item(key = "your_mix") {
-                                HomeYourMix(
-                                    yourMix,
-                                    useMiuix = false,
-                                    isLoading = !hasScanned,
-                                    onRemix = { playerViewModel.setQueueAndPlayRemixed(it, strings.yourMix) }
-                                ) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
-                            }
-                            item(key = "listening_time") {
-                                HomeListeningTime(totalListeningMs, useMiuix = false, onClick = onOpenStats)
-                            }
-                            if (featuredPlaylists.isNotEmpty()) {
-                                item {
-                                    LineageSectionHeader(title = strings.featuredPlaylists)
-                                    LazyRow(
-                                        contentPadding = PaddingValues(horizontal = 8.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        items(featuredPlaylists, key = { it.name + it.createdAt }) { pl ->
-                                            val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
-                                            LineageHorizontalMediaItem(
-                                                headline = pl.name,
-                                                subhead = "${plTracks.size} tracks",
-                                                thumbnailContent = {
-                                                    PlaylistCoverArt(
-                                                        coverUri = pl.coverUri,
-                                                        tracks = plTracks,
-                                                        placeholderColor = MaterialTheme.colorScheme.secondaryContainer,
-                                                        placeholderIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                                        fallback = {
-                                                            Icon(Icons.Filled.QueueMusic, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(48.dp))
+                        if (isLandscape) {
+                            Row(
+                                modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding() + 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                LazyColumn(
+                                    modifier = Modifier.weight(1f).fillMaxSize(),
+                                    contentPadding = PaddingValues(start = 12.dp, end = 8.dp, bottom = if (hasMiniPlayer) 190.dp else 110.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    item(key = "your_mix") {
+                                        HomeYourMix(
+                                            yourMix,
+                                            useMiuix = false,
+                                            isLoading = !hasScanned,
+                                            onRemix = { playerViewModel.setQueueAndPlayRemixed(it, strings.yourMix) }
+                                        ) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
+                                    }
+                                    item(key = "listening_time") {
+                                        HomeListeningTime(totalListeningMs, useMiuix = false, onClick = onOpenStats)
+                                    }
+                                }
+                                LazyColumn(
+                                    modifier = Modifier.weight(1f).fillMaxSize(),
+                                    contentPadding = PaddingValues(start = 8.dp, end = 12.dp, bottom = 20.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    if (featuredPlaylists.isNotEmpty()) {
+                                        item(key = "featured_playlists") {
+                                            LineageSectionHeader(title = strings.featuredPlaylists)
+                                            LazyRow(
+                                                contentPadding = PaddingValues(horizontal = 8.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                items(featuredPlaylists, key = { it.name + it.createdAt }) { pl ->
+                                                    val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+                                                    LineageHorizontalMediaItem(
+                                                        headline = pl.name,
+                                                        subhead = "${plTracks.size} tracks",
+                                                        thumbnailContent = {
+                                                            PlaylistCoverArt(
+                                                                coverUri = pl.coverUri,
+                                                                tracks = plTracks,
+                                                                placeholderColor = MaterialTheme.colorScheme.secondaryContainer,
+                                                                placeholderIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                                fallback = {
+                                                                    Icon(Icons.Filled.QueueMusic, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(48.dp))
+                                                                }
+                                                            )
+                                                        },
+                                                        onClick = {
+                                                            val i = dev.shephard.player.ui.screens.ensureLikedSongsPlaylist(rawPlaylists, strings).indexOf(pl)
+                                                            if (i >= 0) onOpenPlaylistDetail(i)
                                                         }
                                                     )
-                                                },
-                                                onClick = {
-                                                    val i = dev.shephard.player.ui.screens.ensureLikedSongsPlaylist(rawPlaylists, strings).indexOf(pl)
-                                                    if (i >= 0) onOpenPlaylistDetail(i)
                                                 }
+                                            }
+                                        }
+                                    }
+                                    if (recentlyPlayedTracks.isNotEmpty()) {
+                                        item(key = "recently_played_carousel") {
+                                            RecentlyPlayedSectionM3(
+                                                title = strings.recentlyPlayed,
+                                                tracks = recentlyPlayedTracks,
+                                                onTrackClick = { index -> onTrackClick(recentlyPlayedTracks, index, strings.recentlyPlayed) },
                                             )
                                         }
                                     }
                                 }
                             }
-
-                            if (recentlyPlayedTracks.isNotEmpty()) {
-                                item(key = "recently_played_carousel") {
-                                    RecentlyPlayedSectionM3(
-                                        title = strings.recentlyPlayed,
-                                        tracks = recentlyPlayedTracks,
-                                        onTrackClick = { index ->
-                                            onTrackClick(recentlyPlayedTracks, index, strings.recentlyPlayed)
-                                        },
-                                    )
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(
+                                    top = padding.calculateTopPadding() + 4.dp,
+                                    bottom = 220.dp
+                                ),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                item(key = "your_mix") {
+                                    HomeYourMix(
+                                        yourMix,
+                                        useMiuix = false,
+                                        isLoading = !hasScanned,
+                                        onRemix = { playerViewModel.setQueueAndPlayRemixed(it, strings.yourMix) }
+                                    ) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
+                                }
+                                item(key = "listening_time") {
+                                    HomeListeningTime(totalListeningMs, useMiuix = false, onClick = onOpenStats)
+                                }
+                                if (featuredPlaylists.isNotEmpty()) {
+                                    item {
+                                        LineageSectionHeader(title = strings.featuredPlaylists)
+                                        LazyRow(
+                                            contentPadding = PaddingValues(horizontal = 8.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            items(featuredPlaylists, key = { it.name + it.createdAt }) { pl ->
+                                                val plTracks = remember(pl, tracks, likedIds) { resolvePlaylistTracks(pl, tracks, likedIds) }
+                                                LineageHorizontalMediaItem(
+                                                    headline = pl.name,
+                                                    subhead = "${plTracks.size} tracks",
+                                                    thumbnailContent = {
+                                                        PlaylistCoverArt(
+                                                            coverUri = pl.coverUri,
+                                                            tracks = plTracks,
+                                                            placeholderColor = MaterialTheme.colorScheme.secondaryContainer,
+                                                            placeholderIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                            fallback = {
+                                                                Icon(Icons.Filled.QueueMusic, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(48.dp))
+                                                            }
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        val i = dev.shephard.player.ui.screens.ensureLikedSongsPlaylist(rawPlaylists, strings).indexOf(pl)
+                                                        if (i >= 0) onOpenPlaylistDetail(i)
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                if (recentlyPlayedTracks.isNotEmpty()) {
+                                    item(key = "recently_played_carousel") {
+                                        RecentlyPlayedSectionM3(
+                                            title = strings.recentlyPlayed,
+                                            tracks = recentlyPlayedTracks,
+                                            onTrackClick = { index ->
+                                                onTrackClick(recentlyPlayedTracks, index, strings.recentlyPlayed)
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         }

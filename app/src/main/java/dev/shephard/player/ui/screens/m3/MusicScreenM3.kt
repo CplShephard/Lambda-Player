@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
@@ -109,6 +110,7 @@ fun MusicScreenM3(
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
     val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
+    val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
     val strings = LocalStrings.current
 
     val permissionState = rememberAudioPermissionState(
@@ -218,7 +220,7 @@ fun MusicScreenM3(
                         ) { layout ->
                         if (layout == LayoutMode.GRID) {
                             LazyVerticalGrid(
-                                columns = GridCells.Fixed(2),
+                                columns = GridCells.Fixed(if (isLandscape) 8 else 2),
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(
                                     start = 8.dp,
@@ -239,6 +241,33 @@ fun MusicScreenM3(
                                             if (idx >= 0) onTrackClick(tracks, idx)
                                         }
                                     ) }
+                                }
+                            }
+                        } else if (isLandscape) {
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(2),
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(bottom = 220.dp, top = 4.dp, start = 8.dp, end = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                gridItemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth().animateItem().padding(vertical = 2.dp),
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = m3ItemCardColors()
+                                    ) {
+                                        LineageListItemWithThumbnail(
+                                            headline = track.title,
+                                            supporting = "${track.artist} • ${track.album}",
+                                            thumbnailModel = track.albumArtUri,
+                                            placeholderIcon = Icons.Filled.MusicNote,
+                                            trailingText = track.formattedDuration(),
+                                            trailingIcon = Icons.Filled.MoreVert,
+                                            onClick = { onTrackClick(tracks, index) },
+                                            onTrailingClick = { selectedTrackForMenu = track }
+                                        )
+                                    }
                                 }
                             }
                         } else {

@@ -290,7 +290,7 @@ class PreferencesManager(private val context: Context) {
     }
 
     val statsTopCount: Flow<Int> = context.dataStore.data.map {
-        (it[PrefsKeys.STATS_TOP_COUNT] ?: 10).coerceIn(10, 50)
+        (it[PrefsKeys.STATS_TOP_COUNT] ?: 10).coerceIn(10, 30)
     }
 
     val likedSongIds: Flow<String> = context.dataStore.data.map {
@@ -605,7 +605,7 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun setStatsTopCount(count: Int) {
-        context.dataStore.edit { it[PrefsKeys.STATS_TOP_COUNT] = count.coerceIn(10, 50) }
+        context.dataStore.edit { it[PrefsKeys.STATS_TOP_COUNT] = count.coerceIn(10, 30) }
     }
 
     suspend fun setLikedSongIds(json: String) {

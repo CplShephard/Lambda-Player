@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -28,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
@@ -71,9 +73,13 @@ fun MiuixDrawer(
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     LaunchedEffect(Unit) { visible = true }
     val currentOnDismissRequest by rememberUpdatedState(onDismissRequest)
+    val windowWidth = LocalConfiguration.current.screenWidthDp.dp
+    val drawerWidth = minOf(420.dp, windowWidth * 0.88f)
+    val leftAlignedOffset = -(windowWidth - drawerWidth) / 2
     WindowBottomSheet(
         show = visible,
-        modifier = modifier,
+        modifier = Modifier.absoluteOffset(x = leftAlignedOffset).then(modifier),
+        sheetMaxWidth = drawerWidth,
         title = title,
         startAction = startAction,
         endAction = endAction,
