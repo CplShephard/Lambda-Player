@@ -22,6 +22,7 @@ import dev.shephard.player.ui.miuix.Switch
 import dev.shephard.player.ui.miuix.Text
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.fillMaxWidth
 
 /** Miuix-window counterpart of the automatic missing-lyrics prompt. */
 @Composable

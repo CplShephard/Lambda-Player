@@ -34,6 +34,7 @@ import dev.shephard.player.ui.i18n.LocalStrings
 import dev.shephard.player.ui.miuix.MiuixAppTheme
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.fillMaxWidth
 
 /** Playlist action sheet following Pixel's header + grouped action rows. */
 @Composable

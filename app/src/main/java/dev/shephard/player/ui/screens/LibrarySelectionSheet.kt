@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.fillMaxWidth
 
 /** Bulk chooser is independent of the list/grid layout and persists into existing playlists. */
 @Composable

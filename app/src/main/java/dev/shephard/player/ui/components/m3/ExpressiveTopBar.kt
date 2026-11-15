@@ -29,7 +29,7 @@ class ExpressiveTopBarState internal constructor(
     val fraction: Float get() = (-offsetPx / rangePx).coerceIn(0f, 1f)
     private var settling: Job? = null
 
-    private fun consume(delta: Float): Float {
+    internal fun consume(delta: Float): Float {
         settling?.cancel()
         val next = (offsetPx + delta).coerceIn(-rangePx, 0f)
         val consumed = next - offsetPx

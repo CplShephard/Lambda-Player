@@ -41,6 +41,9 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 
 private data class QueueEntry(val key: Int, val track: AudioTrack)
 

@@ -90,7 +90,7 @@ class SongArtworkProvider : ContentProvider() {
                 .appendPath("song").appendPath(songId.toString()).appendQueryParameter("v", hash).build()
         }
 
-        private fun parse(uri: Uri): Pair<Long, String>? {
+        internal fun parse(uri: Uri): Pair<Long, String>? {
             val parts = uri.pathSegments
             if (parts.size != 2 || parts[0] != "song") return null
             val id = parts[1].toLongOrNull()?.takeIf { it >= 0L } ?: return null

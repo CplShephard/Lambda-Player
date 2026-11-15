@@ -48,6 +48,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
@@ -429,10 +431,7 @@ onDismiss: () -> Unit,
                         )
                         }
                         if (showAddToPlaylist && track != null) {
-                            M3AddToPlaylistDrawer(
-                            trackId = trackId,
-                            track = track,
-                            playerViewModel = playerViewModel,
+                            M3AddToPlaylistDrawer(trackId, track, playerViewModel,
                             onDismiss = { showAddToPlaylist = false },
                             strings = strings
                         )
@@ -627,7 +626,7 @@ private fun M3LandscapeContent(
         dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { onShowQueueChange(false) })
     }
     if (showAddToPlaylist) {
-        M3AddToPlaylistDrawer(trackId = track?.id ?: -1L, track = track, playerViewModel = playerViewModel, onDismiss = { onShowAddToPlaylistChange(false) }, strings = strings)
+        M3AddToPlaylistDrawer(track?.id ?: -1L, track, playerViewModel, { showAddToPlaylist = false }, strings)
     }
 }
 
@@ -734,6 +733,17 @@ strings: dev.shephard.player.ui.i18n.Strings
             }
         }
     }
+}
+
+
+@Composable
+internal fun M3NowPlayingProgressLineage(playerViewModel: PlayerViewModel, isPlaying: Boolean) {
+    val prog by playerViewModel.progress.collectAsState()
+    val fraction = if (prog.durationMs > 0) prog.positionMs.toFloat() / prog.durationMs else 0f
+    androidx.compose.material3.LinearWavyProgressIndicator(
+        progress = fraction,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+    )
 }
 
 private fun contrastColorFor(color: Color): Color =

@@ -768,13 +768,7 @@ private fun MiuixLandscapeContent(
         QueueDrawer(playerViewModel = playerViewModel, useMiuix = true, onDismiss = { onShowQueueChange(false) })
     }
     if (showPlaylists) {
-        AddToPlaylistDrawer(
-            trackId = track?.id ?: -1L,
-            track = track,
-            playerViewModel = playerViewModel,
-            onDismiss = { onShowPlaylistsChange(false) },
-            strings = strings
-        )
+        AddToPlaylistDrawer(track?.id ?: -1L, track, playerViewModel, { onShowPlaylistsChange(false) }, strings)
     }
 }
 
