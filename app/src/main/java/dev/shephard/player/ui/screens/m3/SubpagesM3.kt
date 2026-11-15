@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.twotone.LinearScale
 import androidx.compose.material.icons.twotone.SpeakerGroup
 import androidx.compose.material.icons.twotone.SwapHoriz
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -101,6 +102,7 @@ fun SettingsScreenM3(
     playerViewModel: PlayerViewModel = viewModel(),
     onOpenThemeSettings: () -> Unit = {},
     onOpenPlayerSettings: () -> Unit = {},
+    onOpenOnlineMode: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     onOpenStats: () -> Unit = {},
 ) {
@@ -151,6 +153,20 @@ fun SettingsScreenM3(
                         supporting = strings.playbackSettingsSummary,
                         leadingContent = { Icon(Icons.Filled.Headphones, null, tint = MaterialTheme.colorScheme.primary) },
                         onClick = onOpenPlayerSettings
+                    )
+                }
+            }
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = m3ItemCardColors()
+                ) {
+                    LineageListItem(
+                        headline = "Online Mod",
+                        supporting = "Extensionlar ve Discover sekmesi",
+                        leadingContent = { Icon(Icons.Filled.Explore, null, tint = MaterialTheme.colorScheme.primary) },
+                        onClick = onOpenOnlineMode
                     )
                 }
             }

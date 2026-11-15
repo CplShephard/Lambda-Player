@@ -58,13 +58,27 @@ fun MainContainer(
     val blurEnabled = LocalBlurEnabled.current
     // Resolve the startup page before creating the pager without blocking the UI thread.
     // The value is loaded once, so later page writes never recreate the pager.
-    val startup by produceState<Pair<Boolean, Int>?>(null, prefs) {
+    val startup by produceState<Triple<Boolean, Boolean, Int>?>(null, prefs) {
         prefs.migrateLibraryNavigation()
-        value = prefs.useMiuix.first() to prefs.lastMainPage.first()
+        value = Triple(prefs.useMiuix.first(), prefs.onlineModeEnabled.first(), prefs.lastMainPage.first())
     }
     val initial = startup ?: return
     val useMiuix by prefs.useMiuix.collectAsState(initial = initial.first)
-    val initialLastMainPage = initial.second
+    val startupOnlineEnabled = initial.second
+    val initialLastMainPage = initial.third
+    // Online mode controls the 4th dock tab (Discover to the left of Home)
+    val initialOnlineModeEnabled = remember { kotlinx.coroutines.runBlocking { prefs.onlineModeEnabled.first() } }
+    val onlineModeEnabled by prefs.onlineModeEnabled.collectAsState(initial = initialOnlineModeEnabled)
+    val activeDestinations = remember(onlineModeEnabled) { activeBottomNavDestinations(onlineModeEnabled) }
+    // Translate persisted 3-page index to current 4-page layout:
+    // offline 0=Home,1=Library,2=Settings  ->  online 1=Home,2=Library,3=Settings,0=Discover
+    val adjustedInitialPage = remember(startupOnlineEnabled, onlineModeEnabled, initialLastMainPage) {
+        when {
+            !startupOnlineEnabled && onlineModeEnabled -> (initialLastMainPage + 1).coerceIn(0, activeDestinations.size - 1)
+            startupOnlineEnabled && !onlineModeEnabled -> (initialLastMainPage - 1).coerceIn(0, activeDestinations.size - 1)
+            else -> initialLastMainPage.coerceIn(0, activeDestinations.size - 1)
+        }
+    }
 
     // The custom wallpaper feature was removed: clear its leftover settings and image files once.
     LaunchedEffect(Unit) { prefs.clearRemovedWallpaperData() }
@@ -90,13 +104,30 @@ fun MainContainer(
         var miniPlayerBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
 
         // Build the pager state once with a stable initial value. The
-        // rememberPagerState factory is keyed only on pageCount, so this won't
-        // be rebuilt on subsequent recompositions.
+        // pageCount lambda reacts to onlineModeEnabled so the pager expands to 4 pages
+        // without recreating thePagerState — existing pager animations keep running.
         val pagerState = rememberPagerState(
-            initialPage = initialLastMainPage.coerceIn(0, bottomNavDestinations.size - 1),
-            pageCount = { bottomNavDestinations.size },
+            initialPage = adjustedInitialPage.coerceIn(0, (activeDestinations.size - 1).coerceAtLeast(0)),
+            pageCount = { activeDestinations.size },
         )
         val mainPagerState = rememberMainPagerState(pagerState)
+        // Keep the selected tab in sync when Online Mode toggles (Discover inserted/removed at front)
+        var previousOnlineEnabled by remember { mutableStateOf(onlineModeEnabled) }
+        androidx.compose.runtime.LaunchedEffect(onlineModeEnabled, activeDestinations.size) {
+            if (previousOnlineEnabled != onlineModeEnabled) {
+                val target = if (onlineModeEnabled) {
+                    // offline (Home 0) -> online (Home 1): shift +1
+                    (mainPagerState.selectedPage + 1).coerceIn(0, activeDestinations.size - 1)
+                } else {
+                    // online -> offline: Discover 0 -> Home 0, others -1
+                    if (mainPagerState.selectedPage == 0) 0 else (mainPagerState.selectedPage - 1).coerceIn(0, activeDestinations.size - 1)
+                }
+                if (target != mainPagerState.selectedPage && mainPagerState.pagerState.currentPage == mainPagerState.selectedPage) {
+                    mainPagerState.animateToPage(target)
+                }
+                previousOnlineEnabled = onlineModeEnabled
+            }
+        }
         val currentPage = mainPagerState.pagerState.currentPage
         val settledPage = mainPagerState.pagerState.settledPage
 
@@ -113,6 +144,7 @@ fun MainContainer(
         // Persist the settled page, debounced so we don't write to DataStore on
         // every intermediate frame of a swipe gesture. This is the main fix for
         // the Settings -> Playlists transition hitch.
+        // We persist the raw pager index (0..3 online, 0..2 offline). Startup translation handles mode changes.
         LaunchedEffect(settledPage) {
             delay(250)
             prefs.setLastMainPage(settledPage)
@@ -178,6 +210,7 @@ fun MainContainer(
                     useMiuix = useMiuix,
                     preferences = prefs,
                     mainPagerState = mainPagerState,
+                    activeDestinations = activeDestinations,
                     modifier = Modifier
                         .fillMaxSize()
                         .background(themeBackground),

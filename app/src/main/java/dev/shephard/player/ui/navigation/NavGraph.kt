@@ -110,6 +110,7 @@ import top.yukonga.miuix.kmp.nav.core.NavKey
 import top.yukonga.miuix.kmp.nav.core.NavEntryBuilder
 import top.yukonga.miuix.kmp.nav.transition.NavSwipeDirection
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
@@ -140,6 +141,7 @@ fun NavGraph(
     useMiuix: Boolean = true,
     preferences: PreferencesManager,
     mainPagerState: MainPagerState,
+    activeDestinations: List<Destination> = bottomNavDestinations,
     onOpenNowPlaying: () -> Unit = {},
     onMiniPlayerBoundsChanged: (androidx.compose.ui.geometry.Rect) -> Unit = {},
     onTrackClick: (List<AudioTrack>, Int, String?) -> Unit = { _, _, _ -> },
@@ -210,7 +212,7 @@ fun NavGraph(
     val overlayHeight = remember { mutableStateOf(0.dp) }
     val overlayDensity = LocalDensity.current
     // DSL block for NavDisplay (the public overload). entryProvider() itself is internal in miuix-nav.
-    val entryContent = remember(backStack, useMiuix, swipeBackDirection, interceptPredictiveBack) {
+    val entryContent = remember(backStack, useMiuix, swipeBackDirection, interceptPredictiveBack, activeDestinations) {
         val block: NavEntryBuilder.() -> Unit = {
             entry<MainRoute> {
                 NavEntryBackHandler(interceptPredictiveBack, ::pop) {
@@ -228,9 +230,33 @@ fun NavGraph(
                                 state = mainPagerState.pagerState,
                                 beyondViewportPageCount = 1,
                             ) { page ->
+                                val dest = activeDestinations.getOrNull(page) ?: return@HorizontalPager
                                 Box(modifier = Modifier.fillMaxSize()) {
-                                    when (page) {
-                                        0 -> if (useMiuix) {
+                                    when (dest) {
+                                        Destination.Discover -> {
+                                            val ctx = androidx.compose.ui.platform.LocalContext.current
+                                            val extManager = remember { ExtensionManager(ctx) }
+                                            val dlManager = remember { ExtensionDownloadManager(ctx, extManager) }
+                                            val libVm: dev.shephard.player.player.LibraryViewModel = viewModel()
+                                            if (useMiuix) {
+                                                dev.shephard.player.ui.screens.ExtensionSearchScreen(
+                                                    extensionManager = extManager,
+                                                    downloadManager = dlManager,
+                                                    onLibraryRefresh = { libVm.loadTracks() },
+                                                    onBack = {},
+                                                    showBack = false
+                                                )
+                                            } else {
+                                                dev.shephard.player.ui.screens.m3.ExtensionSearchScreenM3(
+                                                    extensionManager = extManager,
+                                                    downloadManager = dlManager,
+                                                    onLibraryRefresh = { libVm.loadTracks() },
+                                                    onBack = {},
+                                                    showBack = false
+                                                )
+                                            }
+                                        }
+                                        Destination.Home -> if (useMiuix) {
                                             HomeScreen(
                                                 libraryViewModel = viewModel(),
                                                 playerViewModel = playerViewModel,
@@ -249,7 +275,7 @@ fun NavGraph(
                                                 onOpenStats = { push(StatsRoute) },
                                             )
                                         }
-                                        1 -> dev.shephard.player.ui.screens.LibraryScreen(
+                                        Destination.Library -> dev.shephard.player.ui.screens.LibraryScreen(
                                             useMiuix = useMiuix,
                                             libraryViewModel = viewModel(),
                                             playerViewModel = playerViewModel,
@@ -259,7 +285,7 @@ fun NavGraph(
                                             onOpenPlaylistDetail = { push(PlaylistDetailRoute(it)) },
                                             onOpenAlbumDetail = { id, album, artist -> push(AlbumDetailRoute(id, album, artist)) },
                                         )
-                                        2 -> if (useMiuix) {
+                                        Destination.Settings -> if (useMiuix) {
                                             SettingsScreen(
                                                 playerViewModel = playerViewModel,
                                                 onOpenThemeSettings = { push(ThemeRoute) },
@@ -273,6 +299,7 @@ fun NavGraph(
                                                 playerViewModel = playerViewModel,
                                                 onOpenThemeSettings = { push(ThemeRoute) },
                                                 onOpenPlayerSettings = { push(PlayerRoute) },
+                                                onOpenOnlineMode = { push(OnlineModeRoute) },
                                                 onOpenAbout = { push(AboutRoute) },
                                                 onOpenStats = { push(StatsRoute) },
                                             )
@@ -440,26 +467,44 @@ private fun MainDock(
     selectedIndex: () -> Int,
     onSelected: (Int) -> Unit,
 ) {
-    val appleStyle by preferences.useAppleFloatingBar.collectAsState(initial = false)
+    // FIX: preload floating-bar toggle synchronously — otherwise Miuix floating dock flashes from hidden to visible for 1 frame on launch
+    val initialAppleStyle = androidx.compose.runtime.remember { kotlinx.coroutines.runBlocking { preferences.useAppleFloatingBar.first() } }
+    val appleStyle by preferences.useAppleFloatingBar.collectAsState(initial = initialAppleStyle)
+    // Online Mode controls 4th tab (Discover)
+    val initialOnlineEnabled = androidx.compose.runtime.remember { kotlinx.coroutines.runBlocking { preferences.onlineModeEnabled.first() } }
+    val onlineEnabled by preferences.onlineModeEnabled.collectAsState(initial = initialOnlineEnabled)
+    val activeDestinations = remember(onlineEnabled) { activeBottomNavDestinations(onlineEnabled) }
     when {
         appleStyle && useMiuix -> AppleFloatingDock(
+            activeDestinations = activeDestinations,
             useMiuix = true,
             selectedIndex = selectedIndex,
             onSelected = onSelected,
         )
-        !useMiuix -> M3NavigationDock(preferences = preferences, selectedIndex = selectedIndex, onSelected = onSelected)
-        else -> MiuixNavigationDock(selectedIndex = selectedIndex, onSelected = onSelected)
+        !useMiuix -> M3NavigationDock(
+            preferences = preferences,
+            activeDestinations = activeDestinations,
+            selectedIndex = selectedIndex,
+            onSelected = onSelected
+        )
+        else -> MiuixNavigationDock(
+            activeDestinations = activeDestinations,
+            selectedIndex = selectedIndex,
+            onSelected = onSelected
+        )
     }
 }
 
 @Composable
 private fun M3NavigationDock(
     preferences: PreferencesManager,
+    activeDestinations: List<Destination> = bottomNavDestinations,
     selectedIndex: () -> Int,
     onSelected: (Int) -> Unit,
 ) {
     val strings = LocalStrings.current
-    val cornerRadius by preferences.m3NavBarCornerRadius.collectAsState(initial = 24)
+    val initialCorner = androidx.compose.runtime.remember { kotlinx.coroutines.runBlocking { preferences.m3NavBarCornerRadius.first() } }
+    val cornerRadius by preferences.m3NavBarCornerRadius.collectAsState(initial = initialCorner)
     val insets = WindowInsets.safeDrawing.only(
         WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
     )
@@ -470,7 +515,7 @@ private fun M3NavigationDock(
         windowInsets = insets,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) {
-        bottomNavDestinations.forEachIndexed { index, dest ->
+        activeDestinations.forEachIndexed { index, dest ->
             val label = when (dest) {
                 Destination.Discover -> "Discover"
                 Destination.Home -> strings.home
@@ -500,6 +545,7 @@ private fun M3NavigationDock(
 
 @Composable
 private fun MiuixNavigationDock(
+    activeDestinations: List<Destination> = bottomNavDestinations,
     selectedIndex: () -> Int,
     onSelected: (Int) -> Unit,
 ) {
@@ -520,7 +566,7 @@ private fun MiuixNavigationDock(
             .background(barColor)
     ) {
         NavigationBar(color = barColor) {
-            bottomNavDestinations.forEachIndexed { index, dest ->
+            activeDestinations.forEachIndexed { index, dest ->
                 val label = when (dest) {
                     Destination.Discover -> "Discover"
                     Destination.Home -> strings.home
@@ -540,6 +586,7 @@ private fun MiuixNavigationDock(
 
 @Composable
 private fun AppleFloatingDock(
+    activeDestinations: List<Destination> = bottomNavDestinations,
     useMiuix: Boolean,
     selectedIndex: () -> Int,
     onSelected: (Int) -> Unit,
@@ -594,7 +641,7 @@ private fun AppleFloatingDock(
     ) {
     // Miuix dock: InstallerX Revived's FloatingBottomBar (ported to ui/glass).
     FloatingBottomBar(
-        items = bottomNavDestinations,
+        items = activeDestinations,
         selectedIndex = selectedIndex,
         onSelected = onSelected,
         backdrop = effectiveBackdrop,

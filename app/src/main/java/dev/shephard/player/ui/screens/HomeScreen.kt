@@ -90,9 +90,14 @@ fun HomeScreen(
     val recentEvents by playerViewModel.statsEventsFlow.collectAsState()
     val totalListeningMs by playerViewModel.totalListeningMsLive.collectAsState()
 
+    // First-second loading overlay — hides the initial empty flash and gives a smooth 1s intro
+    var showMinLoading by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) {
         libraryViewModel.ensureTracksLoaded()
+        kotlinx.coroutines.delay(1000)
+        showMinLoading = false
     }
+    val showLoadingOverlay = showMinLoading || !hasScanned
 
     val featuredTracks = dev.shephard.player.ui.components.rememberFeaturedTracks(tracks, 5)
 
@@ -125,60 +130,69 @@ fun HomeScreen(
     // Playlist detail is a top-level submenu (PlaylistDetailRoute in NavGraph), exactly like the
     // settings submenus: it covers the pager, dock and mini player by z-order instead of living
     // inside this page. Opening it just pushes the route.
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    containerColor = Color.Transparent,
-                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                    topBar = {
-                        MiuixTopBar(
-                            title = strings.home,
-                            state = topBarState
-                        )
-                    }
-                ) { innerPadding ->
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .captureForTopBarBlur(topBarState)
-                                .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
-                                .overScrollVertical()
-                                .verticalScroll(scrollState)
-                                .padding(
-                                    top = innerPadding.calculateTopPadding() + 8.dp,
-                                    bottom = 220.dp
-                                ),
-                            verticalArrangement = Arrangement.spacedBy(24.dp)
-                        ) {
-                            HomeYourMix(
-                                yourMix,
-                                useMiuix = true,
-                                isLoading = !hasScanned,
-                                onRemix = { playerViewModel.setQueueAndPlayRemixed(it, strings.yourMix) }
-                            ) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
-                            HomeListeningTime(totalListeningMs, useMiuix = true, onClick = onOpenStats)
-                            if (featuredPlaylists.isNotEmpty()) {
-                                FeaturedPlaylistsSection(
-                                    title = strings.featuredPlaylists,
-                                    playlists = featuredPlaylists,
-                                    tracks = tracks,
-                                    likedIds = likedIds,
-                                    onPlaylistClick = { pl ->
-                                        val i = dev.shephard.player.ui.screens.ensureLikedSongsPlaylist(rawPlaylists, strings).indexOf(pl)
-                                        if (i >= 0) onOpenPlaylistDetail(i)
-                                    }
-                                )
-                            }
-
-                            if (recentlyPlayedTracks.isNotEmpty()) {
-                                RecentlyPlayedSection(
-                                    title = strings.recentlyPlayed,
-                                    tracks = recentlyPlayedTracks,
-                                    onTrackClick = { recentIdx ->
-                                        onTrackClick(recentlyPlayedTracks, recentIdx, strings.recentlyPlayed)
-                                    }
-                                )
-                            }
+                Box(Modifier.fillMaxSize()) {
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        containerColor = Color.Transparent,
+                        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                        topBar = {
+                            MiuixTopBar(
+                                title = strings.home,
+                                state = topBarState
+                            )
                         }
+                    ) { innerPadding ->
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .captureForTopBarBlur(topBarState)
+                                    .nestedScroll(topBarState.scrollBehavior.nestedScrollConnection)
+                                    .overScrollVertical()
+                                    .verticalScroll(scrollState)
+                                    .padding(
+                                        top = innerPadding.calculateTopPadding() + 8.dp,
+                                        bottom = 220.dp
+                                    ),
+                                verticalArrangement = Arrangement.spacedBy(24.dp)
+                            ) {
+                                HomeYourMix(
+                                    yourMix,
+                                    useMiuix = true,
+                                    isLoading = !hasScanned,
+                                    onRemix = { playerViewModel.setQueueAndPlayRemixed(it, strings.yourMix) }
+                                ) { queue, index -> onTrackClick(queue, index, strings.yourMix) }
+                                HomeListeningTime(totalListeningMs, useMiuix = true, onClick = onOpenStats)
+                                if (featuredPlaylists.isNotEmpty()) {
+                                    FeaturedPlaylistsSection(
+                                        title = strings.featuredPlaylists,
+                                        playlists = featuredPlaylists,
+                                        tracks = tracks,
+                                        likedIds = likedIds,
+                                        onPlaylistClick = { pl ->
+                                            val i = dev.shephard.player.ui.screens.ensureLikedSongsPlaylist(rawPlaylists, strings).indexOf(pl)
+                                            if (i >= 0) onOpenPlaylistDetail(i)
+                                        }
+                                    )
+                                }
+
+                                if (recentlyPlayedTracks.isNotEmpty()) {
+                                    RecentlyPlayedSection(
+                                        title = strings.recentlyPlayed,
+                                        tracks = recentlyPlayedTracks,
+                                        onTrackClick = { recentIdx ->
+                                            onTrackClick(recentlyPlayedTracks, recentIdx, strings.recentlyPlayed)
+                                        }
+                                    )
+                                }
+                            }
+                    }
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = showLoadingOverlay,
+                        enter = androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.fadeOut()
+                    ) {
+                        dev.shephard.player.ui.components.MiuixLibraryLoadingOverlay()
+                    }
                 }
 }
 

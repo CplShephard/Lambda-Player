@@ -60,3 +60,6 @@ val onlineBottomNavDestinations = listOf(
     Destination.Library,
     Destination.Settings
 )
+
+fun activeBottomNavDestinations(onlineEnabled: Boolean): List<Destination> =
+    if (onlineEnabled) onlineBottomNavDestinations else bottomNavDestinations
