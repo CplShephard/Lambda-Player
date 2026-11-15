@@ -103,7 +103,7 @@ internal fun scaleNavTransition(exitDirection: PredictiveBackExitDirection): Nav
     )
 }
 
-internal fun shapedTopProgress(progress: Float, gesture: NavGesture?): Float = if (gesture == null) progress else 1f - BackGestureEasing.transform((1f - progress).coerceIn(0f, 1f))
+private fun shapedTopProgress(progress: Float, gesture: NavGesture?): Float = if (gesture == null) progress else 1f - BackGestureEasing.transform((1f - progress).coerceIn(0f, 1f))
 
 private fun exitDirectionSign(
     direction: PredictiveBackExitDirection,

@@ -262,7 +262,7 @@ private fun bounceScale(settle: NavSettle?, gesture: NavGesture?): Float {
     return ((100f + overlay) / 100f).coerceAtMost(1f)
 }
 
-internal fun shapedTopProgress(progress: Float, gesture: NavGesture?): Float = if (gesture == null) progress else 1f - BackGestureEasing.transform((1f - progress).coerceIn(0f, 1f))
+private fun shapedTopProgress(progress: Float, gesture: NavGesture?): Float = if (gesture == null) progress else 1f - BackGestureEasing.transform((1f - progress).coerceIn(0f, 1f))
 
 private fun crossActivityYShift(gesture: NavGesture?, height: Float, scale: Float, density: Density): Float {
     if (gesture == null || height <= 0f) return 0f
