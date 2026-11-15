@@ -48,8 +48,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
@@ -445,7 +443,7 @@ onDismiss: () -> Unit,
     }
 
     if (showQueue) {
-        dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { onShowQueueChange(false) })
+        dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { showQueue = false })
     }
 
     val isLandscapeOutside = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -626,7 +624,7 @@ private fun M3LandscapeContent(
         dev.shephard.player.ui.screens.QueueDrawer(playerViewModel = playerViewModel, useMiuix = false, onDismiss = { onShowQueueChange(false) })
     }
     if (showAddToPlaylist) {
-        M3AddToPlaylistDrawer(track?.id ?: -1L, track, playerViewModel, { showAddToPlaylist = false }, strings)
+        M3AddToPlaylistDrawer(track?.id ?: -1L, track, playerViewModel, { onShowAddToPlaylistChange(false) }, strings)
     }
 }
 
@@ -636,7 +634,7 @@ internal fun M3NowPlayingProgressLineage(playerViewModel: PlayerViewModel, isPla
     val prog by playerViewModel.progress.collectAsState()
     val fraction = if (prog.durationMs > 0) prog.positionMs.toFloat() / prog.durationMs else 0f
     androidx.compose.material3.LinearWavyProgressIndicator(
-        progress = fraction,
+        progress = { fraction },
         modifier = androidx.compose.foundation.layout.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
     )
 }
@@ -735,16 +733,6 @@ strings: dev.shephard.player.ui.i18n.Strings
     }
 }
 
-
-@Composable
-internal fun M3NowPlayingProgressLineage(playerViewModel: PlayerViewModel, isPlaying: Boolean) {
-    val prog by playerViewModel.progress.collectAsState()
-    val fraction = if (prog.durationMs > 0) prog.positionMs.toFloat() / prog.durationMs else 0f
-    androidx.compose.material3.LinearWavyProgressIndicator(
-        progress = fraction,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-    )
-}
 
 private fun contrastColorFor(color: Color): Color =
 if (color.luminance() >= 0.56f) Color(0xFF17131A) else Color.White
