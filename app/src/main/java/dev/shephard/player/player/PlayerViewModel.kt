@@ -1089,9 +1089,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun playQueueItemAbsolute(index: Int) {
-        clearCarouselPrediction()
         val c = controller ?: return
-        if (index in queueTracks.indices) { c.seekTo(index, 0L); c.play() }
+        if (index in queueTracks.indices) {
+            _navigationDirection.value = index.compareTo(c.currentMediaItemIndex).let { if (it < 0) -1 else 1 }
+            clearCarouselPrediction()
+            c.seekTo(index, 0L); c.play()
+        }
     }
 
     fun removeQueueItemAbsolute(index: Int) {

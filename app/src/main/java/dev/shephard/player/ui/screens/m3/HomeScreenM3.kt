@@ -149,7 +149,7 @@ fun HomeScreenM3(
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(
-                                top = padding.calculateTopPadding() + 8.dp,
+                                top = padding.calculateTopPadding() + 4.dp,
                                 bottom = 220.dp
                             ),
                             verticalArrangement = Arrangement.spacedBy(8.dp)

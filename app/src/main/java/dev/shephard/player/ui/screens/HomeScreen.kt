@@ -142,7 +142,7 @@ fun HomeScreen(
                                     .overScrollVertical()
                                     .verticalScroll(scrollState)
                                     .padding(
-                                        top = innerPadding.calculateTopPadding() + 8.dp,
+                                        top = innerPadding.calculateTopPadding() + 4.dp,
                                         bottom = 220.dp
                                     ),
                                 verticalArrangement = Arrangement.spacedBy(24.dp)
