@@ -2,6 +2,9 @@ package dev.shephard.player.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +26,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -143,7 +149,86 @@ fun PlaybackSettingsSheet(
         HorizontalDivider(color = MiuixAppTheme.colorScheme.surfaceVariant)
 
         ListeningStatsCard(totalListeningMs = state.totalListeningMs)
+
+        HorizontalDivider(color = MiuixAppTheme.colorScheme.surfaceVariant)
+
+        // Orphan data cleanup (GEREKSIZ metadata) with progress bar to 100%
+        OrphanCleanupSection(playerViewModel = playerViewModel)
     }
+}
+
+@Composable
+private fun OrphanCleanupSection(playerViewModel: PlayerViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val strings = LocalStrings.current
+    var showDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var progress by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var report by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<PlayerViewModel.OrphanCleanupReport?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val libraryVm: dev.shephard.player.ui.screens.LibraryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val libraryTracks by libraryVm.tracks.collectAsState()
+
+    Column(modifier = androidx.compose.foundation.layout.fillMaxWidth().padding(vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(text = "Storage orphan cleanup", style = MiuixAppTheme.typography.bodyLarge, color = MiuixAppTheme.colorScheme.onBackground)
+                Text(text = "Scan DataStore for tracks not on device and remove only unnecessary (GEREKSIZ) leftover metadata", style = MiuixAppTheme.typography.bodyMedium, color = MiuixAppTheme.colorScheme.onSurfaceVariant)
+                if (report != null) {
+                    Text(text = report!!.summary(), style = MiuixAppTheme.typography.bodyMedium, color = MiuixAppTheme.colorScheme.primary, modifier = Modifier.padding(top = 6.dp))
+                }
+            }
+            MiuixAppTheme.let {
+                top.yukonga.miuix.kmp.basic.Button(
+                    onClick = {
+                        progress = 0; report = null; showDialog = true
+                        scope.launch {
+                            val ids = libraryTracks.map { it.id.toString() }.toSet()
+                            val stable = libraryTracks.map { dev.shephard.player.data.TrackFingerprint.stableKey(it) }.toSet()
+                            val res = playerViewModel.scanAndCleanOrphanedData(ids, stable) { p -> progress = p }
+                            report = res
+                            kotlinx.coroutines.delay(400)
+                            showDialog = false
+                            android.widget.Toast.makeText(context, res.summary(), android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }
+                ) { Text("Scan & clean") }
+            }
+        }
+        if (report != null) {
+            Text(text = "${report!!.totalRemoved} orphan items removed — listening ${report!!.removedListening}, lyrics ${report!!.removedLyrics}", style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+        }
+    }
+    if (showDialog) {
+        OrphanCleanupProgressDialog(progress = progress, onDismiss = { showDialog = false })
+    }
+}
+
+@Composable
+private fun OrphanCleanupProgressDialog(progress: Int, onDismiss: () -> Unit) {
+    var show by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
+    androidx.compose.runtime.LaunchedEffect(progress) { if (progress >= 100) kotlinx.coroutines.delay(350) }
+    dev.shephard.player.ui.miuix.MiuixDialog(
+        onDismissRequest = { show = false; onDismiss() },
+        title = "Scanning DataStore… ${progress}%",
+        text = {
+            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 4.dp))
+                // Linear progress bar filling to 100%
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(6.dp)).background(MiuixAppTheme.colorScheme.surfaceVariant)
+                ) {
+                    Box(modifier = Modifier.fillMaxWidth(fraction = progress / 100f).height(10.dp).clip(RoundedCornerShape(6.dp)).background(MiuixAppTheme.colorScheme.primary))
+                }
+                Text(text = "${progress}% — checking listening stats, lyrics, overrides…", style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+                Text(text = "Only GEREKSIZ (orphaned) entries will be deleted from DataStore directory", style = MiuixAppTheme.typography.bodySmall, color = MiuixAppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), modifier = Modifier.padding(top = 6.dp))
+            }
+        },
+        buttons = {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                top.yukonga.miuix.kmp.basic.TextButton(onClick = { show = false; onDismiss() }, text = "Cancel")
+            }
+        }
+    )
 }
 
 @Composable

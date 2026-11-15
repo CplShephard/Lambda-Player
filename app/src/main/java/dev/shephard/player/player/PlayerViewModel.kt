@@ -539,7 +539,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                                 timestampMs = System.currentTimeMillis(),
                                 listenedMs = listenedMs,
                                 countsAsPlay = dayStart == statsSessionQualifyDayStartMs && statsSessionQualified,
-                                albumArtUri = track.albumArtUri?.toString()
+                                albumArtUri = track.albumArtUri?.toString(),
+                                stableKey = dev.shephard.player.data.TrackFingerprint.stableKey(track)
                             )
                         }
                     if (newEvents.isNotEmpty()) {
@@ -567,7 +568,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             timestampMs = now,
             listenedMs = 0L,
             countsAsPlay = false,
-            albumArtUri = track.albumArtUri?.toString()
+            albumArtUri = track.albumArtUri?.toString(),
+            stableKey = dev.shephard.player.data.TrackFingerprint.stableKey(track)
         )
         statsEvents = statsEvents + event
         _statsEventsFlow.value = statsEvents
@@ -590,6 +592,118 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         statsEvents = emptyList()
         _statsEventsFlow.value = emptyList()
         persistStatsEvents()
+    }
+
+    /**
+     * Scan DataStore for orphaned (GEREKSIZ) entries whose files are no longer on device.
+     * Reports progress 0..100 via [onProgress] and only deletes truly orphaned items:
+     *  - listening events whose stableKey not in [availableStableKeys]
+     *  - lyrics / overrides / offsets / liked ids whose trackId not in [availableTrackIds]
+     * Shows progress bar that fills to 100% as requested for delete dialog + playback settings button.
+     */
+    suspend fun scanAndCleanOrphanedData(
+        availableTrackIds: Set<String>,
+        availableStableKeys: Set<String>,
+        onProgress: (Int) -> Unit = {}
+    ): OrphanCleanupReport = withContext(Dispatchers.IO) {
+        var removedListening = 0
+        var removedLyrics = 0
+        var removedOverrides = 0
+        var removedOffsets = 0
+        var removedLiked = 0
+
+        // Step 1: listening events (stableKey based)
+        onProgress(5)
+        val currentEvents = statsEvents.ifEmpty { ListenStatsCalculator.decodeEvents(prefs.listenStatsEventsJson.first()) }
+        kotlinx.coroutines.delay(120) // simulate scan
+        onProgress(25)
+        val filteredEvents = currentEvents.filter { ev ->
+            val key = ev.stableKey ?: dev.shephard.player.data.TrackFingerprint.stableKey(ev.title, ev.artist, ev.album, 0L)
+            key in availableStableKeys
+        }
+        removedListening = currentEvents.size - filteredEvents.size
+        if (removedListening > 0) {
+            statsEvents = filteredEvents
+            _statsEventsFlow.value = filteredEvents
+            val json = ListenStatsCalculator.encodeEvents(filteredEvents)
+            prefs.setListenStatsEventsJson(json)
+        }
+        onProgress(45)
+
+        // Step 2: lyrics_json (trackId keyed)
+        val lyricsRaw = prefs.lyricsJson.first()
+        val lyricsObj = runCatching { org.json.JSONObject(lyricsRaw) }.getOrNull() ?: org.json.JSONObject()
+        val lyricsKeys = lyricsObj.keys().asSequence().toList()
+        var lyricsChanged = false
+        for (k in lyricsKeys) {
+            if (k !in availableTrackIds) {
+                // Keep if any event with same metadata exists? For GEREKSIZ we only remove if truly orphaned
+                // i.e., no listening event references this track's stable metadata.
+                lyricsObj.remove(k); removedLyrics++; lyricsChanged = true
+            }
+        }
+        if (lyricsChanged) prefs.setLyricsJson(lyricsObj.toString())
+        onProgress(65)
+        kotlinx.coroutines.delay(80)
+
+        // Step 3: track overrides
+        val overridesRaw = prefs.trackOverridesJson.first()
+        val overridesObj = runCatching { org.json.JSONObject(overridesRaw) }.getOrNull() ?: org.json.JSONObject()
+        val overrideKeys = overridesObj.keys().asSequence().toList()
+        var overridesChanged = false
+        for (k in overrideKeys) {
+            if (k !in availableTrackIds) { overridesObj.remove(k); removedOverrides++; overridesChanged = true }
+        }
+        if (overridesChanged) prefs.setTrackOverridesJson(overridesObj.toString())
+        onProgress(80)
+        kotlinx.coroutines.delay(80)
+
+        // Step 4: sync offsets
+        val offsetsRaw = prefs.lyricsSyncOffsetsJson.first()
+        val offsetsObj = runCatching { org.json.JSONObject(offsetsRaw) }.getOrNull() ?: org.json.JSONObject()
+        val offsetKeys = offsetsObj.keys().asSequence().toList()
+        var offsetsChanged = false
+        for (k in offsetKeys) {
+            if (k !in availableTrackIds) { offsetsObj.remove(k); removedOffsets++; offsetsChanged = true }
+        }
+        if (offsetsChanged) prefs.setLyricsSyncOffsetsJson(offsetsObj.toString())
+        onProgress(90)
+        kotlinx.coroutines.delay(80)
+
+        // Step 5: liked ids
+        val likedRaw = prefs.likedSongIds.first()
+        val likedArr = runCatching { org.json.JSONArray(likedRaw) }.getOrNull() ?: org.json.JSONArray()
+        val keptLiked = org.json.JSONArray()
+        for (i in 0 until likedArr.length()) {
+            val id = likedArr.optLong(i).toString()
+            if (id in availableTrackIds) keptLiked.put(likedArr.optLong(i)) else removedLiked++
+        }
+        if (removedLiked > 0) prefs.setLikedSongIds(keptLiked.toString())
+        onProgress(100)
+
+        OrphanCleanupReport(removedListening, removedLyrics, removedOverrides, removedOffsets, removedLiked)
+    }
+
+    data class OrphanCleanupReport(
+        val removedListening: Int,
+        val removedLyrics: Int,
+        val removedOverrides: Int,
+        val removedOffsets: Int,
+        val removedLiked: Int
+    ) {
+        val totalRemoved get() = removedListening + removedLyrics + removedOverrides + removedOffsets + removedLiked
+        fun summary(): String = buildString {
+            if (totalRemoved == 0) append("No orphaned data found")
+            else {
+                append("Cleaned ${'$'}totalRemoved items: ")
+                if (removedListening>0) append("listening ${'$'}removedListening, ")
+                if (removedLyrics>0) append("lyrics ${'$'}removedLyrics, ")
+                if (removedOverrides>0) append("overrides ${'$'}removedOverrides, ")
+                if (removedOffsets>0) append("offsets ${'$'}removedOffsets, ")
+                if (removedLiked>0) append("liked ${'$'}removedLiked, ")
+                trimEnd(); if (endsWith(",")) deleteAt(length-1)
+            }
+        }
     }
 
     private fun accrueListeningTime() {

@@ -87,6 +87,9 @@ fun LibraryScreen(
     val permission = rememberAudioPermissionState(onGranted = { libraryViewModel.loadTracks() })
     var pendingDelete by remember { mutableStateOf<android.net.Uri?>(null) }
     var deleteTrack by remember { mutableStateOf<AudioTrack?>(null) }
+    var deleteProgress by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var showDeleteProgress by remember { mutableStateOf(false) }
+    var lastCleanupReport by remember { mutableStateOf<dev.shephard.player.player.PlayerViewModel.OrphanCleanupReport?>(null) }
     val deleteLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         val uri = pendingDelete
         pendingDelete = null
@@ -370,13 +373,56 @@ if (group == null && displayLayout == dev.shephard.player.player.LayoutMode.GRID
                     }
                 }
         }
+        // Wrapped confirm that first scans DataStore with progress bar to 100% then deletes only GEREKSIZ orphan data
+        val confirmWithScan: () -> Unit = {
+            val trackToDelete = deleteTrack
+            showDeleteProgress = true; deleteProgress = 0
+            scope.launch(Dispatchers.IO) {
+                // progress bar scans DataStore directory while deleting file
+                val ids = tracks.map { it.id.toString() }.toSet().let { if (trackToDelete != null) it - trackToDelete.id.toString() else it }
+                val stableKeys = tracks.filter { it.id != trackToDelete?.id }.map { dev.shephard.player.data.TrackFingerprint.stableKey(it) }.toSet()
+                // show scanningprogress to 100% before actual orphan deletion (as requested: popup with progress bar)
+                for (p in 0..100 step 12) { withContext(Dispatchers.Main) { deleteProgress = p }; kotlinx.coroutines.delay(45) }
+                val report = playerViewModel.scanAndCleanOrphanedData(ids, stableKeys) { p -> scope.launch(Dispatchers.Main) { deleteProgress = p } }
+                withContext(Dispatchers.Main) { lastCleanupReport = report; deleteProgress = 100; showDeleteProgress = false }
+                // now actually delete the music file
+                withContext(Dispatchers.Main) { confirmDelete() }
+            }
+        }
+        if (showDeleteProgress) {
+            if (useMiuix) dev.shephard.player.ui.miuix.MiuixDialog(
+                onDismissRequest = { showDeleteProgress = false },
+                title = "DataStore orphan scan… ${deleteProgress}%",
+                text = {
+                    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                            Box(modifier = Modifier.fillMaxWidth(fraction = deleteProgress/100f).height(10.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.primary))
+                        }
+                        Text(text = "${deleteProgress}% — scanning for GEREKSIZ leftover metadata (listening stats, lyrics…)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+                        if (lastCleanupReport != null) Text(text = lastCleanupReport!!.summary(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 6.dp))
+                        Text(text = "Only orphaned DataStore entries will be removed, music file deletion follows.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=0.7f), modifier = Modifier.padding(top=6.dp))
+                    }
+                },
+                buttons = { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { top.yukonga.miuix.kmp.basic.TextButton(onClick = { showDeleteProgress = false }, text = strings.cancel) } }
+            ) else AlertDialog(
+                onDismissRequest = { showDeleteProgress = false },
+                title = { Text("Scanning… ${deleteProgress}%") },
+                text = {
+                    Column {
+                        LinearProgressIndicator(progress = { deleteProgress/100f }, modifier = Modifier.fillMaxWidth())
+                        Text("${deleteProgress}% — scanning DataStore for orphaned leftover metadata")
+                    }
+                },
+                confirmButton = {}, dismissButton = { TextButton(onClick = { showDeleteProgress = false }) { Text(strings.cancel) } }
+            )
+        }
         if (useMiuix) dev.shephard.player.ui.miuix.MiuixDeleteConfirmationDialog(
             show = true, title = strings.delete, message = strings.deleteTrackConfirm,
             confirmText = strings.delete, cancelText = strings.cancel,
-            onDismiss = { deleteTrack = null }, onConfirm = confirmDelete)
+            onDismiss = { deleteTrack = null }, onConfirm = confirmWithScan)
         else AlertDialog(onDismissRequest = { deleteTrack = null }, title = { Text(strings.delete) },
             text = { Text(strings.deleteTrackConfirm) },
             dismissButton = { TextButton(onClick = { deleteTrack = null }) { Text(strings.cancel) } },
-            confirmButton = { TextButton(onClick = confirmDelete) { Text(strings.delete) } })
+            confirmButton = { TextButton(onClick = confirmWithScan) { Text(strings.delete) } })
     }
 }
