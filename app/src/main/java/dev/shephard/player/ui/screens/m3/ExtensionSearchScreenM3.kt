@@ -49,7 +49,8 @@ fun ExtensionSearchScreenM3(
     extensionManager: ExtensionManager,
     downloadManager: ExtensionDownloadManager,
     onLibraryRefresh: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    showBack: Boolean = true
 ) {
     val installed by extensionManager.installedExtensions.collectAsState()
     val activeExtensions = remember(installed) { installed.filter { it.isEnabled } }
@@ -68,10 +69,14 @@ fun ExtensionSearchScreenM3(
         topBar = {
             TopAppBar(
                 title = { Text("Discover") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                navigationIcon = if (showBack) {
+                    {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
+                } else {
+                    {}
                 }
             )
         }

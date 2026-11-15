@@ -46,7 +46,8 @@ fun ExtensionSearchScreen(
     extensionManager: ExtensionManager,
     downloadManager: ExtensionDownloadManager,
     onLibraryRefresh: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    showBack: Boolean = true
 ) {
     val installed by extensionManager.installedExtensions.collectAsState()
     val activeExtensions = remember(installed) { installed.filter { it.isEnabled } }
@@ -63,14 +64,18 @@ fun ExtensionSearchScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = "Discover",
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+            if (showBack) {
+                TopAppBar(
+                    title = "Discover",
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                        }
                     }
-                }
-            )
+                )
+            } else {
+                TopAppBar(title = "Discover")
+            }
         }
     ) { padding ->
         Column(

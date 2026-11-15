@@ -77,6 +77,12 @@ fun LibraryScreen(
     val sortDescending by prefs.librarySortDescending.collectAsState(initial = false)
     val folderFilter by prefs.libraryFolderFilter.collectAsState(initial = "")
     val tracks by libraryViewModel.tracks.collectAsState()
+    val hasScanned by libraryViewModel.hasScanned.collectAsState()
+    var showMinLoading by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(1000)
+        showMinLoading = false
+    }
     val state by playerViewModel.uiState.collectAsState()
     // Also reconcile a queue restored after the first library emission.
     val queueIdentity = state.queue.map { it.id to it.uri }
@@ -134,6 +140,7 @@ fun LibraryScreen(
     }
     val foreground = if (useMiuix) MiuixAppTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurface
     val accent = if (useMiuix) MiuixAppTheme.colorScheme.primary else MaterialTheme.colorScheme.primary
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().background(if (useMiuix) MiuixAppTheme.colorScheme.background else MaterialTheme.colorScheme.surface)
         .then(if (useMiuix) Modifier.miuixHeaderSafeTop() else Modifier.statusBarsPadding())) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -326,6 +333,16 @@ if (group == null && displayLayout == dev.shephard.player.player.LayoutMode.GRID
                 isRefreshing = refreshing || manualRefreshIndicator, onRefresh = refreshLibrary,
                 modifier = Modifier.weight(1f).fillMaxWidth(), content = { pagerContent() },
             )
+        }
+    }
+        // 1s loading overlay — covers the library pager until first scan completes
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showMinLoading || !hasScanned,
+            enter = androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.fadeOut()
+        ) {
+            if (useMiuix) dev.shephard.player.ui.components.MiuixLibraryLoadingOverlay()
+            else dev.shephard.player.ui.components.M3LibraryLoadingOverlay()
         }
     }
     if (showSelection) LibrarySelectionSheet(tracks, useMiuix, playerViewModel) { showSelection = false }

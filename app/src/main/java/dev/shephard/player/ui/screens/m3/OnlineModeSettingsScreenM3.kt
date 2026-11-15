@@ -65,6 +65,15 @@ fun OnlineModeSettingsScreenM3(
     var isLoadingRegistry by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
 
+    androidx.compose.runtime.LaunchedEffect(onlineModeEnabled, savedRegistryUrl) {
+        if (onlineModeEnabled && savedRegistryUrl.isNotBlank()) {
+            isLoadingRegistry = true
+            runCatching { extensionManager.fetchRegistry(savedRegistryUrl) }
+                .onFailure { statusMessage = "Registry hatası: ${it.message}" }
+            isLoadingRegistry = false
+        }
+    }
+
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->

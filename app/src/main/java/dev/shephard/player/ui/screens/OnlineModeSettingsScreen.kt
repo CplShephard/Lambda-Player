@@ -59,6 +59,14 @@ fun OnlineModeSettingsScreen(
     var registryUrlInput by remember(savedRegistryUrl) { mutableStateOf(savedRegistryUrl) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
 
+    // Auto-fetch registry when Online Mode is on and URL is valid — fixes "list not showing" report
+    androidx.compose.runtime.LaunchedEffect(onlineModeEnabled, savedRegistryUrl) {
+        if (onlineModeEnabled && savedRegistryUrl.isNotBlank()) {
+            runCatching { extensionManager.fetchRegistry(savedRegistryUrl) }
+                .onFailure { statusMessage = "Registry hatası: ${it.message}" }
+        }
+    }
+
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
