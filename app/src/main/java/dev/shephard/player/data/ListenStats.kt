@@ -137,13 +137,12 @@ object ListenStatsCalculator {
             }
             .sortedByDescending { it.listenedMs }
 
-        val eventsByTrack = periodEvents.groupBy { it.stableKey?.takeIf { s -> s.isNotBlank() } ?: it.trackId.toString() }
+        val eventsByTrack = periodEvents.groupBy { it.trackId }
         val trackEntries = eventsByTrack.entries
-            .map { (key, events) ->
+            .map { (trackId, events) ->
                 val first = events.first()
-                // Preserve original trackId for UI when file still exists, but grouping is stable
                 StatsTrackEntry(
-                    trackId = first.trackId,
+                    trackId = trackId,
                     title = first.title,
                     artistName = first.artist,
                     albumName = first.album,

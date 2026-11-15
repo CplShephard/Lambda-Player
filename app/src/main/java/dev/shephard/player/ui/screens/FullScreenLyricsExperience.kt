@@ -484,9 +484,9 @@ fun FullScreenLyricsExperience(
                         label = "lyricsBackdropCrossfade",
                         modifier = Modifier.fillMaxSize(),
                     ) { artUri ->
-                        if (artUri != null && !isAnimatedCover && blurEnabled && blurStrength > 0f) {
+                        if (artUri != null && blurEnabled && blurStrength > 0f) {
                             AsyncImage(
-                                model = artUri,
+                                model = if (isAnimatedCover) rememberStaticArtwork(artUri) else artUri,
                                 contentDescription = null,
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -494,14 +494,6 @@ fun FullScreenLyricsExperience(
                                     .blur(blurStrength.dp),
                                 contentScale = ContentScale.Crop,
                                 colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.2f) }),
-                            )
-                        } else if (artUri != null && isAnimatedCover) {
-                            // Frozen frame for animated covers
-                            AsyncImage(
-                                model = rememberStaticArtwork(artUri),
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
                             )
                         } else if (artUri != null) {
                             AsyncImage(
@@ -794,17 +786,17 @@ fun FullScreenLyricsExperience(
                                     animationSpec = tween(520, easing = FastOutSlowInEasing),
                                     label = "shakeProgress"
                                 )
-                                // Letter-level jiggle driven by infinite transition when line is near active
-                                val shouldJiggle = isActive || (distance == 1 && line.words.isNotEmpty())
+                                // Only active line letters move slowly; others have single transition animation
+                                val shouldJiggle = isActive
                                 val infinite = rememberInfiniteTransition(label = "lyricJiggle")
                                 val jiggleX by infinite.animateFloat(
-                                    initialValue = -0.7f, targetValue = 0.7f,
-                                    animationSpec = infiniteRepeatable(tween(160, easing = LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse),
+                                    initialValue = -0.3f, targetValue = 0.3f,
+                                    animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse),
                                     label = "jiggleX"
                                 )
                                 val jiggleY by infinite.animateFloat(
-                                    initialValue = -0.9f, targetValue = 0.9f,
-                                    animationSpec = infiniteRepeatable(tween(140, easing = LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse),
+                                    initialValue = -0.3f, targetValue = 0.3f,
+                                    animationSpec = infiniteRepeatable(tween(800, easing = LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse),
                                     label = "jiggleY"
                                 )
                                 Column(
@@ -816,12 +808,16 @@ fun FullScreenLyricsExperience(
                                             scaleX = scale
                                             scaleY = scale
                                             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
-                                            // Whole-line premium shake as it enters/exits (upward motion)
+                                            // Only active line letters move slowly; transitioning lines drag slightly down then settle
+                                            val lineSlideOffset by androidx.compose.animation.core.animateDpAsState(
+                                                targetValue = if (isActive) 0.dp else if (distance == 1) 4.dp else 0.dp,
+                                                animationSpec = androidx.compose.animation.core.tween(380, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                                                label = "lineSlide"
+                                            )
+                                            translationY += lineSlideOffset.toPx() * (if (index < activeIndex) -1f else 1f)
                                             if (shouldJiggle) {
-                                                // Subtle rotation + tiny shift mimics QQ Music letter tremble
-                                                translationX = jiggleX * 1.2f
-                                                translationY = jiggleY * 1.1f
-                                                rotationZ = jiggleX * 0.35f
+                                                translationX = jiggleX * 0.6f
+                                                translationY += jiggleY * 0.5f
                                             }
                                         }
                                         .blur(animatedBlur)
@@ -870,12 +866,12 @@ fun FullScreenLyricsExperience(
                             }
                         }
                     }
-                        // Floating music notes overlay during gaps (centered, like QQ Music)
+                        // Note animation as a line (QQ Music style) at lines alignment - hide when singing starts
                         androidx.compose.animation.AnimatedVisibility(
                             visible = showNoteAnim,
-                            enter = fadeIn(tween(220)) ,
+                            enter = fadeIn(tween(220)),
                             exit = fadeOut(tween(180)),
-                            modifier = Modifier.align(androidx.compose.ui.Alignment.Center)
+                            modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 140.dp).fillMaxWidth().padding(horizontal = 18.dp)
                         ) {
                             QqMusicNoteAnimation(primary = primary, foreground = LocalLyricsForeground.current)
                         }

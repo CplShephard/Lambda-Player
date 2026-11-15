@@ -280,7 +280,7 @@ onDismiss: () -> Unit
 )
     ) {
 
-        AmbientGlowBackground(track = track, isPlaying = state.isPlaying, isAnimated = isAnimatedCover)
+        if (!isAnimatedCover) AmbientGlowBackground(track = track, isPlaying = state.isPlaying, isAnimated = false)
 
         val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         if (isLandscape) {
@@ -388,7 +388,7 @@ onDismiss: () -> Unit
                 Row(
                 modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 16.dp, start = 20.dp, end = 20.dp),
+                .padding(top = 6.dp, start = 20.dp, end = 20.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
                 ) {

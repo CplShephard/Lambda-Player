@@ -56,6 +56,7 @@ fun PlaybackSettingsSheet(
             .background(MiuixAppTheme.colorScheme.background)
             .statusBarsPadding()
             .padding(horizontal = 20.dp)
+            .verticalScroll(androidx.compose.foundation.rememberScrollState())
     ) {
         Row(
             modifier = Modifier
