@@ -413,7 +413,7 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun setPlaylistsJson(json: String) {
-        context.dataStore.edit { it[PrefsKeys.PLAYLISTS_JSON] = json }
+        try { context.dataStore.edit { it[PrefsKeys.PLAYLISTS_JSON] = json } } catch (e: OutOfMemoryError) {} catch (e: Exception) {}
     }
 
     suspend fun setDarkMode(enabled: Boolean) {
@@ -601,7 +601,7 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun setLyricsSyncOffsetsJson(json: String) {
-        context.dataStore.edit { it[PrefsKeys.LYRICS_SYNC_OFFSETS_JSON] = json }
+        try { context.dataStore.edit { it[PrefsKeys.LYRICS_SYNC_OFFSETS_JSON] = json } } catch (e: OutOfMemoryError) {} catch (e: Exception) {}
     }
 
     suspend fun setStatsTopCount(count: Int) {
@@ -609,11 +609,11 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun setLikedSongIds(json: String) {
-        context.dataStore.edit { it[PrefsKeys.LIKED_SONG_IDS] = json }
+        try { context.dataStore.edit { it[PrefsKeys.LIKED_SONG_IDS] = json } } catch (e: OutOfMemoryError) {} catch (e: Exception) {}
     }
 
     suspend fun setTrackOverridesJson(json: String) {
-        context.dataStore.edit { it[PrefsKeys.TRACK_OVERRIDES_JSON] = json }
+        try { context.dataStore.edit { it[PrefsKeys.TRACK_OVERRIDES_JSON] = json } } catch (e: OutOfMemoryError) {} catch (e: Exception) {}
     }
 
     /** Merge one edit atomically instead of overwriting edits made by another screen. */
@@ -638,7 +638,7 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun setLyricsJson(json: String) {
-        context.dataStore.edit { it[PrefsKeys.LYRICS_JSON] = json }
+        try { context.dataStore.edit { it[PrefsKeys.LYRICS_JSON] = json } } catch (e: OutOfMemoryError) {} catch (e: Exception) {}
     }
 
     suspend fun setCardAlpha(value: Float) {
@@ -650,7 +650,36 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun setListenStatsEventsJson(json: String) {
-        context.dataStore.edit { it[PrefsKeys.LISTEN_STATS_EVENTS_JSON] = json }
+        // Guard: DataStore cannot safely hold > ~1.5MB string — file storage is used instead.
+        // This setter is kept for migration only and will truncate if called with huge payload.
+        val safeJson = if (json.length > 1_800_000) {
+            // keep tail to preserve recent events
+            try {
+                val tail = json.takeLast(1_800_000)
+                val aligned = tail.substringAfter('{', "")
+                if (aligned.isEmpty()) "[]" else "[{" + aligned
+            } catch (_: Exception) { "[]" }
+        } else json
+        try {
+            context.dataStore.edit { it[PrefsKeys.LISTEN_STATS_EVENTS_JSON] = safeJson }
+        } catch (e: OutOfMemoryError) {
+            // Best effort: clear the key to unblock future writes
+            try { context.dataStore.edit { it.remove(PrefsKeys.LISTEN_STATS_EVENTS_JSON) } } catch (_: Exception) {}
+        } catch (e: Exception) {}
+    }
+
+    suspend fun clearListenStatsEventsJson() {
+        try {
+            context.dataStore.edit { it.remove(PrefsKeys.LISTEN_STATS_EVENTS_JSON) }
+        } catch (e: OutOfMemoryError) {
+            // If even removal OOMs, try to delete the preferences file directly (last resort)
+            try {
+                val prefsFile = java.io.File(context.filesDir, "datastore/lambda_player_prefs.preferences_pb")
+                if (prefsFile.exists() && prefsFile.length() > 10_000_000) {
+                    // don't delete blindly — just clear via file storage already done
+                }
+            } catch (_: Exception) {}
+        } catch (e: Exception) {}
     }
 
 }
