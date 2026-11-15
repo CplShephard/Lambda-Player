@@ -22,6 +22,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableLongState
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,7 +90,16 @@ fun rememberSmoothLyricsPosition(positionMs: Long, isPlaying: Boolean, enabled: 
     return smooth
 }
 
-fun androidx.compose.ui.graphics.drawscope.DrawScope.drawKaraokeHighlight(
+fun androidx.compose.ui.graphics.drawscope.ContentDrawScope.drawKaraokeHighlight(
+    layout: TextLayoutResult,
+    line: SyncedLyricLine,
+    positionMs: Long,
+    color: Color,
+) {
+    drawKaraokeHighlightInternal(layout, line, positionMs, color)
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawKaraokeHighlightInternal(
     layout: TextLayoutResult,
     line: SyncedLyricLine,
     positionMs: Long,
