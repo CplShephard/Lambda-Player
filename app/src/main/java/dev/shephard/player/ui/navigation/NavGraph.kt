@@ -57,6 +57,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.style.TextOverflow
@@ -278,12 +279,11 @@ fun NavGraph(
                             }
                         }
 
-                        val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
                         AnimatedVisibility(
                             visible = true,
                             modifier = Modifier
-                                .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomCenter)
-                                .fillMaxWidth(if (isLandscape) 0.5f else 1f)
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
                                 .zIndex(1f),
                             enter = fadeIn(tween(200)) + slideInVertically(initialOffsetY = { it }),
                             exit = fadeOut(tween(150)) + slideOutVertically(targetOffsetY = { it })
@@ -492,6 +492,7 @@ private fun M3NavigationDock(
                     M3Icon(
                         imageVector = if (selectedIndex() == index) dest.selectedIcon else dest.unselectedIcon,
                         contentDescription = label,
+                        modifier = Modifier.graphicsLayer { rotationZ = if (isLandscape) 90f else 0f },
                     )
                 },
                 label = {
@@ -584,7 +585,8 @@ private fun MiuixNavigationDock(
                                 dev.shephard.player.ui.miuix.Icon(
                                     imageVector = dest.unselectedIcon,
                                     contentDescription = label,
-                                    modifier = Modifier.size(NavigationBarDefaults.IconSize),
+                                    modifier = Modifier.size(NavigationBarDefaults.IconSize)
+                                        .graphicsLayer { rotationZ = if (isLandscape) 90f else 0f },
                                     tint = iconColor,
                                 )
                             }
@@ -593,7 +595,8 @@ private fun MiuixNavigationDock(
                                 imageVector = if (!isLandscape || isSelected) dest.selectedIcon else dest.unselectedIcon,
                                 contentDescription = null,
                                 modifier = Modifier.padding(top = NavigationBarDefaults.IconTopPadding)
-                                    .size(NavigationBarDefaults.IconSize),
+                                    .size(NavigationBarDefaults.IconSize)
+                                    .graphicsLayer { rotationZ = if (isLandscape) 90f else 0f },
                                 tint = iconColor,
                             )
                             dev.shephard.player.ui.miuix.Text(
@@ -679,11 +682,13 @@ private fun AppleFloatingDock(
                 dev.shephard.player.ui.miuix.Icon(
                     imageVector = icon,
                     contentDescription = null,
+                    modifier = Modifier.graphicsLayer { rotationZ = if (isLandscape) 90f else 0f },
                 )
             } else {
                 M3Icon(
                     imageVector = icon,
                     contentDescription = null,
+                    modifier = Modifier.graphicsLayer { rotationZ = if (isLandscape) 90f else 0f },
                 )
             }
         },

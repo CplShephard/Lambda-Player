@@ -83,7 +83,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.ContentCopy
@@ -243,6 +242,7 @@ fun FullScreenLyricsExperience(
         isPlaying = state.isPlaying,
         enabled = synced.isNotEmpty(),
         frameAccurate = remember(synced) { synced.any { it.words.isNotEmpty() } },
+        trackId = track?.id,
     )
     val activeIndex by remember(synced, syncOffsetMs) {
         derivedStateOf {
@@ -277,7 +277,7 @@ fun FullScreenLyricsExperience(
     }
 
     // Decide only after saved, embedded and automatic lyrics have finished loading.
-    // Missing lyrics stay inline with the animated note row instead of interrupting playback with a popup.
+    // Missing lyrics stay inline instead of interrupting playback with a popup.
     LaunchedEffect(track?.id, state.lyricsLoading, state.lyrics, skipLyricsPrompt, showSearch) {
         val current = track
         if (current != null && skipLyricsPrompt != null && !state.lyricsLoading && !showSearch && current.id !in promptedTracks) {
@@ -683,7 +683,12 @@ fun FullScreenLyricsExperience(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        QqMusicNoteAnimation(primary = primary, foreground = LocalLyricsForeground.current)
+                        Icon(
+                            imageVector = Icons.Filled.MusicNote,
+                            contentDescription = null,
+                            tint = primary.copy(alpha = 0.75f),
+                            modifier = Modifier.size(48.dp),
+                        )
                         Spacer(Modifier.height(14.dp))
                         BasicText(strings.noLyricsFound, style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.78f)))
                         Spacer(Modifier.height(16.dp))
@@ -702,30 +707,6 @@ fun FullScreenLyricsExperience(
                     }
                 }
                 else -> {
-                    // QQ Music style floating notes during instrumental gaps (word-by-word only)
-                    val hasWordSync = remember(synced) { synced.any { it.words.isNotEmpty() } }
-                    val showNoteAnim by remember(synced, smoothPositionMs.longValue, activeIndex, syncOffsetMs) {
-                        derivedStateOf {
-                            if (!hasWordSync) false else {
-                                val pos = smoothPositionMs.longValue - syncOffsetMs
-                                // Check if currently inside any word
-                                val curr = synced.getOrNull(activeIndex)
-                                val inWord = curr?.words?.any { w -> pos in w.startMs..w.endMs } == true
-                                if (inWord) false else {
-                                    if (activeIndex < 0) {
-                                        val first = synced.firstOrNull()?.timeMs ?: 0L
-                                        pos < first - 250
-                                    } else {
-                                        val next = synced.getOrNull(activeIndex + 1)
-                                        val lastEnd = curr?.words?.lastOrNull()?.endMs ?: curr?.timeMs ?: pos
-                                        val gapFromEnd = pos - lastEnd
-                                        val gapToNext = if (next != null) next.timeMs - pos else 0L
-                                        gapFromEnd > 700 || gapToNext > 800
-                                    }
-                                }
-                            }
-                        }
-                    }
                     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         LazyColumn(
                         state = lyricsListState,
@@ -856,15 +837,6 @@ fun FullScreenLyricsExperience(
                             }
                         }
                     }
-                        // Note animation as a line (QQ Music style) at lines alignment - hide when singing starts
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = showNoteAnim,
-                            enter = fadeIn(tween(220)),
-                            exit = fadeOut(tween(180)),
-                            modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 140.dp).fillMaxWidth().padding(horizontal = 18.dp)
-                        ) {
-                            QqMusicNoteAnimation(primary = primary, foreground = LocalLyricsForeground.current)
-                        }
                     }
                 }
             }
