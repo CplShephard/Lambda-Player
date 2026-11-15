@@ -70,6 +70,7 @@ object PrefsKeys {
     val LYRICS_TRANSLATION_VISIBLE = booleanPreferencesKey("lyrics_translation_visible")
     val LYRICS_TRANSLATION_LANGUAGE = stringPreferencesKey("lyrics_translation_language")
     val CAROUSEL_STYLE = stringPreferencesKey("carousel_style")
+    val STATS_TOP_COUNT = intPreferencesKey("stats_top_count")
     val LYRICS_SYNC_OFFSETS_JSON = stringPreferencesKey("lyrics_sync_offsets_json")
 }
 
@@ -285,6 +286,10 @@ class PreferencesManager(private val context: Context) {
 
     val lyricsSyncOffsetsJson: Flow<String> = context.dataStore.data.map {
         it[PrefsKeys.LYRICS_SYNC_OFFSETS_JSON] ?: "{}"
+    }
+
+    val statsTopCount: Flow<Int> = context.dataStore.data.map {
+        (it[PrefsKeys.STATS_TOP_COUNT] ?: 10).coerceIn(10, 50)
     }
 
     val likedSongIds: Flow<String> = context.dataStore.data.map {
@@ -567,6 +572,10 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setLyricsSyncOffsetsJson(json: String) {
         context.dataStore.edit { it[PrefsKeys.LYRICS_SYNC_OFFSETS_JSON] = json }
+    }
+
+    suspend fun setStatsTopCount(count: Int) {
+        context.dataStore.edit { it[PrefsKeys.STATS_TOP_COUNT] = count.coerceIn(10, 50) }
     }
 
     suspend fun setLikedSongIds(json: String) {

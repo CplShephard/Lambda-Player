@@ -46,6 +46,8 @@ import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.twotone.LinearScale
 import androidx.compose.material.icons.twotone.SpeakerGroup
 import androidx.compose.material.icons.twotone.SwapHoriz
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -390,6 +392,10 @@ fun StatsScreenM3(
     val allEvents by playerViewModel.statsEventsFlow.collectAsState()
     val tracks by libraryViewModel.tracks.collectAsState()
     var selectedPeriod by remember { mutableStateOf(StatsPeriod.Today) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember(context) { dev.shephard.player.player.PreferencesManager(context) }
+    val topCount by prefs.statsTopCount.collectAsState(initial = 10)
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     val snapshot = remember(allEvents, selectedPeriod) {
         val periodEvents = ListenStatsCalculator.filterEventsForPeriod(allEvents, selectedPeriod)
@@ -405,6 +411,21 @@ fun StatsScreenM3(
                     state = m3TopBarState,
                     title = { Text(strings.statsTitle) },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
+                    actions = {
+                        androidx.compose.foundation.layout.Box {
+                            var expanded by remember { androidx.compose.runtime.mutableStateOf(false) }
+                            IconButton(onClick = { expanded = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Top count") }
+                            androidx.compose.material3.DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                                listOf(10,20,30,40,50).forEach { count ->
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { Text("Top $count") },
+                                        onClick = { expanded = false; scope.launch { prefs.setStatsTopCount(count) } },
+                                        leadingIcon = if (topCount == count) ({ Icon(Icons.Filled.Check, null) }) else null
+                                    )
+                                }
+                            }
+                        }
+                    },
                     colors = m3TopBarColors(),
                 )
             },
@@ -441,6 +462,7 @@ fun StatsScreenM3(
             }
 
             Text(formatListeningTimeM3Lineage(snapshot.summary.totalListenedMs, strings), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text("Top $topCount", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                     }
                 }
@@ -457,7 +479,7 @@ fun StatsScreenM3(
                     item(key = "top_title") {
                         Text(strings.statsTopTracks, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     }
-                    itemsIndexed(snapshot.trackEntries.take(10), key = { _, entry -> entry.trackId }) { index, entry ->
+                    itemsIndexed(snapshot.trackEntries.take(topCount), key = { _, entry -> entry.trackId to entry.title }) { index, entry ->
                         val track = remember(entry.trackId, tracks) {
                             tracks.firstOrNull { it.id == entry.trackId }
                                 ?: tracks.firstOrNull { it.title == entry.title && it.artist == entry.artistName }
