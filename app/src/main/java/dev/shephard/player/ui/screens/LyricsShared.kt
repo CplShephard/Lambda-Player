@@ -1,18 +1,25 @@
 // Shared lyrics geometry and karaoke helpers — used by both vertical FullScreen and horizontal embedded
 package dev.shephard.player.ui.screens
 
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableLongState
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -23,6 +30,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.shephard.player.player.SyncedLyricLine
 import kotlinx.coroutines.delay
+import java.text.BreakIterator
+import java.util.Locale
+import kotlin.math.cos
+import kotlin.math.sin
 
 val LocalLyricsForeground = staticCompositionLocalOf { Color.White }
 
@@ -32,6 +43,157 @@ const val LyricMoveDurationMs = 650
 const val LyricAnchorFraction = 0.40f
 val LyricLineHorizontalPadding = 14.dp
 val LyricLineVerticalPadding = 9.dp
+
+/**
+ * Draws a lyric line with the existing text layout and lets each grapheme wobble independently.
+ * The same 700/800 ms oscillators already used by the lyric views drive the motion; the line
+ * layout, wrapping, and karaoke hit ranges therefore remain unchanged.
+ */
+@Composable
+fun SyncedLyricText(
+    text: String,
+    modifier: Modifier,
+    style: TextStyle,
+    wobbleEnabled: Boolean,
+    wobbleProgress: Float,
+    jiggleX: Float,
+    jiggleY: Float,
+    phaseSeed: Float,
+    karaokeLine: SyncedLyricLine?,
+    positionMs: Long,
+    karaokeColor: Color,
+) {
+    val textLayout = remember(text) { mutableStateOf<TextLayoutResult?>(null) }
+    val graphemeRanges = remember(text) { lyricGraphemeRanges(text) }
+    val layout = textLayout.value
+    val drawWobble = wobbleEnabled && wobbleProgress > 0f
+    val glyphPaths = remember(layout, graphemeRanges, drawWobble) {
+        if (layout != null && drawWobble) {
+            graphemeRanges.map { range -> layout.getPathForRange(range.first, range.last + 1) }
+        } else {
+            emptyList()
+        }
+    }
+
+    BasicText(
+        text = text,
+        onTextLayout = { textLayout.value = it },
+        modifier = modifier.drawWithContent {
+            if (layout == null || !drawWobble) {
+                drawContent()
+                if (karaokeLine != null && layout != null) {
+                    drawKaraokeHighlight(layout, karaokeLine, positionMs, karaokeColor)
+                }
+            } else {
+                drawWobblingLyricGlyphs(
+                    layout = layout,
+                    graphemeRanges = graphemeRanges,
+                    glyphPaths = glyphPaths,
+                    baseColor = style.color,
+                    karaokeLine = karaokeLine,
+                    positionMs = positionMs,
+                    karaokeColor = karaokeColor,
+                    progress = wobbleProgress,
+                    jiggleX = jiggleX,
+                    jiggleY = jiggleY,
+                    phaseSeed = phaseSeed,
+                )
+            }
+        },
+        style = style,
+    )
+}
+
+private fun lyricGraphemeRanges(text: String): List<IntRange> {
+    if (text.isEmpty()) return emptyList()
+    val iterator = BreakIterator.getCharacterInstance(Locale.ROOT)
+    iterator.setText(text)
+    val ranges = ArrayList<IntRange>()
+    var start = iterator.first()
+    var end = iterator.next()
+    while (end != BreakIterator.DONE) {
+        if (end > start) ranges += start until end
+        start = end
+        end = iterator.next()
+    }
+    return ranges
+}
+
+private fun ContentDrawScope.drawWobblingLyricGlyphs(
+    layout: TextLayoutResult,
+    graphemeRanges: List<IntRange>,
+    glyphPaths: List<Path>,
+    baseColor: Color,
+    karaokeLine: SyncedLyricLine?,
+    positionMs: Long,
+    karaokeColor: Color,
+    progress: Float,
+    jiggleX: Float,
+    jiggleY: Float,
+    phaseSeed: Float,
+) {
+    val sungCharacterPosition = karaokeLine?.let { sungCharacterPosition(it, positionMs) }
+    val xAmplitudePx = 2.dp.toPx()
+    val yAmplitudePx = 1.5.dp.toPx()
+    val maxAxisScale = 0.70710678f
+
+    graphemeRanges.forEachIndexed { index, range ->
+        val start = range.first
+        val endExclusive = range.last + 1
+        val glyphPath = glyphPaths[index]
+        val phase = (index + phaseSeed) * 1.6180339f
+        val cosine = cos(phase.toDouble()).toFloat()
+        val sine = sin(phase.toDouble()).toFloat()
+        val offsetX = (jiggleX * cosine + jiggleY * sine) * maxAxisScale * xAmplitudePx * progress
+        val offsetY = (jiggleY * cosine - jiggleX * sine) * maxAxisScale * yAmplitudePx * progress
+
+        withTransform({ translate(left = offsetX, top = offsetY) }) {
+            drawPath(glyphPath, color = baseColor)
+            val sungThrough = sungCharacterPosition ?: return@withTransform
+            if (sungThrough <= start) return@withTransform
+
+            val glyphProgress = ((sungThrough - start) / (endExclusive - start).toFloat()).coerceIn(0f, 1f)
+            if (glyphProgress >= 1f) {
+                drawPath(glyphPath, color = karaokeColor)
+            } else {
+                val bounds = layout.getBoundingBox(start)
+                if (bounds.width > 0f && bounds.height > 0f) {
+                    val isRtl = layout.getParagraphDirection(start) == ResolvedTextDirection.Rtl
+                    val revealEdge = if (isRtl) {
+                        bounds.right - bounds.width * glyphProgress
+                    } else {
+                        bounds.left + bounds.width * glyphProgress
+                    }
+                    clipRect(
+                        left = if (isRtl) revealEdge else bounds.left,
+                        top = 0f,
+                        right = if (isRtl) bounds.right else revealEdge,
+                        bottom = size.height,
+                    ) {
+                        drawPath(glyphPath, color = karaokeColor)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun sungCharacterPosition(line: SyncedLyricLine, positionMs: Long): Float {
+    var sungChars = 0f
+    for (word in line.words) {
+        if (positionMs >= word.endMs) {
+            sungChars = word.endChar.toFloat()
+        } else {
+            if (positionMs > word.startMs) {
+                val fraction = (positionMs - word.startMs).toFloat() /
+                    (word.endMs - word.startMs).coerceAtLeast(1L)
+                sungChars = word.startChar + fraction.coerceIn(0f, 1f) * (word.endChar - word.startChar)
+            }
+            break
+        }
+    }
+    return sungChars.coerceIn(0f, line.text.length.toFloat())
+}
 
 fun lyricLineLayoutStyle(base: TextStyle): TextStyle = base.copy(
     fontSize = 23.sp,

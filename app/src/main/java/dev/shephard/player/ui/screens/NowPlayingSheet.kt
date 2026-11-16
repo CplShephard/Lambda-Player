@@ -89,12 +89,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
@@ -124,6 +122,7 @@ import dev.shephard.player.ui.components.BouncyIconButton
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.components.MinimalSeekBar
 import dev.shephard.player.ui.components.MiuixPlayPauseButton
+import dev.shephard.player.ui.components.rememberStaticArtwork
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
@@ -291,7 +290,7 @@ onDismiss: () -> Unit
 )
     ) {
 
-        if (!isAnimatedCover) AmbientGlowBackground(track = track, isPlaying = state.isPlaying, isAnimated = false)
+        AmbientGlowBackground(track = track, isPlaying = state.isPlaying, isAnimated = isAnimatedCover)
 
         val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
         if (isLandscape) {
@@ -561,20 +560,20 @@ private fun MiuixLandscapeContent(
             modifier = Modifier
                 .weight(0.5f)
                 .fillMaxHeight()
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
         ) {
             // Reserve room for metadata and transport controls so the cover never pushes them
             // below the landscape viewport on short displays.
             val coverHeightLimit = (maxHeight - 230.dp).coerceAtLeast(48.dp)
             Column(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp, start = 8.dp, end = 8.dp),
+                    .padding(horizontal = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -596,13 +595,13 @@ private fun MiuixLandscapeContent(
                 Box(modifier = Modifier.size(32.dp))
             }
             Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 4.dp)) {
                     val pageFraction = when (carouselStyle) {
                         dev.shephard.player.player.CarouselStyle.NO_PEEK -> 1f
                         dev.shephard.player.player.CarouselStyle.TWO_PEEK -> .6f
                         else -> .8f
                     }
-                    val artHeight = minOf(maxWidth * pageFraction, coverHeightLimit, configuration.screenHeightDp.dp * .45f)
+                    val artHeight = minOf(maxWidth * pageFraction, coverHeightLimit, configuration.screenHeightDp.dp * .45f) * 1.15f
                     if (state.queue.isNotEmpty()) {
                         dev.shephard.player.ui.components.AlbumCarousel(
                             queue = state.queue,
@@ -633,7 +632,7 @@ private fun MiuixLandscapeContent(
                     transitionSpec = { landscapeTrackTransition(navigationDirection) },
                     label = "nowPlayingMetadataLand",
                 ) { current ->
-                    Column(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         if (current != null) {
                             Text(
                                 current.title, style = MiuixAppTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
@@ -649,7 +648,7 @@ private fun MiuixLandscapeContent(
             }
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -699,9 +698,7 @@ private fun MiuixLandscapeContent(
                 SeekBarRow(playerViewModel = playerViewModel, compact = true)
                 // Compact landscape transport controls stay proportional to the cover.
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 2.dp, start = 0.dp, end = 0.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -922,8 +919,6 @@ private fun MiuixEmbeddedLyricsContent(
                             else -> fg.copy(alpha = 0.72f)
                         }
                         val animatedColor by androidx.compose.animation.animateColorAsState(targetValue = targetColor, animationSpec = androidx.compose.animation.core.tween(LyricMoveDurationMs), label = "lyricLineColorH")
-                        var textLayout by remember { androidx.compose.runtime.mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
-                        val shouldJiggle = lyricsShakeEnabled && scaleLineActive
                         val infinite = androidx.compose.animation.core.rememberInfiniteTransition(label = "lyricJiggleH")
                         val jiggleX by infinite.animateFloat(initialValue = -0.3f, targetValue = 0.3f, animationSpec = androidx.compose.animation.core.infiniteRepeatable(tween(700, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "jiggleXH")
                         val jiggleY by infinite.animateFloat(initialValue = -0.3f, targetValue = 0.3f, animationSpec = androidx.compose.animation.core.infiniteRepeatable(tween(800, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "jiggleYH")
@@ -934,30 +929,41 @@ private fun MiuixEmbeddedLyricsContent(
                                 scaleX = scale; scaleY = scale
                                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
                                 translationY += lineSlideOffset.toPx() * (if (index < activeIndex) -1f else 1f)
-                                if (shouldJiggle) {
-                                    translationX = jiggleX * with(density) { 2.dp.toPx() } * shakeProgress
-                                    translationY += jiggleY * with(density) { 1.5.dp.toPx() } * shakeProgress
-                                }
                             }.blur(animatedBlur).padding(horizontal = LyricLineHorizontalPadding, vertical = LyricLineVerticalPadding),
                         ) {
                             androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxWidth()) {
-                                androidx.compose.foundation.text.BasicText(
+                                SyncedLyricText(
                                     text = line.text,
-                                    onTextLayout = { textLayout = it },
-                                    modifier = Modifier.fillMaxWidth().drawWithContent {
-                                        drawContent()
-                                        if (karaoke) textLayout?.let { layout ->
-                                            drawKaraokeHighlight(layout = layout, line = line, positionMs = smoothPositionMs.longValue - syncOffsetMs, color = fg)
-                                        }
-                                    },
+                                    modifier = Modifier.fillMaxWidth(),
                                     style = lyricLineLayoutStyle(textStyle).copy(color = animatedColor),
+                                    wobbleEnabled = lyricsShakeEnabled,
+                                    wobbleProgress = shakeProgress,
+                                    jiggleX = jiggleX,
+                                    jiggleY = jiggleY,
+                                    phaseSeed = index.toFloat() * 0.37f,
+                                    karaokeLine = if (karaoke) line else null,
+                                    positionMs = smoothPositionMs.longValue - syncOffsetMs,
+                                    karaokeColor = fg,
                                 )
                             }
                             if (!line.translation.isNullOrBlank()) {
-                                androidx.compose.foundation.text.BasicText(
+                                SyncedLyricText(
                                     text = line.translation,
                                     modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
-                                    style = textStyle.copy(color = animatedColor.copy(alpha = animatedColor.alpha * .78f), fontSize = 16.sp, lineHeight = 22.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Left),
+                                    style = textStyle.copy(
+                                        color = animatedColor.copy(alpha = animatedColor.alpha * .78f),
+                                        fontSize = 16.sp,
+                                        lineHeight = 22.sp,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Left,
+                                    ),
+                                    wobbleEnabled = lyricsShakeEnabled,
+                                    wobbleProgress = shakeProgress,
+                                    jiggleX = jiggleX,
+                                    jiggleY = jiggleY,
+                                    phaseSeed = index.toFloat() * 0.37f + 0.61f,
+                                    karaokeLine = null,
+                                    positionMs = smoothPositionMs.longValue - syncOffsetMs,
+                                    karaokeColor = fg,
                                 )
                             }
                         }
@@ -1012,59 +1018,50 @@ private fun MiuixEmbeddedLyricsContent(
 
 @Composable
 private fun AmbientGlowBackground(
-track: AudioTrack?,
-isPlaying: Boolean,
-isAnimated: Boolean = false
+    track: AudioTrack?,
+    isPlaying: Boolean,
+    isAnimated: Boolean = false,
 ) {
     val darkOverlayAlpha by androidx.compose.animation.core.animateFloatAsState(
-    targetValue = if (isPlaying) 0.35f else 0.68f,
-    animationSpec = androidx.compose.animation.core.tween(400),
-    label = "darkOverlayAlpha"
-)
+        targetValue = if (isPlaying) 0.35f else 0.68f,
+        animationSpec = androidx.compose.animation.core.tween(400),
+        label = "darkOverlayAlpha",
+    )
     Box(modifier = Modifier.fillMaxSize()) {
-        // For animated gif/mp4 covers, show only cover animation with no blurred background
-        if (isAnimated) {
-            Box(
-            modifier = Modifier
-            .fillMaxSize()
-            .background(MiuixAppTheme.colorScheme.background)
-        )
-        } else {
-            androidx.compose.animation.Crossfade(
+        // Animated covers use their first still frame with the same blur treatment as the
+        // regular Now Playing backdrop, instead of leaving the sheet with a black background.
+        androidx.compose.animation.Crossfade(
             targetState = track?.albumArtUri,
             animationSpec = androidx.compose.animation.core.tween(
-            durationMillis = 420,
-            easing = androidx.compose.animation.core.FastOutSlowInEasing
-        ),
-            label = "ambientAlbumArtFade"
-            ) { artUri ->
-                if (artUri != null) {
-                    AsyncImage(
-                    model = artUri,
+                durationMillis = 420,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing,
+            ),
+            label = "ambientAlbumArtFade",
+        ) { artUri ->
+            if (artUri != null) {
+                AsyncImage(
+                    model = if (isAnimated) rememberStaticArtwork(artUri) else artUri,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { scaleX = 1.08f; scaleY = 1.08f }
-                    .blur(radius = 32.dp),
-                    colorFilter = ColorFilter.colorMatrix(
-                    ColorMatrix().apply { setToSaturation(1.25f) }
+                        .fillMaxSize()
+                        .graphicsLayer { scaleX = 1.08f; scaleY = 1.08f }
+                        .blur(radius = 32.dp),
+                    colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.25f) }),
                 )
-                )
-                } else {
-                    Box(
+            } else {
+                Box(
                     modifier = Modifier
-                    .fillMaxSize()
-                    .background(MiuixAppTheme.colorScheme.surfaceVariant)
+                        .fillMaxSize()
+                        .background(MiuixAppTheme.colorScheme.surfaceVariant),
                 )
-                }
             }
         }
         Box(
-        modifier = Modifier
-        .fillMaxSize()
-        .background(Color.Black.copy(alpha = darkOverlayAlpha))
-    )
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = darkOverlayAlpha)),
+        )
     }
 }
 
@@ -1103,7 +1100,7 @@ private fun SeekBarRow(playerViewModel: PlayerViewModel, compact: Boolean = fals
         inactiveColor = Color.White.copy(alpha = 0.3f)
     )
         Row(
-        modifier = Modifier.fillMaxWidth().padding(top = if (compact) 2.dp else 6.dp, start = horizontalInset, end = horizontalInset),
+        modifier = Modifier.fillMaxWidth().padding(top = if (compact) 0.dp else 6.dp, start = horizontalInset, end = horizontalInset),
         horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(

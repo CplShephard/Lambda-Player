@@ -602,6 +602,7 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
     val crossfade by prefs.crossfadeEnabled.collectAsState(initial = false)
     val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
     val playWith by prefs.playWithOthers.collectAsState(initial = false)
+    val lyricsShakeEffect by prefs.lyricsShakeEffectEnabled.collectAsState(initial = true)
     val lyricsAutoSearch by prefs.lyricsAutoSearchMode.collectAsState(initial = LyricsAutoSearchMode.OFF)
     val volumeNormalization by prefs.volumeNormalization.collectAsState(initial = VolumeNormalization.NONE)
     val carouselStyle by prefs.carouselStyle.collectAsState(initial = dev.shephard.player.player.CarouselStyle.NO_PEEK)
@@ -647,6 +648,12 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
                             selectedIndex = normalizationModes.indexOf(volumeNormalization),
                             onSelectedIndexChange = { idx -> scope.launch { prefs.setVolumeNormalization(normalizationModes[idx]) } }
                         )
+                        Spacer(Modifier.height(8.dp))
+                        MiuixSwitchRow(
+                            label = strings.lyricsShakeEffect,
+                            checked = lyricsShakeEffect,
+                            description = strings.lyricsShakeEffectDescription,
+                        ) { scope.launch { prefs.setLyricsShakeEffectEnabled(it) } }
                     }
                 }
             } else {
@@ -678,6 +685,12 @@ fun PlayerSettingsScreen(onBack: () -> Unit) {
                     selectedIndex = normalizationModes.indexOf(volumeNormalization),
                     onSelectedIndexChange = { idx -> scope.launch { prefs.setVolumeNormalization(normalizationModes[idx]) } }
                 )
+                Spacer(Modifier.height(8.dp))
+                MiuixSwitchRow(
+                    label = strings.lyricsShakeEffect,
+                    checked = lyricsShakeEffect,
+                    description = strings.lyricsShakeEffectDescription,
+                ) { scope.launch { prefs.setLyricsShakeEffectEnabled(it) } }
             }
         }
 

@@ -15,9 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import dev.shephard.player.ui.components.m3.rememberExpressiveTopBarState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -123,21 +121,219 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
     val activeSpec = if (!isSpec2025Supported) ThemeColorSpec.SPEC_2021 else colorSpec
     val specIndex = availableSpecs.indexOf(activeSpec).coerceAtLeast(0)
 
-            val m3TopBarState = rememberExpressiveTopBarState()
-            Scaffold(
-            modifier = Modifier.fillMaxSize().nestedScroll(m3TopBarState.connection),
-            containerColor = MaterialTheme.colorScheme.surface,
-            topBar = {
-                M3SmallTopBar(
-                    state = m3TopBarState,
-                    title = { Text(strings.themeSettings) },
-                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription) } },
-                    colors = m3TopBarColors(),
+    @Composable
+    fun UiStyleSection() {
+        SegmentedColumn(title = strings.themeUiStyleSection, columns = 1) {
+            item {
+                DropDownMenuWidget(
+                    icon = Icons.TwoTone.ColorLens,
+                    title = strings.uiEngine,
+                    description = strings.uiEngineDescription,
+                    choice = if (useMiuix) 0 else 1,
+                    data = listOf(strings.miuixUi, strings.googleUi),
+                    onChoiceChange = { idx -> scope.launch { prefs.setUseMiuix(idx == 0) } }
                 )
-            },
-        ) { paddingValues ->
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(if (isLandscape) 2 else 1),
+            }
+        }
+    }
+
+    @Composable
+    fun M3UiSection() {
+        SegmentedColumn(title = strings.themeM3UiSection, columns = 1) {
+            item {
+                DropDownMenuWidget(
+                    icon = Icons.Filled.DarkMode,
+                    title = strings.themeMode,
+                    choice = themeModeIndex,
+                    data = themeModeList,
+                    onChoiceChange = { idx -> scope.launch { prefs.setThemeMode(themeModeOptions[idx].toPreferenceInt()) } }
+                )
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                item {
+                    SwitchWidget(
+                        icon = Icons.TwoTone.InvertColors,
+                        title = strings.dynamicColor,
+                        description = strings.dynamicColorDescription,
+                        checked = dynamicColor,
+                        onCheckedChange = { scope.launch { prefs.setDynamicColor(it) } }
+                    )
+                }
+            }
+            item {
+                SwitchWidget(
+                    icon = Icons.TwoTone.InvertColors,
+                    title = strings.dynamicColorByCover,
+                    description = strings.dynamicColorByCoverDescription,
+                    checked = dynamicByCover,
+                    onCheckedChange = { scope.launch { prefs.setDynamicColorByCover(it) } }
+                )
+            }
+            item {
+                DropDownMenuWidget(
+                    icon = Icons.Filled.Palette,
+                    title = strings.paletteStyle,
+                    choice = paletteIndex,
+                    data = paletteStyleOptions.map { it.displayName },
+                    onChoiceChange = { idx -> scope.launch { prefs.setPaletteStyle(paletteStyleOptions[idx]) } }
+                )
+            }
+            item {
+                DropDownMenuWidget(
+                    icon = Icons.Filled.Tune,
+                    title = strings.colorSpec,
+                    description = if (!isSpec2025Supported) strings.colorSpecOnly2021 else null,
+                    choice = specIndex,
+                    data = availableSpecs.map { it.displayName },
+                    onChoiceChange = { idx -> scope.launch { prefs.setColorSpec(availableSpecs[idx]) } }
+                )
+            }
+        }
+    }
+
+    @Composable
+    fun AccentColorSection() {
+        if (dynamicColorNullable != null) {
+            val accentVisibility = remember { androidx.compose.animation.core.MutableTransitionState(accentGridTarget) }
+            androidx.compose.runtime.LaunchedEffect(accentGridTarget) { accentVisibility.targetState = accentGridTarget }
+            androidx.compose.animation.AnimatedVisibility(
+                visibleState = accentVisibility,
+                enter = androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(300)) +
+                    androidx.compose.animation.expandVertically(animationSpec = androidx.compose.animation.core.tween(400)),
+                exit = androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(250)) +
+                    androidx.compose.animation.shrinkVertically(animationSpec = androidx.compose.animation.core.tween(350))
+            ) {
+                SegmentedColumn(title = strings.accentColor, columns = 1) {
+                    item {
+                        BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                            val itemMinWidth = 88.dp
+                            val columns = (maxWidth / itemMinWidth).toInt().coerceAtLeast(1)
+                            val chunkedColors = PresetColors.chunked(columns)
+                            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                chunkedColors.forEach { rowItems ->
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                                        rowItems.forEach { rawColor ->
+                                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                                ColorSwatchPreview(
+                                                    rawColor = rawColor,
+                                                    currentStyle = paletteStyle,
+                                                    colorSpec = colorSpec,
+                                                    textStyle = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+                                                    textColor = MaterialTheme.colorScheme.onSurface,
+                                                    isSelected = seedColor == rawColor.color.toArgb() && !isDynamicColorOn,
+                                                ) { scope.launch { prefs.setSeedColor(rawColor.color.toArgb()) } }
+                                            }
+                                        }
+                                        val remaining = columns - rowItems.size
+                                        if (remaining > 0) repeat(remaining) { Spacer(Modifier.weight(1f)) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun NavBarCornerRadiusSection() {
+        SegmentedColumn(title = strings.navBarCornerRadius, columns = 1) {
+            item {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(strings.navBarCornerRadius, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "${navBarCornerRadiusValue.toInt()} dp",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Slider(
+                        value = navBarCornerRadiusValue,
+                        onValueChange = { navBarCornerRadiusValue = it },
+                        onValueChangeFinished = {
+                            scope.launch { prefs.setM3NavBarCornerRadius(navBarCornerRadiusValue.toInt()) }
+                        },
+                        valueRange = 0f..64f,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                            .clip(RoundedCornerShape(topStart = navBarCornerRadiusValue.dp, topEnd = navBarCornerRadiusValue.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            strings.googleUi,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun PredictiveBackSection() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            SegmentedColumn(title = strings.predictiveBackTitle, columns = 1) {
+                item {
+                    DropDownMenuWidget(
+                        icon = Icons.TwoTone.ColorLens,
+                        title = strings.predictiveBackTitle,
+                        description = strings.predictiveBackDescription,
+                        choice = PredictiveBackAnimation.entries.indexOf(predictiveBack).coerceAtLeast(0),
+                        data = PredictiveBackAnimation.entries.map { predictiveBackDisplayName(it, strings) },
+                        onChoiceChange = { idx ->
+                            scope.launch { prefs.setPredictiveBackAnimation(PredictiveBackAnimation.entries[idx]) }
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun LanguageSection() {
+        SegmentedColumn(title = strings.language, columns = 1) {
+            item {
+                val langIndex = AllLanguages.indexOfFirst { it.code == language }.coerceAtLeast(0)
+                DropDownMenuWidget(
+                    icon = Icons.Filled.Translate,
+                    title = strings.language,
+                    choice = langIndex,
+                    data = AllLanguages.map { it.displayName },
+                    onChoiceChange = { idx -> scope.launch { prefs.setLanguage(AllLanguages[idx].code) } }
+                )
+            }
+        }
+    }
+
+    val m3TopBarState = rememberExpressiveTopBarState()
+    Scaffold(
+        modifier = Modifier.fillMaxSize().nestedScroll(m3TopBarState.connection),
+        containerColor = MaterialTheme.colorScheme.surface,
+        topBar = {
+            M3SmallTopBar(
+                state = m3TopBarState,
+                title = { Text(strings.themeSettings) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.backContentDescription)
+                    }
+                },
+                colors = m3TopBarColors(),
+            )
+        },
+    ) { paddingValues ->
+        LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 top = paddingValues.calculateTopPadding(),
@@ -146,183 +342,37 @@ fun ThemeSettingsScreenM3(onBack: () -> Unit) {
             ),
             verticalArrangement = Arrangement.spacedBy(if (isLandscape) 12.dp else 0.dp),
         ) {
-            // UI Style - M3 switcher restored
-            item {
-                SegmentedColumn(title = strings.themeUiStyleSection, columns = 1) {
-                    item {
-                        DropDownMenuWidget(
-                            icon = Icons.TwoTone.ColorLens,
-                            title = strings.uiEngine,
-                            description = strings.uiEngineDescription,
-                            choice = if (useMiuix) 0 else 1,
-                            data = listOf(strings.miuixUi, strings.googleUi),
-                            onChoiceChange = { idx -> scope.launch { prefs.setUseMiuix(idx == 0) } }
-                        )
-                    }
-                }
-            }
-
-            // M3 UI Section - bring back switchers
-            item {
-                SegmentedColumn(title = strings.themeM3UiSection, columns = 1) {
-                    item {
-                        DropDownMenuWidget(
-                            icon = Icons.Filled.DarkMode,
-                            title = strings.themeMode,
-                            choice = themeModeIndex,
-                            data = themeModeList,
-                            onChoiceChange = { idx -> scope.launch { prefs.setThemeMode(themeModeOptions[idx].toPreferenceInt()) } }
-                        )
-                    }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        item {
-                            SwitchWidget(
-                                icon = Icons.TwoTone.InvertColors,
-                                title = strings.dynamicColor,
-                                description = strings.dynamicColorDescription,
-                                checked = dynamicColor,
-                                onCheckedChange = { scope.launch { prefs.setDynamicColor(it) } }
-                            )
-                        }
-                    }
-                    item {
-                        SwitchWidget(
-                            icon = Icons.TwoTone.InvertColors,
-                            title = strings.dynamicColorByCover,
-                            description = strings.dynamicColorByCoverDescription,
-                            checked = dynamicByCover,
-                            onCheckedChange = { scope.launch { prefs.setDynamicColorByCover(it) } }
-                        )
-                    }
-                    item {
-                        DropDownMenuWidget(
-                            icon = Icons.Filled.Palette,
-                            title = strings.paletteStyle,
-                            choice = paletteIndex,
-                            data = paletteStyleOptions.map { it.displayName },
-                            onChoiceChange = { idx -> scope.launch { prefs.setPaletteStyle(paletteStyleOptions[idx]) } }
-                        )
-                    }
-                    item {
-                        DropDownMenuWidget(
-                            icon = Icons.Filled.Tune,
-                            title = strings.colorSpec,
-                            description = if (!isSpec2025Supported) strings.colorSpecOnly2021 else null,
-                            choice = specIndex,
-                            data = availableSpecs.map { it.displayName },
-                            onChoiceChange = { idx -> scope.launch { prefs.setColorSpec(availableSpecs[idx]) } }
-                        )
-                    }
-                }
-            }
-
-            // Accent color grid - fixed #4: no closing animation when dynamic color on
-            if (dynamicColorNullable != null) {
+            if (isLandscape) {
                 item {
-                    val accentVisibility = remember { androidx.compose.animation.core.MutableTransitionState(accentGridTarget) }
-                    androidx.compose.runtime.LaunchedEffect(accentGridTarget) { accentVisibility.targetState = accentGridTarget }
-                    androidx.compose.animation.AnimatedVisibility(
-                        visibleState = accentVisibility,
-                        enter = androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(300)) + androidx.compose.animation.expandVertically(animationSpec = androidx.compose.animation.core.tween(400)),
-                        exit = androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(250)) + androidx.compose.animation.shrinkVertically(animationSpec = androidx.compose.animation.core.tween(350))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top,
                     ) {
-                    SegmentedColumn(title = strings.accentColor, columns = 1) {
-                        item {
-                            BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                val itemMinWidth = 88.dp
-                                val columns = (this.maxWidth / itemMinWidth).toInt().coerceAtLeast(1)
-                                val chunkedColors = PresetColors.chunked(columns)
-                                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    chunkedColors.forEach { rowItems ->
-                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                                            rowItems.forEach { rawColor ->
-                                                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                                    ColorSwatchPreview(
-                                                        rawColor = rawColor,
-                                                        currentStyle = paletteStyle,
-                                                        colorSpec = colorSpec,
-                                                        textStyle = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
-                                                        textColor = MaterialTheme.colorScheme.onSurface,
-                                                        isSelected = seedColor == rawColor.color.toArgb() && !isDynamicColorOn,
-                                                    ) { scope.launch { prefs.setSeedColor(rawColor.color.toArgb()) } }
-                                                }
-                                            }
-                                            val remaining = columns - rowItems.size
-                                            if (remaining > 0) repeat(remaining) { Spacer(Modifier.weight(1f)) }
-                                        }
-                                    }
-                                }
-                            }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            UiStyleSection()
+                            M3UiSection()
+                            AccentColorSection()
                         }
-                    }
-                    }
-                }
-            }
-
-            item {
-                SegmentedColumn(title = strings.navBarCornerRadius, columns = 1) {
-                    item {
-                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Text(strings.navBarCornerRadius, style = MaterialTheme.typography.bodyMedium)
-                                Text("${navBarCornerRadiusValue.toInt()} dp", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                            }
-                            Slider(
-                                value = navBarCornerRadiusValue,
-                                onValueChange = { navBarCornerRadiusValue = it },
-                                onValueChangeFinished = { scope.launch { prefs.setM3NavBarCornerRadius(navBarCornerRadiusValue.toInt()) } },
-                                valueRange = 0f..64f,
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(52.dp)
-                                    .clip(RoundedCornerShape(topStart = navBarCornerRadiusValue.dp, topEnd = navBarCornerRadiusValue.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(strings.googleUi, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // The M3-only nav-bar radius option fills the equivalent Layout slot.
+                            NavBarCornerRadiusSection()
+                            PredictiveBackSection()
+                            LanguageSection()
                         }
                     }
                 }
-            }
-
-            // Predictive Back (InstallerX Revived)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                item {
-                    SegmentedColumn(title = strings.predictiveBackTitle, columns = 1) {
-                        item {
-                            DropDownMenuWidget(
-                                icon = Icons.TwoTone.ColorLens,
-                                title = strings.predictiveBackTitle,
-                                description = strings.predictiveBackDescription,
-                                choice = PredictiveBackAnimation.entries.indexOf(predictiveBack).coerceAtLeast(0),
-                                data = PredictiveBackAnimation.entries.map { predictiveBackDisplayName(it, strings) },
-                                onChoiceChange = { idx -> scope.launch { prefs.setPredictiveBackAnimation(PredictiveBackAnimation.entries[idx]) } }
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Language - switcher restored
-            item {
-                SegmentedColumn(title = strings.language, columns = 1) {
-                    item {
-                        val langIndex = AllLanguages.indexOfFirst { it.code == language }.coerceAtLeast(0)
-                        DropDownMenuWidget(
-                            icon = Icons.Filled.Translate,
-                            title = strings.language,
-                            choice = langIndex,
-                            data = AllLanguages.map { it.displayName },
-                            onChoiceChange = { idx -> scope.launch { prefs.setLanguage(AllLanguages[idx].code) } }
-                        )
-                    }
-                }
+            } else {
+                item { UiStyleSection() }
+                item { M3UiSection() }
+                item { AccentColorSection() }
+                item { NavBarCornerRadiusSection() }
+                item { PredictiveBackSection() }
+                item { LanguageSection() }
             }
         }
-        }
+    }
+
 }
 
 private fun predictiveBackDisplayName(animation: PredictiveBackAnimation, strings: dev.shephard.player.ui.i18n.Strings): String = when (animation) {

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -95,7 +96,9 @@ fun M3SmallTopBar(
 ) {
     val fraction = state.fraction
     val titleStart = androidx.compose.ui.unit.lerp(20.dp, if (navigationIcon != null) 80.dp else 20.dp, fraction)
-    val height = androidx.compose.ui.unit.lerp(140.dp, 64.dp, fraction)
+    val height = androidx.compose.ui.unit.lerp(M3TopBarExpandedHeight, M3TopBarCollapsedHeight, fraction)
+    val titleContentHeight = androidx.compose.ui.unit.lerp(56.dp, 50.dp, fraction)
+    val titleOffsetY = androidx.compose.ui.unit.lerp((-4).dp, 0.dp, fraction)
     Box(
         modifier = modifier.fillMaxWidth().background(Brush.verticalGradient(
             0f to colors.containerColor, .9f to colors.containerColor, 1f to colors.containerColor.copy(alpha = 0f)))
@@ -105,10 +108,11 @@ fun M3SmallTopBar(
     ) {
         Box(
             modifier = Modifier.fillMaxSize()
-                .padding(start = titleStart, end = androidx.compose.ui.unit.lerp(24.dp, 64.dp, fraction)),
+                .padding(start = titleStart, end = androidx.compose.ui.unit.lerp(24.dp, 64.dp, fraction))
+                .offset(y = titleOffsetY),
             contentAlignment = androidx.compose.ui.BiasAlignment(-1f, 1f - 2f * fraction)
         ) {
-            Box(modifier = Modifier.height(64.dp), contentAlignment = Alignment.CenterStart) {
+            Box(modifier = Modifier.height(titleContentHeight), contentAlignment = Alignment.CenterStart) {
                 androidx.compose.material3.ProvideTextStyle(
                     MaterialTheme.typography.titleLarge.copy(
                         fontSize = androidx.compose.ui.unit.lerp(32.sp, 23.sp, fraction),
@@ -118,11 +122,11 @@ fun M3SmallTopBar(
             }
         }
         if (navigationIcon != null) {
-            Box(Modifier.align(Alignment.TopStart).padding(start = 12.dp).height(64.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.align(Alignment.TopStart).padding(start = 12.dp).height(50.dp), contentAlignment = Alignment.Center) {
                 navigationIcon()
             }
         }
-        Row(modifier = Modifier.align(Alignment.TopEnd).height(64.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.align(Alignment.TopEnd).height(50.dp), verticalAlignment = Alignment.CenterVertically) {
             actions()
         }
     }

@@ -79,6 +79,7 @@ import dev.shephard.player.ui.components.m3.LineageSortingChip
 import dev.shephard.player.ui.components.m3.SegmentedColumn
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.animation.AnimatedContent
@@ -110,7 +111,10 @@ fun MusicScreenM3(
 
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
-    val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
+    // Seed from DataStore before showing the layout transition, so a saved Grid preference is
+    // rendered as Grid immediately when this page is re-entered.
+    val initialMusicsLayout = remember(prefs) { kotlinx.coroutines.runBlocking { prefs.musicsLayout.first() } }
+    val musicsLayout by prefs.musicsLayout.collectAsState(initial = initialMusicsLayout)
     val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
     val listBottomPadding = bottomOverlayContentPadding(
         fallback = when {

@@ -226,7 +226,10 @@ private fun PixelMixCollage(
             .padding(if (compact) 8.dp else 14.dp)
     ) {
         val h = maxHeight
-        val base = minOf(if (compact) 184.dp else 300.dp, h)
+        // Grow only the artwork collage: the landscape hero is intentionally compact, but its
+        // tiles can use the available height more aggressively than the portrait layout.
+        val tileScale = if (compact) 1.25f else 1.10f
+        val base = minOf((if (compact) 184.dp else 300.dp) * tileScale, h)
         val configs = remember(pattern, base, h) { buildCollageConfigs(pattern, base, h) }
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().height(h * .6f)) {

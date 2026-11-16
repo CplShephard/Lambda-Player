@@ -481,6 +481,7 @@ private fun M3NavigationDock(
     M3NavigationBar(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (isLandscape) Modifier.height(68.dp) else Modifier)
             .clip(RoundedCornerShape(topStart = cornerRadius.dp, topEnd = cornerRadius.dp)),
         windowInsets = insets,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
