@@ -76,6 +76,7 @@ import dev.shephard.player.ui.components.bottomOverlayContentPadding
 import dev.shephard.player.ui.components.MiuixDrawerActionHeader
 import dev.shephard.player.ui.components.captureForTopBarBlur
 import dev.shephard.player.ui.components.miuixHeaderSafeTop
+import dev.shephard.player.ui.components.miuixSubmenuButtonSurface
 import dev.shephard.player.ui.navigation.PageTransitions
 import dev.shephard.player.ui.components.rememberDrawerDismiss
 import dev.shephard.player.ui.miuix.OutlinedTextField
@@ -1281,10 +1282,10 @@ internal fun PlaylistDetailView(
                     Box(Modifier.align(Alignment.TopEnd).miuixHeaderSafeTop().padding(end = 8.dp).height(56.dp),
                         contentAlignment = Alignment.Center) {
                         Box(
-                            Modifier.size(40.dp).clip(CircleShape)
-                                .background(cs.surfaceVariant.copy(alpha = 0.75f * detailCollapse)),
+                            Modifier.size(40.dp).clip(CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
+                            Box(Modifier.matchParentSize().miuixSubmenuButtonSurface(topBarState, detailCollapse))
                             LibraryPopupButton(true, Icons.Filled.MoreVert, strings.libraryOptions, cs.onBackground, menuChoices)
                         }
                     }

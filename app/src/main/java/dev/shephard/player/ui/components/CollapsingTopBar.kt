@@ -40,6 +40,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import dev.shephard.player.ui.components.bounceClick
 import dev.shephard.player.ui.glass.LocalBlurEnabled
+import dev.shephard.player.ui.glass.LocalLiquidGlassEnabled
+import dev.shephard.player.ui.glass.miuixBlurSurface
 import dev.shephard.player.ui.glass.miuixTopBarBlur
 import dev.shephard.player.ui.glass.rememberMiuixPageBackdrop
 import dev.shephard.player.ui.miuix.Icon
@@ -280,6 +282,29 @@ fun rememberScrollFraction(listState: LazyListState, thresholdDp: Dp = 44.dp): S
     }
 }
 
+/** The circular submenu control surface, fading in with the collapsing bar. */
+@Composable
+fun Modifier.miuixSubmenuButtonSurface(
+    state: CollapsingTopBarState,
+    collapseFraction: Float,
+): Modifier {
+    val surfaceAlpha = 0.75f * collapseFraction.coerceIn(0f, 1f)
+    if (surfaceAlpha <= 0f) return this
+
+    val colors = MiuixAppTheme.colorScheme
+    val backdrop = state.pageBackdrop
+    return if (LocalLiquidGlassEnabled.current && backdrop != null) {
+        this.miuixBlurSurface(
+            backdrop = backdrop,
+            shape = CircleShape,
+            tintAlpha = 0.75f,
+            fallbackColor = colors.surfaceVariant,
+        ).graphicsLayer { this.alpha = surfaceAlpha }
+    } else {
+        this.background(colors.surfaceVariant.copy(alpha = surfaceAlpha), CircleShape)
+    }
+}
+
 /**
  * Small top bar for sub-pages (theme / playback / about / stats / playlist detail).
  *
@@ -304,10 +329,10 @@ fun SubmenuTopBar(
     val fraction = if (compact) collapseFraction.coerceIn(0f, 1f) else state.collapseFraction
     val backIcon: @Composable () -> Unit = {
         Box(
-            modifier = Modifier.padding(start = 12.dp).size(40.dp).clip(CircleShape)
-                .background(cs.surfaceVariant.copy(alpha = 0.75f * fraction)).bounceClick { onBack() },
+            modifier = Modifier.padding(start = 12.dp).size(40.dp).clip(CircleShape).bounceClick { onBack() },
             contentAlignment = Alignment.Center,
         ) {
+            Box(Modifier.matchParentSize().miuixSubmenuButtonSurface(state, fraction))
             Icon(Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = LocalStrings.current.backContentDescription, tint = cs.onBackground)
         }
@@ -315,10 +340,12 @@ fun SubmenuTopBar(
     val trailingIcon: @Composable () -> Unit = {
         if (trailingContent != null) {
             Box(
-                modifier = Modifier.padding(end = 12.dp).size(40.dp).clip(CircleShape)
-                    .background(cs.surfaceVariant.copy(alpha = 0.75f * fraction)),
+                modifier = Modifier.padding(end = 12.dp).size(40.dp).clip(CircleShape),
                 contentAlignment = Alignment.Center,
-            ) { trailingContent() }
+            ) {
+                Box(Modifier.matchParentSize().miuixSubmenuButtonSurface(state, fraction))
+                trailingContent()
+            }
         }
     }
     Box(modifier = modifier.fillMaxWidth()) {

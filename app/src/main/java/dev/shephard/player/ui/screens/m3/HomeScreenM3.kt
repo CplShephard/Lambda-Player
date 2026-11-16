@@ -107,7 +107,7 @@ fun HomeScreenM3(
             isLandscape -> 84.dp
             else -> 96.dp
         },
-    )
+    ).let { padding -> if (isLandscape) padding * 0.5f else padding }
     val tracks by libraryViewModel.tracks.collectAsState()
     val hasScanned by libraryViewModel.hasScanned.collectAsState()
     val recentEvents by playerViewModel.statsEventsFlow.collectAsState()

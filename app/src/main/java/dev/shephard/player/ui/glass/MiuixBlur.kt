@@ -119,11 +119,12 @@ fun Modifier.miuixBlurSurface(
     shape: Shape = RoundedCornerShape(20.dp),
     blurRadius: Float = 25f,
     tintAlpha: Float = 0.8f,
+    tintColor: Color = MiuixAppTheme.colorScheme.surface,
     fallbackColor: Color = MiuixAppTheme.colorScheme.surfaceVariant,
 ): Modifier {
     if (backdrop == null) return this.background(fallbackColor, shape)
 
-    val blendColor = MiuixAppTheme.colorScheme.surface.copy(alpha = tintAlpha)
+    val blendColor = tintColor.copy(alpha = tintAlpha)
     if (LocalLiquidGlassEnabled.current && isLiquidGlassSupported) {
         return this.then(Modifier.drawBackdrop(
             backdrop = backdrop, shape = { shape },
