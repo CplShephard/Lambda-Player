@@ -479,22 +479,22 @@ private fun M3LandscapeContent(
         modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()
     ) {
         BoxWithConstraints(
-            modifier = Modifier.weight(0.5f).fillMaxHeight().padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.weight(0.5f).fillMaxHeight().padding(horizontal = 12.dp, vertical = 6.dp),
         ) {
             // Keep transport and lyrics usable on short landscape windows by sizing the cover
             // from the space left after the fixed metadata and control rows.
-            val coverHeightLimit = (maxHeight - 215.dp).coerceAtLeast(48.dp)
+            val coverHeightLimit = (maxHeight - 218.dp).coerceAtLeast(48.dp)
             Column(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-            Box(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Box(modifier = Modifier.size(width = 36.dp, height = 4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)))
             }
             Text(
                 text = strings.nowPlaying,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -502,7 +502,7 @@ private fun M3LandscapeContent(
                 overflow = TextOverflow.Ellipsis,
             )
             androidx.compose.foundation.layout.BoxWithConstraints(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(top = 2.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 val pageFraction = when (carouselStyle) {
@@ -510,7 +510,7 @@ private fun M3LandscapeContent(
                     dev.shephard.player.player.CarouselStyle.TWO_PEEK -> .6f
                     else -> .8f
                 }
-                val artHeight = minOf(maxWidth * pageFraction, coverHeightLimit, configuration.screenHeightDp.dp * .45f)
+                val artHeight = minOf(maxWidth * pageFraction, coverHeightLimit, configuration.screenHeightDp.dp * .45f) * 1.15f
                 if (state.queue.isNotEmpty()) {
                     dev.shephard.player.ui.components.AlbumCarousel(
                         queue = state.queue, currentIndex = state.currentQueueIndex,
@@ -530,7 +530,7 @@ private fun M3LandscapeContent(
                 }
             }
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(track?.title ?: "", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -540,12 +540,13 @@ private fun M3LandscapeContent(
                 val trackId = track?.id ?: -1L
                 val isLiked = trackId > 0 && state.likedSongIds.contains(trackId)
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     BouncyIconButton(
                         onClick = { onShowQueueChange(true) },
+                        modifier = Modifier.size(44.dp),
                         icon = Icons.AutoMirrored.Filled.QueueMusic,
                         contentDescription = strings.queue,
                         tint = MaterialTheme.colorScheme.onSurface,
@@ -569,7 +570,7 @@ private fun M3LandscapeContent(
                 M3NowPlayingProgressLineage(playerViewModel = playerViewModel, isPlaying = state.isPlaying, compact = true)
                 // Keep the landscape transport buttons on the same expressive M3 style as portrait.
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -579,7 +580,7 @@ private fun M3LandscapeContent(
                         description = strings.remix,
                         active = isRemixed,
                         onClick = playerViewModel::remixQueue,
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(44.dp),
                     )
                     dev.shephard.player.ui.components.m3.AnimatedPlaybackControls(
                         modifier = Modifier.weight(1f),
@@ -587,21 +588,21 @@ private fun M3LandscapeContent(
                         onPrevious = playerViewModel::skipToPrevious,
                         onPlayPause = playerViewModel::togglePlayPause,
                         onNext = playerViewModel::skipToNext,
-                        height = 48.dp,
+                        height = 44.dp,
                         pressAnimationSpec = androidx.compose.animation.core.tween(
                             240,
                             easing = androidx.compose.animation.core.FastOutSlowInEasing,
                         ),
                         releaseDelay = 0L,
-                        playPauseIconSize = 26.dp,
-                        iconSize = 22.dp,
+                        playPauseIconSize = 24.dp,
+                        iconSize = 20.dp,
                     )
                     dev.shephard.player.ui.components.m3.M3PlaybackModeButton(
                         icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                         description = strings.repeat,
                         active = state.repeatMode != RepeatMode.OFF,
                         onClick = playerViewModel::cycleRepeatMode,
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(44.dp),
                     )
                 }
             }
@@ -673,24 +674,22 @@ internal fun M3NowPlayingProgressLineage(playerViewModel: PlayerViewModel, isPla
             thumbLineHeightWhenInteracting = if (compact) 18.dp else 24.dp,
             semanticsLabel = LocalStrings.current.playbackPosition,
         )
-        if (!compact) {
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = horizontalInset)
-                    .padding(top = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = m3FormatMillisLineage((displayFraction * progress.durationMs).toLong()),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = m3FormatMillisLineage(progress.durationMs),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .padding(horizontal = horizontalInset)
+                .padding(top = if (compact) 0.dp else 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = m3FormatMillisLineage((displayFraction * progress.durationMs).toLong()),
+                style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = m3FormatMillisLineage(progress.durationMs),
+                style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

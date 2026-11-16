@@ -229,6 +229,7 @@ fun PlayerSettingsScreenM3(
     val crossfade by prefs.crossfadeEnabled.collectAsState(initial = false)
     val gapless by prefs.gaplessEnabled.collectAsState(initial = true)
     val playWith by prefs.playWithOthers.collectAsState(initial = false)
+    val lyricsShakeEffect by prefs.lyricsShakeEffectEnabled.collectAsState(initial = true)
     val lyricsAutoSearch by prefs.lyricsAutoSearchMode.collectAsState(initial = LyricsAutoSearchMode.OFF)
     val volumeNormalization by prefs.volumeNormalization.collectAsState(initial = VolumeNormalization.NONE)
     val carouselStyle by prefs.carouselStyle.collectAsState(initial = dev.shephard.player.player.CarouselStyle.NO_PEEK)
@@ -307,6 +308,15 @@ fun PlayerSettingsScreenM3(
                             title = strings.playWithOthers,
                             checked = playWith,
                             onCheckedChange = { scope.launch { prefs.setPlayWithOthers(it) } }
+                        )
+                    }
+                    item {
+                        SwitchWidget(
+                            icon = Icons.Filled.Subtitles,
+                            title = strings.lyricsShakeEffect,
+                            description = strings.lyricsShakeEffectDescription,
+                            checked = lyricsShakeEffect,
+                            onCheckedChange = { scope.launch { prefs.setLyricsShakeEffectEnabled(it) } }
                         )
                     }
                 }

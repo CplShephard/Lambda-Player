@@ -36,10 +36,6 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.runtime.MutableLongState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.drawText
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -577,13 +573,11 @@ fun FullScreenLyricsExperience(
                         LyricsSettingsPanel(
                             useMiuix = useMiuix, primary = primary, textStyle = textStyle,
                             blurEnabled = blurEnabled, blurStrength = blurStrength, autoScroll = autoScroll,
-                            shakeEffectEnabled = lyricsShakeEnabled,
                             syncOffsetMs = syncOffsetMs,
                             onBlurEnabledChange = { enabled -> scope.launch { preferences.setLyricsBackgroundBlurEnabled(enabled) } },
                             onBlurStrengthChange = { blurStrength = it },
                             onBlurStrengthChangeFinished = { scope.launch { preferences.setLyricsBackgroundBlurStrength(blurStrength) } },
                             onAutoScrollChange = { enabled -> scope.launch { preferences.setLyricsAutoScrollEnabled(enabled) } },
-                            onShakeEffectChange = { enabled -> scope.launch { preferences.setLyricsShakeEffectEnabled(enabled) } },
                             onOffsetChange = playerViewModel::setLyricsSyncOffset,
                             onExport = {
                                 closeThen {
@@ -756,14 +750,12 @@ fun FullScreenLyricsExperience(
                                     animationSpec = tween(LyricMoveDurationMs),
                                     label = "lyricLineColor",
                                 )
-                                var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
                                 val shakeProgress by animateFloatAsState(
                                     targetValue = if (lyricsShakeEnabled && scaleLineActive) 1f else 0f,
                                     animationSpec = tween(220, easing = FastOutSlowInEasing),
                                     label = "shakeProgress",
                                 )
-                                // Keep the optional premium wobble subtle and attached to the active lyric line.
-                                val shouldJiggle = lyricsShakeEnabled && scaleLineActive
+                                // Per-letter wobble uses the same 700/800 ms timing as the old line shake.
                                 val infinite = rememberInfiniteTransition(label = "lyricJiggle")
                                 val jiggleX by infinite.animateFloat(
                                     initialValue = -0.3f, targetValue = 0.3f,
@@ -790,38 +782,44 @@ fun FullScreenLyricsExperience(
                                             scaleY = scale
                                             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
                                             translationY += lineSlideOffset.toPx() * (if (index < activeIndex) -1f else 1f)
-                                            if (shouldJiggle) {
-                                                translationX = jiggleX * with(density) { 2.dp.toPx() } * shakeProgress
-                                                translationY += jiggleY * with(density) { 1.5.dp.toPx() } * shakeProgress
-                                            }
                                         }
                                         .blur(animatedBlur)
                                         .padding(horizontal = LyricLineHorizontalPadding, vertical = LyricLineVerticalPadding),
                                 ) {
-                                    // Word-by-word karaoke with per-word letter wobble overlay
+                                    // Preserve the original line layout while applying wobble to each grapheme.
                                     Box(modifier = Modifier.fillMaxWidth()) {
-                                        BasicText(
+                                        SyncedLyricText(
                                             text = line.text,
-                                            onTextLayout = { textLayout = it },
-                                            modifier = Modifier.fillMaxWidth().drawWithContent {
-                                                drawContent()
-                                                if (karaoke) textLayout?.let { layout ->
-                                                    drawKaraokeHighlight(
-                                                        layout = layout, line = line,
-                                                        positionMs = lyricPositionMs,
-                                                        color = foreground,
-                                                    )
-                                                }
-                                            },
+                                            modifier = Modifier.fillMaxWidth(),
                                             style = lyricLineLayoutStyle(textStyle).copy(color = animatedColor),
+                                            wobbleEnabled = lyricsShakeEnabled,
+                                            wobbleProgress = shakeProgress,
+                                            jiggleX = jiggleX,
+                                            jiggleY = jiggleY,
+                                            phaseSeed = index.toFloat() * 0.37f,
+                                            karaokeLine = if (karaoke) line else null,
+                                            positionMs = lyricPositionMs,
+                                            karaokeColor = foreground,
                                         )
                                     }
                                     if (showTranslation && !line.translation.isNullOrBlank()) {
-                                        BasicText(
+                                        SyncedLyricText(
                                             text = line.translation,
                                             modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
-                                            style = textStyle.copy(color = animatedColor.copy(alpha = animatedColor.alpha * .78f),
-                                                fontSize = 16.sp, lineHeight = 22.sp, textAlign = TextAlign.Left),
+                                            style = textStyle.copy(
+                                                color = animatedColor.copy(alpha = animatedColor.alpha * .78f),
+                                                fontSize = 16.sp,
+                                                lineHeight = 22.sp,
+                                                textAlign = TextAlign.Left,
+                                            ),
+                                            wobbleEnabled = lyricsShakeEnabled,
+                                            wobbleProgress = shakeProgress,
+                                            jiggleX = jiggleX,
+                                            jiggleY = jiggleY,
+                                            phaseSeed = index.toFloat() * 0.37f + 0.61f,
+                                            karaokeLine = null,
+                                            positionMs = lyricPositionMs,
+                                            karaokeColor = foreground,
                                         )
                                     }
                                 }
@@ -977,13 +975,11 @@ private fun LyricsSettingsPanel(
     blurEnabled: Boolean,
     blurStrength: Float,
     autoScroll: Boolean,
-    shakeEffectEnabled: Boolean,
     syncOffsetMs: Int,
     onBlurEnabledChange: (Boolean) -> Unit,
     onBlurStrengthChange: (Float) -> Unit,
     onBlurStrengthChangeFinished: () -> Unit,
     onAutoScrollChange: (Boolean) -> Unit,
-    onShakeEffectChange: (Boolean) -> Unit,
     onOffsetChange: (Int) -> Unit,
     onExport: () -> Unit,
     exportEnabled: Boolean,
@@ -996,13 +992,11 @@ private fun LyricsSettingsPanel(
             blurEnabled = blurEnabled,
             blurStrength = blurStrength,
             autoScroll = autoScroll,
-            shakeEffectEnabled = shakeEffectEnabled,
             syncOffsetMs = syncOffsetMs,
             onBlurEnabledChange = onBlurEnabledChange,
             onBlurStrengthChange = onBlurStrengthChange,
             onBlurStrengthChangeFinished = onBlurStrengthChangeFinished,
             onAutoScrollChange = onAutoScrollChange,
-            onShakeEffectChange = onShakeEffectChange,
             onOffsetChange = onOffsetChange,
             onExport = onExport,
             exportEnabled = exportEnabled,
@@ -1034,19 +1028,6 @@ private fun LyricsSettingsPanel(
             )
             Spacer(Modifier.weight(1f))
             LyricsIconButton(Icons.Filled.FileDownload, "Export lyrics", onExport, enabled = exportEnabled)
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                BasicText(
-                    strings.lyricsShakeEffect,
-                    style = textStyle.copy(color = LocalLyricsForeground.current, fontSize = 14.sp, fontWeight = FontWeight.Medium),
-                )
-                BasicText(
-                    strings.lyricsShakeEffectDescription,
-                    style = textStyle.copy(color = LocalLyricsForeground.current.copy(alpha = 0.68f), fontSize = 12.sp),
-                )
-            }
-            Switch(checked = shakeEffectEnabled, onCheckedChange = onShakeEffectChange)
         }
         BasicText(
             "${strings.blurEffect} · ${blurStrength.toInt()} dp",
@@ -1083,13 +1064,11 @@ private fun MiuixLyricsSettingsPanel(
     blurEnabled: Boolean,
     blurStrength: Float,
     autoScroll: Boolean,
-    shakeEffectEnabled: Boolean,
     syncOffsetMs: Int,
     onBlurEnabledChange: (Boolean) -> Unit,
     onBlurStrengthChange: (Float) -> Unit,
     onBlurStrengthChangeFinished: () -> Unit,
     onAutoScrollChange: (Boolean) -> Unit,
-    onShakeEffectChange: (Boolean) -> Unit,
     onOffsetChange: (Int) -> Unit,
     onExport: () -> Unit,
     exportEnabled: Boolean,
@@ -1132,20 +1111,6 @@ private fun MiuixLyricsSettingsPanel(
             top.yukonga.miuix.kmp.basic.Switch(
                 checked = autoScroll,
                 onCheckedChange = onAutoScrollChange,
-                colors = switchColors,
-            )
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                BasicText(strings.lyricsShakeEffect, style = labelStyle)
-                BasicText(
-                    strings.lyricsShakeEffectDescription,
-                    style = textStyle.copy(color = foreground.copy(alpha = 0.68f), fontSize = 12.sp),
-                )
-            }
-            top.yukonga.miuix.kmp.basic.Switch(
-                checked = shakeEffectEnabled,
-                onCheckedChange = onShakeEffectChange,
                 colors = switchColors,
             )
         }

@@ -19,6 +19,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
+// Match Miuix's top bar: 52 dp collapsed, with a 42 dp large-title expansion.
+internal val M3TopBarCollapsedHeight = 52.dp
+internal val M3TopBarExpandedHeight = 94.dp
+internal val M3TopBarCollapseRange = M3TopBarExpandedHeight - M3TopBarCollapsedHeight
+
 /** A scroll-driven header: collapse before scrolling and expand only at the start of the list. */
 class ExpressiveTopBarState internal constructor(
     private val rangePx: Float,
@@ -61,7 +66,7 @@ class ExpressiveTopBarState internal constructor(
 
 @Composable
 fun rememberExpressiveTopBarState(): ExpressiveTopBarState {
-    val range = with(LocalDensity.current) { 88.dp.toPx() }
+    val range = with(LocalDensity.current) { M3TopBarCollapseRange.toPx() }
     val scope = rememberCoroutineScope()
     return remember(range, scope) { ExpressiveTopBarState(range, scope) }
 }

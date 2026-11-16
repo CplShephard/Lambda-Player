@@ -83,6 +83,7 @@ import dev.shephard.player.ui.components.miuixWidgetClick
 import dev.shephard.player.ui.components.overScrollVertical
 import dev.shephard.player.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -103,7 +104,10 @@ fun MusicScreen(
 
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context) }
-    val musicsLayout by prefs.musicsLayout.collectAsState(initial = LayoutMode.LIST)
+    // Seed the state with the saved preference so LayoutSwitchAnimation never briefly builds the
+    // List view before the DataStore flow emits a previously selected Grid layout.
+    val initialMusicsLayout = remember(prefs) { kotlinx.coroutines.runBlocking { prefs.musicsLayout.first() } }
+    val musicsLayout by prefs.musicsLayout.collectAsState(initial = initialMusicsLayout)
     val isLandscape = dev.shephard.player.ui.util.isLandscapeWindow()
     val listBottomPadding = bottomOverlayContentPadding(
         fallback = when {
