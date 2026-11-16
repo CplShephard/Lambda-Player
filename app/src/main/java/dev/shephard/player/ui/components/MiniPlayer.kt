@@ -48,6 +48,8 @@ import dev.shephard.player.player.PlaybackProgress
 import dev.shephard.player.player.PlayerUiState
 import dev.shephard.player.ui.glass.LocalBlurEnabled
 import dev.shephard.player.ui.glass.LocalContentBackdrop
+import dev.shephard.player.ui.glass.LocalLiquidGlassEnabled
+import dev.shephard.player.ui.glass.isLiquidGlassSupported
 import dev.shephard.player.ui.glass.miuixBlurSurface
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.flow.StateFlow
@@ -74,7 +76,8 @@ fun MiniPlayer(
     val initialAppleFloating = remember { kotlinx.coroutines.runBlocking { prefs.useAppleFloatingBar.first() } }
     val isAppleFloatingEnabled by prefs.useAppleFloatingBar.collectAsState(initial = initialAppleFloating)
 
-    val liquidGlassOn = LocalBlurEnabled.current
+    val blurEnabled = LocalBlurEnabled.current
+    val liquidGlassEnabled = LocalLiquidGlassEnabled.current && isLiquidGlassSupported
     val contentBackdrop = LocalContentBackdrop.current
     val miniPlayerShape = RoundedCornerShape(14.dp)
     val artSize = if (large) 52.dp else 48.dp
@@ -92,8 +95,17 @@ fun MiniPlayer(
             .padding(horizontal = if (large) 8.dp else 15.dp, vertical = if (large) 10.dp else 6.dp)
     ) {
         val isFloatingBarOn = isAppleFloatingEnabled
-        val blurActive = liquidGlassOn && contentBackdrop != null
+        val blurActive = blurEnabled && contentBackdrop != null
         val solidColor = if (isFloatingBarOn) MiuixAppTheme.colorScheme.surfaceVariant else MiuixAppTheme.colorScheme.surface
+        // Keep the mini-player's translucent tint aligned with whichever Miuix dock is active.
+        // The floating dock uses surfaceContainer (.65 blur / .4 Liquid Glass); the standard
+        // dock uses surface at .8. miuixBlurSurface applies a .6 multiplier in Glass mode.
+        val blurTintColor = if (isFloatingBarOn) MiuixAppTheme.colorScheme.surfaceContainer else MiuixAppTheme.colorScheme.surface
+        val blurTintAlpha = when {
+            !isFloatingBarOn -> 0.8f
+            liquidGlassEnabled -> 2f / 3f
+            else -> 0.65f
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -104,7 +116,8 @@ fun MiniPlayer(
                             backdrop = contentBackdrop,
                             shape = miniPlayerShape,
                             blurRadius = if (isFloatingBarOn) 28f else 25f,
-                            tintAlpha = if (isFloatingBarOn) 0.58f else 0.8f,
+                            tintAlpha = blurTintAlpha,
+                            tintColor = blurTintColor,
                             fallbackColor = solidColor
                         )
                     } else {

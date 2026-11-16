@@ -13,8 +13,8 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
@@ -67,9 +67,9 @@ fun SyncedLyricText(
     val graphemeRanges = remember(text) { lyricGraphemeRanges(text) }
     val layout = textLayout.value
     val drawWobble = wobbleEnabled && wobbleProgress > 0f
-    val glyphPaths = remember(layout, graphemeRanges, drawWobble) {
+    val graphemeBounds = remember(layout, graphemeRanges, drawWobble) {
         if (layout != null && drawWobble) {
-            graphemeRanges.map { range -> layout.getPathForRange(range.first, range.last + 1) }
+            graphemeRanges.map { range -> lyricGraphemeBounds(layout, range) }
         } else {
             emptyList()
         }
@@ -79,7 +79,7 @@ fun SyncedLyricText(
         text = text,
         onTextLayout = { textLayout.value = it },
         modifier = modifier.drawWithContent {
-            if (layout == null || !drawWobble) {
+            if (layout == null || !drawWobble || graphemeBounds.isEmpty()) {
                 drawContent()
                 if (karaokeLine != null && layout != null) {
                     drawKaraokeHighlight(layout, karaokeLine, positionMs, karaokeColor)
@@ -88,7 +88,7 @@ fun SyncedLyricText(
                 drawWobblingLyricGlyphs(
                     layout = layout,
                     graphemeRanges = graphemeRanges,
-                    glyphPaths = glyphPaths,
+                    graphemeBounds = graphemeBounds,
                     baseColor = style.color,
                     karaokeLine = karaokeLine,
                     positionMs = positionMs,
@@ -119,10 +119,34 @@ private fun lyricGraphemeRanges(text: String): List<IntRange> {
     return ranges
 }
 
+private fun lyricGraphemeBounds(layout: TextLayoutResult, range: IntRange): Rect {
+    val textLength = layout.layoutInput.text.length
+    val start = range.first.coerceIn(0, textLength)
+    val endExclusive = (range.last + 1).coerceIn(start, textLength)
+    if (start == endExclusive) return Rect.Zero
+
+    var left = Float.POSITIVE_INFINITY
+    var top = Float.POSITIVE_INFINITY
+    var right = Float.NEGATIVE_INFINITY
+    var bottom = Float.NEGATIVE_INFINITY
+    for (offset in start until endExclusive) {
+        val charBounds = layout.getBoundingBox(offset)
+        left = minOf(left, charBounds.left)
+        top = minOf(top, charBounds.top)
+        right = maxOf(right, charBounds.right)
+        bottom = maxOf(bottom, charBounds.bottom)
+    }
+    return if (left.isFinite() && top.isFinite() && right.isFinite() && bottom.isFinite()) {
+        Rect(left, top, right, bottom)
+    } else {
+        Rect.Zero
+    }
+}
+
 private fun ContentDrawScope.drawWobblingLyricGlyphs(
     layout: TextLayoutResult,
     graphemeRanges: List<IntRange>,
-    glyphPaths: List<Path>,
+    graphemeBounds: List<Rect>,
     baseColor: Color,
     karaokeLine: SyncedLyricLine?,
     positionMs: Long,
@@ -138,9 +162,11 @@ private fun ContentDrawScope.drawWobblingLyricGlyphs(
     val maxAxisScale = 0.70710678f
 
     graphemeRanges.forEachIndexed { index, range ->
+        val glyphBounds = graphemeBounds.getOrNull(index) ?: return@forEachIndexed
+        if (glyphBounds.width <= 0f || glyphBounds.height <= 0f) return@forEachIndexed
+
         val start = range.first
         val endExclusive = range.last + 1
-        val glyphPath = glyphPaths[index]
         val phase = (index + phaseSeed) * 1.6180339f
         val cosine = cos(phase.toDouble()).toFloat()
         val sine = sin(phase.toDouble()).toFloat()
@@ -148,29 +174,34 @@ private fun ContentDrawScope.drawWobblingLyricGlyphs(
         val offsetY = (jiggleY * cosine - jiggleX * sine) * maxAxisScale * yAmplitudePx * progress
 
         withTransform({ translate(left = offsetX, top = offsetY) }) {
-            drawPath(glyphPath, color = baseColor)
+            clipRect(glyphBounds.left, glyphBounds.top, glyphBounds.right, glyphBounds.bottom) {
+                drawText(layout, brush = SolidColor(baseColor))
+            }
+
             val sungThrough = sungCharacterPosition ?: return@withTransform
             if (sungThrough <= start) return@withTransform
 
             val glyphProgress = ((sungThrough - start) / (endExclusive - start).toFloat()).coerceIn(0f, 1f)
             if (glyphProgress >= 1f) {
-                drawPath(glyphPath, color = karaokeColor)
+                clipRect(glyphBounds.left, glyphBounds.top, glyphBounds.right, glyphBounds.bottom) {
+                    drawText(layout, brush = SolidColor(karaokeColor))
+                }
             } else {
-                val bounds = layout.getBoundingBox(start)
-                if (bounds.width > 0f && bounds.height > 0f) {
+                val charBounds = layout.getBoundingBox(start)
+                if (charBounds.width > 0f && charBounds.height > 0f) {
                     val isRtl = layout.getParagraphDirection(start) == ResolvedTextDirection.Rtl
                     val revealEdge = if (isRtl) {
-                        bounds.right - bounds.width * glyphProgress
+                        charBounds.right - charBounds.width * glyphProgress
                     } else {
-                        bounds.left + bounds.width * glyphProgress
+                        charBounds.left + charBounds.width * glyphProgress
                     }
                     clipRect(
-                        left = if (isRtl) revealEdge else bounds.left,
-                        top = 0f,
-                        right = if (isRtl) bounds.right else revealEdge,
-                        bottom = size.height,
+                        left = if (isRtl) revealEdge else charBounds.left,
+                        top = glyphBounds.top,
+                        right = if (isRtl) charBounds.right else revealEdge,
+                        bottom = glyphBounds.bottom,
                     ) {
-                        drawPath(glyphPath, color = karaokeColor)
+                        drawText(layout, brush = SolidColor(karaokeColor))
                     }
                 }
             }
